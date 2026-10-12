@@ -1,0 +1,34 @@
+# AI Legal Helper Design Package Manifest v1.0
+
+- `AI_Legal_Helper_03_Master_Development_Plan_v1.0.md`
+- `AI_Legal_Helper_MASTER_INDEX_and_Supervisor_Guide_v1.0.md`
+- `AI_Legal_Helper_P1_Core_Domain_Model_v1.0.md`
+- `AI_Legal_Helper_P1_Gemini_Execution_Directive_v1.0.md`
+- `AI_Legal_Helper_P1_Acceptance_Criteria_v1.0.md`
+- `AI_Legal_Helper_P2_Legal_Knowledge_and_Precedent_RAG_Design_v1.0.md`
+- `AI_Legal_Helper_P2_Gemini_Execution_Directive_v1.0.md`
+- `AI_Legal_Helper_P2_Acceptance_Criteria_v1.0.md`
+- `AI_Legal_Helper_P3_Evidence_Intelligence_Design_v1.0.md`
+- `AI_Legal_Helper_P3_Gemini_Execution_Directive_v1.0.md`
+- `AI_Legal_Helper_P3_Acceptance_Criteria_v1.0.md`
+- `AI_Legal_Helper_P4_Legal_Playbook_Design_v1.0.md`
+- `AI_Legal_Helper_P4_Gemini_Execution_Directive_v1.0.md`
+- `AI_Legal_Helper_P4_Acceptance_Criteria_v1.0.md`
+- `AI_Legal_Helper_P5_Agent_System_Design_v1.0.md`
+- `AI_Legal_Helper_P5_Gemini_Execution_Directive_v1.0.md`
+- `AI_Legal_Helper_P5_Acceptance_Criteria_v1.0.md`
+- `AI_Legal_Helper_P6_Workflow_and_Orchestration_Design_v1.0.md`
+- `AI_Legal_Helper_P6_Gemini_Execution_Directive_v1.0.md`
+- `AI_Legal_Helper_P6_Acceptance_Criteria_v1.0.md`
+- `AI_Legal_Helper_P7_Case_Intelligence_and_Explainability_Design_v1.0.md`
+- `AI_Legal_Helper_P7_Gemini_Execution_Directive_v1.0.md`
+- `AI_Legal_Helper_P7_Acceptance_Criteria_v1.0.md`
+- `AI_Legal_Helper_P8_Application_and_UX_Design_v1.0.md`
+- `AI_Legal_Helper_P8_Gemini_Execution_Directive_v1.0.md`
+- `AI_Legal_Helper_P8_Acceptance_Criteria_v1.0.md`
+- `AI_Legal_Helper_P9_Evaluation_and_Test_Design_v1.0.md`
+- `AI_Legal_Helper_P9_Gemini_Execution_Directive_v1.0.md`
+- `AI_Legal_Helper_P9_Acceptance_Criteria_v1.0.md`
+- `AI_Legal_Helper_P10_Stabilization,_Security,_Release_and_Demo_Design_v1.0.md`
+- `AI_Legal_Helper_P10_Gemini_Execution_Directive_v1.0.md`
+- `AI_Legal_Helper_P10_Acceptance_Criteria_v1.0.md`

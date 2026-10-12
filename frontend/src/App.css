@@ -1,0 +1,87 @@
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  font-family: sans-serif;
+  padding: 20px;
+}
+
+button {
+  margin: 5px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.box {
+  border: 1px solid #ccc;
+  padding: 15px;
+  margin-bottom: 10px;
+  border-radius: 6px;
+  background-color: #f9f9f9;
+}
+
+.detail-sections {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+ul {
+  padding-left: 20px;
+}
+
+li {
+  margin-bottom: 5px;
+}
+
+.error {
+  color: red;
+  margin: 10px 0;
+}
+
+/* Workspace Styles */
+.workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.workspace-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background-color: #f8f9fa;
+  padding: 16px;
+  border-radius: 8px;
+}
+.workspace-nav {
+  display: flex;
+  gap: 8px;
+  border-bottom: 2px solid #eee;
+  padding-bottom: 8px;
+}
+.nav-tab {
+  padding: 8px 16px;
+  text-decoration: none;
+  color: #555;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+.nav-tab:hover {
+  background-color: #eee;
+}
+.nav-tab.active {
+  background-color: #007bff;
+  color: white;
+}
+.tab-pane {
+  padding: 16px;
+  background-color: #fff;
+  border-radius: 8px;
+  border: 1px solid #eee;
+}
+.case-statusBadge {
+  background-color: #e9ecef;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.9em;
+}

@@ -1,0 +1,62 @@
+# ==============================================================================
+# AI Legal Helper - Dependencies (requirements.txt)
+# ==============================================================================
+
+# --- 1. Web & API Framework ---
+fastapi>=0.110.0
+uvicorn[standard]>=0.28.0
+python-multipart>=0.0.9
+pydantic>=2.7.0
+pydantic-settings>=2.2.0
+
+# --- 2. Databases & Persistence ---
+# PostgreSQL & ORM & Migration
+sqlalchemy>=2.0.28
+psycopg[binary]>=3.1.18
+alembic>=1.13.1
+
+# Graph Database (Neo4j)
+neo4j>=5.20.0
+
+# Vector Database (ChromaDB)
+chromadb>=0.5.0
+
+# --- 3. AI & Orchestration (LangChain / LangGraph) ---
+openai>=1.25.0
+langchain>=0.2.0
+langchain-core>=0.2.0
+langchain-openai>=0.1.5
+langchain-chroma>=0.1.0
+langgraph>=0.1.0
+tiktoken>=0.7.0
+
+# --- 4. Observability & Monitoring ---
+# OpenTelemetry Tracing
+opentelemetry-api>=1.24.0
+opentelemetry-sdk>=1.24.0
+opentelemetry-exporter-otlp-proto-http>=1.24.0
+python-json-logger>=2.0.7
+
+# Langfuse LLM Observability
+langfuse>=2.0.0
+
+# --- 5. Security & Authentication ---
+passlib[argon2]>=1.7.4
+argon2-cffi>=23.1.0
+bcrypt>=4.1.2
+
+# --- 6. Document Generation & Parsing ---
+reportlab>=4.1.0
+python-docx>=1.1.0
+pypdf>=4.2.0
+pdfplumber>=0.11.0
+
+# --- 7. Utilities & Environment ---
+python-dotenv>=1.0.1
+httpx>=0.27.0
+tenacity>=8.3.0
+
+# --- 8. Testing & Development ---
+pytest>=8.1.0
+pytest-asyncio>=0.23.6
+

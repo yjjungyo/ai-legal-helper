@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  langfuse:
+    image: langfuse/langfuse:2
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3000"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-ai_user}:${POSTGRES_PASSWORD:-ai_password}@postgres:5432/langfuse
+      - NEXTAUTH_SECRET=${LANGFUSE_SECRET:-my_super_secret_langfuse_key_12345}
+      - SALT=${LANGFUSE_SALT:-my_super_secret_salt_12345}
+      - NEXTAUTH_URL=http://localhost:3001
+      - TELEMETRY_ENABLED=false
+    depends_on:
+      postgres:
+        condition: service_healthy
+
