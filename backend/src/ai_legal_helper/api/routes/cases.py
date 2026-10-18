@@ -22,15 +22,27 @@ from ai_legal_helper.api.schemas.case import (
 from ai_legal_helper.case_intelligence.manager import process_new_statement
 from ai_legal_helper.database.graph_sync_worker import queue_sync_task
 from ai_legal_helper.api.dependencies import get_current_user, get_case_for_user, AUTH_BYPASS
+from ai_legal_helper.case_intelligence.classifier import classify_case_type
 
 router = APIRouter(prefix="/cases", tags=["cases"])
 
 @router.post("", response_model=CaseSchema)
 def create_case(req: CaseCreateRequest, request: Request, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """새로운 사건을 생성한다. 생성 후 Case 루트 노드를 그래프에 동기화한다."""
+    """새로운 사건을 생성한다. 
+    
+    사용자가 사건 유형을 수동으로 선택하지 않았거나 'AI_AUTO'인 경우, 
+    사건 제목과 설명을 바탕으로 AI가 적합한 법률 분쟁 유형을 자동 분류하여 태깅한다.
+    생성 후 Case 루트 노드를 지식 그래프에 동기화한다.
+    """
+    raw_type = (req.case_type or "").strip()
+    if not raw_type or raw_type.upper() in ("AI_AUTO", "AUTO", "자동", "자동 분류"):
+        final_case_type = classify_case_type(req.title or "", req.description)
+    else:
+        final_case_type = raw_type
+
     new_case = Case(
         title=req.title,
-        case_type=req.case_type,
+        case_type=final_case_type,
         description=req.description,
         user_id=current_user.id
     )

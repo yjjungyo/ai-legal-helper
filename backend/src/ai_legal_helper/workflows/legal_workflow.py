@@ -38,12 +38,16 @@
 from typing import Dict, List, Any, Optional
 import os
 import uuid
+import sys
 import asyncio
 from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import HumanMessage
+from langgraph.types import interrupt, Command, Send
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.types import interrupt, Command
-from langgraph.constants import Send
+try:
+    from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+except ImportError:
+    AsyncPostgresSaver = None  # type: ignore
 import operator
 from typing import Annotated
 
@@ -58,23 +62,57 @@ from ai_legal_helper.observability.context import set_node_name
 
 logger = get_logger(__name__)
 
-_checkpointer_instance = None
+_memory_checkpointer_instance = None
+
+
+def get_postgres_conn_string() -> str:
+    """PostgreSQL 비동기 접속을 위한 표준 연결 문자열을 반환한다."""
+    from ai_legal_helper.database.session import SQLALCHEMY_DATABASE_URL
+    url = SQLALCHEMY_DATABASE_URL
+    if url.startswith("postgresql+psycopg://"):
+        url = url.replace("postgresql+psycopg://", "postgresql://", 1)
+    return url
+
+
+async def init_checkpointer():
+    """애플리케이션 시작 시 PostgreSQL 체크포인트 테이블을 자동 초기화(setup)한다."""
+    checkpointer_type = os.getenv("CHECKPOINTER_TYPE", "postgres").lower()
+    if checkpointer_type == "memory":
+        logger.info("[CHECKPOINTER] Using MemorySaver (setup skipped)")
+        return
+
+    conn_string = get_postgres_conn_string()
+    try:
+        async with AsyncPostgresSaver.from_conn_string(conn_string) as saver:
+            await saver.setup()
+        logger.info("[CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully")
+    except Exception as e:
+        logger.error(f"[CHECKPOINTER] Failed to setup PostgreSQL checkpointer: {e}")
+        raise
+
+
+def get_memory_checkpointer() -> MemorySaver:
+    """테스트 또는 격리 환경을 위한 메모리 기반 체크포인터 싱글톤 인스턴스를 반환한다."""
+    global _memory_checkpointer_instance
+    if _memory_checkpointer_instance is None:
+        _memory_checkpointer_instance = MemorySaver()
+    return _memory_checkpointer_instance
+
 
 def get_checkpointer():
     """LangGraph 체크포인터를 획득한다.
 
-    비동기 워크플로우(ainvoke)와의 완벽한 호환성 및 Windows 비동기 루프 안정성을 위해
-    MemorySaver 인스턴스를 제공한다.
-    모든 상담 요청과 HILT 승인 대기 정보는 PostgreSQL DB(ConsultationRecord)에
-    실시간으로 영구 저장되어 서버 재시작 후에도 완벽히 보존된다.
+    기본값은 PostgreSQL 기반 영속 체크포인터(AsyncPostgresSaver)를 사용하며,
+    동기 그래프 컴파일 시에는 기본 메모리 인스턴스를 제공하고,
+    비동기 런타임(run_legal_consultation)에서 AsyncPostgresSaver를 주입한다.
 
     Returns:
-        BaseCheckpointSaver: MemorySaver 인스턴스.
+        BaseCheckpointSaver: 체크포인터 인스턴스.
     """
-    global _checkpointer_instance
-    if _checkpointer_instance is None:
-        _checkpointer_instance = MemorySaver()
-    return _checkpointer_instance
+    checkpointer_type = os.getenv("CHECKPOINTER_TYPE", "postgres").lower()
+    if checkpointer_type == "memory":
+        return get_memory_checkpointer()
+    return get_memory_checkpointer()
 
 
 def _brief_history(messages: List[Any], max_chars: int = 1000) -> str:
@@ -382,28 +420,24 @@ def verification_condition(state: LegalState) -> str:
     hilt_executed = state.get("hilt_executed", False)
     revision_count = state.get("revision_count", 0)
 
-    # 1. 모든 필수 검증을 통과했다면 최종 확정
+    # 1. 모든 필수 검증을 통과했다면 최종 확정 (HILT 여부와 무관하게 PASS일 때만 확정)
     if status == "PASS":
         return "finalize"
 
-    # 2. 법률 근거 부족이 원인이고 후보 법령이 식별된 경우 HILT 법령 검색 승인 요청 (1회 한정)
-    if not hilt_executed and candidate_laws and (
-        reason_code in ("LEGAL_SOURCE_MISSING", "LEGAL_SOURCE_INSUFFICIENT")
-        or (status in ("INSUFFICIENT", "REVISE") and reason_code != "NONE")
-    ):
+    # 2. 법률 근거 부족(LEGAL_SOURCE_MISSING / LEGAL_SOURCE_INSUFFICIENT)이 원인이고 후보 법령이 식별된 경우에만 HILT 법령 검색 승인 요청 (1회 한정)
+    #    주의: CASE_EVIDENCE_MISSING, EVIDENCE_CONFLICT 등 사실관계 문제는 법령 검색으로 오분기 금지
+    if not hilt_executed and candidate_laws and reason_code in ("LEGAL_SOURCE_MISSING", "LEGAL_SOURCE_INSUFFICIENT"):
         return "statute_search_approval"
 
-    # 3. 최초 검증 실패 시(REVISE 또는 일반 INSUFFICIENT) 1회에 한해 적응형 보강 검색(revise) 시도
-    if revision_count < 1:
-        return "revise"
+    # 3. 최초 검증 실패 시(REVISE 또는 일반 작성오류) 1회에 한해 적응형 보강 검색(revise) 시도
+    #    HILT가 이미 실행되었거나 재검토가 이미 수행된 경우에는 무한 루프 방지
+    if revision_count < 1 and not hilt_executed:
+        if status == "REVISE" or (status == "INSUFFICIENT" and reason_code in ("ANSWER_REVISION_REQUIRED", "NONE")):
+            return "revise"
 
-    # 4. HILT 공식 법령 원문 검색이 완료된 상태:
-    #    사용자 승인을 거쳐 공식 법령 원문이 확보되었고 재분석된 상태이므로, 혹시 남아있을 수 있는 미검증 인용은
-    #    finalize_node의 sanitize_unverified_citations를 거쳐 깨끗이 정화한 후 최종 확정(finalize)으로 종결한다.
-    if hilt_executed:
-        return "finalize"
-
-    # 5. 이미 재검토를 거쳤음에도 미통과 시 안전 종료
+    # 4. HILT 실행 후 또는 재검토 한도(1회) 도달 후에도 PASS하지 못한 경우:
+    #    HILT 이력만으로 결함 답변을 finalize하지 않고, 반드시 insufficient_node로 안전 종료하여
+    #    미검증/결함 답변이 확정되는 경로를 원천 차단한다 (P0-02 준수).
     return "insufficient"
 
 
@@ -767,9 +801,8 @@ def re_analyze_node(state: LegalState) -> Dict:
         law = s.get("statute_name") or s.get("title") or "법령"
         art = s.get("article") or ""
         content = s.get("content") or ""
-        fname = s.get("filename") or f"{law}_{art}.txt"
         url = s.get("source_url") or "https://www.law.go.kr"
-        statute_lines.append(f"- 인용 표기: ({fname}, p.1)\n  법령명 및 조문: {law} {art}\n  내용: {content}\n  공식URL: {url}")
+        statute_lines.append(f"- 인용 표기: ({law} {art})\n  법령명 및 조문: {law} {art}\n  내용: {content}\n  공식URL: {url}")
     official_statutes_text = "\n\n".join(statute_lines) if statute_lines else "(조회된 공식 법령 없음)"
 
     # 동적 조문 요약 목록 (하드코딩 배제: 조회된 실제 법령 및 조문 번호만 추출)
@@ -786,15 +819,25 @@ def re_analyze_node(state: LegalState) -> Dict:
         "[사건 맥락]\n{case_context}\n\n"
         "[새로 확보된 공식 법령 원문]\n{official_statutes_text}\n\n"
         "[작성 규칙]\n"
-        "1. [필수 서두 안내 작성]\n"
-        "   답변의 맨 처음에 반드시 다음 형식의 [공식 법령 원문 연동 및 근거 보강 안내] 섹션을 작성하세요:\n"
-        "   [공식 법령 원문 연동 및 근거 보강 안내]\n"
-        "   - 보강 경과: 1차 검토 결과 질문의 핵심 쟁점을 직접 규율하는 법령 조문이 내부 DB에 부재하여 법률검증 Agent에 의해 근거 보강이 요청되었습니다.\n"
-        "   - 공식 출처: 의뢰인의 승인(HITL)을 거쳐 법제처 국가법령정보공동활용 시스템(open.law.go.kr)에서 {statute_names_str} 조문을 실시간으로 공식 조회하였습니다.\n"
-        "   - 반영 근거: 확보된 공식 법령 조문 원문({retrieved_articles_summary})을 바탕으로 질문의 핵심 법률 쟁점 및 당사자의 법적 권리·의무 관계를 재분석하여 작성하였습니다.\n\n"
-        "2. 반드시 위 [새로 확보된 공식 법령 원문]의 구체적인 조문 내용과 사건 맥락을 종합하여 정확하고 명확한 법률 의견을 제시하세요. 검색된 법령 원문에 없는 법률 효과를 단정하지 마시고, 입증이 필요한 사항은 실무상 주의사항으로 명확히 안내하세요.\n"
-        "3. 법령 조문 인용 시 위 [새로 확보된 공식 법령 원문]에 기재된 `(파일명, p.1)` 형태를 정확하게 1회만 사용하여 인용하세요. 중복 괄호 `(( ... ))`를 작성하지 마세요.\n"
-        "4. 마크다운 특수문자(#, ##, ###, **, *, ---, > 등)를 일체 사용하지 마세요. 화면에 마크다운 기호가 그대로 노출되므로 [제목], 1., 2., - 불릿 등의 일반 플레인 텍스트로만 정돈하여 작성하세요."
+        "1. [서두 안내]\n"
+        "   답변의 맨 처음에 다음 1줄의 정돈된 안내 섹션만 작성하세요 (조문 번호들을 쉼표로 끝없이 나열하지 마세요):\n"
+        "   [안내: 공식 법령 원문 반영]\n"
+        "   - 본 답변은 의뢰인의 승인(HITL)을 거쳐 법제처 국가법령정보공동활용 시스템(open.law.go.kr)의 {statute_names_str} 공식 조문을 조회하여 재분석된 결과입니다.\n\n"
+        "2. [답변 구성 체계]\n"
+        "   실제 의뢰인(고객)에게 실질적인 도움이 되도록 다음 4개 섹션 체계로 명확하고 전문성 있게 작성하세요:\n"
+        "   [1. 핵심 결론 (한눈에 보기)]\n"
+        "   - 의뢰인이 질문한 핵심 사항(보증금 반환 가능성, 상대방의 사전 인식 인정 여부, 추가 손해배상 청구 가능 여부)에 대해 3줄 이내로 명쾌하게 답을 요약하세요.\n"
+        "   [2. 지금 당장 취해야 할 행동 가이드 (Action Plan)]\n"
+        "   - 1단계(임대인 본인에게 내용증명 발송 및 손해 사전 고지), 2단계(입증 증거 수집 및 백업), 3단계(계약 종료 후 임차권등기명령 신청 및 법적 절차) 등 구체적인 실무 조치 순서를 제시하세요.\n"
+        "   [3. 쟁점별 심층 법률 분석]\n"
+        "   - 묵시적 갱신과 해지의 효력, 배우자 통지의 도달 인정 가능성 및 집을 보여준 사실의 법적 의미, 다른 집 보증금 반환 지연으로 인한 추가 손해배상(특별손해와 예견가능성 요건)을 법령 조문에 근거하여 분석하세요.\n"
+        "   [4. 입증 필요사항 및 실무상 유의사항]\n"
+        "   - 소송 또는 분쟁 시 의뢰인이 반드시 입증해야 할 증거 자료와 법원 판단 리스크를 명확히 안내하세요.\n\n"
+        "3. [법령 및 증거 인용 규칙]\n"
+        "   - 법령 조문 인용 시 가상의 PDF 파일명(예: 주택임대차보호법.pdf)을 절대 쓰지 마시고, 반드시 `(법령명 제O조)` 형태(예: `(주택임대차보호법 제6조의2)`, `(민법 제551조)`)로 정확하게 인용하세요.\n"
+        "   - 사건 증거 인용 시 실제 사건 증거 파일명(예: `(2022_주택임대차계약서.pdf, p.1)`) 형태로 인용하세요.\n"
+        "4. [서식 규칙]\n"
+        "   - 섹션 제목은 대괄호 `[제목]` 형태로 작성하고, 중요한 핵심 단어에는 **볼드** 강조를 적절히 사용하세요."
     )
     llm = get_llm(temperature=0.0)
     res = (prompt | llm).invoke({
@@ -805,19 +848,21 @@ def re_analyze_node(state: LegalState) -> Dict:
         "retrieved_articles_summary": retrieved_articles_summary,
     })
     raw_content = str(res.content) if hasattr(res, "content") else str(res)
-    cleaned_draft = clean_markdown_formatting(raw_content)
 
     return {
-        "draft_answer": cleaned_draft,
+        "draft_answer": raw_content.strip(),
         "revision_count": state.get("revision_count", 0) + 1,
     }
 
 
 @trace
-def build_legal_graph():
+def build_legal_graph(checkpointer: Optional[Any] = None):
     """법률 상담 LangGraph 상태 머신을 구성 및 컴파일한다.
 
     HILT 법령 원문 검색 및 Checkpointer가 포함된다.
+
+    Args:
+        checkpointer: 명시적으로 주입할 LangGraph 체크포인터 (미지정 시 get_checkpointer() 사용)
 
     Returns:
         CompiledStateGraph: 실행 가능한 LangGraph 애플리케이션.
@@ -865,33 +910,23 @@ def build_legal_graph():
     graph.add_edge("insufficient", END)
     graph.add_edge("finalize", END)
 
-    checkpointer = get_checkpointer()
+    if checkpointer is None:
+        checkpointer = get_checkpointer()
     app = graph.compile(checkpointer=checkpointer)
     logger.info("[GRAPH] Unified Legal Engine (with HILT Statute Search) build complete")
     return app
 
 
-@trace
-async def run_legal_consultation(
-    question: str, 
-    thread_id: str, 
-    resume_data: Optional[Dict[str, Any]] = None
+async def _execute_consultation(
+    question: str,
+    thread_id: str,
+    resume_data: Optional[Dict[str, Any]],
+    checkpointer: Any,
 ) -> Dict[str, Any]:
-    """법률 상담 슈퍼바이저 워크플로우를 실행하고 최종 답변, 출처 또는 승인 대기 상태를 반환한다.
-
-    Args:
-        question: 사용자의 법률 질의 내용
-        thread_id: 대화 스레드 또는 요청 식별자
-        resume_data: HILT 승인/거절 시 재개를 위한 사용자 결정 데이터 (예: {"approved": True})
-
-    Returns:
-        Dict[str, Any]: 상담 처리 결과 딕셔너리.
-            - HILT 인터럽트 발생 시: `status: "APPROVAL_REQUIRED"`, `approval_request: {...}`
-            - 정상 완료 시: `status: "SUCCESS"`, `answer: "..."`, `sources: [...]`
-    """
+    """지정된 체크포인터 환경에서 실제 LangGraph 워크플로우를 실행하고 결과를 수합한다."""
     from ai_legal_helper.observability.langfuse_client import flush_langfuse, get_langfuse_callback_handler
 
-    app = build_legal_graph()
+    app = build_legal_graph(checkpointer=checkpointer)
     callbacks = []
     lf_cb = get_langfuse_callback_handler()
     if lf_cb:
@@ -904,12 +939,23 @@ async def run_legal_consultation(
 
     try:
         if resume_data is not None:
+            # 존재하지 않는 thread_id에 대한 resume 방어 검증
+            if hasattr(checkpointer, "aget_tuple"):
+                state_tuple = await checkpointer.aget_tuple(config)
+            else:
+                state_tuple = checkpointer.get_tuple(config)
+            if state_tuple is None or not getattr(state_tuple, "checkpoint", None):
+                raise ValueError(f"해당 thread_id('{thread_id}')에 대기 중이거나 저장된 워크플로우 상태가 존재하지 않습니다.")
+
             final_state = await app.ainvoke(Command(resume=resume_data), config)
         else:
             inputs = {"messages": [HumanMessage(content=question)]}
             final_state = await app.ainvoke(inputs, config)
     finally:
         flush_langfuse()
+
+    if final_state is None:
+        raise ValueError(f"워크플로우 실행 결과가 비어 있습니다. thread_id: {thread_id}")
 
     # HILT 인터럽트 발생 여부 감지
     if "__interrupt__" in final_state and final_state["__interrupt__"]:
@@ -944,4 +990,48 @@ async def run_legal_consultation(
         "approval_request": final_state.get("approval_request"),
         "approval_status": final_state.get("approval_status"),
     }
+
+
+@trace
+async def run_legal_consultation(
+    question: str, 
+    thread_id: str, 
+    resume_data: Optional[Dict[str, Any]] = None,
+    checkpointer: Optional[Any] = None,
+) -> Dict[str, Any]:
+    """법률 상담 슈퍼바이저 워크플로우를 실행하고 최종 답변, 출처 또는 승인 대기 상태를 반환한다.
+
+    Args:
+        question: 사용자의 법률 질의 내용
+        thread_id: 대화 스레드 또는 요청 식별자
+        resume_data: HILT 승인/거절 시 재개를 위한 사용자 결정 데이터 (예: {"approved": True})
+        checkpointer: 명시적으로 주입할 체크포인터 (미지정 시 환경설정에 따라 자동 선택)
+
+    Returns:
+        Dict[str, Any]: 상담 처리 결과 딕셔너리.
+            - HILT 인터럽트 발생 시: `status: "APPROVAL_REQUIRED"`, `approval_request: {...}`
+            - 정상 완료 시: `status: "SUCCESS"`, `answer: "..."`, `sources: [...]`
+    """
+    if sys.platform == "win32":
+        try:
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        except Exception:
+            pass
+
+    if checkpointer is not None:
+        return await _execute_consultation(question, thread_id, resume_data, checkpointer)
+
+    checkpointer_type = os.getenv("CHECKPOINTER_TYPE", "postgres").lower()
+    if checkpointer_type == "memory" or AsyncPostgresSaver is None:
+        if AsyncPostgresSaver is None and checkpointer_type != "memory":
+            logger.warning(
+                "[CHECKPOINTER_FALLBACK] langgraph-checkpoint-postgres 모듈이 설치되지 않아 "
+                "로컬 MemorySaver로 폴백합니다. 영구 체크포인팅을 위해 pip install langgraph-checkpoint-postgres가 권장됩니다."
+            )
+        mem_saver = get_memory_checkpointer()
+        return await _execute_consultation(question, thread_id, resume_data, mem_saver)
+    else:
+        conn_string = get_postgres_conn_string()
+        async with AsyncPostgresSaver.from_conn_string(conn_string) as pg_saver:
+            return await _execute_consultation(question, thread_id, resume_data, pg_saver)
 

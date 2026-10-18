@@ -33,7 +33,14 @@ from ai_legal_helper.observability.context import (
 from ai_legal_helper.database.graph_sync_worker import graph_sync_worker_loop
 from ai_legal_helper.database.session import engine
 from ai_legal_helper.database.neo4j import get_neo4j_driver
-from sqlalchemy import text
+import sys
+
+# Windows 환경에서 psycopg async 및 ProactorEventLoop 호환성을 위한 SelectorLoop 지정
+if sys.platform == "win32":
+    try:
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    except Exception:
+        pass
 
 # Initialize logging and configuration
 setup_logging("INFO")
@@ -41,9 +48,16 @@ logger = get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """FastAPI 애플리케이션 시작 시 백그라운드 Graph Sync Worker를 기동하고,
+    """FastAPI 애플리케이션 시작 시 체크포인터 테이블 초기화 및 백그라운드 Graph Sync Worker를 기동하고,
     종료 시 워커 태스크 취소, Langfuse 버퍼 플러시, Neo4j 드라이버 정리를 수행한다.
     """
+    # 0. PostgreSQL LangGraph Checkpointer 테이블 자동 초기화 (P0-03)
+    try:
+        from ai_legal_helper.workflows.legal_workflow import init_checkpointer
+        await init_checkpointer()
+    except Exception as e:
+        logger.warning(f"[LIFESPAN] Checkpointer initialization warning: {e}")
+
     worker_task = asyncio.create_task(graph_sync_worker_loop())
     yield
     # 1. 백그라운드 Graph Sync Worker 안전 종료

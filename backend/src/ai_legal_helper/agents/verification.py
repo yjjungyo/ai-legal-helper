@@ -37,6 +37,11 @@ CITATION_PATTERN = re.compile(
     r"\(+\s*([^\n,]+?\.(?:pdf|docx|txt))\s*,\s*p\.?\s*([0-9\-~]+|\?)\s*\)+",
     re.IGNORECASE,
 )
+# 공식 법령 조문 인용 패턴 (예: (주택임대차보호법 제6조의2), (민법 제623조))
+STATUTE_CITATION_PATTERN = re.compile(
+    r"\(+\s*([가-힣]+(?:법률|법|시행령|시행규칙))\s+(제\s*\d+\s*조(?:\s*의\s*\d+)?)\s*\)+",
+    re.IGNORECASE,
+)
 # [GRAPH:id] 또는 [VECTOR:id] 형태의 증거 인용 패턴
 GRAPH_CITATION_PATTERN = re.compile(r"\[((?:GRAPH|VECTOR):[^\]]+)\]")
 # 판례 사건번호 패턴 (예: 2022다21580, 2023도99999)
@@ -66,13 +71,13 @@ class VerificationOutput(BaseModel):
     status: str = Field(description="PASS, REVISE, 또는 INSUFFICIENT")
     reason_code: Optional[str] = Field(
         default="NONE",
-        description="LEGAL_SOURCE_MISSING, LEGAL_SOURCE_INSUFFICIENT, CASE_EVIDENCE_MISSING, EVIDENCE_CONFLICT, ANSWER_REVISION_REQUIRED, CITATION_INVALID, 또는 NONE"
+        description="LEGAL_SOURCE_MISSING, LEGAL_SOURCE_INSUFFICIENT, CASE_EVIDENCE_MISSING, EVIDENCE_CONFLICT, ANSWER_REVISION_REQUIRED, CITATION_INVALID, VERIFICATION_ERROR, 또는 NONE"
     )
     missing_legal_issues: List[str] = Field(default_factory=list, description="법령 검색이 필요한 구체적 법률 쟁점 목록")
     candidate_laws: List[str] = Field(default_factory=list, description="부족한 쟁점을 규율하는 후보 법령명 목록 (예: ['주택임대차보호법'])")
     recommended_action: Optional[str] = Field(
         default="FINALIZE",
-        description="REQUEST_STATUTE_SEARCH_APPROVAL, REQUEST_EVIDENCE, REVISE_DRAFT, 또는 FINALIZE"
+        description="REQUEST_STATUTE_SEARCH_APPROVAL, REQUEST_EVIDENCE, REVISE_DRAFT, SAFE_FALLBACK, 또는 FINALIZE"
     )
     explanation: Optional[str] = Field(default="", description="검증 결과 및 권장 후속 조치 사유 설명")
     claims: List[ClaimVerification] = Field(default_factory=list, description="주요 법률 주장 목록 및 검증 결과")
@@ -185,10 +190,21 @@ def _extract_containing_segment(full_text: str, match_start: int, match_end: int
     # 이전 문장 경계 (. 뒤 공백 또는 줄바꿈)
     prev_nl = full_text.rfind("\n", left_bound, match_start)
     prev_period = full_text.rfind(". ", left_bound, match_start)
-    best_left = max(
-        prev_nl + 1 if prev_nl != -1 else left_bound,
-        prev_period + 2 if prev_period != -1 else left_bound,
-    )
+
+    # 인용 부호 바로 앞에 마침표가 있는 경우 (예: "반환해야 합니다. (법령 제1조)"),
+    # 해당 마침표 앞의 본문 문장을 인용 대상 문맥으로 인식한다.
+    if prev_period != -1 and not full_text[prev_period + 2 : match_start].strip():
+        prev_prev_nl = full_text.rfind("\n", left_bound, prev_period)
+        prev_prev_period = full_text.rfind(". ", left_bound, prev_period)
+        best_left = max(
+            prev_prev_nl + 1 if prev_prev_nl != -1 else left_bound,
+            prev_prev_period + 2 if prev_prev_period != -1 else left_bound,
+        )
+    else:
+        best_left = max(
+            prev_nl + 1 if prev_nl != -1 else left_bound,
+            prev_period + 2 if prev_period != -1 else left_bound,
+        )
 
     # 다음 문장 경계 (. 뒤 공백, 줄바꿈)
     next_nl = full_text.find("\n", match_end, right_bound)
@@ -209,8 +225,8 @@ def _check_claim_supported_by_source(
 
     Args:
         claim_segment: 인용이 등장한 문장 또는 단락.
-        matched_sources: 파일명/ID가 일치하는 Source Registry 항목 리스트.
-        raw_file: 인용된 파일명.
+        matched_sources: 파일명/ID/법령명이 일치하는 Source Registry 항목 리스트.
+        raw_file: 인용된 파일명 또는 법령명.
 
     Returns:
         Tuple[bool, Optional[str]]: (뒷받침 여부, 거부 사유 코드)
@@ -225,7 +241,14 @@ def _check_claim_supported_by_source(
     if claimed_articles and source_articles and not claimed_articles.intersection(source_articles):
         return False, f"ARTICLE_MISMATCH({','.join(sorted(claimed_articles))})"
 
-    # 2. 주장 문장과 출처 본문 간 핵심 어휘 중첩도 확인
+    # 2. 법률 효과의 정반대 왜곡 또는 기간 조건 불일치 검증 (P1-03)
+    # 기간 경과(예: 3개월이 지나면 효력 발생) 조건 vs 즉시/당일 효력 발생 모순 검증
+    period_in_source = re.search(r"(\d+\s*(?:개월|달|일|년|주))\s*(?:이\s*지나|경과|후|지난\s*때).*?(?:효력|해지|반환)", combined_content)
+    immediate_in_claim = re.search(r"(도달\s*즉시|즉시|당일|즉각|바로)\s*(?:효력|해지|반환)", claim_segment)
+    if period_in_source and immediate_in_claim:
+        return False, f"LEGAL_EFFECT_CONTRADICTION(기간조건 {period_in_source.group(1)} vs {immediate_in_claim.group(1)})"
+
+    # 3. 주장 문장과 출처 본문 간 핵심 어휘 중첩도 확인
     claim_tokens = _extract_meaningful_tokens(claim_segment, exclude_filename=raw_file)
     source_tokens = _extract_meaningful_tokens(combined_content)
     if claim_tokens and source_tokens:
@@ -241,7 +264,7 @@ def audit_citations_and_claims(
     retrieved_sources: List[Dict[str, Any]],
     case_context: str = "",
 ) -> Dict[str, Any]:
-    """초안 답변의 모든 인용(파일명, 그래프 ID, 판례 사건번호)을 Source Registry와 대조하여 존재성 및 본문 뒷받침 여부를 감사한다.
+    """초안 답변의 모든 인용(파일명, 공식 법령 조문, 그래프 ID, 판례 사건번호)을 Source Registry와 대조하여 존재성 및 본문 뒷받침 여부를 감사한다.
 
     Args:
         draft_answer: 검증 대상 답변 초안.
@@ -258,6 +281,7 @@ def audit_citations_and_claims(
     retrieved_chunk_ids: List[str] = []
     by_filename: Dict[str, List[Dict[str, Any]]] = {}
     by_source_id: Dict[str, Dict[str, Any]] = {}
+    by_statute_article: Dict[Tuple[str, str], List[Dict[str, Any]]] = {}
     known_case_numbers: set[str] = set()
 
     for src in normalized_registry:
@@ -279,6 +303,16 @@ def audit_citations_and_claims(
             if fn_candidate:
                 base_fn = os.path.basename(str(fn_candidate)).strip().lower()
                 by_filename.setdefault(base_fn, []).append(src)
+
+        # 법령 및 조문 인덱싱 (P1-03)
+        sname = str(src.get("statute_name") or "").strip()
+        art = str(src.get("article") or "").strip()
+        if sname and art:
+            clean_art = re.sub(r"\s+", "", art)
+            by_statute_article.setdefault((sname, clean_art), []).append(src)
+        elif sid and "_" in sid:
+            parts = sid.split("_", 1)
+            by_statute_article.setdefault((parts[0].strip(), re.sub(r"\s+", "", parts[1])), []).append(src)
 
         if src.get("case_number"):
             known_case_numbers.add(re.sub(r"\s+", "", str(src["case_number"])))
@@ -308,8 +342,9 @@ def audit_citations_and_claims(
             "rejection_reasons": {},
             "unverified_citations": [],
             "unsupported_citations": [],
-            "citation_existence_rate": 1.0,
-            "citation_support_rate": 1.0,
+            "citation_existence_rate": "N/A",
+            "citation_support_rate": "N/A",
+            "citation_coverage_rate": 0.0,
             "verified_sources": normalized_registry,
         }
 
@@ -357,7 +392,54 @@ def audit_citations_and_claims(
                 ms_id = str(ms.get("source_id") or cite_id)
                 validated_sources_map[ms_id] = ms
 
-    # 2. [GRAPH:...] / [VECTOR:...] 인용 검증
+    # 2. (법령명 제N조) 공식 법령 인용 검증 (P1-03)
+    for s_match in STATUTE_CITATION_PATTERN.finditer(draft_answer):
+        law_name = s_match.group(1).strip()
+        art_clean = re.sub(r"\s+", "", s_match.group(2).strip())
+        cite_label = f"({law_name} {art_clean})"
+        full_match_text = s_match.group(0).strip()
+        cite_id = f"{law_name}_{art_clean}"
+        if cite_id not in generated_citation_ids:
+            generated_citation_ids.append(cite_id)
+
+        matched_sources = by_statute_article.get((law_name, art_clean), [])
+        if not matched_sources:
+            # 보조 매칭: source_id 또는 title 확인
+            for s in normalized_registry:
+                s_id = str(s.get("source_id") or "")
+                s_name = str(s.get("statute_name") or s.get("title") or "")
+                s_art = re.sub(r"\s+", "", str(s.get("article") or ""))
+                if (law_name in s_name or law_name in s_id) and (art_clean == s_art or art_clean in s_id):
+                    matched_sources.append(s)
+
+        if not matched_sources:
+            if cite_id not in rejected_citation_ids:
+                rejected_citation_ids.append(cite_id)
+                rejection_reasons[cite_id] = "NOT_IN_SOURCE_REGISTRY"
+            if cite_label not in unverified_labels:
+                unverified_labels.append(cite_label)
+            if full_match_text not in unverified_labels:
+                unverified_labels.append(full_match_text)
+            continue
+
+        containing_seg = _extract_containing_segment(draft_answer, s_match.start(), s_match.end())
+        is_supported, reason = _check_claim_supported_by_source(containing_seg, matched_sources, law_name)
+        if not is_supported:
+            if cite_id not in rejected_citation_ids:
+                rejected_citation_ids.append(cite_id)
+                rejection_reasons[cite_id] = reason or "UNSUPPORTED_BY_SOURCE_CONTENT"
+            if cite_label not in unsupported_labels:
+                unsupported_labels.append(cite_label)
+            if full_match_text not in unsupported_labels:
+                unsupported_labels.append(full_match_text)
+        else:
+            if cite_id not in validated_citation_ids:
+                validated_citation_ids.append(cite_id)
+            for ms in matched_sources:
+                ms_id = str(ms.get("source_id") or cite_id)
+                validated_sources_map[ms_id] = ms
+
+    # 3. [GRAPH:...] / [VECTOR:...] 인용 검증
     for g_match in GRAPH_CITATION_PATTERN.finditer(draft_answer):
         gid = g_match.group(1).strip()
         if gid not in generated_citation_ids:
@@ -375,7 +457,7 @@ def audit_citations_and_claims(
                 validated_citation_ids.append(gid)
             validated_sources_map[str(matched_g.get("source_id") or gid)] = matched_g
 
-    # 3. 임의 생성된 판례 사건번호(예: 2023다99999) 검증
+    # 4. 임의 생성된 판례 사건번호(예: 2023다99999) 검증
     for cn_match in CASE_NUMBER_PATTERN.finditer(draft_answer):
         cn_clean = re.sub(r"\s+", "", cn_match.group(1))
         cite_id = f"PRECEDENT:{cn_clean}"
@@ -396,8 +478,32 @@ def audit_citations_and_claims(
         1 for cid in rejected_citation_ids
         if rejection_reasons.get(cid) in ("NOT_IN_SOURCE_REGISTRY", "UNVERIFIED_PRECEDENT_CASE_NUMBER")
     )
-    existence_rate = ((total_gen - not_exist_count) / total_gen) if total_gen > 0 else 1.0
-    support_rate = (len(validated_citation_ids) / total_gen) if total_gen > 0 else 1.0
+
+    # 제로 분모 처리 (P1-03): 인용이 없는 답변은 100%로 오해되지 않도록 N/A 처리
+    if total_gen == 0:
+        existence_rate = "N/A"
+        support_rate = "N/A"
+        coverage_rate = 0.0
+    else:
+        existence_rate = round(((total_gen - not_exist_count) / total_gen), 4)
+        support_rate = round((len(validated_citation_ids) / total_gen), 4)
+
+        # Citation Coverage Rate: 실질 본문 문장 중 유효 인용이 포함된 문장 비율
+        substantive_segs = [
+            s for s in segments 
+            if len(s) > 10 and not any(h in s for h in ("⚖️", "🛡️", "⚠️", "안내:", "출처:"))
+        ]
+        if not substantive_segs:
+            coverage_rate = 1.0
+        else:
+            cited_count = sum(
+                1 for s in substantive_segs
+                if (CITATION_PATTERN.search(s) or 
+                    STATUTE_CITATION_PATTERN.search(s) or 
+                    GRAPH_CITATION_PATTERN.search(s) or 
+                    CASE_NUMBER_PATTERN.search(s))
+            )
+            coverage_rate = round(cited_count / len(substantive_segs), 4)
 
     # 검증된 최종 출처 목록: LLM이 출력한 파일명에 의존하지 않고 서버 Source Registry의 정규화된 메타데이터만 사용
     # 단, 거부(rejected)된 출처 ID에 해당하는 문서는 제외
@@ -427,10 +533,12 @@ def audit_citations_and_claims(
         "rejection_reasons": rejection_reasons,
         "unverified_citations": unverified_labels,
         "unsupported_citations": unsupported_labels,
-        "citation_existence_rate": round(existence_rate, 4),
-        "citation_support_rate": round(support_rate, 4),
+        "citation_existence_rate": existence_rate,
+        "citation_support_rate": support_rate,
+        "citation_coverage_rate": coverage_rate,
         "verified_sources": verified_sources,
     }
+
 
 
 def validate_citations_against_sources(
@@ -545,17 +653,29 @@ def run_verification(
     from ai_legal_helper.llm.gateway import get_llm
     llm = get_llm(temperature=0.0)
 
-    chain = prompt | llm
-
     try:
-        res = chain.invoke({
-            "question": question,
-            "draft_answer": draft_answer,
-            "retrieved_sources": formatted_sources,
-            "case_context": case_context or "(사건 정보 없음)",
-        })
+        formatted_prompt = prompt.format(
+            question=question,
+            draft_answer=draft_answer,
+            retrieved_sources=formatted_sources,
+            case_context=case_context or "(사건 정보 없음)",
+        )
+        res = None
+        for attempt in range(2):
+            try:
+                res = llm.invoke(formatted_prompt)
+                break
+            except (TimeoutError, ConnectionError) as net_err:
+                logger.warning(f"Verification Agent 호출 재시도 ({attempt+1}/2): {net_err}")
+                if attempt == 1:
+                    raise net_err
 
-        text = res.content.strip() if hasattr(res, "content") else str(res).strip()
+        if res is None:
+            raise RuntimeError("검증기 응답을 수신하지 못했습니다.")
+
+        raw_content = getattr(res, "content", res)
+        text = raw_content if isinstance(raw_content, str) else str(raw_content)
+        text = text.strip()
         if text.startswith("```json"):
             text = text[7:]
         elif text.startswith("```"):
@@ -641,10 +761,11 @@ def run_verification(
         return result.model_dump()
 
     except Exception as e:
-        logger.error(f"Verification Agent 오류: {str(e)}")
-        has_citation_defect = bool(unverified_citations or unsupported_citations)
-        fallback_status = "REVISE" if has_citation_defect else "PASS"
-        fallback_warnings = [f"검증 중 오류 발생: {str(e)}"]
+        logger.error(f"Verification Agent 오류 발생 (Fail-Safe 안전 차단 작동): {str(e)}")
+        # P0-01 준수: 검증 시스템 장애 시 절대로 PASS로 Fail-open하지 않고 INSUFFICIENT(VERIFICATION_ERROR)로 안전 종료
+        fallback_warnings = [
+            f"법률검증 시스템 오류로 인해 답변을 검증하지 못했습니다 ({str(e)}). 의뢰인의 권리 보호를 위해 전문가 상담을 권고합니다."
+        ]
         fallback_instructions: List[str] = []
         if unverified_citations:
             cite_str = ", ".join(unverified_citations)
@@ -659,11 +780,11 @@ def run_verification(
                 f"출처 본문과 무관하게 인용된 출처({unsup_str})를 제거하세요."
             )
         return {
-            "status": fallback_status,
-            "reason_code": "NONE",
+            "status": "INSUFFICIENT",
+            "reason_code": "VERIFICATION_ERROR",
             "missing_legal_issues": [],
             "candidate_laws": [],
-            "recommended_action": "FINALIZE",
+            "recommended_action": "SAFE_FALLBACK",
             "explanation": f"검증 처리 중 오류 발생: {str(e)}",
             "claims": [],
             "missing_issues": [],

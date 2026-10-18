@@ -1,7 +1,8 @@
 /**
- * @fileoverview 법률 상담 답변 구조화 렌더러 컴포넌트
- * 원시 마크다운 기호(#, **, --- 등)를 배제하고, 정형화된 공문서 및 법률의견서 양식에 맞추어
- * 안내 배너, 섹션 카드, 불릿 목록, 경고 박스 등을 깔끔하게 시각화합니다.
+ * @fileoverview 법률 상담 답변 구조화 및 안전한 마크다운 렌더러 컴포넌트
+ * 원시 마크다운 기호를 파괴적으로 제거하지 않고, 안전한 인라인 마크다운(볼드, 이탤릭, 인라인 코드) 및
+ * 지시서 P2-03의 8대 권장 구성요소(사건 요약, 확인된 사실, 법률 쟁점, 적용 법령 및 근거, 분석 결과,
+ * 불확실/추가확인 사항, 다음 행동, 검증된 출처)를 가독성 높은 카드/섹션 양식으로 렌더링합니다.
  */
 
 import React from 'react';
@@ -12,80 +13,262 @@ interface LegalAnswerViewProps {
 }
 
 /**
- * 텍스트에 남아 있을 수 있는 원시 마크다운 기호를 프론트엔드 단에서도 방어적으로 정제
- * @param text 원시 텍스트
- * @returns 정제된 플레인 텍스트
+ * 8대 권장 구성요소 분류 정보
  */
-function cleanRawMarkdown(text: string): string {
-  if (!text) return '';
-  return text
-    // 1. 수평선 제거 (---, *** 등)
-    .replace(/^\s*[-*_]{3,}\s*$/gm, '')
-    // 2. 마크다운 헤더 (#, ##, ### 등) -> [헤더]
-    .replace(/^#{1,6}\s*(.+)$/gm, (_match, title) => {
-      const t = title.trim();
-      return t.startsWith('[') && t.endsWith(']') ? t : `[${t}]`;
-    })
-    // 3. 볼드 및 이탤릭 (**text**, *text*, __text__) 제거
-    .replace(/\*\*(.+?)\*\*/g, '$1')
-    .replace(/__(.+?)__/g, '$1')
-    .replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '$1')
-    // 4. 인용구 (> text) 기호 제거
-    .replace(/^>\s*/gm, '')
-    // 5. 인라인 백틱 (`code`) 제거
-    .replace(/`([^`\n]+)`/g, '$1')
-    .trim();
+interface SectionCategoryConfig {
+  icon: string;
+  badgeLabel?: string;
+  theme: 'summary' | 'facts' | 'issues' | 'statutes' | 'analysis' | 'uncertain' | 'action' | 'sources' | 'banner' | 'warning' | 'normal';
 }
 
 /**
- * 정형화된 법률의견서 플레인 텍스트를 섹션별 UI 요소로 파싱하여 렌더링하는 컴포넌트
+ * 섹션 제목으로부터 8대 권장 구성요소 및 특수 블록 테마를 분류하는 함수
+ * @param title 섹션 제목
+ * @returns 해당 섹션의 아이콘 및 테마 설정
+ */
+function classifySectionTitle(title: string): SectionCategoryConfig {
+  const t = title.toLowerCase();
+
+  // 특수 시스템 배너 및 경고
+  if (t.includes('insufficient') || t.includes('근거 불충분') || t.includes('검증 안내') || t.includes('안내:')) {
+    return { icon: '🛡️', badgeLabel: '시스템 검증 안내', theme: 'banner' };
+  }
+  if (t.includes('미검증') || t.includes('초안 주의') || t.includes('주의사항') || t.includes('경고')) {
+    return { icon: '⚠️', badgeLabel: '주의 사항', theme: 'warning' };
+  }
+
+  // 1. 사건 요약
+  if (t.includes('사건 요약') || t.includes('상담 요약') || t.includes('개요')) {
+    return { icon: '📋', badgeLabel: '사건 요약', theme: 'summary' };
+  }
+  // 2. 확인된 사실
+  if (t.includes('확인된 사실') || t.includes('사실관계') || t.includes('확정 사실') || t.includes('기초 사실')) {
+    return { icon: '🔍', badgeLabel: '확인된 사실', theme: 'facts' };
+  }
+  // 3. 법률 쟁점
+  if (t.includes('법률 쟁점') || t.includes('주요 쟁점') || t.includes('핵심 쟁점') || t.includes('쟁점')) {
+    return { icon: '⚖️', badgeLabel: '법률 쟁점', theme: 'issues' };
+  }
+  // 4. 적용 법령 및 근거
+  if (t.includes('적용 법령') || t.includes('관련 법령') || t.includes('법적 근거') || t.includes('관련 조문') || t.includes('판례')) {
+    return { icon: '📜', badgeLabel: '적용 법령 및 근거', theme: 'statutes' };
+  }
+  // 5. 분석 결과
+  if (t.includes('분석 결과') || t.includes('법률 검토') || t.includes('종합 의견') || t.includes('판단 결과') || t.includes('검토 의견')) {
+    return { icon: '💡', badgeLabel: '분석 결과', theme: 'analysis' };
+  }
+  // 6. 불확실하거나 추가 확인이 필요한 사항
+  if (t.includes('불확실') || t.includes('추가 확인') || t.includes('확인 필요') || t.includes('유의사항') || t.includes('한계')) {
+    return { icon: '⚠️', badgeLabel: '불확실 / 추가 확인 필요', theme: 'uncertain' };
+  }
+  // 7. 다음 행동
+  if (t.includes('다음 행동') || t.includes('조치 사항') || t.includes('대응 방안') || t.includes('권장 조치') || t.includes('향후 절차')) {
+    return { icon: '🚀', badgeLabel: '권장 다음 행동', theme: 'action' };
+  }
+  // 8. 검증된 출처
+  if (t.includes('검증된 출처') || t.includes('참고 자료') || t.includes('출처 목록')) {
+    return { icon: '📚', badgeLabel: '검증된 출처', theme: 'sources' };
+  }
+
+  return { icon: '▪', theme: 'normal' };
+}
+
+/**
+ * 인라인 마크다운(볼드, 이탤릭, 인라인 코드)을 안전하게 React 노드 배열로 변환하는 함수
+ * XSS 위험이 전혀 없도록 정규식 분할 후 안전한 JSX 엘리먼트를 반환합니다.
+ * @param text 한 줄의 텍스트
+ * @returns React 노드 배열
+ */
+export function renderInlineMarkdown(text: string): React.ReactNode[] {
+  if (!text) return [];
+
+  // 토큰 분할 정규식: **볼드**, `인라인코드`, *이탤릭*
+  const tokenRegex = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g;
+  const parts = text.split(tokenRegex);
+
+  return parts.map((part, index) => {
+    if (!part) return null;
+
+    // 볼드: **text**
+    if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
+      return (
+        <strong key={index} style={{ fontWeight: 700, color: 'var(--text-main, #0f172a)' }}>
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+
+    // 인라인 코드: `code`
+    if (part.startsWith('`') && part.endsWith('`') && part.length >= 2) {
+      return (
+        <code
+          key={index}
+          style={{
+            backgroundColor: 'var(--surface-alt, #f1f5f9)',
+            border: '1px solid var(--border, #e2e8f0)',
+            borderRadius: '4px',
+            padding: '1px 5px',
+            fontSize: '0.88em',
+            fontFamily: 'monospace',
+            color: '#0969da',
+            margin: '0 2px',
+          }}
+        >
+          {part.slice(1, -1)}
+        </code>
+      );
+    }
+
+    // 이탤릭: *text*
+    if (part.startsWith('*') && part.endsWith('*') && part.length >= 2) {
+      return (
+        <em key={index} style={{ fontStyle: 'italic' }}>
+          {part.slice(1, -1)}
+        </em>
+      );
+    }
+
+    // 일반 텍스트
+    return <span key={index}>{part}</span>;
+  });
+}
+
+/**
+ * 개별 줄의 서식(불릿, 번호 목록, 일반 문장, 빈 줄)에 따라 깔끔한 스타일 적용
+ */
+function renderFormattedLine(line: string, index: number): React.ReactNode {
+  const trimmed = line.trim();
+  if (!trimmed) {
+    return <div key={index} style={{ height: '6px' }} />;
+  }
+
+  // 1. 불릿 목록 (- 또는 • 또는 *)
+  if (trimmed.startsWith('- ') || trimmed.startsWith('• ') || trimmed.startsWith('* ')) {
+    const textContent = trimmed.substring(2);
+    return (
+      <div
+        key={index}
+        style={{
+          display: 'flex',
+          gap: '8px',
+          alignItems: 'flex-start',
+          margin: '3px 0 3px 6px',
+        }}
+      >
+        <span style={{ color: 'var(--primary, #3b82f6)', fontWeight: 'bold' }}>•</span>
+        <span style={{ flex: 1, lineHeight: 1.6 }}>{renderInlineMarkdown(textContent)}</span>
+      </div>
+    );
+  }
+
+  // 2. 번호 목록 (1., 2), 가., (1) 등)
+  const numMatch = trimmed.match(/^(\d+[.)]|\([0-9]+\)|[가-힣][.)])\s*(.+)$/);
+  if (numMatch) {
+    return (
+      <div
+        key={index}
+        style={{
+          display: 'flex',
+          gap: '8px',
+          alignItems: 'flex-start',
+          margin: '3px 0 3px 6px',
+        }}
+      >
+        <span style={{ color: 'var(--text-muted, #64748b)', fontWeight: 600, minWidth: '20px' }}>
+          {numMatch[1]}
+        </span>
+        <span style={{ flex: 1, lineHeight: 1.6 }}>{renderInlineMarkdown(numMatch[2])}</span>
+      </div>
+    );
+  }
+
+  // 3. 인용구 (> text)
+  if (trimmed.startsWith('>')) {
+    const quoteText = trimmed.replace(/^>\s*/, '');
+    return (
+      <div
+        key={index}
+        style={{
+          borderLeft: '3px solid var(--border-focus, #3b82f6)',
+          paddingLeft: '10px',
+          margin: '4px 0',
+          color: 'var(--text-secondary, #475569)',
+          fontStyle: 'italic',
+        }}
+      >
+        {renderInlineMarkdown(quoteText)}
+      </div>
+    );
+  }
+
+  // 4. 일반 문장
+  return (
+    <div key={index} style={{ margin: '2px 0', lineHeight: 1.6 }}>
+      {renderInlineMarkdown(line)}
+    </div>
+  );
+}
+
+/**
+ * 구조화된 법률의견서 및 마크다운 텍스트를 섹션별 UI 요소로 파싱하여 렌더링하는 컴포넌트
  */
 export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content }) => {
-  const cleanedText = cleanRawMarkdown(content);
-  if (!cleanedText) return null;
+  if (!content) return null;
 
   // 줄바꿈 단위로 분할하여 파싱
-  const rawLines = cleanedText.split('\n');
+  const rawLines = content.split('\n');
 
   // 섹션 단위로 그룹화
   const sections: Array<{
-    type: 'banner' | 'warning_box' | 'section' | 'divider' | 'text';
+    type: SectionCategoryConfig['theme'];
     title?: string;
+    icon?: string;
+    badgeLabel?: string;
     lines: string[];
   }> = [];
 
   let currentSection: {
-    type: 'banner' | 'warning_box' | 'section' | 'divider' | 'text';
+    type: SectionCategoryConfig['theme'];
     title?: string;
+    icon?: string;
+    badgeLabel?: string;
     lines: string[];
-  } = { type: 'text', lines: [] };
+  } = { type: 'normal', lines: [] };
 
   for (const line of rawLines) {
     const trimmed = line.trim();
 
-    // 구분선 감지 (===================)
-    if (/^={10,}$/.test(trimmed)) {
+    // 구분선 감지 (=================== 또는 -------------------)
+    if (/^={10,}$/.test(trimmed) || /^-{3,}$/.test(trimmed)) {
       if (currentSection.lines.length > 0 || currentSection.title) {
         sections.push(currentSection);
       }
-      sections.push({ type: 'divider', lines: [] });
-      currentSection = { type: 'text', lines: [] };
+      sections.push({ type: 'normal', title: '__DIVIDER__', lines: [] });
+      currentSection = { type: 'normal', lines: [] };
       continue;
     }
 
-    // 섹션 헤더 감지: [제목...] 형태
-    const headerMatch = trimmed.match(/^\[(.+)\]$/);
-    if (headerMatch) {
+    // 섹션 헤더 감지: [제목...] 형태 또는 ### 제목 또는 ## 제목
+    let detectedTitle: string | null = null;
+    const bracketMatch = trimmed.match(/^\[(.+)\]$/);
+    const mdHeaderMatch = trimmed.match(/^#{1,4}\s*(.+)$/);
+
+    if (bracketMatch) {
+      detectedTitle = bracketMatch[1];
+    } else if (mdHeaderMatch) {
+      detectedTitle = mdHeaderMatch[1].replace(/^\*\*|\*\*$/g, ''); // 볼드 감싸진 헤더 정제
+    }
+
+    if (detectedTitle) {
       if (currentSection.lines.length > 0 || currentSection.title) {
         sections.push(currentSection);
       }
-      const title = headerMatch[1];
-      const isBanner = title.includes('INSUFFICIENT') || title.includes('안내:') || title.includes('검증 안내');
-      const isWarningBox = title.includes('미검증') || title.includes('주의') || title.includes('한계');
-
+      const cat = classifySectionTitle(detectedTitle);
       currentSection = {
-        type: isBanner ? 'banner' : isWarningBox ? 'warning_box' : 'section',
-        title,
+        type: cat.theme,
+        title: detectedTitle,
+        icon: cat.icon,
+        badgeLabel: cat.badgeLabel,
         lines: [],
       };
       continue;
@@ -103,12 +286,12 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content }) => 
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', lineHeight: 1.65 }}>
       {sections.map((sec, idx) => {
         // 1. 구분선
-        if (sec.type === 'divider') {
+        if (sec.title === '__DIVIDER__') {
           return (
             <div
               key={idx}
               style={{
-                borderTop: '1px dashed var(--border)',
+                borderTop: '1px dashed var(--border, #e2e8f0)',
                 margin: '8px 0',
               }}
             />
@@ -140,7 +323,7 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content }) => 
                   marginBottom: '8px',
                 }}
               >
-                <span>🛡️</span>
+                <span>{sec.icon || '🛡️'}</span>
                 <span>{sec.title}</span>
               </div>
               <div style={{ fontSize: '0.9em', color: 'var(--text-main)' }}>
@@ -150,15 +333,15 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content }) => 
           );
         }
 
-        // 3. 미검증 초안 주의 경고 박스
-        if (sec.type === 'warning_box') {
+        // 3. 미검증 초안 / 불확실성 주의 경고 박스
+        if (sec.type === 'warning' || sec.type === 'uncertain') {
           return (
             <div
               key={idx}
               style={{
-                backgroundColor: 'var(--surface-alt, #f8fafc)',
-                border: '1px solid var(--border, #e2e8f0)',
-                borderLeft: '4px solid var(--danger, #ef4444)',
+                backgroundColor: '#fff7ed',
+                border: '1px solid #fed7aa',
+                borderLeft: '4px solid #ea580c',
                 borderRadius: 'var(--radius-md, 6px)',
                 padding: '12px 14px',
                 color: 'var(--text-main, #1e293b)',
@@ -166,24 +349,99 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content }) => 
             >
               <div
                 style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
                   fontWeight: 700,
-                  fontSize: '0.93em',
-                  color: 'var(--danger, #ef4444)',
+                  fontSize: '0.94em',
+                  color: '#c2410c',
                   marginBottom: '6px',
                 }}
               >
-                ⚠️ {sec.title}
+                <span>{sec.icon || '⚠️'}</span>
+                <span>{sec.title}</span>
+                {sec.badgeLabel && (
+                  <span
+                    style={{
+                      fontSize: '0.75em',
+                      backgroundColor: '#ffedd5',
+                      color: '#9a3412',
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      marginLeft: '4px',
+                    }}
+                  >
+                    {sec.badgeLabel}
+                  </span>
+                )}
               </div>
-              <div style={{ fontSize: '0.88em', color: 'var(--text-secondary)' }}>
+              <div style={{ fontSize: '0.89em', color: 'var(--text-secondary, #475569)' }}>
                 {sec.lines.map((l, lIdx) => renderFormattedLine(l, lIdx))}
               </div>
             </div>
           );
         }
 
-        // 4. 일반 본문 섹션
+        // 4. 다음 행동 권장 조치 카드 (산뜻한 블루 카드)
+        if (sec.type === 'action') {
+          return (
+            <div
+              key={idx}
+              style={{
+                backgroundColor: '#f0fdf4',
+                border: '1px solid #bbf7d0',
+                borderLeft: '4px solid #16a34a',
+                borderRadius: 'var(--radius-md, 6px)',
+                padding: '12px 14px',
+                color: 'var(--text-main, #1e293b)',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontWeight: 700,
+                  fontSize: '0.94em',
+                  color: '#15803d',
+                  marginBottom: '6px',
+                }}
+              >
+                <span>{sec.icon || '🚀'}</span>
+                <span>{sec.title}</span>
+                {sec.badgeLabel && (
+                  <span
+                    style={{
+                      fontSize: '0.75em',
+                      backgroundColor: '#dcfce7',
+                      color: '#166534',
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      marginLeft: '4px',
+                    }}
+                  >
+                    {sec.badgeLabel}
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: '0.91em', color: 'var(--text-main)' }}>
+                {sec.lines.map((l, lIdx) => renderFormattedLine(l, lIdx))}
+              </div>
+            </div>
+          );
+        }
+
+        // 5. 일반 본문 및 8대 권장 구성요소 카드
         return (
-          <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div
+            key={idx}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              padding: sec.title ? '4px 0' : '0',
+            }}
+          >
             {sec.title && (
               <div
                 style={{
@@ -196,8 +454,23 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content }) => 
                   marginTop: '4px',
                 }}
               >
-                <span>▪</span>
+                <span>{sec.icon || '▪'}</span>
                 <span>{sec.title}</span>
+                {sec.badgeLabel && (
+                  <span
+                    style={{
+                      fontSize: '0.75em',
+                      fontWeight: 600,
+                      backgroundColor: '#eff6ff',
+                      color: '#1d4ed8',
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      marginLeft: '4px',
+                    }}
+                  >
+                    {sec.badgeLabel}
+                  </span>
+                )}
               </div>
             )}
             <div style={{ fontSize: '0.92em', color: 'var(--text-main)' }}>
@@ -209,61 +482,3 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content }) => 
     </div>
   );
 };
-
-/**
- * 개별 줄의 형태(불릿, 번호 목록, 일반 문장, 빈 줄)에 따라 깔끔한 스타일 적용
- */
-function renderFormattedLine(line: string, index: number): React.ReactNode {
-  const trimmed = line.trim();
-  if (!trimmed) {
-    return <div key={index} style={{ height: '6px' }} />;
-  }
-
-  // 1. 불릿 목록 (- 또는 •)
-  if (trimmed.startsWith('- ') || trimmed.startsWith('• ')) {
-    const textContent = trimmed.substring(2);
-    return (
-      <div
-        key={index}
-        style={{
-          display: 'flex',
-          gap: '8px',
-          alignItems: 'flex-start',
-          margin: '3px 0 3px 6px',
-        }}
-      >
-        <span style={{ color: 'var(--primary, #3b82f6)', fontWeight: 'bold' }}>•</span>
-        <span style={{ flex: 1 }}>{textContent}</span>
-      </div>
-    );
-  }
-
-  // 2. 번호 목록 (1., 2), 가. 등)
-  const numMatch = trimmed.match(/^(\d+[.)]|\([0-9]+\)|[가-힣][.)])\s*(.+)$/);
-  if (numMatch) {
-    return (
-      <div
-        key={index}
-        style={{
-          display: 'flex',
-          gap: '8px',
-          alignItems: 'flex-start',
-          margin: '3px 0 3px 6px',
-        }}
-      >
-        <span style={{ color: 'var(--text-muted, #64748b)', fontWeight: 600, minWidth: '18px' }}>
-          {numMatch[1]}
-        </span>
-        <span style={{ flex: 1 }}>{numMatch[2]}</span>
-      </div>
-    );
-  }
-
-  // 3. 일반 문장
-  return (
-    <div key={index} style={{ margin: '2px 0' }}>
-      {line}
-    </div>
-  );
-}
-

@@ -20,6 +20,7 @@ import os
 import sys
 import types
 import uuid
+import re
 from typing import Optional, Dict, Any, List
 
 # LangChain 1.x 버전에서 langfuse 2.x SDK의 이전 import 경로 호환성 보장
@@ -495,3 +496,82 @@ def log_score(
             )
     except Exception:
         pass
+
+
+# PII 및 민감정보 마스킹 패턴 (P2-02)
+_RRN_PATTERN = re.compile(r"\b(\d{6})[- ]?([1-4]\d{6})\b")
+_PHONE_PATTERN = re.compile(r"\b(01[016789]|02|0[3-6]\d)[- ]?(\d{3,4})[- ]?(\d{4})\b")
+_API_KEY_PATTERN = re.compile(r"\b(sk-[A-Za-z0-9_\-]{20,}|OC=[A-Za-z0-9_\-]+|bearer\s+[A-Za-z0-9_\-\.]{20,})\b", re.IGNORECASE)
+
+
+def mask_pii(text: Optional[str]) -> str:
+    """텍스트 내 주민등록번호, 전화번호, API 키 등 민감정보(PII)를 자동으로 마스킹한다 (P2-02).
+
+    Args:
+        text: 원본 문자열.
+
+    Returns:
+        str: 민감정보가 안전하게 대체된 문자열.
+    """
+    if not text:
+        return ""
+
+    # 1. 주민등록번호 (생년월일 6자리 유지, 뒷자리 마스킹)
+    cleaned = _RRN_PATTERN.sub(r"\1-*******", text)
+
+    # 2. 전화번호/휴대전화 (국번 가운데 마스킹)
+    cleaned = _PHONE_PATTERN.sub(r"\1-****-\3", cleaned)
+
+    # 3. API 키 마스킹
+    cleaned = _API_KEY_PATTERN.sub("[MASKED_API_KEY]", cleaned)
+
+    return cleaned
+
+
+def build_consultation_trace_summary(
+    request_id: str,
+    case_id: Optional[str] = None,
+    execution_status: str = "COMPLETED",
+    verification_status: str = "UNVERIFIED",
+    answer_status: str = "DELIVERED",
+    selected_agents: Optional[List[str]] = None,
+    revision_count: int = 0,
+    retrieval_info: Optional[Dict[str, Any]] = None,
+    verification_info: Optional[Dict[str, Any]] = None,
+    usage_info: Optional[Dict[str, Any]] = None,
+    hilt_info: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """한 번의 상담 세션에 대한 의사결정 및 실행 전체 흐름을 일목요연하게 요약한 구조화 메타데이터를 생성한다 (P2-02).
+
+    Langfuse 대시보드에서 Trace 클릭 시, 최종 답변이 어떤 근거와 판단 과정을 거쳐 생성되었는지
+    한눈에 파악할 수 있도록 돕는다.
+
+    Args:
+        request_id: 상담 요청 식별자.
+        case_id: 연결된 사건 식별자.
+        execution_status: 워크플로우 실행 상태 (IN_PROGRESS, APPROVAL_REQUIRED, COMPLETED, ERROR).
+        verification_status: 법률 검증 상태 (PASS, REVISE, INSUFFICIENT, UNVERIFIED).
+        answer_status: 최종 조언 제공 상태 (DELIVERED, WITHHELD, CAUTIONARY, REVISED).
+        selected_agents: Supervisor가 선정한 전문 에이전트 목록.
+        revision_count: 재분석/재검증 루프 수행 횟수.
+        retrieval_info: 검색 인덱스 및 수집 출처 요약 정보.
+        verification_info: Citation Validator 및 근거 지지율 요약.
+        usage_info: LLM 호출 횟수, 토큰량, 지연시간 요약.
+        hilt_info: HILT 공식 법령 검색 승인/거절 내역.
+
+    Returns:
+        Dict[str, Any]: Langfuse Trace metadata에 부착될 완성된 요약 딕셔너리.
+    """
+    return {
+        "request_id": request_id,
+        "case_id": case_id,
+        "execution_status": execution_status,
+        "verification_status": verification_status,
+        "answer_status": answer_status,
+        "selected_agents": selected_agents or [],
+        "revision_count": revision_count,
+        "retrieval": retrieval_info or {},
+        "verification": verification_info or {},
+        "usage": usage_info or {},
+        "hilt": hilt_info or {},
+    }

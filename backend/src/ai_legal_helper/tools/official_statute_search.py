@@ -21,8 +21,10 @@
 """
 import os
 import re
+import time
 import urllib.request
 import urllib.parse
+import urllib.error
 import xml.etree.ElementTree as ET
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone, timedelta
@@ -41,6 +43,61 @@ def _get_kst_iso() -> str:
     return datetime.now(KST).isoformat()
 
 
+def mask_api_key(text: str, key: Optional[str] = None) -> str:
+    """로그 및 URL에 포함된 법제처 Open API 키를 마스킹([MASKED]) 처리한다.
+
+    Args:
+        text: 원본 문자열 또는 URL.
+        key: 마스킹할 API 키 문자열 (옵션).
+
+    Returns:
+        str: 민감정보가 마스킹된 문자열.
+    """
+    if not text:
+        return ""
+    if key and key in text:
+        text = text.replace(key, "[MASKED]")
+    return re.sub(r"OC=[^&]+", "OC=[MASKED]", text)
+
+
+def _fetch_xml_with_retry(
+    url: str,
+    api_key: Optional[str] = None,
+    timeout: int = 10,
+    max_retries: int = 1,
+    backoff_seconds: float = 1.0,
+) -> Optional[bytes]:
+    """HTTPS 요청을 수행하고 네트워크/타임아웃 오류 발생 시 1회 지수 백오프로 재시도한다.
+
+    Args:
+        url: 요청 대상 HTTPS URL.
+        api_key: 마스킹할 API 키.
+        timeout: 타임아웃 초 (기본값: 10초).
+        max_retries: 최대 재시도 횟수 (기본값: 1회).
+        backoff_seconds: 재시도 대기 시간 초 (기본값: 1.0초).
+
+    Returns:
+        Optional[bytes]: 응답 바이트 데이터. 실패 시 None 반환.
+    """
+    req = urllib.request.Request(url, headers={"User-Agent": "AILegalHelper/1.0"})
+    for attempt in range(max_retries + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return resp.read()
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            masked_url = mask_api_key(url, api_key)
+            if attempt < max_retries:
+                logger.warning(
+                    f"[OFFICIAL_STATUTE] 요청 실패({type(e).__name__}), {backoff_seconds}초 후 재시도... URL: {masked_url}"
+                )
+                time.sleep(backoff_seconds)
+            else:
+                logger.error(
+                    f"[OFFICIAL_STATUTE] 최종 요청 실패({type(e).__name__}): {mask_api_key(str(e), api_key)} URL: {masked_url}"
+                )
+    return None
+
+
 @trace
 def search_official_statutes(
     query: str,
@@ -51,9 +108,10 @@ def search_official_statutes(
 ) -> List[Dict[str, Any]]:
     """법제처 국가법령정보공동활용 API를 호출하여 공식 법령 조문 원문을 실시간 검색한다.
 
-    1. 각 후보 법령명(`candidate_laws`)으로 법제처 법령 검색 API(`lawSearch.do`)를 호출하여 법령 식별자(MST)를 조회한다.
+    1. 각 후보 법령명(`candidate_laws`)으로 법제처 법령 검색 API(`lawSearch.do`)를 HTTPS로 호출하여 법령 식별자(MST)를 조회한다.
        - 법령명 완전 일치(예: '민법' 검색 시 '난민법' 배제)를 우선 검증한다.
-    2. 획득한 MST로 조문 상세 조회 API(`lawService.do`)를 호출하여 조문 목록(XML)을 파싱한다.
+       - 일치하는 법령이 없을 경우 첫 번째 법령을 임의 선택하지 않고 즉시 제외(None Fallback)한다.
+    2. 획득한 MST로 조문 상세 조회 API(`lawService.do`)를 HTTPS로 호출하여 조문 목록(XML)을 파싱한다.
     3. 정보검색(IR) 기반의 일반화된 동적 가중치 알고리즘을 적용하여 조문을 선별한다:
        - 법률검증 Agent가 식별한 누락 쟁점(`missing_issues`)에 조문 제목이 부합할 경우 최우선 순위(15.0x)를 부여한다.
        - 법령명 자체에 포함된 단어(예: '주택임대차보호법'의 '주택', '임대차')는 조문 전반에 빈출하므로 가중치를 감쇄(0.2x~0.3x, TF-IDF 원리)한다.
@@ -95,17 +153,18 @@ def search_official_statutes(
             continue
 
         try:
-            # 1단계: 법제처 법령 목록 검색 (MST 획득)
+            # 1단계: 법제처 법령 목록 검색 (MST 획득, HTTPS 강제)
             encoded_name = urllib.parse.quote(clean_law_name)
             search_url = (
-                f"http://www.law.go.kr/DRF/lawSearch.do?"
+                f"https://www.law.go.kr/DRF/lawSearch.do?"
                 f"OC={api_key}&target=law&type=XML&query={encoded_name}"
             )
             logger.info(f"[OFFICIAL_STATUTE] 법제처 법령 검색 호출: {clean_law_name}")
 
-            req = urllib.request.Request(search_url, headers={"User-Agent": "AILegalHelper/1.0"})
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                search_xml_bytes = resp.read()
+            search_xml_bytes = _fetch_xml_with_retry(search_url, api_key=api_key)
+            if not search_xml_bytes:
+                logger.warning(f"[OFFICIAL_STATUTE] '{clean_law_name}' 검색 응답 수신 실패")
+                continue
 
             search_root = ET.fromstring(search_xml_bytes)
             
@@ -126,11 +185,9 @@ def search_official_statutes(
                         matched_elem = elem
                         break
 
+            # 임의 법령 채택 fallback 제거: 일치하지 않으면 임의 채택하지 않고 건너뜀
             if matched_elem is None:
-                matched_elem = search_root.find(".//law")
-
-            if matched_elem is None:
-                logger.warning(f"[OFFICIAL_STATUTE] '{clean_law_name}' 법령을 법제처에서 찾지 못했습니다.")
+                logger.warning(f"[OFFICIAL_STATUTE] '{clean_law_name}' 법령을 법제처 검색 결과에서 찾지 못했습니다.")
                 continue
 
             mst = matched_elem.findtext("법령일련번호") or matched_elem.findtext("일련번호")
@@ -138,21 +195,26 @@ def search_official_statutes(
             law_id = matched_elem.findtext("법령ID") or ""
             law_no = matched_elem.findtext("공포번호") or ""
             eff_date_raw = matched_elem.findtext("시행일자") or ""
+            prom_date_raw = matched_elem.findtext("공포일자") or ""
             
-            # 시행일자 YYYY-MM-DD 변환
+            # 시행일자 및 공포일자 YYYY-MM-DD 변환
             effective_date_str = ""
             if len(eff_date_raw) == 8:
                 effective_date_str = f"{eff_date_raw[:4]}-{eff_date_raw[4:6]}-{eff_date_raw[6:]}"
+            promulgation_date_str = ""
+            if len(prom_date_raw) == 8:
+                promulgation_date_str = f"{prom_date_raw[:4]}-{prom_date_raw[4:6]}-{prom_date_raw[6:]}"
 
             if not mst:
                 logger.warning(f"[OFFICIAL_STATUTE] '{clean_law_name}'의 MST(일련번호)가 없습니다.")
                 continue
 
-            # 2단계: 법제처 조문 상세 조회
-            service_url = f"http://www.law.go.kr/DRF/lawService.do?OC={api_key}&target=law&MST={mst}&type=XML"
-            req_service = urllib.request.Request(service_url, headers={"User-Agent": "AILegalHelper/1.0"})
-            with urllib.request.urlopen(req_service, timeout=10) as resp_service:
-                detail_xml_bytes = resp_service.read()
+            # 2단계: 법제처 조문 상세 조회 (HTTPS 강제)
+            service_url = f"https://www.law.go.kr/DRF/lawService.do?OC={api_key}&target=law&MST={mst}&type=XML"
+            detail_xml_bytes = _fetch_xml_with_retry(service_url, api_key=api_key)
+            if not detail_xml_bytes:
+                logger.warning(f"[OFFICIAL_STATUTE] '{official_law_name}' 상세 조문 응답 수신 실패")
+                continue
 
             detail_root = ET.fromstring(detail_xml_bytes)
             article_nodes = detail_root.findall(".//조문단위")
@@ -263,6 +325,10 @@ def search_official_statutes(
                     "title": official_law_name,
                     "statute_name": official_law_name,
                     "article": art_label,
+                    "law_id": law_id or None,
+                    "version_id": mst or None,
+                    "promulgation_date": promulgation_date_str or None,
+                    "promulgation_number": law_no or None,
                     "content": item["content"],
                     "retrieval_method": "OFFICIAL_STATUTE_SEARCH",
                     "chunk_id": f"statute-{mst}-{art_label}",
@@ -286,7 +352,8 @@ def search_official_statutes(
             logger.info(f"[OFFICIAL_STATUTE] '{official_law_name}'에서 조문 {len(selected_articles)}건 확보 완료")
 
         except Exception as e:
-            logger.error(f"[OFFICIAL_STATUTE] 법령 '{law_name}' 검색 중 오류: {type(e).__name__}: {str(e)}")
+            masked_err = mask_api_key(f"{type(e).__name__}: {str(e)}", api_key)
+            logger.error(f"[OFFICIAL_STATUTE] 법령 '{law_name}' 검색 중 오류: {masked_err}")
 
     return retrieved_sources
 

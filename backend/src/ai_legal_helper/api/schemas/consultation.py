@@ -41,10 +41,14 @@ class Source(BaseModel):
     version_date: Optional[str] = None
     retrieved_at: Optional[str] = None
 
-    # 법령(STATUTE) 추가 필드
+    # 법령(STATUTE) 추가 필드 (P1-02 보강)
+    law_id: Optional[str] = None
     statute_name: Optional[str] = None
     article: Optional[str] = None
+    promulgation_date: Optional[str] = None
+    promulgation_number: Optional[str] = None
     effective_date: Optional[str] = None
+    version_id: Optional[str] = None
 
     # 판례(PRECEDENT) 추가 필드
     court: Optional[str] = None
@@ -70,6 +74,11 @@ class ConsultationResponse(BaseModel):
     request_id: str
     trace_id: str
     status: str
+    # 3계층 상태 분리 (P1-05 Three-Tier Status Model)
+    execution_status: Optional[str] = "COMPLETED"  # IN_PROGRESS | APPROVAL_REQUIRED | COMPLETED | ERROR
+    verification_status: Optional[str] = None      # PASS | REVISE | INSUFFICIENT | UNVERIFIED
+    answer_status: Optional[str] = None            # DELIVERED | WITHHELD | CAUTIONARY | REVISED
+
     answer: Optional[str] = None
     sources: List[Source] = []
     elapsed_ms: Optional[float] = None

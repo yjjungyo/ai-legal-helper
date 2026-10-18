@@ -17,10 +17,14 @@ export interface Source {
   version_date?: string | null;
   retrieved_at?: string | null;
 
-  // 법령(STATUTE) 전용 필드
+  // 법령(STATUTE) 전용 필드 (P1-02 보강)
+  law_id?: string | null;
   statute_name?: string | null;
   article?: string | null;
+  promulgation_date?: string | null;
+  promulgation_number?: string | null;
   effective_date?: string | null;
+  version_id?: string | null;
 
   // 판례(PRECEDENT) 전용 필드
   court?: string | null;
@@ -63,6 +67,10 @@ export interface ConsultationResponse {
   request_id: string;
   trace_id: string;
   status: 'IN_PROGRESS' | 'SUCCESS' | 'ERROR' | 'APPROVAL_REQUIRED';
+  // 3계층 상태 분리 (P1-05 Three-Tier Status Model)
+  execution_status?: 'IN_PROGRESS' | 'APPROVAL_REQUIRED' | 'COMPLETED' | 'ERROR';
+  verification_status?: 'PASS' | 'REVISE' | 'INSUFFICIENT' | 'UNVERIFIED' | string;
+  answer_status?: 'DELIVERED' | 'WITHHELD' | 'CAUTIONARY' | 'REVISED' | string;
   answer?: string;
   sources: Source[];
   elapsed_ms?: number;

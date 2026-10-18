@@ -529,6 +529,9 @@ class ConsultationRecord(Base):
     question = Column(Text, nullable=False)
     answer = Column(Text, nullable=True)
     status = Column(String, default="IN_PROGRESS")  # IN_PROGRESS, APPROVAL_REQUIRED, SUCCESS, ERROR, REJECTED
+    execution_status = Column(String(50), default="IN_PROGRESS", nullable=True)  # IN_PROGRESS, APPROVAL_REQUIRED, COMPLETED, ERROR
+    verification_status = Column(String(50), nullable=True)  # PASS, REVISE, INSUFFICIENT, UNVERIFIED
+    answer_status = Column(String(50), default="WITHHELD", nullable=True)  # DELIVERED, WITHHELD, CAUTIONARY, REVISED
     approval_request = Column(JSON, nullable=True)
     sources = Column(JSON, nullable=True)
     verification_result = Column(JSON, nullable=True)

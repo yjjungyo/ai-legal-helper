@@ -63,11 +63,14 @@ async def start_consultation(
     request_id = get_request_id() or str(uuid.uuid4())
     trace_id = get_trace_id() or str(uuid.uuid4())
     
-    # Initial status
+    # Initial status (P1-05 3-tier status model)
     resp = ConsultationResponse(
         request_id=request_id,
         trace_id=trace_id,
         status="IN_PROGRESS",
+        execution_status="IN_PROGRESS",
+        verification_status="UNVERIFIED",
+        answer_status="WITHHELD",
         question=req.question,
         case_id=req.case_id,
         created_at=get_kst_iso(),
@@ -84,7 +87,10 @@ async def start_consultation(
             request_id=request_id,
             trace_id=trace_id,
             question=req.question,
-            status="IN_PROGRESS"
+            status="IN_PROGRESS",
+            execution_status="IN_PROGRESS",
+            verification_status="UNVERIFIED",
+            answer_status="WITHHELD",
         )
         db.add(record)
         db.commit()
@@ -142,24 +148,39 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
         
         resp = _consultations[request_id]
         is_approval_required = (result.get("status") == "APPROVAL_REQUIRED")
+        ver_res = result.get("verification_result") or {}
+        ver_status = ver_res.get("status") or "UNVERIFIED"
 
         if is_approval_required:
             resp.status = "APPROVAL_REQUIRED"
+            resp.execution_status = "APPROVAL_REQUIRED"
+            resp.verification_status = ver_status
+            resp.answer_status = "WITHHELD"
             resp.approval_request = result.get("approval_request")
             resp.answer = result.get("answer", "해당 쟁점에 필요한 공식 법령(특별법 등) 원문 검색 진행을 위해 사용자 승인이 필요합니다.")
         else:
             resp.status = "SUCCESS"
+            resp.execution_status = "COMPLETED"
+            resp.verification_status = ver_status
+            resp.answer_status = "DELIVERED" if ver_status == "PASS" else "WITHHELD"
             resp.answer = result.get("answer", "")
             resp.approval_request = result.get("approval_request")
         
-        # Map sources (서버 Source Registry 기반 표준 Source 스키마 정규화 및 중복 제거)
+        # Map sources (서버 Source Registry 기반 표준 Source 스키마 정규화 및 의미 기반 중복 제거)
         from ai_legal_helper.rag.source_schema import normalize_source_dict
         sources_data = result.get("sources", [])
         dedup_sources = []
         seen_source_keys = set()
         for s in sources_data:
             std_dict = normalize_source_dict(s)
-            key = (std_dict.get("source_id"), std_dict.get("file"), str(std_dict.get("page") or ""))
+            stype = std_dict.get("source_type")
+            if stype == "CASE_EVIDENCE":
+                key = (stype, std_dict.get("file"), str(std_dict.get("page") or "1"))
+            elif stype == "STATUTE":
+                key = (stype, std_dict.get("statute_name") or std_dict.get("title"), std_dict.get("article"))
+            else:
+                key = (std_dict.get("source_id"), std_dict.get("file"), str(std_dict.get("page") or ""))
+
             if key not in seen_source_keys:
                 seen_source_keys.add(key)
                 dedup_sources.append(Source(**std_dict))
@@ -174,30 +195,46 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
         resp.selected_agents = result.get("selected_agents", [])
         resp.warnings.extend(result.get("warnings", []))
 
-        # 요구사항 5: Langfuse 루트 Span/Trace에 최종 출처·검증·실행시간·토큰 요약 기록
+        # 요구사항 5: Langfuse 루트 Span/Trace에 최종 출처·검증·실행시간·토큰 요약 기록 (P2-02)
         try:
             from ai_legal_helper.observability.context import get_current_span_id
-            from ai_legal_helper.observability.langfuse_client import update_span
+            from ai_legal_helper.observability.langfuse_client import update_span, build_consultation_trace_summary
             audit_meta = (resp.verification_result or {}).get("citation_audit", {})
-            update_span(get_current_span_id(), {
-                "elapsed_ms": round(elapsed_ms, 2),
-                "total_tokens": usage_summary.total_tokens,
-                "retrieval_source_ids": audit_meta.get("retrieval_source_ids", [s.source_id for s in resp.sources]),
-                "retrieval_methods": audit_meta.get("retrieval_methods", []),
-                "retrieved_chunk_ids": audit_meta.get("retrieved_chunk_ids", []),
-                "generated_citation_ids": audit_meta.get("generated_citation_ids", []),
-                "validated_citation_ids": audit_meta.get("validated_citation_ids", []),
-                "rejected_citation_ids": audit_meta.get("rejected_citation_ids", []),
-                "rejection_reasons": audit_meta.get("rejection_reasons", {}),
-                "citation_existence_rate": audit_meta.get("citation_existence_rate", 1.0),
-                "citation_support_rate": audit_meta.get("citation_support_rate", 1.0),
-            })
+            summary_dict = build_consultation_trace_summary(
+                request_id=request_id,
+                case_id=req.case_id,
+                execution_status=resp.execution_status or "COMPLETED",
+                verification_status=resp.verification_status or "UNVERIFIED",
+                answer_status=resp.answer_status or "DELIVERED",
+                selected_agents=resp.selected_agents,
+                revision_count=resp.revision_count,
+                retrieval_info={
+                    "methods": audit_meta.get("retrieval_methods", []),
+                    "hits_count": len(resp.sources),
+                    "source_ids": [s.source_id for s in resp.sources if s.source_id],
+                },
+                verification_info={
+                    "status": (resp.verification_result or {}).get("status"),
+                    "reason_code": (resp.verification_result or {}).get("reason_code"),
+                    "citation_existence_rate": audit_meta.get("citation_existence_rate", 1.0),
+                    "citation_support_rate": audit_meta.get("citation_support_rate", 1.0),
+                    "citation_coverage_rate": audit_meta.get("citation_coverage_rate", 1.0),
+                    "rejected_citations": audit_meta.get("rejected_citation_ids", []),
+                },
+                usage_info={
+                    "total_calls": usage_summary.total_calls,
+                    "total_tokens": usage_summary.total_tokens,
+                    "elapsed_ms": round(elapsed_ms, 2),
+                },
+            )
+            update_span(get_current_span_id(), summary_dict)
 
             # Langfuse Scores/Evaluation 탭에 정량 평가 점수 기록
             from ai_legal_helper.observability.langfuse_client import log_score
-            exist_rate = float(audit_meta.get("citation_existence_rate", 1.0))
-            supp_rate = float(audit_meta.get("citation_support_rate", 1.0))
-            ver_status = (resp.verification_result or {}).get("status", "PASS")
+            exist_raw = audit_meta.get("citation_existence_rate")
+            exist_rate = float(exist_raw) if exist_raw not in (None, "N/A") else 0.0
+            supp_raw = audit_meta.get("citation_support_rate")
+            supp_rate = float(supp_raw) if supp_raw not in (None, "N/A") else 0.0
             score_val = 1.0 if ver_status == "PASS" else (0.5 if ver_status == "REVISE" else 0.0)
             log_score(trace_id, "citation_existence_rate", exist_rate)
             log_score(trace_id, "citation_support_rate", supp_rate)
@@ -209,6 +246,9 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
         elapsed_ms = (time.time() - start_time) * 1000
         resp = _consultations[request_id]
         resp.status = "ERROR"
+        resp.execution_status = "ERROR"
+        resp.verification_status = "UNVERIFIED"
+        resp.answer_status = "WITHHELD"
         resp.warnings.append(str(e))
         resp.elapsed_ms = elapsed_ms
     finally:
@@ -220,6 +260,9 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
                 ).first()
                 if rec:
                     rec.status = resp.status
+                    rec.execution_status = getattr(resp, "execution_status", resp.status)
+                    rec.verification_status = getattr(resp, "verification_status", None)
+                    rec.answer_status = getattr(resp, "answer_status", None)
                     rec.answer = resp.answer
                     rec.approval_request = resp.approval_request
                     rec.sources = [s.model_dump() for s in resp.sources] if resp.sources else []
@@ -270,6 +313,9 @@ async def get_consultation(
         request_id=record.request_id,
         trace_id=record.trace_id or "",
         status=record.status,
+        execution_status=getattr(record, "execution_status", record.status) or "COMPLETED",
+        verification_status=getattr(record, "verification_status", None),
+        answer_status=getattr(record, "answer_status", None),
         answer=record.answer,
         approval_request=record.approval_request,
         sources=sources,
@@ -345,25 +391,41 @@ async def decide_statute_search_approval(
     trace_id = record.trace_id if record else _consultations[request_id].trace_id
     case_id = record.case_id if record else _consultations[request_id].case_id
 
-    # 중복 Resume 방지: 즉시 상태를 IN_PROGRESS로 전이
+    # 원자적 상태 변경 및 중복 Resume 방지 (P1-06)
+    if record:
+        updated_rows = db.query(ConsultationRecord).filter(
+            ConsultationRecord.request_id == request_id,
+            ConsultationRecord.status == "APPROVAL_REQUIRED",
+        ).update({
+            "status": "IN_PROGRESS",
+            "execution_status": "IN_PROGRESS",
+        })
+        db.commit()
+        if updated_rows == 0:
+            raise HTTPException(
+                status_code=409,
+                detail="이미 다른 요청에 의해 승인/거절 처리가 진행 중이거나 완료되었습니다.",
+            )
+
+    # 메모리 캐시 상태 동기화
     if request_id in _consultations:
         resp = _consultations[request_id]
         resp.status = "IN_PROGRESS"
+        resp.execution_status = "IN_PROGRESS"
     else:
         resp = ConsultationResponse(
             request_id=request_id,
             trace_id=trace_id or "",
             status="IN_PROGRESS",
+            execution_status="IN_PROGRESS",
+            verification_status="UNVERIFIED",
+            answer_status="WITHHELD",
             question=record.question if record else None,
             case_id=case_id,
             created_at=get_kst_iso(record.created_at) if record and record.created_at else None,
         )
         _consultations[request_id] = resp
         setattr(resp, "_user_id", current_user.id)
-
-    if record:
-        record.status = "IN_PROGRESS"
-        db.commit()
 
     # 비동기 백그라운드 태스크로 재개(Resume) 파이프라인 가동
     background_tasks.add_task(
@@ -426,52 +488,81 @@ async def process_consultation_resume(
             )
             _consultations[request_id] = resp
 
+        ver_res = result.get("verification_result") or {}
+        ver_status = ver_res.get("status") or "UNVERIFIED"
+
         resp.status = "SUCCESS"
+        resp.execution_status = "COMPLETED"
+        resp.verification_status = ver_status
+        resp.answer_status = "DELIVERED" if ver_status == "PASS" else "WITHHELD"
         resp.answer = result.get("answer", "")
         resp.elapsed_ms = elapsed_ms
         resp.usage_summary = usage_summary
-        resp.verification_result = result.get("verification_result", {})
+        resp.verification_result = ver_res
         resp.revision_count = result.get("revision_count", 0)
         resp.selected_agents = result.get("selected_agents", [])
         resp.warnings.extend(result.get("warnings", []))
         resp.approval_request = result.get("approval_request")
 
-        # Sources 정규화
+        # Sources 정규화 (의미 기반 중복 제거)
         from ai_legal_helper.rag.source_schema import normalize_source_dict
         sources_data = result.get("sources", [])
         dedup_sources = []
         seen_source_keys = set()
         for s in sources_data:
             std_dict = normalize_source_dict(s)
-            key = (std_dict.get("source_id"), std_dict.get("file"), str(std_dict.get("page") or ""))
+            stype = std_dict.get("source_type")
+            if stype == "CASE_EVIDENCE":
+                key = (stype, std_dict.get("file"), str(std_dict.get("page") or "1"))
+            elif stype == "STATUTE":
+                key = (stype, std_dict.get("statute_name") or std_dict.get("title"), std_dict.get("article"))
+            else:
+                key = (std_dict.get("source_id"), std_dict.get("file"), str(std_dict.get("page") or ""))
+
             if key not in seen_source_keys:
                 seen_source_keys.add(key)
                 dedup_sources.append(Source(**std_dict))
         resp.sources = dedup_sources
 
-        # Langfuse span 업데이트
+        # Langfuse span 업데이트 (P2-02)
         try:
             from ai_legal_helper.observability.context import get_current_span_id
-            from ai_legal_helper.observability.langfuse_client import update_span
+            from ai_legal_helper.observability.langfuse_client import update_span, build_consultation_trace_summary
             audit_meta = (resp.verification_result or {}).get("citation_audit", {})
-            update_span(get_current_span_id(), {
-                "elapsed_ms": round(elapsed_ms, 2),
-                "total_tokens": usage_summary.total_tokens,
-                "retrieval_source_ids": audit_meta.get("retrieval_source_ids", [s.source_id for s in resp.sources]),
-                "retrieval_methods": audit_meta.get("retrieval_methods", []),
-                "retrieved_chunk_ids": audit_meta.get("retrieved_chunk_ids", []),
-                "generated_citation_ids": audit_meta.get("generated_citation_ids", []),
-                "validated_citation_ids": audit_meta.get("validated_citation_ids", []),
-                "rejected_citation_ids": audit_meta.get("rejected_citation_ids", []),
-                "rejection_reasons": audit_meta.get("rejection_reasons", {}),
-                "citation_existence_rate": audit_meta.get("citation_existence_rate", 1.0),
-                "citation_support_rate": audit_meta.get("citation_support_rate", 1.0),
-            })
+            summary_dict = build_consultation_trace_summary(
+                request_id=request_id,
+                case_id=case_id,
+                execution_status=resp.execution_status or "COMPLETED",
+                verification_status=resp.verification_status or "UNVERIFIED",
+                answer_status=resp.answer_status or "DELIVERED",
+                selected_agents=resp.selected_agents,
+                revision_count=resp.revision_count,
+                retrieval_info={
+                    "methods": audit_meta.get("retrieval_methods", []),
+                    "hits_count": len(resp.sources),
+                    "source_ids": [s.source_id for s in resp.sources if s.source_id],
+                },
+                verification_info={
+                    "status": (resp.verification_result or {}).get("status"),
+                    "reason_code": (resp.verification_result or {}).get("reason_code"),
+                    "citation_existence_rate": audit_meta.get("citation_existence_rate", 1.0),
+                    "citation_support_rate": audit_meta.get("citation_support_rate", 1.0),
+                    "citation_coverage_rate": audit_meta.get("citation_coverage_rate", 1.0),
+                    "rejected_citations": audit_meta.get("rejected_citation_ids", []),
+                },
+                usage_info={
+                    "total_calls": usage_summary.total_calls,
+                    "total_tokens": usage_summary.total_tokens,
+                    "elapsed_ms": round(elapsed_ms, 2),
+                },
+            )
+            update_span(get_current_span_id(), summary_dict)
 
             from ai_legal_helper.observability.langfuse_client import log_score
-            exist_rate = float(audit_meta.get("citation_existence_rate", 1.0))
-            supp_rate = float(audit_meta.get("citation_support_rate", 1.0))
-            ver_status = (resp.verification_result or {}).get("status", "PASS")
+            exist_raw = audit_meta.get("citation_existence_rate")
+            exist_rate = float(exist_raw) if exist_raw not in (None, "N/A") else 0.0
+            supp_raw = audit_meta.get("citation_support_rate")
+            supp_rate = float(supp_raw) if supp_raw not in (None, "N/A") else 0.0
             score_val = 1.0 if ver_status == "PASS" else (0.5 if ver_status == "REVISE" else 0.0)
             log_score(trace_id, "citation_existence_rate", exist_rate)
             log_score(trace_id, "citation_support_rate", supp_rate)
@@ -484,6 +575,9 @@ async def process_consultation_resume(
         resp = _consultations.get(request_id)
         if resp:
             resp.status = "ERROR"
+            resp.execution_status = "ERROR"
+            resp.verification_status = "UNVERIFIED"
+            resp.answer_status = "WITHHELD"
             resp.warnings.append(str(e))
     finally:
         # DB에 상담 결과 및 답변 영구 저장
@@ -495,6 +589,9 @@ async def process_consultation_resume(
                 if rec and request_id in _consultations:
                     resp = _consultations[request_id]
                     rec.status = resp.status
+                    rec.execution_status = getattr(resp, "execution_status", resp.status)
+                    rec.verification_status = getattr(resp, "verification_status", None)
+                    rec.answer_status = getattr(resp, "answer_status", None)
                     rec.answer = resp.answer
                     rec.approval_request = resp.approval_request
                     rec.sources = [s.model_dump() for s in resp.sources] if resp.sources else []
@@ -539,6 +636,9 @@ async def list_case_consultations(
             request_id=rec.request_id,
             trace_id=rec.trace_id or "",
             status=rec.status,
+            execution_status=getattr(rec, "execution_status", rec.status) or "COMPLETED",
+            verification_status=getattr(rec, "verification_status", None),
+            answer_status=getattr(rec, "answer_status", None),
             answer=rec.answer,
             approval_request=rec.approval_request,
             sources=sources,

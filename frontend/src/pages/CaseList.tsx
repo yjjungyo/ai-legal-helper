@@ -26,7 +26,9 @@ interface CreateCaseModalProps {
  */
 function CreateCaseModal({ isOpen, onClose, onSuccess }: CreateCaseModalProps) {
   const [title, setTitle] = useState('');
-  const [caseType, setCaseType] = useState('주택임대차');
+  const [caseType, setCaseType] = useState('AI_AUTO');
+  const [customType, setCustomType] = useState('');
+  const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -42,7 +44,8 @@ function CreateCaseModal({ isOpen, onClose, onSuccess }: CreateCaseModalProps) {
     try {
       setIsSubmitting(true);
       setErrorMessage('');
-      const newCase = await createCase(title.trim(), caseType);
+      const finalCaseType = caseType === 'CUSTOM' ? (customType.trim() || undefined) : caseType;
+      const newCase = await createCase(title.trim(), finalCaseType, description.trim() || undefined);
       onSuccess(newCase.id);
     } catch (err) {
       console.error('Failed to create case:', err);
@@ -54,7 +57,7 @@ function CreateCaseModal({ isOpen, onClose, onSuccess }: CreateCaseModalProps) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
         <div className="modal-header">
           <h3 style={{ fontSize: '1.1em', fontWeight: 700, margin: 0 }}>새 법률 사건 등록</h3>
           <button 
@@ -67,20 +70,20 @@ function CreateCaseModal({ isOpen, onClose, onSuccess }: CreateCaseModalProps) {
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div className="modal-body">
+          <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {errorMessage && (
-              <div style={{ padding: '8px 12px', backgroundColor: 'var(--danger-bg)', color: 'var(--danger)', borderRadius: '6px', fontSize: '0.85em', marginBottom: '14px' }}>
+              <div style={{ padding: '8px 12px', backgroundColor: 'var(--danger-bg)', color: 'var(--danger)', borderRadius: '6px', fontSize: '0.85em' }}>
                 {errorMessage}
               </div>
             )}
 
             <div className="form-group">
-              <label htmlFor="case-title">사건 제목 *</label>
+              <label htmlFor="case-title" style={{ fontWeight: 600 }}>사건 제목 *</label>
               <input
                 id="case-title"
                 className="form-control"
                 type="text"
-                placeholder="예: 보증금 반환 청구 및 임차권등기명령 사건"
+                placeholder="예: 전세보증금 반환 청구 및 임차권등기명령 사건"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 autoFocus
@@ -88,24 +91,64 @@ function CreateCaseModal({ isOpen, onClose, onSuccess }: CreateCaseModalProps) {
             </div>
 
             <div className="form-group">
-              <label htmlFor="case-type">사건 분류 (분쟁 유형)</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <label htmlFor="case-type" style={{ fontWeight: 600, margin: 0 }}>사건 분류 (분쟁 유형)</label>
+                <span style={{ fontSize: '0.78em', color: 'var(--primary, #2563eb)' }}>🤖 AI 자동 판별 지원</span>
+              </div>
               <select
                 id="case-type"
                 className="form-control"
                 value={caseType}
                 onChange={(e) => setCaseType(e.target.value)}
               >
-                <option value="주택임대차">주택임대차 (보증금/원상복구/계약갱신)</option>
-                <option value="상가임대차">상가임대차 (권리금/임대료 분쟁)</option>
-                <option value="대여금/채권">대여금 및 채권추심 (차용증/미수금)</option>
-                <option value="손해배상">손해배상 청구 (불법행위/채무불이행)</option>
-                <option value="근로/노동">근로 및 임금체불 (퇴직금/부당해고)</option>
-                <option value="기타 민사">기타 일반 민사 분쟁</option>
+                <option value="AI_AUTO">🤖 AI 내용 기반 자동 분류 (권장 — 선택 불필요)</option>
+                <option value="주택임대차 (보증금/원상복구/계약갱신)">주택임대차 (보증금/원상복구/계약갱신)</option>
+                <option value="상가임대차 (권리금/임대료 분쟁)">상가임대차 (권리금/임대료 분쟁)</option>
+                <option value="대여금 및 채권추심 (차용증/미수금)">대여금 및 채권추심 (차용증/미수금)</option>
+                <option value="손해배상 청구 (교통사고/불법행위/채무불이행)">손해배상 청구 (교통사고/불법행위/채무불이행)</option>
+                <option value="근로 및 임금체불 (퇴직금/부당해고/산재)">근로 및 임금체불 (퇴직금/부당해고/산재)</option>
+                <option value="형사 사건 (사기/횡령/폭행/고소)">형사 사건 (사기/횡령/폭행/고소)</option>
+                <option value="가사 분쟁 (이혼/재산분할/상속/유류분)">가사 분쟁 (이혼/재산분할/상속/유류분)</option>
+                <option value="상사 및 기업 (계약서/주주분쟁/공정거래)">상사 및 기업 (계약서/주주분쟁/공정거래)</option>
+                <option value="행정 및 조세 (영업정지/처분취소/과징금)">행정 및 조세 (영업정지/처분취소/과징금)</option>
+                <option value="일반 민사 분쟁">일반 민사 분쟁</option>
+                <option value="CUSTOM">✏️ 직접 입력</option>
               </select>
+
+              {caseType === 'CUSTOM' && (
+                <input
+                  type="text"
+                  className="form-control"
+                  style={{ marginTop: '8px' }}
+                  placeholder="원하시는 사건 분류명을 직접 입력하세요 (예: 지식재산권, 의료과실 등)"
+                  value={customType}
+                  onChange={(e) => setCustomType(e.target.value)}
+                  autoFocus
+                />
+              )}
+
+              {caseType === 'AI_AUTO' && (
+                <div style={{ marginTop: '6px', fontSize: '0.8em', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                  💡 분쟁 유형을 고르지 않으셔도 괜찮습니다. AI가 사건 내용과 향후 상담 과정을 분석하여 적합한 법률 분야를 자동으로 분류합니다.
+                </div>
+              )}
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="case-description" style={{ fontWeight: 600 }}>사건 내용 및 배경 설명 (선택 사항)</label>
+              <textarea
+                id="case-description"
+                className="form-control"
+                rows={3}
+                placeholder="분쟁 배경이나 상황(예: 계약 만료일, 미반환 금액, 현재 임대인과의 연락 상황 등)을 간략히 적어주시면 AI가 더 정확하게 유형을 분류하고 상담을 준비합니다."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                style={{ resize: 'vertical' }}
+              />
             </div>
           </div>
 
-          <div className="modal-footer">
+          <div className="modal-footer" style={{ marginTop: '8px' }}>
             <button type="button" className="btn btn-secondary" onClick={onClose} disabled={isSubmitting}>
               취소
             </button>

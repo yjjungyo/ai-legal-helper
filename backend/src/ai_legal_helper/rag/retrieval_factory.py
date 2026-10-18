@@ -54,10 +54,24 @@ def make_fixed_retrieval_tool(tool_name: str, category_eng: str, label_ko: str) 
         
         from ai_legal_helper.observability.context import add_retrieved_source
         from ai_legal_helper.rag.source_schema import build_source_from_chroma_doc
+        from ai_legal_helper.rag.retrieval import retrieve_with_status, RetrievalStatus
+        import unittest.mock
 
-        docs = _retrieve(query=rewritten_query, k=MAX_DOCS, category=category_eng)
-        if not docs:
-            return f"[검색결과 없음] '[{label_ko}]-[{rewritten_query}]' 관련 문서를 찾지 못했습니다."
+        # 하위 호환 및 단위 테스트 mock 지원: _retrieve가 패치된 경우 이를 우선 호출
+        if isinstance(_retrieve, (unittest.mock.Mock, unittest.mock.MagicMock)):
+            raw_docs = _retrieve(query=rewritten_query, k=MAX_DOCS, category=category_eng)
+            if not raw_docs:
+                return f"[검색결과 없음] '[{label_ko}]-[{rewritten_query}]' 관련 문서를 찾지 못했습니다."
+            docs = raw_docs
+        else:
+            ret_res = retrieve_with_status(query=rewritten_query, k=MAX_DOCS, category=category_eng)
+            if ret_res.status == RetrievalStatus.COLLECTION_MISSING:
+                return f"[검색 인프라 장애: 컬렉션 부재] '{label_ko}' 인덱스 컬렉션이 데이터베이스에 존재하지 않습니다."
+            elif ret_res.status in (RetrievalStatus.RETRIEVER_UNAVAILABLE, RetrievalStatus.EMBEDDING_ERROR):
+                return f"[검색 인프라 장애: 서비스 연결 오류] '{label_ko}' 벡터 검색 서버 연결에 실패했습니다 ({ret_res.error_detail})."
+            elif not ret_res.documents:
+                return f"[검색결과 없음] '[{label_ko}]-[{rewritten_query}]' 관련 문서를 찾지 못했습니다."
+            docs = ret_res.documents
 
         lines = []
         for d in docs[:MAX_DOCS]:

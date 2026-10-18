@@ -16,6 +16,64 @@ interface ChatSectionProps {
 }
 
 /**
+ * 상담 결과 상태(실행 상태, 검증 상태, 답변 상태)에 따른 일관된 배지 렌더링 함수 (P2-03)
+ * @param item 상담 응답 객체
+ * @returns 상태에 부합하는 배지 JSX
+ */
+function renderStatusBadge(item: ConsultationResponse) {
+  if (item.status === 'ERROR') {
+    return <span className="badge badge-red">오류</span>;
+  }
+  if (item.status === 'APPROVAL_REQUIRED') {
+    return <span className="badge badge-blue">승인 대기</span>;
+  }
+  if (item.status === 'IN_PROGRESS') {
+    return <span className="badge badge-amber">처리 중</span>;
+  }
+
+  // item.status === 'SUCCESS'인 경우 세부 answer_status 및 verification_status 판별
+  if (item.answer_status === 'WITHHELD' || item.verification_status === 'FAIL') {
+    return (
+      <span
+        className="badge"
+        style={{
+          backgroundColor: '#fffbeb',
+          color: '#b45309',
+          border: '1px solid #fef3c7',
+          fontWeight: 600,
+        }}
+      >
+        🛡️ 판단 유보 (근거 부족)
+      </span>
+    );
+  }
+  if (item.answer_status === 'CAUTIONARY' || item.verification_status === 'REVISE') {
+    return (
+      <span
+        className="badge"
+        style={{
+          backgroundColor: '#f3e8ff',
+          color: '#7e22ce',
+          border: '1px solid #e9d5ff',
+          fontWeight: 600,
+        }}
+      >
+        ⚠️ 주의 안내 포함
+      </span>
+    );
+  }
+  if (item.verification_status === 'PASS' || item.answer_status === 'DELIVERED') {
+    return (
+      <span className="badge badge-green">
+        ✓ 검증 완료 (답변)
+      </span>
+    );
+  }
+
+  return <span className="badge badge-green">답변 완료</span>;
+}
+
+/**
  * 사건 작업 공간 내 AI 법률 상담 컴포넌트
  */
 export function ChatSection({ caseId }: ChatSectionProps) {
@@ -34,12 +92,24 @@ export function ChatSection({ caseId }: ChatSectionProps) {
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   // 클릭하여 펼쳐진 출처 상세(청크 본문 및 표준 메타데이터) 키 상태
   const [expandedSourceKey, setExpandedSourceKey] = useState<string | null>(null);
+  // 요청별 AI 추론 및 근거 검증 인스펙터(Tier 2) 열림 상태
+  const [expandedInspectorKeys, setExpandedInspectorKeys] = useState<Record<string, boolean>>({});
 
   /**
    * 출처 항목 클릭 시 원문 청크 및 상세 메타데이터 패널 토글
    */
   const toggleSourceDetail = (key: string) => {
     setExpandedSourceKey((prev) => (prev === key ? null : key));
+  };
+
+  /**
+   * AI 추론 및 근거 검증 인스펙터(Tier 2) 패널 토글
+   */
+  const toggleInspector = (requestId: string) => {
+    setExpandedInspectorKeys((prev) => ({
+      ...prev,
+      [requestId]: !prev[requestId],
+    }));
   };
 
   /**
@@ -315,25 +385,7 @@ export function ChatSection({ caseId }: ChatSectionProps) {
                   <span style={{ fontSize: '0.82em', color: 'var(--text-muted)' }}>
                     {item.created_at ? new Date(item.created_at).toLocaleString() : '상담 기록'}
                   </span>
-                  <span
-                    className={
-                      item.status === 'SUCCESS'
-                        ? 'badge badge-green'
-                        : item.status === 'ERROR'
-                        ? 'badge badge-red'
-                        : item.status === 'APPROVAL_REQUIRED'
-                        ? 'badge badge-blue'
-                        : 'badge badge-amber'
-                    }
-                  >
-                    {item.status === 'SUCCESS'
-                      ? '답변 완료'
-                      : item.status === 'ERROR'
-                      ? '오류'
-                      : item.status === 'APPROVAL_REQUIRED'
-                      ? '승인 대기'
-                      : '처리 중'}
-                  </span>
+                  {renderStatusBadge(item)}
                 </div>
 
                 {item.question && (
@@ -432,226 +484,316 @@ export function ChatSection({ caseId }: ChatSectionProps) {
                 )
               )}
 
-              {/* 7. 검증된 법률 근거 및 사건 증거 출처 분리 렌더링 및 청크 상세 조회 */}
-              {item.sources && item.sources.length > 0 && (() => {
-                const legalSources = item.sources.filter((s) => s.source_type !== 'CASE_EVIDENCE');
-                const evidenceSources = item.sources.filter((s) => s.source_type === 'CASE_EVIDENCE');
+              {/* 7. 답변 요약 바 및 Tier 2 인스펙터 토글 */}
+              {item.answer && (
+                (() => {
+                  const legalSources = Array.from(
+                    new Map(
+                      (item.sources || [])
+                        .filter((s) => s.source_type !== 'CASE_EVIDENCE')
+                        .map((s) => [s.statute_name && s.article ? `${s.statute_name}_${s.article}` : `${s.source_id}_${s.file}`, s])
+                    ).values()
+                  );
 
-                const renderSourceItem = (s: typeof item.sources[0], idx: number, prefix: string) => {
-                  const key = `${item.request_id}-${prefix}-${idx}`;
-                  const isExpanded = expandedSourceKey === key;
-                  const pageDisplay = s.page ? (s.page.startsWith('p.') ? s.page : `p.${s.page}`) : (s.page || 'p.1');
-                  const typeLabel =
-                    s.source_type === 'STATUTE'
-                      ? '법령'
-                      : s.source_type === 'PRECEDENT'
-                      ? '판례'
-                      : s.source_type === 'CASE_EVIDENCE'
-                      ? '사건 증거'
-                      : '법률 문서';
-                  const badgeClass =
-                    s.source_type === 'STATUTE'
-                      ? 'badge-blue'
-                      : s.source_type === 'PRECEDENT'
-                      ? 'badge-purple'
-                      : s.source_type === 'CASE_EVIDENCE'
-                      ? 'badge-green'
-                      : 'badge-gray';
+                  const evidenceSources = Array.from(
+                    new Map(
+                      (item.sources || [])
+                        .filter((s) => s.source_type === 'CASE_EVIDENCE')
+                        .map((s) => [`${s.file}_${s.page || '1'}`, s])
+                    ).values()
+                  );
+
+                  const isInspectorOpen = !!expandedInspectorKeys[item.request_id];
+                  const verStatus = item.verification_result?.status;
+
+                  const renderSourceItem = (s: typeof item.sources[0], idx: number, prefix: string) => {
+                    const key = `${item.request_id}-${prefix}-${idx}`;
+                    const isExpanded = expandedSourceKey === key;
+                    const pageDisplay = s.page ? (s.page.startsWith('p.') ? s.page : `p.${s.page}`) : (s.page || 'p.1');
+                    const typeLabel =
+                      s.source_type === 'STATUTE'
+                        ? '법령'
+                        : s.source_type === 'PRECEDENT'
+                        ? '판례'
+                        : s.source_type === 'CASE_EVIDENCE'
+                        ? '사건 증거'
+                        : '법률 문서';
+                    const badgeClass =
+                      s.source_type === 'STATUTE'
+                        ? 'badge-blue'
+                        : s.source_type === 'PRECEDENT'
+                        ? 'badge-purple'
+                        : s.source_type === 'CASE_EVIDENCE'
+                        ? 'badge-green'
+                        : 'badge-gray';
+
+                    return (
+                      <li
+                        key={key}
+                        style={{
+                          marginBottom: '8px',
+                          padding: '8px 12px',
+                          backgroundColor: 'var(--surface)',
+                          borderRadius: 'var(--radius-md)',
+                          border: '1px solid var(--border)',
+                          listStyle: 'none',
+                        }}
+                      >
+                        <div
+                          onClick={() => toggleSourceDetail(key)}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            cursor: 'pointer',
+                            gap: '8px',
+                            flexWrap: 'wrap',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <span className={`badge ${badgeClass}`} style={{ fontSize: '0.72em' }}>
+                              {typeLabel}
+                            </span>
+                            <strong style={{ color: 'var(--text-main)', fontSize: '0.9em' }}>
+                              {s.title || s.file}
+                            </strong>
+                            {pageDisplay && (
+                              <span style={{ color: 'var(--text-muted)', fontSize: '0.82em' }}>
+                                ({pageDisplay})
+                              </span>
+                            )}
+                            {s.article && (
+                              <span style={{ color: 'var(--primary)', fontSize: '0.82em', fontWeight: 600 }}>
+                                [{s.article}]
+                              </span>
+                            )}
+                            {s.case_number && (
+                              <span style={{ color: 'var(--secondary)', fontSize: '0.82em', fontWeight: 600 }}>
+                                [{s.court ? `${s.court} ` : ''}{s.case_number}]
+                              </span>
+                            )}
+                          </div>
+                          <span style={{ fontSize: '0.78em', color: 'var(--primary)', userSelect: 'none' }}>
+                            {isExpanded ? '▲ 접기' : '▼ 원문 청크 / 메타데이터 확인'}
+                          </span>
+                        </div>
+
+                        {/* 펼쳐졌을 때: 검증된 메타데이터 및 실제 검색된 본문 청크 */}
+                        {isExpanded && (
+                          <div
+                            style={{
+                              marginTop: '10px',
+                              paddingTop: '8px',
+                              borderTop: '1px dashed var(--border)',
+                              fontSize: '0.82em',
+                              color: 'var(--text-secondary)',
+                            }}
+                          >
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '6px', marginBottom: '8px' }}>
+                              {s.source_id && <div><strong>출처 식별자:</strong> {s.source_id}</div>}
+                              {s.retrieval_method && <div><strong>검색 경로:</strong> {s.retrieval_method}</div>}
+                              {s.chunk_id && <div><strong>청크 ID:</strong> {s.chunk_id}</div>}
+                              {s.effective_date && <div><strong>시행일:</strong> {s.effective_date}</div>}
+                              {s.decision_date && <div><strong>선고일:</strong> {s.decision_date}</div>}
+                              {s.evidence_id && <div><strong>증거 ID:</strong> {s.evidence_id}</div>}
+                            </div>
+                            {s.content ? (
+                              <div
+                                style={{
+                                  padding: '8px 10px',
+                                  backgroundColor: 'var(--surface-alt)',
+                                  borderRadius: 'var(--radius-sm)',
+                                  whiteSpace: 'pre-wrap',
+                                  lineHeight: 1.5,
+                                  color: 'var(--text-main)',
+                                }}
+                              >
+                                <strong>📄 실제 검색된 원문 청크:</strong>
+                                <div style={{ marginTop: '4px' }}>{s.content}</div>
+                              </div>
+                            ) : (
+                              <div style={{ color: 'var(--text-muted)' }}>본문 청크 요약이 제공되지 않았습니다.</div>
+                            )}
+                          </div>
+                        )}
+                      </li>
+                    );
+                  };
 
                   return (
-                    <li
-                      key={key}
-                      style={{
-                        marginBottom: '8px',
-                        padding: '8px 12px',
-                        backgroundColor: 'var(--surface)',
-                        borderRadius: 'var(--radius-md)',
-                        border: '1px solid var(--border)',
-                        listStyle: 'none',
-                      }}
-                    >
+                    <div style={{ marginTop: '12px' }}>
+                      {/* Tier 1 요약 바: 검증 배지, 핵심 법령 뱃지, 인스펙터 토글 버튼 */}
                       <div
-                        onClick={() => toggleSourceDetail(key)}
                         style={{
                           display: 'flex',
                           justifyContent: 'space-between',
                           alignItems: 'center',
-                          cursor: 'pointer',
-                          gap: '8px',
                           flexWrap: 'wrap',
+                          gap: '8px',
+                          padding: '10px 14px',
+                          backgroundColor: 'var(--surface-alt)',
+                          borderRadius: 'var(--radius-md)',
+                          border: '1px solid var(--border)',
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                          <span className={`badge ${badgeClass}`} style={{ fontSize: '0.72em' }}>
-                            {typeLabel}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <span
+                            className={
+                              verStatus === 'PASS'
+                                ? 'badge badge-green'
+                                : verStatus === 'REVISE'
+                                ? 'badge badge-amber'
+                                : 'badge badge-gray'
+                            }
+                            style={{ fontSize: '0.78em', fontWeight: 600 }}
+                          >
+                            🛡️ 근거 검증 {verStatus === 'PASS' ? '완료 (PASS)' : verStatus || '진행됨'}
                           </span>
-                          <strong style={{ color: 'var(--text-main)', fontSize: '0.9em' }}>
-                            {s.title || s.file}
-                          </strong>
-                          {pageDisplay && (
-                            <span style={{ color: 'var(--text-muted)', fontSize: '0.82em' }}>
-                              ({pageDisplay})
+
+                          {legalSources.slice(0, 3).map((s, sIdx) => (
+                            <span key={sIdx} className="badge badge-blue" style={{ fontSize: '0.75em' }}>
+                              📜 {s.statute_name || s.title} {s.article || ''}
+                            </span>
+                          ))}
+                          {legalSources.length > 3 && (
+                            <span style={{ fontSize: '0.75em', color: 'var(--text-muted)' }}>
+                              외 {legalSources.length - 3}개 조문
                             </span>
                           )}
-                          {s.article && (
-                            <span style={{ color: 'var(--primary)', fontSize: '0.82em', fontWeight: 600 }}>
-                              [{s.article}]
-                            </span>
-                          )}
-                          {s.case_number && (
-                            <span style={{ color: 'var(--secondary)', fontSize: '0.82em', fontWeight: 600 }}>
-                              [{s.court ? `${s.court} ` : ''}{s.case_number}]
+
+                          {evidenceSources.length > 0 && (
+                            <span className="badge badge-gray" style={{ fontSize: '0.75em' }}>
+                              📁 사건 증거 {evidenceSources.length}건 대조
                             </span>
                           )}
                         </div>
-                        <span style={{ fontSize: '0.78em', color: 'var(--primary)', userSelect: 'none' }}>
-                          {isExpanded ? '▲ 접기' : '▼ 원문 청크 / 메타데이터 확인'}
-                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => toggleInspector(item.request_id)}
+                          className="btn btn-outline btn-sm"
+                          style={{
+                            fontSize: '0.8em',
+                            padding: '3px 8px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            backgroundColor: isInspectorOpen ? '#eff6ff' : 'transparent',
+                            borderColor: isInspectorOpen ? '#3b82f6' : 'var(--border)',
+                            color: isInspectorOpen ? '#1d4ed8' : 'var(--text-secondary)',
+                          }}
+                        >
+                          <span>🔬 AI 추론 & 검증 증빙 인스펙터</span>
+                          <span>{isInspectorOpen ? '▲ 접기' : '▼ 펼치기'}</span>
+                        </button>
                       </div>
 
-                      {/* 펼쳐졌을 때: 검증된 메타데이터 및 실제 검색된 본문 청크 */}
-                      {isExpanded && (
+                      {/* Tier 2: AI 추론 및 근거 검증 인스펙터 패널 (마스터 과제 심사 / 변호사 검토용) */}
+                      {isInspectorOpen && (
                         <div
                           style={{
                             marginTop: '10px',
-                            paddingTop: '8px',
-                            borderTop: '1px dashed var(--border)',
-                            fontSize: '0.82em',
-                            color: 'var(--text-secondary)',
+                            padding: '16px 18px',
+                            backgroundColor: 'var(--surface)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--radius-md)',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '14px',
                           }}
                         >
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '6px', marginBottom: '8px' }}>
-                            {s.source_id && <div><strong>출처 식별자:</strong> {s.source_id}</div>}
-                            {s.retrieval_method && <div><strong>검색 경로:</strong> {s.retrieval_method}</div>}
-                            {s.chunk_id && <div><strong>청크 ID:</strong> {s.chunk_id}</div>}
-                            {s.effective_date && <div><strong>시행일:</strong> {s.effective_date}</div>}
-                            {s.decision_date && <div><strong>선고일:</strong> {s.decision_date}</div>}
-                            {s.evidence_id && <div><strong>증거 ID:</strong> {s.evidence_id}</div>}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '8px' }}>
+                            <strong style={{ color: 'var(--primary)', fontSize: '0.92em' }}>
+                              🔬 AI 추론 프로세스 & 검증 감사 리포트 (Evaluation Audit)
+                            </strong>
+                            <span style={{ fontSize: '0.78em', color: 'var(--text-muted)' }}>
+                              요청 ID: {item.request_id}
+                            </span>
                           </div>
-                          {s.content ? (
-                            <div
-                              style={{
-                                padding: '8px 10px',
-                                backgroundColor: 'var(--surface-alt)',
-                                borderRadius: 'var(--radius-sm)',
-                                whiteSpace: 'pre-wrap',
-                                lineHeight: 1.5,
-                                color: 'var(--text-main)',
-                              }}
-                            >
-                              <strong>📄 실제 검색된 원문 청크:</strong>
-                              <div style={{ marginTop: '4px' }}>{s.content}</div>
+
+                          {/* 1. Multi-Agent & 워크플로우 실행 메타 */}
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px', fontSize: '0.82em', backgroundColor: 'var(--surface-alt)', padding: '10px 12px', borderRadius: '6px' }}>
+                            <div>
+                              <strong>실행 에이전트:</strong> {item.selected_agents && item.selected_agents.length > 0 ? item.selected_agents.join(', ') : '민법/부동산 전문 에이전트'}
                             </div>
-                          ) : (
-                            <div style={{ color: 'var(--text-muted)' }}>본문 청크 요약이 제공되지 않았습니다.</div>
+                            <div>
+                              <strong>재분석(Revision) 횟수:</strong> {item.revision_count ?? 0}회
+                            </div>
+                            <div>
+                              <strong>공식 법령 연동(HITL):</strong> {item.approval_request ? '승인 완료 (open.law.go.kr)' : '내부 RAG'}
+                            </div>
+                            <div>
+                              <strong>답변 상태:</strong> {item.answer_status || 'DELIVERED'}
+                            </div>
+                          </div>
+
+                          {/* 2. 검증된 법령/판례 출처 (중복 제거된 고유 목록) */}
+                          {legalSources.length > 0 && (
+                            <div>
+                              <strong style={{ display: 'block', marginBottom: '6px', fontSize: '0.85em', color: 'var(--primary)' }}>
+                                ⚖️ 검증된 법령 및 판례 출처 ({legalSources.length}건 고유):
+                              </strong>
+                              <ul style={{ margin: 0, padding: 0 }}>
+                                {legalSources.map((s, idx) => renderSourceItem(s, idx, 'legal'))}
+                              </ul>
+                            </div>
                           )}
+
+                          {/* 3. 참조된 사건 증거 자료 (중복 제거된 고유 목록) */}
+                          {evidenceSources.length > 0 && (
+                            <div>
+                              <strong style={{ display: 'block', marginBottom: '6px', fontSize: '0.85em', color: 'var(--success)' }}>
+                                📁 참조된 사건 증거 자료 ({evidenceSources.length}건 고유):
+                              </strong>
+                              <ul style={{ margin: 0, padding: 0 }}>
+                                {evidenceSources.map((s, idx) => renderSourceItem(s, idx, 'evidence'))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {/* 4. 유의사항 및 권고사항 */}
+                          {(() => {
+                            let combinedWarnings = Array.from(
+                              new Set([...(item.warnings || []), ...(item.verification_result?.warnings || [])])
+                            );
+                            if (item.status === 'SUCCESS') {
+                              combinedWarnings = combinedWarnings.filter(
+                                (w) => !w.includes('INSUFFICIENT 처리되었습니다')
+                              );
+                            }
+                            if (combinedWarnings.length === 0) return null;
+
+                            return (
+                              <div
+                                style={{
+                                  padding: '10px 12px',
+                                  backgroundColor: '#fffbeb',
+                                  border: '1px solid #fef3c7',
+                                  borderRadius: '6px',
+                                  fontSize: '0.82em',
+                                  color: '#b45309',
+                                }}
+                              >
+                                <strong style={{ display: 'block', marginBottom: '4px' }}>
+                                  🛡️ 법률검증 Agent 실무 권고사항 및 소송상 유의사항:
+                                </strong>
+                                <ul style={{ margin: '0 0 0 16px', padding: 0 }}>
+                                  {combinedWarnings.map((w, idx) => (
+                                    <li key={idx} style={{ lineHeight: 1.5 }}>
+                                      {w}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            );
+                          })()}
                         </div>
                       )}
-                    </li>
+                    </div>
                   );
-                };
-
-                return (
-                  <div style={{ marginTop: '14px', fontSize: '0.85em', color: 'var(--text-secondary)' }}>
-                    {legalSources.length > 0 && (
-                      <div style={{ marginBottom: '10px' }}>
-                        <strong style={{ display: 'block', marginBottom: '6px', color: 'var(--primary)' }}>
-                          ⚖️ 검증된 법령 및 판례 출처 ({legalSources.length}건):
-                        </strong>
-                        <ul style={{ margin: 0, padding: 0 }}>
-                          {legalSources.map((s, idx) => renderSourceItem(s, idx, 'legal'))}
-                        </ul>
-                      </div>
-                    )}
-                    {evidenceSources.length > 0 && (
-                      <div>
-                        <strong style={{ display: 'block', marginBottom: '6px', color: 'var(--success)' }}>
-                          📁 참조된 사건 증거 자료 ({evidenceSources.length}건):
-                        </strong>
-                        <ul style={{ margin: 0, padding: 0 }}>
-                          {evidenceSources.map((s, idx) => renderSourceItem(s, idx, 'evidence'))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-
-              {/* 8. 법률검증 Agent(Verification Agent) 근거 검증 결과 및 경고 표시 (Issue #10) */}
-              {item.verification_result && item.verification_result.status && (
-                <div
-                  style={{
-                    marginTop: '12px',
-                    padding: '10px 14px',
-                    borderRadius: 'var(--radius-md)',
-                    backgroundColor: 'var(--surface-alt)',
-                    border: '1px solid var(--border)',
-                    fontSize: '0.84em',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <strong>🛡️ 근거 검증(Grounding Verification):</strong>
-                    <span
-                      className={
-                        item.verification_result.status === 'PASS'
-                          ? 'badge badge-green'
-                          : item.verification_result.status === 'REVISE'
-                          ? 'badge badge-amber'
-                          : 'badge badge-red'
-                      }
-                    >
-                      {item.verification_result.status === 'PASS'
-                        ? '검증 통과 (PASS)'
-                        : item.verification_result.status === 'REVISE'
-                        ? '수정 후 반영 (REVISE)'
-                        : '근거 보완 필요 (INSUFFICIENT)'}
-                    </span>
-                    {typeof item.revision_count === 'number' && item.revision_count > 0 && (
-                      <span style={{ color: 'var(--text-muted)' }}>(재검토 {item.revision_count}회 수행)</span>
-                    )}
-                  </div>
-                </div>
+                })()
               )}
-
-              {(() => {
-                let combinedWarnings = Array.from(
-                  new Set([...(item.warnings || []), ...(item.verification_result?.warnings || [])])
-                );
-                // 성공(SUCCESS)으로 종결된 답변인 경우 모순을 유발하는 INSUFFICIENT 문구 필터링
-                if (item.status === 'SUCCESS') {
-                  combinedWarnings = combinedWarnings.filter(
-                    (w) => !w.includes('INSUFFICIENT 처리되었습니다')
-                  );
-                }
-                if (combinedWarnings.length === 0) return null;
-
-                const isSuccess = item.status === 'SUCCESS';
-
-                return (
-                  <div
-                    style={{
-                      marginTop: '10px',
-                      padding: '10px 14px',
-                      backgroundColor: isSuccess ? 'var(--surface-alt)' : 'var(--warning-bg)',
-                      border: isSuccess ? '1px solid var(--border)' : '1px solid var(--warning-border)',
-                      borderRadius: 'var(--radius-md)',
-                      fontSize: '0.84em',
-                      color: isSuccess ? 'var(--text-secondary)' : 'var(--warning)',
-                    }}
-                  >
-                    <strong style={{ color: isSuccess ? 'var(--primary)' : 'var(--warning)' }}>
-                      {isSuccess ? '🛡️ 법률검증 Agent 실무 권고사항 및 소송상 유의사항:' : '⚠️ 주의 및 검증 안내:'}
-                    </strong>
-                    <ul style={{ margin: '4px 0 0 18px', padding: 0 }}>
-                      {combinedWarnings.map((w, idx) => (
-                        <li key={idx} style={{ lineHeight: 1.5 }}>
-                          {w}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                );
-              })()}
             </div>
           ))}
         </div>

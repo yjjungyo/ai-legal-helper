@@ -55,10 +55,14 @@ class StandardSource(BaseModel):
     version_date: Optional[str] = None
     retrieved_at: Optional[str] = None
 
-    # 2. 법령(STATUTE) 전용 필드
+    # 2. 법령(STATUTE) 전용 필드 (P1-02)
+    law_id: Optional[str] = None
     statute_name: Optional[str] = None
     article: Optional[str] = None
+    promulgation_date: Optional[str] = None
+    promulgation_number: Optional[str] = None
     effective_date: Optional[str] = None
+    version_id: Optional[str] = None
 
     # 3. 판례(PRECEDENT) 전용 필드
     court: Optional[str] = None
@@ -366,9 +370,13 @@ def normalize_source_dict(raw: Any) -> Dict[str, Any]:
         source_url=raw.get("source_url"),
         version_date=version_date,
         retrieved_at=raw.get("retrieved_at") or _utc_now_iso(),
+        law_id=str(raw.get("law_id")).strip() if raw.get("law_id") else None,
         statute_name=statute_name if source_type == "STATUTE" else None,
         article=article if source_type in ("STATUTE", "DOCUMENT") else None,
+        promulgation_date=_format_yyyymmdd(raw.get("promulgation_date")) if source_type == "STATUTE" else None,
+        promulgation_number=str(raw.get("promulgation_number")).strip() if raw.get("promulgation_number") else None,
         effective_date=effective_date if source_type == "STATUTE" else None,
+        version_id=str(raw.get("version_id")).strip() if raw.get("version_id") else None,
         court=raw.get("court") if source_type == "PRECEDENT" else None,
         case_number=raw.get("case_number") if source_type == "PRECEDENT" else None,
         decision_date=raw.get("decision_date") if source_type == "PRECEDENT" else None,
@@ -380,4 +388,52 @@ def normalize_source_dict(raw: Any) -> Dict[str, Any]:
         category=raw.get("category"),
     )
     return std.model_dump()
+
+
+def is_statute_applicable_to_date(source_dict: Dict[str, Any], target_date_str: str) -> bool:
+    """주어진 법령 출처가 사건 발생일(또는 계약/해지 기준일)에 시행 중이었는지 검증한다.
+
+    대한민국 법령의 효력 발생 시점(시행일자)을 기준으로 사건 당시 적용 가능한 법령인지 판별하며,
+    최신 법령과 사건 당시 법령을 혼동하지 않도록 돕는다.
+
+    Args:
+        source_dict: 법령 출처 정보 딕셔너리 (effective_date, promulgation_date, version_date 등 포함).
+        target_date_str: 사건 발생일 또는 계약/해지 기준일자 (예: '2026-10-17' 또는 '20261017').
+
+    Returns:
+        bool: 사건 발생일 기준 시행 중인 법령이면 True, 미시행 법령이면 False.
+              날짜 정보가 없거나 파싱 불가능한 경우 안전하게 True를 반환한다.
+    """
+    if not source_dict or not target_date_str:
+        return True
+
+    def _parse_clean_date(d: Any) -> Optional[datetime]:
+        """임의 형식의 날짜 문자열을 datetime 객체로 파싱한다."""
+        if not d:
+            return None
+        s = str(d).strip().replace(".", "-").replace("/", "-")
+        if len(s) == 8 and s.isdigit():
+            s = f"{s[:4]}-{s[4:6]}-{s[6:8]}"
+        try:
+            return datetime.strptime(s[:10], "%Y-%m-%d")
+        except Exception:
+            return None
+
+    target_dt = _parse_clean_date(target_date_str)
+    if not target_dt:
+        return True
+
+    # 1. 시행일자(effective_date) 우선 비교
+    eff_str = source_dict.get("effective_date") or source_dict.get("version_date")
+    eff_dt = _parse_clean_date(eff_str)
+    if eff_dt:
+        return target_dt >= eff_dt
+
+    # 2. 공포일자(promulgation_date) 비교 (시행일자 미기재 시 참고)
+    prom_str = source_dict.get("promulgation_date")
+    prom_dt = _parse_clean_date(prom_str)
+    if prom_dt:
+        return target_dt >= prom_dt
+
+    return True
 
