@@ -25,7 +25,7 @@ function renderStatusBadge(item: ConsultationResponse) {
     return <span className="badge badge-red">오류</span>;
   }
   if (item.status === 'APPROVAL_REQUIRED') {
-    return <span className="badge badge-blue">승인 대기</span>;
+    return <span className="badge badge-blue">추가 검색 승인 대기</span>;
   }
   if (item.status === 'IN_PROGRESS') {
     return (
@@ -51,7 +51,7 @@ function renderStatusBadge(item: ConsultationResponse) {
             borderTopColor: '#1d4ed8',
           }}
         />
-        법령 조회 및 재분석 중
+        공식 법령 조회 및 재분석 중
       </span>
     );
   }
@@ -244,27 +244,7 @@ export function ChatSection({ caseId }: ChatSectionProps) {
         </div>
       </div>
 
-      {/* 4. 분석 진행 중 인디케이터 */}
-      {loading && (
-        <div
-          style={{
-            padding: '16px 20px',
-            backgroundColor: 'var(--warning-bg)',
-            borderRadius: 'var(--radius-md)',
-            border: '1px solid var(--warning-border)',
-            textAlign: 'center',
-          }}
-        >
-          <strong style={{ color: 'var(--warning)', display: 'block', marginBottom: '4px' }}>
-            🔄 법률 전문 Agent가 사건 문맥을 검토하여 분석 중입니다...
-          </strong>
-          <span style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>
-            판례 및 법령 대조, 증거 관계 검증을 거쳐 답변이 생성됩니다.
-          </span>
-        </div>
-      )}
-
-      {/* 5. 오류 메시지 */}
+      {/* 4. 오류 메시지 */}
       {error && (
         <div
           style={{
@@ -280,99 +260,189 @@ export function ChatSection({ caseId }: ChatSectionProps) {
         </div>
       )}
 
-      {/* 6. 실시간 요청 진행 상태 (In-progress) */}
-      {result && result.status === 'IN_PROGRESS' && (
-        <div className="card" style={{ borderStyle: 'dashed' }}>
-          <h4 style={{ margin: '0 0 6px 0', fontSize: '0.95em' }}>진행 중인 상담 (요청 ID: {result.request_id})</h4>
-          <p style={{ fontSize: '0.88em', color: 'var(--text-secondary)' }}>법률 근거 및 판례 데이터베이스를 검색 중입니다...</p>
-        </div>
-      )}
-
-      {/* 6.1 실시간 HILT 승인 대기 카드 */}
-      {result && result.status === 'APPROVAL_REQUIRED' && (
+      {/* 5. 현재 진행 중인 상담 (Active Consultation) 단일 전용 작업 공간 */}
+      {(result || loading) && (
         <div
+          className="card"
           style={{
-            padding: '18px 22px',
-            backgroundColor: '#eff6ff',
-            borderRadius: 'var(--radius-md)',
-            border: '2px solid #3b82f6',
-            boxShadow: '0 4px 12px rgba(59, 130, 246, 0.15)',
+            border: result?.status === 'APPROVAL_REQUIRED' ? '2px solid #3b82f6' : '1px solid #bfdbfe',
+            backgroundColor: result?.status === 'APPROVAL_REQUIRED' ? '#eff6ff' : '#f8fafc',
+            boxShadow: result?.status === 'APPROVAL_REQUIRED' ? '0 4px 14px rgba(59, 130, 246, 0.15)' : 'none',
+            padding: '20px 22px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-            <span style={{ fontSize: '1.3em' }}>⚖️</span>
-            <strong style={{ color: '#1e40af', fontSize: '1.05em' }}>
-              공식 법령 원문 추가 검색 승인 요청 (Human-in-the-Loop)
-            </strong>
-            <span
-              style={{
-                marginLeft: 'auto',
-                backgroundColor: '#dbeafe',
-                color: '#1d4ed8',
-                padding: '3px 8px',
-                borderRadius: '4px',
-                fontSize: '0.78em',
-                fontWeight: 600,
-              }}
-            >
-              사용자 결정 대기
-            </span>
-          </div>
-
-          <p style={{ fontSize: '0.92em', color: '#1e293b', lineHeight: 1.6, margin: '8px 0 14px 0' }}>
-            {result.approval_request?.explanation ||
-              '현재 검색된 법률 자료만으로는 의뢰인의 쟁점을 검증할 수 없습니다. 국가법령정보공동활용 공식 API에서 원문 조문을 직접 검색하여 법률 재분석을 진행하시겠습니까?'}
-          </p>
-
+          {/* 상단 헤더: 제목 및 통합 상태 배지 */}
           <div
             style={{
-              backgroundColor: '#ffffff',
-              padding: '12px 16px',
-              borderRadius: '6px',
-              fontSize: '0.88em',
-              marginBottom: '16px',
-              border: '1px solid #bfdbfe',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '12px',
             }}
           >
-            <div style={{ marginBottom: '6px' }}>
-              <strong style={{ color: '#475569' }}>확인 필요 쟁점: </strong>
-              <span style={{ color: '#0f172a', fontWeight: 600 }}>
-                {result.approval_request?.missing_issue || '특별법 조문 확인 필요'}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '1.25em' }}>
+                {result?.status === 'APPROVAL_REQUIRED' ? '⚖️' : '🔄'}
               </span>
+              <strong
+                style={{
+                  fontSize: '1.05em',
+                  color: result?.status === 'APPROVAL_REQUIRED' ? '#1e40af' : '#1e293b',
+                }}
+              >
+                {result?.status === 'APPROVAL_REQUIRED'
+                  ? '공식 법령 원문 추가 검색 승인 요청 (Human-in-the-Loop)'
+                  : '현재 진행 중인 법률 상담 분석'}
+              </strong>
             </div>
-            {result.approval_request?.candidate_laws && result.approval_request.candidate_laws.length > 0 && (
-              <div style={{ marginBottom: '6px' }}>
-                <strong style={{ color: '#475569' }}>조회 후보 법령: </strong>
-                <span style={{ color: '#2563eb', fontWeight: 600 }}>
-                  {result.approval_request.candidate_laws.join(', ')}
-                </span>
-              </div>
-            )}
             <div>
-              <strong style={{ color: '#475569' }}>검색 출처: </strong>
-              <span style={{ color: '#64748b' }}>
-                {result.approval_request?.search_scope || '공식 법령 원문 (open.law.go.kr)'}
-              </span>
+              {result ? (
+                renderStatusBadge(result)
+              ) : (
+                <span className="badge badge-blue">
+                  <span
+                    className="spinner"
+                    style={{ width: '10px', height: '10px', display: 'inline-block', marginRight: '4px' }}
+                  />
+                  분석 준비 중
+                </span>
+              )}
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-            <button
-              onClick={() => handleApprovalDecision(result.request_id, false)}
-              disabled={loading}
-              className="btn btn-secondary btn-sm"
+          {/* 의뢰인 질문 표시 (진행 맥락 인지 지원) */}
+          {(result?.question || question) && (
+            <div
+              style={{
+                marginBottom: '14px',
+                padding: '10px 14px',
+                backgroundColor: '#ffffff',
+                borderRadius: '6px',
+                border: '1px solid #e2e8f0',
+                fontSize: '0.9em',
+                color: '#334155',
+              }}
             >
-              ✕ 추가 검색 없이 종료 (판단 유보)
-            </button>
-            <button
-              onClick={() => handleApprovalDecision(result.request_id, true)}
-              disabled={loading}
-              className="btn btn-primary btn-sm"
-              style={{ backgroundColor: '#2563eb', borderColor: '#1d4ed8', fontWeight: 600 }}
+              <strong style={{ color: '#0f172a', marginRight: '6px' }}>👤 의뢰인 질문:</strong>
+              <span>{result?.question || question}</span>
+            </div>
+          )}
+
+          {/* 상황 A: HILT 승인 대기 상태 */}
+          {result?.status === 'APPROVAL_REQUIRED' && (
+            <div>
+              <p style={{ fontSize: '0.92em', color: '#1e293b', lineHeight: 1.6, margin: '8px 0 14px 0' }}>
+                {result.approval_request?.explanation ||
+                  '현재 검색된 법률 자료만으로는 의뢰인의 쟁점을 검증할 수 없습니다. 국가법령정보공동활용 공식 API에서 원문 조문을 직접 검색하여 법률 재분석을 진행하시겠습니까?'}
+              </p>
+
+              <div
+                style={{
+                  backgroundColor: '#ffffff',
+                  padding: '12px 16px',
+                  borderRadius: '6px',
+                  fontSize: '0.88em',
+                  marginBottom: '16px',
+                  border: '1px solid #bfdbfe',
+                }}
+              >
+                <div style={{ marginBottom: '6px' }}>
+                  <strong style={{ color: '#475569' }}>확인 필요 쟁점: </strong>
+                  <span style={{ color: '#0f172a', fontWeight: 600 }}>
+                    {result.approval_request?.missing_issue || '특별법 조문 확인 필요'}
+                  </span>
+                </div>
+                {result.approval_request?.candidate_laws && result.approval_request.candidate_laws.length > 0 && (
+                  <div style={{ marginBottom: '6px' }}>
+                    <strong style={{ color: '#475569' }}>조회 후보 법령: </strong>
+                    <span style={{ color: '#2563eb', fontWeight: 600 }}>
+                      {result.approval_request.candidate_laws.join(', ')}
+                    </span>
+                  </div>
+                )}
+                <div>
+                  <strong style={{ color: '#475569' }}>검색 출처: </strong>
+                  <span style={{ color: '#64748b' }}>
+                    {result.approval_request?.search_scope || '공식 법령 원문 (open.law.go.kr)'}
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => handleApprovalDecision(result.request_id, false)}
+                  disabled={loading}
+                  className="btn btn-secondary btn-sm"
+                >
+                  ✕ 추가 검색 없이 종료 (판단 유보)
+                </button>
+                <button
+                  onClick={() => handleApprovalDecision(result.request_id, true)}
+                  disabled={loading}
+                  className="btn btn-primary btn-sm"
+                  style={{ backgroundColor: '#2563eb', borderColor: '#1d4ed8', fontWeight: 600 }}
+                >
+                  ✓ 공식 법령 검색 승인 및 재분석
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 상황 B: 분석 또는 공식 법령 재분석 진행 중 상태 (단일 프로그레스 배너) */}
+          {(loading || result?.status === 'IN_PROGRESS') && result?.status !== 'APPROVAL_REQUIRED' && (
+            <div
+              style={{
+                padding: '16px 18px',
+                backgroundColor: '#ffffff',
+                borderRadius: '6px',
+                border: '1px solid #e2e8f0',
+              }}
             >
-              ✓ 공식 법령 검색 승인 및 재분석
-            </button>
-          </div>
+              {result?.approval_request ? (
+                // HILT 승인 후 공식 법령 조회 및 재분석 단계
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                    <span
+                      className="spinner"
+                      style={{
+                        width: '14px',
+                        height: '14px',
+                        borderColor: '#93c5fd',
+                        borderTopColor: '#16a34a',
+                      }}
+                    />
+                    <strong style={{ color: '#15803d', fontSize: '0.96em' }}>
+                      공식 법령 원문 검색 및 AI 재분석 진행 중입니다...
+                    </strong>
+                  </div>
+                  <p style={{ fontSize: '0.86em', color: '#166534', margin: 0, lineHeight: 1.5 }}>
+                    국가법령정보공동활용(open.law.go.kr) 공식 API에서 최신 법령 조문을 조회하여 법률검증 및 답변을 재작성하고 있습니다. (약 10~20초 소요)
+                  </p>
+                </div>
+              ) : (
+                // 1차 법률 상담 분석 단계
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                    <span
+                      className="spinner"
+                      style={{
+                        width: '14px',
+                        height: '14px',
+                        borderColor: '#93c5fd',
+                        borderTopColor: '#1d4ed8',
+                      }}
+                    />
+                    <strong style={{ color: '#1d4ed8', fontSize: '0.96em' }}>
+                      법률 전문 Agent가 사건 문맥을 검토하여 분석 중입니다...
+                    </strong>
+                  </div>
+                  <p style={{ fontSize: '0.86em', color: '#475569', margin: 0, lineHeight: 1.5 }}>
+                    등록된 사건 사실관계와 판례·법령 데이터베이스를 대조하고 증거 관계를 검증하여 맞춤 답변을 생성하고 있습니다.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -442,98 +512,8 @@ export function ChatSection({ caseId }: ChatSectionProps) {
                 </div>
               )}
 
-              {/* 5. 공식 법령 원문 추가 검색 HILT 승인 요청 박스 */}
-              {item.status === 'APPROVAL_REQUIRED' && (
-                <div
-                  style={{
-                    padding: '16px 20px',
-                    backgroundColor: '#eff6ff',
-                    borderRadius: 'var(--radius-md)',
-                    border: '2px solid #3b82f6',
-                    marginBottom: '14px',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '1.2em' }}>⚖️</span>
-                    <strong style={{ color: '#1e40af', fontSize: '1.02em' }}>
-                      공식 법령 원문 추가 검색 승인 요청 (Human-in-the-Loop)
-                    </strong>
-                  </div>
-                  <p style={{ fontSize: '0.88em', color: '#1e293b', margin: '4px 0 10px 0' }}>
-                    {item.approval_request?.explanation ||
-                      '현재 검색된 자료만으로는 해당 법률 쟁점을 확정할 수 없습니다. 국가법령정보공동활용 공식 API에서 원문 조문을 검색하여 재분석할 수 있습니다.'}
-                  </p>
-                  <div style={{ fontSize: '0.84em', color: '#475569', marginBottom: '12px' }}>
-                    <div><strong>확인 필요 쟁점: </strong>{item.approval_request?.missing_issue}</div>
-                    {item.approval_request?.candidate_laws && item.approval_request.candidate_laws.length > 0 && (
-                      <div><strong>조회 후보 법령: </strong>{item.approval_request.candidate_laws.join(', ')}</div>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                    <button
-                      onClick={() => handleApprovalDecision(item.request_id, false)}
-                      disabled={loading}
-                      className="btn btn-secondary btn-sm"
-                    >
-                      ✕ 추가 검색 없이 종료
-                    </button>
-                    <button
-                      onClick={() => handleApprovalDecision(item.request_id, true)}
-                      disabled={loading}
-                      className="btn btn-primary btn-sm"
-                      style={{ backgroundColor: '#2563eb', borderColor: '#1d4ed8' }}
-                    >
-                      ✓ 공식 법령 검색 승인 및 재분석
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* 5-1. 공식 법령 검색 승인 후 AI 재분석 진행 중 실시간 안내 배너 (P2-03) */}
-              {item.status === 'IN_PROGRESS' && (
-                <div
-                  style={{
-                    padding: '16px 20px',
-                    backgroundColor: '#f0fdf4',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid #bbf7d0',
-                    borderLeft: '4px solid #16a34a',
-                    marginBottom: '14px',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '1.2em' }}>🔄</span>
-                    <strong style={{ color: '#15803d', fontSize: '0.98em' }}>
-                      공식 법령 원문 검색 및 AI 재분석 진행 중입니다...
-                    </strong>
-                  </div>
-                  <p style={{ fontSize: '0.88em', color: '#166534', margin: 0, lineHeight: 1.5 }}>
-                    국가법령정보공동활용(open.law.go.kr) 공식 API에서 최신 법령 조문을 조회하여 법률검증 및 답변을 재작성하고 있습니다. (약 10~20초 소요)
-                  </p>
-                </div>
-              )}
-
-              {/* 6. AI 법률 분석 및 조언 본문 또는 진행 중 / 판단 유보 상태 카드 (P0-02) */}
-              {item.status === 'IN_PROGRESS' ? (
-                <div
-                  style={{
-                    padding: '28px 24px',
-                    backgroundColor: 'var(--surface)',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px dashed var(--primary)',
-                    textAlign: 'center',
-                    marginBottom: '14px',
-                  }}
-                >
-                  <div style={{ fontSize: '2em', marginBottom: '10px' }}>⚖️</div>
-                  <strong style={{ display: 'block', marginBottom: '6px', color: 'var(--primary)', fontSize: '1.02em' }}>
-                    법률 전문 Agent가 공식 법령을 반영하여 답변을 다시 작성하고 있습니다
-                  </strong>
-                  <span style={{ fontSize: '0.88em', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                    국가법령 조문 대조, 입증 요건 재검토, 법률검증 Agent의 근거 검증을 마치는 대로 완성된 법률 의견서가 즉시 표시됩니다.
-                  </span>
-                </div>
-              ) : item.answer_status === 'WITHHELD' || item.status === 'APPROVAL_REQUIRED' ? (
+              {/* 5. AI 법률 분석 및 조언 본문 또는 판단 유보 상태 카드 (P0-02) */}
+              {item.answer_status === 'WITHHELD' ? (
                 /* WITHHELD: 미검증 법률 분석 초안은 노출하지 않고 판단 유보 카드 및 보강 안내문 표시 */
                 <div
                   style={{

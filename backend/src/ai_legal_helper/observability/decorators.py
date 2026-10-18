@@ -109,6 +109,23 @@ def trace(func: Callable) -> Callable:
         except Exception as ex:
             logger.debug(f"Langfuse log_success error: {ex}")
 
+    def log_interrupt(start_time: float, current_span_id: str, e: Exception, parent_agent: str, parent_node: str):
+        elapsed_ms = (time.time() - start_time) * 1000
+        log_data = {
+            "status": "INTERRUPT",
+            "source_file": src_file,
+            "source_function": func.__name__,
+            "source_line": src_line,
+            "elapsed_ms": elapsed_ms,
+            "agent_name": parent_agent,
+            "node_name": parent_node,
+        }
+        logger.info(f"[HILT_INTERRUPT] {func.__name__} paused for Human-in-the-Loop decision: {e}", extra=log_data)
+        try:
+            end_span(span_id=current_span_id, level="DEFAULT", status_message="Interrupted for HILT decision")
+        except Exception as ex:
+            logger.debug(f"Langfuse log_interrupt error: {ex}")
+
     def log_error(start_time: float, current_span_id: str, e: Exception, parent_agent: str, parent_node: str):
         elapsed_ms = (time.time() - start_time) * 1000
 
@@ -204,6 +221,11 @@ def trace(func: Callable) -> Callable:
                     log_success(start_time, current_span_id, parent_agent, parent_node, output_data=result)
                     return result
                 except Exception as e:
+                    exc_name = type(e).__name__
+                    if exc_name in ("GraphInterrupt", "Interrupt"):
+                        span.set_status(Status(StatusCode.OK, "Interrupted for HILT"))
+                        log_interrupt(start_time, current_span_id, e, parent_agent, parent_node)
+                        raise e
                     import re
                     safe_span_msg = str(e)
                     safe_span_msg = re.sub(r'(api[_-]?key)=[\w-]+', r'\1=***', safe_span_msg, flags=re.IGNORECASE)
@@ -260,6 +282,11 @@ def trace(func: Callable) -> Callable:
                     log_success(start_time, current_span_id, parent_agent, parent_node, output_data=result)
                     return result
                 except Exception as e:
+                    exc_name = type(e).__name__
+                    if exc_name in ("GraphInterrupt", "Interrupt"):
+                        span.set_status(Status(StatusCode.OK, "Interrupted for HILT"))
+                        log_interrupt(start_time, current_span_id, e, parent_agent, parent_node)
+                        raise e
                     import re
                     safe_span_msg = str(e)
                     safe_span_msg = re.sub(r'(api[_-]?key)=[\w-]+', r'\1=***', safe_span_msg, flags=re.IGNORECASE)

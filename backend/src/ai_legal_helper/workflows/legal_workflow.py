@@ -40,6 +40,7 @@ import os
 import uuid
 import sys
 import asyncio
+import re
 from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import HumanMessage
 from langgraph.types import interrupt, Command, Send
@@ -646,6 +647,47 @@ def finalize_node(state: LegalState) -> Dict:
     }
 
 
+def _format_client_approval_explanation(
+    raw_explanation: str,
+    candidate_laws: List[str],
+    missing_issues: List[str],
+) -> str:
+    """고객(의뢰인) 화면에 노출될 법령 추가 검색 승인 요청 사유를 정제하고 표준화한다.
+
+    내부 시스템 감수용 단어('초안', 'draft' 등)가 포함되어 있을 경우 이를 고객 친화적인
+    전문 법률 안내 문구로 자동 치환/정제하여 전문성과 신뢰성을 보장한다.
+
+    Args:
+        raw_explanation: Verifier Agent가 생성한 원시 사유 텍스트
+        candidate_laws: 검색 후보 법령 목록
+        missing_issues: 확인 필요한 법률 쟁점 목록
+
+    Returns:
+        str: 고객 화면에 노출하기에 적합하도록 정제된 승인 사유 안내문
+    """
+    laws_str = f"({', '.join(candidate_laws)})" if candidate_laws else ""
+    if not raw_explanation:
+        return f"질문하신 사안의 법률 쟁점을 정확히 검토하기 위해 공식 법령{laws_str} 조문 원문의 추가 확인이 필요합니다."
+
+    cleaned = raw_explanation.strip()
+
+    # '초안', 'draft' 등 내부 시스템 감수 용어 치환
+    cleaned = re.sub(r'초안은\s*', '질문하신 사안의 법률 검토에 있어 ', cleaned)
+    cleaned = re.sub(r'초안이\s*', '해당 사안에서 ', cleaned)
+    cleaned = re.sub(r'초안을\s*그대로\s*확정하기보다[,\s]*', '확정적인 법률 판단을 내리기 전에 ', cleaned)
+    cleaned = re.sub(r'초안을\s*', '의견서를 ', cleaned)
+    cleaned = re.sub(r'초안의\s*', '검토 내용의 ', cleaned)
+    cleaned = re.sub(r'초안\s*', '법률 검토 ', cleaned)
+    cleaned = re.sub(r'\b[Dd]raft\b', '법률 검토', cleaned)
+
+    # 서두가 질문 맥락 없이 시작하는 경우 고객 친화적 서두 보강
+    if not (cleaned.startswith("질문") or cleaned.startswith("의뢰인")):
+        lead = f"질문하신 사안에 대해 정확하고 신뢰할 수 있는 법적 판단을 제공하기 위해 공식 법령{laws_str} 조문의 확인이 필요합니다. "
+        cleaned = lead + cleaned
+
+    return cleaned
+
+
 @trace
 def statute_search_approval_node(state: LegalState) -> Dict:
     """법령 원문 검색 승인을 위한 HILT(Human-in-the-Loop) 노드.
@@ -666,7 +708,8 @@ def statute_search_approval_node(state: LegalState) -> Dict:
     candidate_laws = ver_res.get("candidate_laws", [])
     missing_issues = ver_res.get("missing_legal_issues", []) or ver_res.get("missing_issues", [])
     reason_code = ver_res.get("reason_code", "LEGAL_SOURCE_MISSING")
-    explanation = ver_res.get("explanation", "현재 검색된 법률 자료만으로는 해당 쟁점을 충분히 검증할 수 없습니다.")
+    explanation_raw = ver_res.get("explanation", "현재 검색된 법률 자료만으로는 해당 쟁점을 충분히 검증할 수 없습니다.")
+    explanation = _format_client_approval_explanation(explanation_raw, candidate_laws, missing_issues)
 
     case_id = state.get("case_id") or get_case_id() or "GENERAL_CONSULTATION"
     req_id = state.get("request_id") or get_request_id() or str(uuid.uuid4())

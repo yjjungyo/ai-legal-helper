@@ -1,5 +1,14 @@
 /**
  * @fileoverview 법률 상담 실행 및 사건별 대화 이력 조회를 관리하는 커스텀 Hook 모듈
+ * 
+ * [개선 사항]
+ * 1. 활성 상담(Active Consultation)과 완료된 상담 이력(History)의 엄격한 분리:
+ *    - IN_PROGRESS / APPROVAL_REQUIRED 상태의 상담은 오직 `result`(활성 상담) 상태로만 관리하고,
+ *    - `history`에는 최종 완료(SUCCESS / ERROR)된 과거 상담 기록만 필터링하여 보관합니다.
+ * 2. 브라우저 새로고침(F5) 시 세션 연속성 복원:
+ *    - 페이지 재진입 시 서버 DB에서 최신 미완료 상담을 감지하여 `result`로 자동 복원하고,
+ *      진행 중인 경우 폴링을 자동 재개합니다.
+ * 3. HILT 승인/거절 시 단일화된 폴링 및 낙관적 상태 전이 처리.
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { ConsultationResponse } from '../types/consultation';
@@ -8,20 +17,22 @@ import { startConsultation, getConsultation, getCaseConsultations, approveStatut
 /**
  * 법률 상담 실행 및 사건별 대화 이력 조회를 관리하는 Hook.
  *
- * 주요 처리:
- * 1. 사건(caseId)이 주어지면 영구 저장된 과거 상담 내역(history)을 서버에서 자동 조회한다.
- * 2. 신규 상담 요청을 전송하고 비동기 폴링을 통해 완료 시까지 상태를 추적한다.
- * 3. HILT 법령 검색 승인/거절 요청(respondApproval)을 처리하고 재개된 워크플로우를 폴링한다.
- * 4. 상담이 완료되면 이력 목록을 새로고침하고 입력창을 초기화한다.
+ * @param caseId 현재 작업 중인 사건 식별자 UUID
+ * @returns 상담 입력값, 완료된 이력 목록, 현재 활성 상담 결과, 로딩 및 오류 상태, 실행 액션 함수들
  */
 export function useConsultation(caseId?: string) {
   const [question, setQuestion] = useState('');
+  /** 완료된 과거 상담 내역만 보관 (IN_PROGRESS, APPROVAL_REQUIRED 제외) */
   const [history, setHistory] = useState<ConsultationResponse[]>([]);
+  /** 현재 진행 중이거나 사용자 승인 대기 중인 단일 활성 상담 객체 */
   const [result, setResult] = useState<ConsultationResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  /**
+   * 실행 중인 상태 폴링 인터벌을 안전하게 해제한다.
+   */
   const clearPollInterval = useCallback(() => {
     if (pollIntervalRef.current !== null) {
       clearInterval(pollIntervalRef.current);
@@ -29,16 +40,90 @@ export function useConsultation(caseId?: string) {
     }
   }, []);
 
+  /**
+   * 지정된 상담 요청 ID의 진행 상태를 2초 주기로 주기적 조회(Polling)한다.
+   *
+   * @param requestId 추적 대상 상담 요청 식별자
+   */
+  const startPolling = useCallback(
+    (requestId: string) => {
+      clearPollInterval();
+      setLoading(true);
+
+      pollIntervalRef.current = setInterval(async () => {
+        try {
+          const current = await getConsultation(requestId);
+          setResult(current);
+
+          // 1. HILT 추가 법령 검색 승인 대기 상태로 전이된 경우: 폴링 일시중지 후 사용자 입력 대기
+          if (current.status === 'APPROVAL_REQUIRED') {
+            clearPollInterval();
+            setLoading(false);
+          } else if (current.status === 'SUCCESS' || current.status === 'ERROR') {
+            // 2. 최종 완료(SUCCESS) 또는 오류(ERROR) 상태 도달 시: 폴링 종료 및 이력 목록 갱신
+            clearPollInterval();
+            setLoading(false);
+            setQuestion('');
+
+            if (caseId) {
+              const records = await getCaseConsultations(caseId);
+              // 완료된 기록만 history에 보관
+              const completedRecords = records.filter(
+                (r) => r.status !== 'IN_PROGRESS' && r.status !== 'APPROVAL_REQUIRED'
+              );
+              setHistory(completedRecords);
+            }
+            // 활성 작업 완료 -> 활성 카드 닫고 상담 이력 최상단에 완료된 답변으로 표시
+            setResult(null);
+          }
+        } catch (err) {
+          clearPollInterval();
+          setError(err instanceof Error ? err.message : String(err));
+          setLoading(false);
+        }
+      }, 2000);
+    },
+    [caseId, clearPollInterval]
+  );
+
+  /**
+   * 사건의 상담 내역을 조회하고, 활성 상담과 완료 이력을 분리하여 상태를 동기화한다.
+   * 새로고침(F5) 시 진행 중이던 상담이 있을 경우 자동으로 활성 영역으로 복원하고 폴링을 재개한다.
+   */
   const loadHistory = useCallback(async () => {
     if (!caseId) return;
     try {
       const records = await getCaseConsultations(caseId);
-      setHistory(records);
+
+      // 최신 레코드 중 미완료(진행 중이거나 승인 대기) 건 탐색
+      const activeRecord = records.find(
+        (r) => r.status === 'IN_PROGRESS' || r.status === 'APPROVAL_REQUIRED'
+      );
+      // 상담 이력에는 오직 완료된 건(SUCCESS, ERROR)만 필터링하여 보관
+      const completedRecords = records.filter(
+        (r) => r.status !== 'IN_PROGRESS' && r.status !== 'APPROVAL_REQUIRED'
+      );
+      setHistory(completedRecords);
+
+      // 활성 레코드가 존재하는 경우: 상단 활성 작업 공간으로 복원
+      if (activeRecord) {
+        setResult(activeRecord);
+        if (activeRecord.status === 'IN_PROGRESS') {
+          // 새로고침으로 중단되었던 실시간 상태 추적 폴링 자동 재개
+          startPolling(activeRecord.request_id);
+        } else {
+          setLoading(false);
+        }
+      } else {
+        // 활성 레코드가 없는 경우 잔여 활성 상태 정리
+        setResult(null);
+      }
     } catch (err) {
       console.warn('Failed to load consultation history:', err);
     }
-  }, [caseId]);
+  }, [caseId, startPolling]);
 
+  // 마운트 및 caseId 변경 시 이력 조회 및 미완료 작업 복원
   useEffect(() => {
     loadHistory();
     return () => {
@@ -46,37 +131,20 @@ export function useConsultation(caseId?: string) {
     };
   }, [loadHistory, clearPollInterval]);
 
+  /**
+   * 신규 법률 상담 요청을 서버에 전송하고 실시간 진행 상태 추적을 시작한다.
+   */
   const submit = async () => {
-    if (!question.trim()) return;
+    if (!question.trim() || !caseId) return;
     clearPollInterval();
     setLoading(true);
     setError(null);
-    setResult(null);
 
     try {
       const initial = await startConsultation(question, caseId);
+      // 활성 상담 상태로 등록하고 폴링 시작
       setResult(initial);
-
-      // 비동기 상담 완료 시까지 2초 주기로 상태 폴링
-      pollIntervalRef.current = setInterval(async () => {
-        try {
-          const current = await getConsultation(initial.request_id);
-          setResult(current);
-          if (current.status !== 'IN_PROGRESS') {
-            clearPollInterval();
-            setLoading(false);
-            if (current.status === 'SUCCESS' || current.status === 'ERROR') {
-              setQuestion('');
-            }
-            loadHistory();
-          }
-        } catch (err) {
-          clearPollInterval();
-          setError(err instanceof Error ? err.message : String(err));
-          setLoading(false);
-          loadHistory();
-        }
-      }, 2000);
+      startPolling(initial.request_id);
     } catch (err) {
       clearPollInterval();
       setError(err instanceof Error ? err.message : String(err));
@@ -96,55 +164,27 @@ export function useConsultation(caseId?: string) {
     setLoading(true);
     setError(null);
 
-    // 1. 낙관적(Optimistic) UI 업데이트: 사용자가 승인 즉시 history 항목의 상태를 IN_PROGRESS로 전이
-    setHistory((prev) =>
-      prev.map((item) =>
-        item.request_id === requestId
-          ? {
-              ...item,
-              status: 'IN_PROGRESS',
-              execution_status: 'IN_PROGRESS',
-              answer_status: 'WITHHELD',
-              answer: '',
-            }
-          : item
-      )
+    // 1. 낙관적(Optimistic) UI 업데이트: 활성 상담의 상태를 IN_PROGRESS로 즉시 전이
+    setResult((prev) =>
+      prev && prev.request_id === requestId
+        ? {
+            ...prev,
+            status: 'IN_PROGRESS',
+            execution_status: 'IN_PROGRESS',
+            answer_status: 'WITHHELD',
+          }
+        : prev
     );
 
     try {
+      // 2. 서버에 승인 결정 전달 및 재개된 워크플로우 폴링 시작
       const updated = await approveStatuteSearch(requestId, approved, reason);
       setResult(updated);
-      setHistory((prev) =>
-        prev.map((item) => (item.request_id === requestId ? { ...item, ...updated } : item))
-      );
-
-      // 2. 재개된 워크플로우 완료 시까지 2초 주기로 상태 폴링 및 history 실시간 동기화
-      pollIntervalRef.current = setInterval(async () => {
-        try {
-          const current = await getConsultation(requestId);
-          setResult(current);
-          setHistory((prev) =>
-            prev.map((item) => (item.request_id === requestId ? { ...item, ...current } : item))
-          );
-
-          if (current.status !== 'IN_PROGRESS' && current.status !== 'APPROVAL_REQUIRED') {
-            clearPollInterval();
-            setLoading(false);
-            setQuestion('');
-            await loadHistory();
-          }
-        } catch (err) {
-          clearPollInterval();
-          setError(err instanceof Error ? err.message : String(err));
-          setLoading(false);
-          await loadHistory();
-        }
-      }, 2000);
+      startPolling(requestId);
     } catch (err) {
       clearPollInterval();
       setError(err instanceof Error ? err.message : String(err));
       setLoading(false);
-      await loadHistory();
     }
   };
 
@@ -160,6 +200,3 @@ export function useConsultation(caseId?: string) {
     error,
   };
 }
-
-
-

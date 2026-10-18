@@ -420,3 +420,54 @@ def test_h02_h04_re_analyze_prompt_neutral_for_loan_dispute():
         assert "민법" in captured_prompt
         assert "대여금" in captured_prompt
 
+
+# ==============================================================================
+# HILT 승인 사유 고객 친화적 정제 및 인터럽트 정상 제어 흐름 검증
+# ==============================================================================
+
+def test_client_facing_approval_explanation_no_draft_words():
+    """HILT 법령 검색 승인 사유에서 '초안' 등 내부 시스템 감수 용어가 제거되고 고객 친화적 안내로 변환되는지 검증."""
+    from ai_legal_helper.workflows.legal_workflow import _format_client_approval_explanation
+
+    raw_from_llm = (
+        "초안은 전체 방향은 대체로 실무적으로 타당하나, 핵심 결론을 뒷받침하는 법률 근거가 현재 검색 결과에 충분히 확보되어 있지 않습니다. "
+        "특히 질문은 '주택' 전세의 묵시적 갱신과 해지 통고가 핵심인데, 초안이 직접 인용한 주택임대차보호법 제6조의2 본문은 검색 결과에 없습니다. "
+        "따라서 초안을 그대로 확정하기보다, 관련 법령을 추가 검색해야 합니다."
+    )
+    candidate_laws = ["주택임대차보호법", "민법"]
+    missing_issues = ["묵시적 갱신 해지 효력"]
+
+    formatted = _format_client_approval_explanation(raw_from_llm, candidate_laws, missing_issues)
+
+    # 1. 내부 시스템 용어 '초안'이 절대 포함되지 않아야 함
+    assert "초안은" not in formatted
+    assert "초안이" not in formatted
+    assert "초안을" not in formatted
+    assert "초안" not in formatted
+
+    # 2. 고객 친화적인 법률 안내 문맥이 구성되어야 함
+    assert "질문" in formatted or "사안" in formatted
+    assert "주택임대차보호법" in formatted
+
+
+def test_decorator_handles_graph_interrupt_without_error_log():
+    """LangGraph의 HILT 인터럽트(GraphInterrupt) 발생 시 데코레이터가 ERROR가 아닌 정상 제어 흐름으로 처리하는지 검증."""
+    from langgraph.errors import GraphInterrupt
+    from ai_legal_helper.observability.decorators import trace
+
+    @trace
+    def dummy_hilt_node(x: int):
+        raise GraphInterrupt("Waiting for user decision")
+
+    with patch("ai_legal_helper.observability.decorators.logger") as mock_logger:
+        try:
+            dummy_hilt_node(42)
+        except GraphInterrupt:
+            pass
+
+        # ERROR 레벨 로그가 호출되지 않아야 함 (HILT 인터럽트는 정상 흐름)
+        mock_logger.error.assert_not_called()
+        # 대신 INFO 레벨로 [HILT_INTERRUPT]가 기록되어야 함
+        assert any("[HILT_INTERRUPT]" in str(call) for call in mock_logger.info.call_args_list)
+
+

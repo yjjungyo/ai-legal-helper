@@ -129,6 +129,9 @@ VERIFICATION_PROMPT = """당신은 법률검증 Agent(Legal Verification Agent)�
    - CASE_EVIDENCE_MISSING: 법령은 충분하나 사건의 필수 사실관계나 증거(예: 통보 도달일, 계약서 특약 등)가 누락된 경우 (recommended_action: "REQUEST_EVIDENCE").
    - EVIDENCE_CONFLICT: 사용자 진술이나 사건 증거 간에 모순이 감지된 경우.
    - ANSWER_REVISION_REQUIRED: 법률 근거는 충분하나 초안의 문장 표현, 법적 평가, 논리 전개에 오류가 있는 경우 (recommended_action: "REVISE_DRAFT").
+   - 사유 설명(explanation) 작성 필수 원칙:
+     * '초안', 'draft', '검토자', '작성자' 등 내부 시스템 감수 용어를 절대 사용하지 마세요. 의뢰인은 중간 초안을 본 적이 없습니다.
+     * 의뢰인에게 직접 제공되는 공식 안내문이므로, 질문하신 사안(예: 전세보증금 반환, 계약 해지 효력 등)에 대해 정확하고 신뢰할 수 있는 법적 권리 및 대처 방안을 제공하기 위해 왜 해당 법령 원문의 추가 확인이 필요한지 정중하고 전문적인 법률 안내 어조로 작성하세요.
    - CITATION_INVALID: 존재하지 않는 가짜 파일명이나 사건번호를 허위 인용한 경우.
    - NONE: 검증 통과(PASS)인 경우 (recommended_action: "FINALIZE").
 
@@ -150,7 +153,7 @@ VERIFICATION_PROMPT = """당신은 법률검증 Agent(Legal Verification Agent)�
   "missing_legal_issues": ["법령 검색이 필요한 법률 쟁점"],
   "candidate_laws": ["필요한 공식 법령명 (예: 주택임대차보호법)"],
   "recommended_action": "REQUEST_STATUTE_SEARCH_APPROVAL | REQUEST_EVIDENCE | REVISE_DRAFT | FINALIZE",
-  "explanation": "검증 판정 및 권장 조치에 대한 구체적 설명",
+  "explanation": "의뢰인에게 표시할 법령 추가 검색 필요 사유 ('초안'/'draft' 단어 절대 사용 금지, 고객 친화적 전문 법률 안내 어조)",
   "claims": [
     {{
       "claim": "검증할 주장 문장",
