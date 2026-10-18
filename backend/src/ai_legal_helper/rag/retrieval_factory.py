@@ -7,7 +7,7 @@ P2.1 검증 단계에서 전문 에이전트(AgentExecutor)가 도구의 반환�
 워크플로우 외부로 전달하지 못하는 문제를 해결하기 위해, 검색이 성공할 때마다 
 `contextvars` 기반의 `add_retrieved_source`를 호출하여 실제 참조된 문헌 정보를 추적한다.
 """
-from __future__ import annotations
+import os
 from langchain_core.tools import Tool
 
 from ai_legal_helper.observability.decorators import trace
@@ -53,6 +53,7 @@ def make_fixed_retrieval_tool(tool_name: str, category_eng: str, label_ko: str) 
         rewritten_query = rewrite_query(query or "", label_ko, max_terms=2)
         
         from ai_legal_helper.observability.context import add_retrieved_source
+        from ai_legal_helper.rag.source_schema import build_source_from_chroma_doc
 
         docs = _retrieve(query=rewritten_query, k=MAX_DOCS, category=category_eng)
         if not docs:
@@ -60,30 +61,27 @@ def make_fixed_retrieval_tool(tool_name: str, category_eng: str, label_ko: str) 
 
         lines = []
         for d in docs[:MAX_DOCS]:
-            m = d.metadata or {}
-            fn = m.get("file_name", "?")
-            p1 = m.get("page", "?")
-            p2 = m.get("page_end", p1)
-            page_disp = str(p1) if p1 == p2 or p2 in (None, "?", "") else f"{p1}-{p2}"
-            source_id = f"{fn}_{page_disp}"
+            std_src = build_source_from_chroma_doc(
+                d,
+                category=category_eng,
+                retrieval_method="CHROMA_VECTOR",
+            )
+            fn = std_src.get("filename") or "?"
+            page_disp = std_src.get("page") or "?"
+            snip = (std_src.get("content") or "").strip().replace("\n", " ")
+            std_src["content"] = snip
 
-            snip = (d.page_content or "").strip().replace("\n", " ")
-            
-            # P2.1: AgentExecutor가 출처를 숨기는 문제를 우회하기 위해 전역 컨텍스트에 기록
-            add_retrieved_source({
-                "source_id": source_id,
-                "file_name": fn,
-                "page": page_disp,
-                "content": snip,
-                "category": category_eng
-            })
+            # P2.1: AgentExecutor가 출처를 숨기는 문제를 우회하기 위해 전역 컨텍스트에 표준 Source 스키마로 기록
+            add_retrieved_source(std_src)
 
             if len(snip) > SNIP:
                 snip = f"{snip[:SNIP]}...(+{len(d.page_content)-SNIP})"
 
-            lines.append(f"[CITE] file={fn} page={page_disp}\n{snip}")
+            # 표준 출처 형식: (파일명.pdf, p.페이지)
+            lines.append(f"[CITE] ({fn}, p.{page_disp})\n{snip}")
 
-        lines.append("[GUIDE] 위 1~3건을 근거로 즉시 최종 답변을 작성하세요. 추가 검색 금지.")
+        # 하드코딩된 법령 파일명 예시로 인한 LLM 출처 환각을 방지하기 위해 위 [CITE] 항목만 인용하도록 안내
+        lines.append("[GUIDE] 위 [CITE] 문서를 근거로 즉시 최종 답변을 작성하세요. 인용한 법령 출처는 반드시 위 [CITE]에 제시된 실제 '(파일명.pdf, p.페이지)' 형식으로만 명시하고, 검색 결과에 없는 파일명은 절대 기재하지 마세요. 추가 검색 금지.")
         return "\n".join(lines)
 
     return Tool(

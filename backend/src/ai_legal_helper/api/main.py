@@ -1,3 +1,16 @@
+"""
+모듈명: main.py
+
+[모듈 개요]
+AI Legal Helper 백엔드 FastAPI 애플리케이션의 엔트리포인트 및 전역 라이프사이클을 관리한다.
+CORS, 전역 에러 핸들러, 분산 추적(trace_id/request_id) 주입 미들웨어, 헬스체크 및 라우터를 등록한다.
+
+[주요 기능]
+1. lifespan: 백그라운드 Graph Sync Worker 루프의 안전한 시작 및 종료 관리
+2. trace_context_middleware: 들어오는 모든 HTTP 요청에 고유 trace_id/request_id 발급 및 ContextVar 주입
+3. 라우터 통합: consultation, cases, evidence, documents, graph, workflow, auth 모듈 등록
+4. 헬스체크: /api/v1/health/live 및 /api/v1/health/ready (Postgres, Neo4j) 제공
+"""
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -5,9 +18,18 @@ from contextlib import asynccontextmanager
 from sqlalchemy.exc import SQLAlchemyError
 import time
 import asyncio
+import uuid
 
 from ai_legal_helper.api.routes import consultation, cases, evidence, graph, documents, workflow, auth
 from ai_legal_helper.observability.logging_config import setup_logging, get_logger
+from ai_legal_helper.observability.context import (
+    set_trace_id,
+    reset_trace_id,
+    set_request_id,
+    reset_request_id,
+    set_case_id,
+    reset_case_id,
+)
 from ai_legal_helper.database.graph_sync_worker import graph_sync_worker_loop
 from ai_legal_helper.database.session import engine
 from ai_legal_helper.database.neo4j import get_neo4j_driver
@@ -19,14 +41,29 @@ logger = get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Start graph sync worker
+    """FastAPI 애플리케이션 시작 시 백그라운드 Graph Sync Worker를 기동하고,
+    종료 시 워커 태스크 취소, Langfuse 버퍼 플러시, Neo4j 드라이버 정리를 수행한다.
+    """
     worker_task = asyncio.create_task(graph_sync_worker_loop())
     yield
-    # Shutdown worker
+    # 1. 백그라운드 Graph Sync Worker 안전 종료
     worker_task.cancel()
     try:
         await worker_task
     except asyncio.CancelledError:
+        pass
+    # 2. Langfuse 관측성 버퍼 플러시
+    try:
+        from ai_legal_helper.observability.langfuse_client import flush_langfuse
+        flush_langfuse()
+    except Exception:
+        pass
+    # 3. Neo4j 드라이버 리소스 정리
+    try:
+        driver = get_neo4j_driver()
+        if driver:
+            driver.close()
+    except Exception:
         pass
 
 app = FastAPI(title="AI Legal Helper API", version="1.0.0", lifespan=lifespan)
@@ -44,6 +81,79 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def trace_context_middleware(request: Request, call_next):
+    """모든 HTTP 요청에 대해 고유 trace_id와 request_id를 부여하고 컨텍스트에 주입한다.
+
+    클라이언트 요청 헤더('X-Trace-Id', 'X-Request-Id')가 있으면 이를 승계하고,
+    없을 경우 신규 UUID를 발급하여 Langfuse 분산 추적 및 애플리케이션 로그를 일치시킨다.
+
+    Args:
+        request (Request): 들어오는 FastAPI HTTP 요청 객체.
+        call_next: 다음 미들웨어 또는 엔드포인트 핸들러 호출 함수.
+
+    Returns:
+        Response: 'X-Trace-Id'와 'X-Request-Id' 응답 헤더가 주입된 HTTP 응답 객체.
+    """
+    trace_id = request.headers.get("X-Trace-Id") or str(uuid.uuid4())
+    request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
+
+    t_token = set_trace_id(trace_id)
+    r_token = set_request_id(request_id)
+
+    # URL 경로에서 case_id 자동 추출 (/api/v1/cases/{case_id}/...)
+    c_token = None
+    candidate_case_id = None
+    path_parts = request.url.path.strip("/").split("/")
+    if "cases" in path_parts:
+        c_idx = path_parts.index("cases")
+        if len(path_parts) > c_idx + 1:
+            candidate = path_parts[c_idx + 1]
+            if len(candidate) >= 8 and candidate not in ("actions", "evidence", "statements"):
+                candidate_case_id = candidate
+                c_token = set_case_id(candidate)
+
+    # Langfuse 최상위 Root Trace 시작
+    from ai_legal_helper.observability.langfuse_client import start_trace, end_trace, get_system_name
+    path = request.url.path
+    is_noise = path.endswith("/health/live") or request.method == "OPTIONS"
+    if not is_noise:
+        sys_name = get_system_name()
+        start_trace(
+            trace_id=trace_id,
+            name=f"HTTP:{request.method}_{path}",
+            session_id=candidate_case_id,
+            metadata={
+                "method": request.method,
+                "path": path,
+                "request_id": request_id,
+                "system_name": sys_name,
+            },
+            tags=[sys_name],
+        )
+
+    start_time = time.time()
+    try:
+        response = await call_next(request)
+        elapsed_ms = (time.time() - start_time) * 1000
+        response.headers["X-Trace-Id"] = trace_id
+        response.headers["X-Request-Id"] = request_id
+
+        # CORS OPTIONS 및 주기적 헬스체크 폴링을 제외한 모든 HTTP 요청에 대해 액세스 로그 기록
+        if not is_noise:
+            client_ip = request.client.host if request.client else "-"
+            logger.info(f'{client_ip} - "{request.method} {path}" {response.status_code} ({elapsed_ms:.1f}ms)')
+
+        return response
+    finally:
+        if not is_noise:
+            end_trace(trace_id)
+        reset_trace_id(t_token)
+        reset_request_id(r_token)
+        if c_token:
+            reset_case_id(c_token)
 
 app.include_router(consultation.router, prefix="/api/v1")
 app.include_router(cases.router, prefix="/api/v1")

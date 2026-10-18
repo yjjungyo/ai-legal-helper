@@ -62,3 +62,31 @@ def test_case_consultation_persistence():
     assert any(item["question"] == "보증금 반환 거부 시 어떻게 대처하나요?" for item in items)
 
 
+def test_delete_case_and_cascade():
+    """사건 삭제 시 사건 및 연관된 모든 데이터가 영구 삭제되는지 검증한다."""
+    # 1. 사건 생성
+    case_res = client.post("/api/v1/cases", json={"title": "삭제 대상 테스트 사건", "case_type": "주택임대차"})
+    assert case_res.status_code == 200
+    case_id = case_res.json()["id"]
+
+    # 2. 사건에 진술 추가 (Facts 생성)
+    stmt_res = client.post(f"/api/v1/cases/{case_id}/statements", json={"statement": "2023년 12월 1일 보증금 5000만원 지급함."})
+    assert stmt_res.status_code == 200
+
+    # 3. 사건에 상담 내역 추가
+    c_res = client.post("/api/v1/consultations", json={"question": "보증금 반환 소송 기한이 어떻게 되나요?", "case_id": case_id})
+    assert c_res.status_code == 200
+
+    # 4. 사건 삭제 API 호출
+    del_res = client.delete(f"/api/v1/cases/{case_id}")
+    assert del_res.status_code == 200
+    del_data = del_res.json()
+    assert del_data["status"] == "SUCCESS"
+    assert del_data["deleted_id"] == case_id
+
+    # 5. 삭제된 사건 조회 시 404 반환 검증
+    get_res = client.get(f"/api/v1/cases/{case_id}")
+    assert get_res.status_code == 404
+
+
+

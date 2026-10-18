@@ -21,8 +21,40 @@ class ConsultationRequest(BaseModel):
     session_id: Optional[str] = None
 
 class Source(BaseModel):
-    file: str
-    page: str
+    """법률 RAG 및 사건 증거 RAG 통합 표준 출처 응답 스키마.
+
+    공통 필드와 유형별 필드(법령, 판례, 사건 증거, 일반 문서)를 모두 포함하며,
+    실제 검색 데이터에서 확인되지 않은 필드는 None(null)으로 반환한다.
+    """
+    file: str = "?"
+    page: Optional[str] = ""
+
+    # 표준 공통 필드
+    source_id: Optional[str] = None
+    source_type: Optional[str] = None  # STATUTE | PRECEDENT | CASE_EVIDENCE | DOCUMENT
+    document_id: Optional[str] = None
+    title: Optional[str] = None
+    content: Optional[str] = None
+    retrieval_method: Optional[str] = None
+    chunk_id: Optional[str] = None
+    source_url: Optional[str] = None
+    version_date: Optional[str] = None
+    retrieved_at: Optional[str] = None
+
+    # 법령(STATUTE) 추가 필드
+    statute_name: Optional[str] = None
+    article: Optional[str] = None
+    effective_date: Optional[str] = None
+
+    # 판례(PRECEDENT) 추가 필드
+    court: Optional[str] = None
+    case_number: Optional[str] = None
+    decision_date: Optional[str] = None
+
+    # 사건 증거(CASE_EVIDENCE) 및 일반 문서(DOCUMENT) 추가 필드
+    evidence_id: Optional[str] = None
+    filename: Optional[str] = None
+    category: Optional[str] = None
 
 class UsageSummary(BaseModel):
     total_calls: int
@@ -53,3 +85,13 @@ class ConsultationResponse(BaseModel):
     question: Optional[str] = None
     case_id: Optional[str] = None
     created_at: Optional[str] = None
+
+    # P4.1 HILT Statute Search Approval fields
+    approval_request: Optional[Dict[str, Any]] = None
+
+
+class ApprovalDecisionRequest(BaseModel):
+    """법령 검색 승인/거절 결정 요청 스키마."""
+    approved: bool = Field(description="승인 여부 (True: 승인 후 공식 법령 원문 검색 진행, False: 거절 후 판단 유보)")
+    reason: Optional[str] = Field(default=None, description="거절 또는 승인 사유 메모")
+

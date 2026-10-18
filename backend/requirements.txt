@@ -8,6 +8,7 @@ uvicorn[standard]>=0.28.0
 python-multipart>=0.0.9
 pydantic>=2.7.0
 pydantic-settings>=2.2.0
+email-validator>=2.0.0
 
 # --- 2. Databases & Persistence ---
 # PostgreSQL & ORM & Migration
@@ -50,6 +51,7 @@ reportlab>=4.1.0
 python-docx>=1.1.0
 pypdf>=4.2.0
 pdfplumber>=0.11.0
+filetype>=1.2.0
 
 # --- 7. Utilities & Environment ---
 python-dotenv>=1.0.1

@@ -94,8 +94,8 @@ def plan_legal_actions(context_text: str) -> ActionPlanResponse:
         "4. 환각을 방지하기 위해 증거가 없는 주장은 UNSATISFIED 로 처리하세요.\n"
     )
     
-    # 구조화 출력을 위해 with_structured_output 사용
-    llm = get_llm(temperature=0.0).with_structured_output(ActionPlanResponse)
+    # Azure OpenAI 호환성을 위해 function_calling 방식으로 구조화 출력 호출
+    llm = get_llm(temperature=0.0).with_structured_output(ActionPlanResponse, method="function_calling")
     
     try:
         response = llm.invoke(prompt.format(catalog_str=catalog_str, context_text=context_text))

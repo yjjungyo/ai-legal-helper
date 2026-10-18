@@ -74,3 +74,15 @@ def test_get_workflow_status_not_found(client: TestClient):
     fake_id = str(uuid.uuid4())
     response = client.get(f"/api/v1/cases/{fake_id}/workflow/status")
     assert response.status_code == 404
+
+def test_get_workflow_summary(client: TestClient, db, setup_case_and_action):
+    case, action = setup_case_and_action
+    response = client.get(f"/api/v1/cases/{case.id}/workflow/summary")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["case_id"] == case.id
+    assert data["stage_code"] == "ACTION_PLAN_READY"
+    assert "next_action" in data
+    assert "stats" in data
+    assert data["stats"]["actions_count"] >= 1
+    assert len(data["recent_actions"]) >= 1

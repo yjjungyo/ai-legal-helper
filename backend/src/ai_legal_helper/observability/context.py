@@ -105,38 +105,40 @@ def reset_node_name(token: contextvars.Token):
     """노드의 이름을 롤백한다."""
     _node_name_var.reset(token)
 
-_retrieved_sources_var: contextvars.ContextVar[list] = contextvars.ContextVar('retrieved_sources', default=[])
+_retrieved_sources_var: contextvars.ContextVar[list] = contextvars.ContextVar('retrieved_sources', default=None)
 
 def add_retrieved_source(source: dict):
-    """
-    RAG 검색 과정에서 참조된 문서 출처를 컨텍스트 변수에 추가한다.
+    """RAG 검색 과정에서 참조된 문서 출처를 컨텍스트 변수에 추가한다.
 
-    AgentExecutor가 툴의 결과를 반환하지 않는 문제를 해결하기 위해 도입되었다.
-    가변 객체의 공유로 인한 부작용을 방지하기 위해, 기존 리스트에 원소를 추가하여
-    새로운 리스트를 생성한 뒤 설정하는 방식을 사용한다.
+    LangChain AgentExecutor 및 Tool 실행 시 내부적으로 `contextvars.copy_context()`가
+    수행되므로, 새 리스트를 생성하여 `.set()`하면 하위 컨텍스트에만 바인딩되어 상위로 전파되지 않는다.
+    따라서 부모-자식 간에 공유되는 동일한 리스트 객체에 `.append()`를 수행하여 출처 유실을 방지한다.
 
     Args:
-        source (dict): 추가할 검색 출처 정보
+        source (dict): 추가할 검색 출처 정보 (표준 Source 스키마)
     """
     sources = _retrieved_sources_var.get()
-    # It's better to create a new list or just append. Since contextvars are somewhat tricky with mutable objects,
-    # let's set a new list.
-    new_sources = list(sources) + [source]
-    _retrieved_sources_var.set(new_sources)
+    if sources is None:
+        sources = []
+        _retrieved_sources_var.set(sources)
+    sources.append(source)
 
 def get_retrieved_sources() -> list:
-    """
-    컨텍스트에서 RAG 검색 출처 목록을 가져온다.
-    
+    """컨텍스트에서 RAG 검색 출처 목록의 복사본을 가져온다.
+
     Returns:
         list: 현재 컨텍스트에 누적된 출처 딕셔너리의 리스트
     """
-    return _retrieved_sources_var.get()
+    sources = _retrieved_sources_var.get()
+    if sources is None:
+        return []
+    return list(sources)
 
 def reset_retrieved_sources():
-    """
-    RAG 검색 출처 목록을 빈 리스트로 초기화한다.
-    주로 새로운 에이전트 실행 시작 지점에서 호출하여 이전 데이터를 정리한다.
+    """RAG 검색 출처 목록을 새 빈 리스트로 초기화한다.
+
+    새로운 에이전트 실행 시작 지점에서 호출하여 이전 호출의 잔여 데이터를 정리하고,
+    하위 Tool들이 공유할 새로운 빈 리스트 컨테이너를 컨텍스트에 바인딩한다.
     """
     _retrieved_sources_var.set([])
 

@@ -36,6 +36,8 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from ai_legal_helper.observability.decorators import trace
+from ai_legal_helper.observability.context import get_current_span_id
+from ai_legal_helper.observability.langfuse_client import update_span
 
 logger = logging.getLogger(__name__)
 
@@ -246,8 +248,12 @@ class GraphRAGRetriever:
         
         # 2. Graph DB Fallback 검사
         if self.driver is None:
-            try: update_span(get_current_span_id(), {"fallback": True, "vector_matches_count": len(vector_results)})
-            except: pass
+            cur_span = get_current_span_id()
+            if cur_span:
+                try:
+                    update_span(cur_span, {"fallback": True, "vector_matches_count": len(vector_results)})
+                except Exception:
+                    pass
             return {
                 "strategy": "hybrid_fallback",
                 "available": False,
@@ -262,8 +268,12 @@ class GraphRAGRetriever:
         # 3. 그래프 탐색
         traversal = self.search_traversal(case_id, query=query, seed_ids=seeds)
         
-        try: update_span(get_current_span_id(), {"fallback": False, "vector_matches_count": len(vector_results), "traversal_paths_count": len(traversal)})
-        except: pass
+        cur_span = get_current_span_id()
+        if cur_span:
+            try:
+                update_span(cur_span, {"fallback": False, "vector_matches_count": len(vector_results), "traversal_paths_count": len(traversal)})
+            except Exception:
+                pass
         return {
             "strategy": "hybrid",
             "available": True,
@@ -398,12 +408,8 @@ def format_graph_context(result: Dict[str, Any], valid_paths: List[Dict[str, Any
 
 
 def graph_paths_to_sources(valid_paths: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """검증된 그래프 경로를 Verification Agent 의 출처 형식으로 변환한다."""
-    return [{
-        "source_id": f"GRAPH:{p.get('span_id') or p.get('claim_id')}",
-        "category": "EVIDENCE_GRAPH",
-        "content": f"{p.get('claim_statement')} -{p.get('relation')}-> {p.get('target_content')}",
-        "evidence_id": p.get("evidence_id"),
-        "span_id": p.get("span_id"),
-        "claim_id": p.get("claim_id"),
-    } for p in valid_paths]
+    """검증된 그래프 경로를 표준 Source 스키마(CASE_EVIDENCE, NEO4J_GRAPH) 형식으로 변환한다."""
+    from ai_legal_helper.rag.source_schema import build_source_from_graph_path
+
+    return [build_source_from_graph_path(p) for p in valid_paths]
+

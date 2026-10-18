@@ -42,28 +42,52 @@ def process_new_statement(db: Session, case_id: str, statement: str) -> Case:
         new_facts = []
         new_parties = []
         
-        # 2. 당사자 병합 (간단히 새 당사자 추가, 중복 방지는 향후 고도화)
+        # 2. 당사자 병합 (이름·역할 정규화 기준 중복 삽입 방지)
+        existing_parties = db.query(Party).filter(Party.case_id == case.id).all()
+        existing_party_map = {
+            ((p.name or "").strip(), (p.role or "").strip()): p
+            for p in existing_parties
+        }
         for ep in extracted.parties:
+            p_key = ((ep.name or "").strip(), (ep.role or "").strip())
+            if not p_key[0]:
+                continue
+            if p_key in existing_party_map:
+                existing_p = existing_party_map[p_key]
+                if not existing_p.party_relationship and ep.relationship:
+                    existing_p.party_relationship = ep.relationship
+                continue
             party = Party(
                 case_id=case.id,
-                name=ep.name,
-                role=ep.role,
+                name=ep.name.strip(),
+                role=ep.role.strip() if ep.role else None,
                 party_relationship=ep.relationship
             )
             db.add(party)
+            existing_party_map[p_key] = party
             new_parties.append(party)
             
-        # 3. 사실관계 병합
+        # 3. 사실관계 병합 (공백 제거 정규화 문자열 기준 중복 삽입 방지)
+        existing_facts = db.query(Fact).filter(Fact.case_id == case.id).all()
+        seen_fact_statements = {
+            "".join((f.statement or "").split())
+            for f in existing_facts
+            if f.statement
+        }
         for ef in extracted.facts:
+            norm_stmt = "".join((ef.statement or "").split())
+            if not norm_stmt or norm_stmt in seen_fact_statements:
+                continue
             fact = Fact(
                 case_id=case.id,
-                statement=ef.statement,
+                statement=ef.statement.strip(),
                 fact_type=ef.fact_type,
                 occurred_at=ef.occurred_at,
                 source_type=ef.source_type,
                 source_ref=statement  # 원문 참조 (AOP 로깅에서는 가려지지만 DB에는 저장)
             )
             db.add(fact)
+            seen_fact_statements.add(norm_stmt)
             new_facts.append(fact)
             
         # 4. 플러시하여 ID를 생성받음

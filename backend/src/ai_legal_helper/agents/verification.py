@@ -3,63 +3,95 @@
 모듈명: verification.py
 
 [모듈 개요]
-AI가 작성한 법률 상담 초안이 실제 검색된 출처에 근거하는지(Grounding) 검증하는 수석 검증관 에이전트를 구현한다.
+AI가 작성한 법률 상담 초안이 실제 검색된 출처(Source Registry)에 근거하는지(Grounding) 검증하는
+법률검증 Agent(Verification Agent) 및 결정론적 Citation Validator를 구현한다.
 
 [주요 기능]
-1. 답변 초안에서 주요 법률 주장 추출
-2. 각 주장이 RAG 검색 문서(`retrieved_sources`)에 존재하는지 확인
-3. 없는 출처 지어내기(Hallucination) 방지 및 모순 탐지
-4. 검증 결과 상태(PASS / REVISE / INSUFFICIENT) 및 상세 내용(JSON) 반환
-
-[처리 흐름]
-질문, 초안, 출처 목록 
-  → Verification Agent 프롬프트 실행
-  → LLM을 통한 분석 및 검증 (수동 JSON 파싱 방식 사용)
-  → VerificationOutput 데이터 반환
-
-[주요 의존성]
-- langchain_core
-- pydantic (데이터 스키마)
-- ai_legal_helper.llm.gateway (LLM 연동)
-
-[주의사항]
-- 일부 구형 Azure OpenAI 모델의 `with_structured_output` 미지원 문제를 회피하기 위해, 
-  프롬프트 지시와 수동 파싱을 결합하여 결과를 구조화한다.
-- 검증관은 답변의 내용 자체를 수정하지 않으며, 단지 평가 결과와 수정 지침만 제공한다.
+1. Source Registry 기반 출처 존재성(Existence) 검증:
+   - 초안 내 `(파일명.pdf, p.페이지)`, `[GRAPH:id]`, 판례 사건번호 등이 실제 조회된 Source Registry에 존재하는지 검증
+2. 출처 본문 뒷받침(Content Support) 검증:
+   - 존재하는 문서를 인용했더라도 해당 문장의 주장 어휘·조문이 실제 출처 본문(content)과 무관하면 검증 실패(UNSUPPORTED) 처리
+3. 미검증 인용 차단 및 정화(Sanitization):
+   - 존재하지 않는 파일명, 허위 사건번호, 뒷받침되지 않는 인용을 최종 답변에서 제거하거나 `[근거 미확인]`으로 표시
+4. Langfuse Observability 기록:
+   - retrieval_source_ids, retrieval_methods, retrieved_chunk_ids, generated_citation_ids,
+     validated_citation_ids, rejected_citation_ids, rejection_reasons, existence/support 평가 지표 기록
 """
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional, Tuple
+import json
+import os
+import re
 from langchain_core.prompts import PromptTemplate
 from pydantic import BaseModel, Field
-import json
 
 from ai_legal_helper.observability.decorators import trace
-from ai_legal_helper.observability.context import get_current_span_id
+from ai_legal_helper.observability.context import get_current_span_id, set_agent_name
 from ai_legal_helper.observability.langfuse_client import update_span
-from ai_legal_helper.observability.context import set_agent_name
 from ai_legal_helper.observability.logging_config import get_logger
+from ai_legal_helper.rag.source_schema import normalize_source_dict
 
 logger = get_logger(__name__)
 
+# (파일명.pdf, p.페이지) 형태의 인용을 추출하는 정규식 패턴 (중복 괄호 `((...))` 및 법령 파일명 내 괄호 허용)
+CITATION_PATTERN = re.compile(
+    r"\(+\s*([^\n,]+?\.(?:pdf|docx|txt))\s*,\s*p\.?\s*([0-9\-~]+|\?)\s*\)+",
+    re.IGNORECASE,
+)
+# [GRAPH:id] 또는 [VECTOR:id] 형태의 증거 인용 패턴
+GRAPH_CITATION_PATTERN = re.compile(r"\[((?:GRAPH|VECTOR):[^\]]+)\]")
+# 판례 사건번호 패턴 (예: 2022다21580, 2023도99999)
+CASE_NUMBER_PATTERN = re.compile(r"(?<!\d)((?:19|20)\d{2}\s*[가-힣]{1,3}\s*\d{3,7})(?!\d)")
+# 조문 번호 패턴 (예: 제3조, 제621조의2)
+ARTICLE_PATTERN = re.compile(r"(제\s*\d+\s*조(?:\s*의\s*\d+)?)")
+# 한국어 핵심 명사/어근 추출용 패턴 (2글자 이상 한글 또는 영숫자)
+TOKEN_PATTERN = re.compile(r"[가-힣]{2,}|[A-Za-z0-9]{2,}")
+
+_STOPWORDS = {
+    "있으며", "있습니다", "합니다", "입니다", "경우", "따라", "의거", "관한", "대한",
+    "법률", "규정", "조항", "문서", "근거", "출처", "참고", "가능", "필요", "해당",
+    "인정", "청구", "발생", "의무", "권리", "판단", "검토", "위해", "통해", "대한",
+}
+
+
 class ClaimVerification(BaseModel):
+    """개별 법률 주장에 대한 근거 검증 결과 스키마."""
     claim: str = Field(description="검증할 법률 주장")
-    source_ids: List[str] = Field(description="주장을 뒷받침하는 출처 ID 목록 (없으면 빈 배열)")
-    grounding_status: str = Field(description="SUPPORTED, UNSUPPORTED, 또는 UNCERTAIN")
-    reason: str = Field(description="검증 사유")
+    source_ids: List[str] = Field(default_factory=list, description="주장을 뒷받침하는 출처 ID 목록 (없으면 빈 배열)")
+    grounding_status: str = Field(default="UNCERTAIN", description="SUPPORTED, UNSUPPORTED, 또는 UNCERTAIN")
+    reason: str = Field(default="", description="검증 사유")
+
 
 class VerificationOutput(BaseModel):
+    """법률검증 Agent의 종합 검증 출력 스키마."""
     status: str = Field(description="PASS, REVISE, 또는 INSUFFICIENT")
-    claims: List[ClaimVerification] = Field(description="주요 법률 주장 목록 및 검증 결과")
-    missing_issues: List[str] = Field(description="질문의 핵심 쟁점 중 누락된 항목")
-    contradictions: List[str] = Field(description="답변 내부의 모순된 논리")
-    revision_instructions: List[str] = Field(description="답변 수정을 위한 지침 (REVISE 상태일 때 유용)")
-    warnings: List[str] = Field(description="사용자에게 보여줄 경고 메시지 목록")
+    reason_code: Optional[str] = Field(
+        default="NONE",
+        description="LEGAL_SOURCE_MISSING, LEGAL_SOURCE_INSUFFICIENT, CASE_EVIDENCE_MISSING, EVIDENCE_CONFLICT, ANSWER_REVISION_REQUIRED, CITATION_INVALID, 또는 NONE"
+    )
+    missing_legal_issues: List[str] = Field(default_factory=list, description="법령 검색이 필요한 구체적 법률 쟁점 목록")
+    candidate_laws: List[str] = Field(default_factory=list, description="부족한 쟁점을 규율하는 후보 법령명 목록 (예: ['주택임대차보호법'])")
+    recommended_action: Optional[str] = Field(
+        default="FINALIZE",
+        description="REQUEST_STATUTE_SEARCH_APPROVAL, REQUEST_EVIDENCE, REVISE_DRAFT, 또는 FINALIZE"
+    )
+    explanation: Optional[str] = Field(default="", description="검증 결과 및 권장 후속 조치 사유 설명")
+    claims: List[ClaimVerification] = Field(default_factory=list, description="주요 법률 주장 목록 및 검증 결과")
+    missing_issues: List[str] = Field(default_factory=list, description="질문의 핵심 쟁점 중 누락된 항목")
+    contradictions: List[str] = Field(default_factory=list, description="답변 내부의 모순된 논리")
+    revision_instructions: List[str] = Field(default_factory=list, description="답변 수정을 위한 지침 (REVISE 상태일 때 유용)")
+    warnings: List[str] = Field(default_factory=list, description="사용자에게 보여줄 경고 메시지 목록")
+    citation_audit: Dict[str, Any] = Field(default_factory=dict, description="결정론적 인용 검증 및 Langfuse 추적 메트릭")
 
-VERIFICATION_PROMPT = """당신은 수석 법률 검증관(Supervisor & Verification Agent)입니다.
-작성된 답변(초안)이 실제 검색된 법률 근거(출처)에 의해 정확히 뒷받침되는지 철저하게 검증하세요.
+
+VERIFICATION_PROMPT = """당신은 법률검증 Agent(Legal Verification Agent)입니다.
+작성된 답변(초안)이 실제 검색된 법률 근거(출처) 및 사건 맥락에 의해 정확히 뒷받침되는지 철저하게 검증하세요.
 
 [검증 대상]
 질문:
 {question}
+
+사건 맥락:
+{case_context}
 
 답변 초안:
 {draft_answer}
@@ -68,101 +100,575 @@ VERIFICATION_PROMPT = """당신은 수석 법률 검증관(Supervisor & Verifica
 {retrieved_sources}
 
 [검증 기준 및 정책 (Grounding Policy)]
-1. 답변의 주요 법률 주장(예: "임대인은 보증금을 반환해야 한다", "묵시적 갱신 시 임차인은 언제든 해지 통보를 할 수 있다")을 추출하세요.
-2. 각 주장이 검색된 출처 내용에 존재하는지 대조하세요. 존재하지 않는 출처 ID를 지어내지 마세요.
-3. 근거가 부족한 주장은 UNSUPPORTED로, 일부 모호하면 UNCERTAIN으로 평가하세요.
-4. 질문의 핵심 쟁점 중 답변에서 누락된 것이 있는지 파악하세요.
-5. 답변 내부에 모순된 논리나 설명이 있는지 확인하세요.
-6. 확인된 사실과 단순 AI의 추론/가정을 명확히 구분해야 합니다.
-7. 종합 상태(status) 결정:
-   - PASS: 모든 주요 주장이 출처에 의해 완벽히 뒷받침되고 누락이나 모순이 없음.
-   - REVISE: 근거 부족, 누락, 내부 모순이 있으나 부분적인 수정으로 개선 가능한 경우.
+1. 답변의 주요 법률 주장을 추출하고, [검색된 출처 목록] 또는 [사건 맥락]에 의해 정확히 뒷받침되는지 판정하세요.
+2. 출처 문서는 존재하더라도 그 본문(Content)이 해당 주장을 실제로 뒷받침하지 않는다면 반드시 UNSUPPORTED로 판정하세요.
+3. 종합 상태(status) 결정:
+   - PASS: 모든 주요 주장이 출처 본문에 의해 뒷받침되고 허위 인용·누락·모순이 없음.
+   - REVISE: 근거 부족, 허위 인용, 출처 본문 불일치, 누락, 내부 모순이 있으나 수정으로 개선 가능한 경우.
    - INSUFFICIENT: 답변의 핵심 논리가 근거에 전혀 없거나 수정이 불가능할 정도로 부족한 경우.
 
+4. 근거 부족 원인 분류 (reason_code):
+   - LEGAL_SOURCE_MISSING: 답변에 필요한 핵심 법률/조문이 검색 결과에 완전히 없음 (예: 질문은 주택임대차보호법에 관한 것인데 민법만 검색된 경우). 이 경우 candidate_laws에 해당 법령명을 반드시 명시하고, recommended_action을 "REQUEST_STATUTE_SEARCH_APPROVAL"로 설정하세요. 후보 법령 지정 시 일반법(민법 등)보다 질문의 특수한 법률관계를 직접 규율하는 특별법(예: 주택임대차보호법, 상가임대차법, 근로기준법 등)을 1순위로 최우선 지정하세요.
+   - LEGAL_SOURCE_INSUFFICIENT: 관련 법률 조문은 검색되었으나 쟁점 해결에 불충분한 경우.
+   - CASE_EVIDENCE_MISSING: 법령은 충분하나 사건의 필수 사실관계나 증거(예: 통보 도달일, 계약서 특약 등)가 누락된 경우 (recommended_action: "REQUEST_EVIDENCE").
+   - EVIDENCE_CONFLICT: 사용자 진술이나 사건 증거 간에 모순이 감지된 경우.
+   - ANSWER_REVISION_REQUIRED: 법률 근거는 충분하나 초안의 문장 표현, 법적 평가, 논리 전개에 오류가 있는 경우 (recommended_action: "REVISE_DRAFT").
+   - CITATION_INVALID: 존재하지 않는 가짜 파일명이나 사건번호를 허위 인용한 경우.
+   - NONE: 검증 통과(PASS)인 경우 (recommended_action: "FINALIZE").
+
+5. 실무상 유의사항 및 입증 안내(Legal Caution)에 관한 특칙:
+   - 답변에서 의뢰인에게 실무상 유의사항(예: 상대방의 항변 가능성 주의, 사실관계의 추가 입증 필요성, 통화내역/녹취록 등 증거 확보 권고, 추가 손해액의 객관적 증빙 지참 안내)을 설명하는 것은 변호사·법률전문가의 정상적이고 필수적인 법률 조언(Legal Caution)입니다.
+   - 이러한 입증 주의사항이나 권고사항이 초안에 기재되어 있다고 해서 이를 "사건 증거 부족(CASE_EVIDENCE_MISSING)"이나 "근거 부족(INSUFFICIENT/REVISE)"으로 판정해서는 절대 안 됩니다.
+   - 오직 답변이 객관적 사실이나 법리가 없음에도 허위 사실을 단정적으로 주장하거나, 존재하지 않는 법적 권리를 기정사실로 왜곡 확정할 때만 REVISE 또는 INSUFFICIENT로 판정하세요.
+
+6. 공식 법령 원문 연동(OFFICIAL_STATUTE_SEARCH) 결과 반영 시:
+   - [검색된 출처 목록]에 retrieval_method가 "OFFICIAL_STATUTE_SEARCH"인 법령 조문이 포함되어 있고, 초안이 해당 조문 원문과 일치하게 분석되었다면 status는 반드시 "PASS"로 판정하세요.
+   - 서두의 [공식 법령 원문 연동 및 근거 보강 안내]는 시스템 규격에 따라 작성된 경과 안내문이므로, 서두의 요약 문구와 본문의 세부 설명 간의 사소한 서술 차이를 "내부 모순(contradictions)"이나 "근거 부족(INSUFFICIENT/REVISE)"으로 지적하지 마세요.
+   - 의뢰인의 질문에 포함된 사실관계(예: 질문자가 진술한 일시, 상대방의 구체적 언행, 연락 및 통지 정황 등)를 답변자가 전제하여 법률적 의미나 입증 필요성을 설명한 것을 두고 "사건 증거 목록에 없다"거나 "사실 불일치"로 문제 삼지 마세요.
+
+[출력 형식 (반드시 순수 JSON만 출력)]
+{{
+  "status": "PASS | REVISE | INSUFFICIENT",
+  "reason_code": "LEGAL_SOURCE_MISSING | LEGAL_SOURCE_INSUFFICIENT | CASE_EVIDENCE_MISSING | EVIDENCE_CONFLICT | ANSWER_REVISION_REQUIRED | CITATION_INVALID | NONE",
+  "missing_legal_issues": ["법령 검색이 필요한 법률 쟁점"],
+  "candidate_laws": ["필요한 공식 법령명 (예: 주택임대차보호법)"],
+  "recommended_action": "REQUEST_STATUTE_SEARCH_APPROVAL | REQUEST_EVIDENCE | REVISE_DRAFT | FINALIZE",
+  "explanation": "검증 판정 및 권장 조치에 대한 구체적 설명",
+  "claims": [
+    {{
+      "claim": "검증할 주장 문장",
+      "source_ids": ["출처 ID"],
+      "grounding_status": "SUPPORTED | UNSUPPORTED | UNCERTAIN",
+      "reason": "검증 판단 사유"
+    }}
+  ],
+  "missing_issues": ["누락된 쟁점"],
+  "contradictions": ["내부 모순 사항"],
+  "revision_instructions": ["구체적인 답변 수정 지침"],
+  "warnings": ["사용자에게 표시할 실무상 유의사항 및 권고"]
+}}
 """
 
-@trace
-def run_verification(question: str, draft_answer: str, retrieved_sources: List[Dict[str, Any]], case_context: str = "") -> Dict[str, Any]:
-    """초안 답변이 검색된 출처에 의해 뒷받침되는지 검증한다.
 
-    입력된 질문과 초안 답변, 그리고 검색된 문서 목록을 LLM에 제공하여
-    답변 내의 법률 주장들이 출처에 명시된 사실과 일치하는지 평가한다.
+def _extract_meaningful_tokens(text: str, exclude_filename: str = "") -> set[str]:
+    """문장에서 불용어와 파일명을 제외한 2글자 이상 핵심 어절/어근/n-gram 집합을 추출한다."""
+    cleaned = text
+    if exclude_filename:
+        cleaned = cleaned.replace(exclude_filename, " ")
+    cleaned = CITATION_PATTERN.sub(" ", cleaned)
+    raw_tokens = TOKEN_PATTERN.findall(cleaned.lower())
+    tokens: set[str] = set()
+    for t in raw_tokens:
+        if t in _STOPWORDS or t.isdigit():
+            continue
+        tokens.add(t)
+        # 한국어 복합명사 및 어근 분리 (예: 부당해고 -> 부당, 해고 / 대항력이 -> 대항력, 대항)
+        if len(t) >= 3 and re.match(r"^[가-힣]+$", t):
+            for sub in (t[:2], t[:3]):
+                if sub not in _STOPWORDS and len(sub) >= 2:
+                    tokens.add(sub)
+            for i in range(len(t) - 1):
+                sub = t[i:i+2]
+                if sub not in _STOPWORDS and len(sub) >= 2:
+                    tokens.add(sub)
+    return tokens
+
+
+def _extract_containing_segment(full_text: str, match_start: int, match_end: int) -> str:
+    """인용 주변의 문맥(인용이 포함된 문장 또는 주변 150자)을 정확히 추출한다.
+
+    파일명(.pdf 등)이나 페이지 번호(p.10) 내부의 점(.)으로 문장이 잘못 분리되는 것을 방지한다.
+    """
+    left_bound = max(0, match_start - 150)
+    right_bound = min(len(full_text), match_end + 150)
+
+    # 이전 문장 경계 (. 뒤 공백 또는 줄바꿈)
+    prev_nl = full_text.rfind("\n", left_bound, match_start)
+    prev_period = full_text.rfind(". ", left_bound, match_start)
+    best_left = max(
+        prev_nl + 1 if prev_nl != -1 else left_bound,
+        prev_period + 2 if prev_period != -1 else left_bound,
+    )
+
+    # 다음 문장 경계 (. 뒤 공백, 줄바꿈)
+    next_nl = full_text.find("\n", match_end, right_bound)
+    next_period = full_text.find(". ", match_end, right_bound)
+    candidates_right = [b for b in (next_nl, next_period + 1 if next_period != -1 else -1) if b != -1]
+    best_right = min(candidates_right) if candidates_right else right_bound
+
+    extracted = full_text[best_left:best_right].strip()
+    return extracted or full_text[match_start:match_end]
+
+
+def _check_claim_supported_by_source(
+    claim_segment: str,
+    matched_sources: List[Dict[str, Any]],
+    raw_file: str,
+) -> Tuple[bool, Optional[str]]:
+    """인용이 포함된 문장(claim_segment)이 해당 출처(matched_sources)의 본문(content)에 의해 뒷받침되는지 검사한다.
 
     Args:
-        question: 사용자의 원본 법률 상담 질문
-        draft_answer: 여러 전문 에이전트가 작성하고 종합된 초안 답변
-        retrieved_sources: 각 에이전트가 RAG 검색을 통해 참조한 실제 문서 메타데이터 목록
+        claim_segment: 인용이 등장한 문장 또는 단락.
+        matched_sources: 파일명/ID가 일치하는 Source Registry 항목 리스트.
+        raw_file: 인용된 파일명.
 
     Returns:
-        검증 결과를 담은 JSON 파싱 딕셔너리 (`VerificationOutput` 모델 스키마 형태)
-        - status: 검증 상태 (PASS / REVISE / INSUFFICIENT)
-        - claims: 개별 주장별 근거 대조 결과 리스트
-        - warnings: 경고 메시지 목록
+        Tuple[bool, Optional[str]]: (뒷받침 여부, 거부 사유 코드)
+    """
+    combined_content = " ".join(str(s.get("content") or "") for s in matched_sources).strip()
+    if not combined_content:
+        return False, "EMPTY_SOURCE_CONTENT"
 
-    Notes:
-        Azure OpenAI의 `with_structured_output` 미지원 가능성을 대비하여,
-        프롬프트로 JSON 형식을 강제한 후 반환된 텍스트를 수동으로 파싱 및 검증한다.
-        파싱 오류 발생 시 서비스 중단을 막기 위해 PASS 상태의 기본 fallback을 반환한다.
+    # 1. 문장에서 특정 조문(제N조)을 명시적으로 주장했는데, 출처 본문에 다른 조문만 있고 해당 조문이 없는 경우
+    claimed_articles = {re.sub(r"\s+", "", m) for m in ARTICLE_PATTERN.findall(claim_segment)}
+    source_articles = {re.sub(r"\s+", "", m) for m in ARTICLE_PATTERN.findall(combined_content)}
+    if claimed_articles and source_articles and not claimed_articles.intersection(source_articles):
+        return False, f"ARTICLE_MISMATCH({','.join(sorted(claimed_articles))})"
+
+    # 2. 주장 문장과 출처 본문 간 핵심 어휘 중첩도 확인
+    claim_tokens = _extract_meaningful_tokens(claim_segment, exclude_filename=raw_file)
+    source_tokens = _extract_meaningful_tokens(combined_content)
+    if claim_tokens and source_tokens:
+        overlap = claim_tokens.intersection(source_tokens)
+        if len(overlap) == 0:
+            return False, "UNSUPPORTED_BY_SOURCE_CONTENT"
+
+    return True, None
+
+
+def audit_citations_and_claims(
+    draft_answer: str,
+    retrieved_sources: List[Dict[str, Any]],
+    case_context: str = "",
+) -> Dict[str, Any]:
+    """초안 답변의 모든 인용(파일명, 그래프 ID, 판례 사건번호)을 Source Registry와 대조하여 존재성 및 본문 뒷받침 여부를 감사한다.
+
+    Args:
+        draft_answer: 검증 대상 답변 초안.
+        retrieved_sources: 현재 요청에서 실제 조회된 Source Registry 목록.
+        case_context: 사건 맥락 텍스트 (사건 증거·사실관계 확인용).
+
+    Returns:
+        Dict[str, Any]: Langfuse 기록 및 검증 판정에 사용되는 상세 감사 결과.
+    """
+    normalized_registry = [normalize_source_dict(s) for s in (retrieved_sources or [])]
+
+    retrieval_source_ids: List[str] = []
+    retrieval_methods: List[str] = []
+    retrieved_chunk_ids: List[str] = []
+    by_filename: Dict[str, List[Dict[str, Any]]] = {}
+    by_source_id: Dict[str, Dict[str, Any]] = {}
+    known_case_numbers: set[str] = set()
+
+    for src in normalized_registry:
+        sid = str(src.get("source_id") or "")
+        if sid and sid not in retrieval_source_ids:
+            retrieval_source_ids.append(sid)
+        if sid:
+            by_source_id[sid.lower()] = src
+
+        method = str(src.get("retrieval_method") or "")
+        if method and method not in retrieval_methods:
+            retrieval_methods.append(method)
+
+        cid = str(src.get("chunk_id") or "")
+        if cid and cid not in retrieved_chunk_ids:
+            retrieved_chunk_ids.append(cid)
+
+        for fn_candidate in (src.get("filename"), src.get("file_name"), src.get("file"), sid):
+            if fn_candidate:
+                base_fn = os.path.basename(str(fn_candidate)).strip().lower()
+                by_filename.setdefault(base_fn, []).append(src)
+
+        if src.get("case_number"):
+            known_case_numbers.add(re.sub(r"\s+", "", str(src["case_number"])))
+        for cn in CASE_NUMBER_PATTERN.findall(str(src.get("content") or "")):
+            known_case_numbers.add(re.sub(r"\s+", "", cn))
+
+    if case_context:
+        for cn in CASE_NUMBER_PATTERN.findall(case_context):
+            known_case_numbers.add(re.sub(r"\s+", "", cn))
+
+    generated_citation_ids: List[str] = []
+    validated_citation_ids: List[str] = []
+    rejected_citation_ids: List[str] = []
+    rejection_reasons: Dict[str, str] = {}
+    unverified_labels: List[str] = []
+    unsupported_labels: List[str] = []
+    validated_sources_map: Dict[str, Dict[str, Any]] = {}
+
+    if not draft_answer:
+        return {
+            "retrieval_source_ids": retrieval_source_ids,
+            "retrieval_methods": retrieval_methods,
+            "retrieved_chunk_ids": retrieved_chunk_ids,
+            "generated_citation_ids": [],
+            "validated_citation_ids": [],
+            "rejected_citation_ids": [],
+            "rejection_reasons": {},
+            "unverified_citations": [],
+            "unsupported_citations": [],
+            "citation_existence_rate": 1.0,
+            "citation_support_rate": 1.0,
+            "verified_sources": normalized_registry,
+        }
+
+    # 문장/줄 단위로 분리하여 인용 문맥 파악
+    segments = [seg.strip() for seg in re.split(r"[\n.!?]+", draft_answer) if seg.strip()]
+
+    # 1. (파일명.pdf, p.페이지) 인용 검증
+    for match in CITATION_PATTERN.finditer(draft_answer):
+        raw_file, raw_page = match.group(1).strip(), match.group(2).strip()
+        # 괄호나 따옴표가 파일명에 혼입된 경우 정제 (중복 괄호 방지)
+        raw_file = raw_file.lstrip("([{\"' \t").rstrip(")]}\"' \t")
+        clean_file = os.path.basename(raw_file).lower()
+        cite_label = f"({raw_file}, p.{raw_page})"
+        full_match_text = match.group(0).strip()
+        cite_id = f"{os.path.basename(raw_file)}_{raw_page}"
+        if cite_id not in generated_citation_ids:
+            generated_citation_ids.append(cite_id)
+
+        matched_sources = by_filename.get(clean_file, [])
+        if not matched_sources:
+            if cite_id not in rejected_citation_ids:
+                rejected_citation_ids.append(cite_id)
+                rejection_reasons[cite_id] = "NOT_IN_SOURCE_REGISTRY"
+            if cite_label not in unverified_labels:
+                unverified_labels.append(cite_label)
+            if full_match_text not in unverified_labels:
+                unverified_labels.append(full_match_text)
+            continue
+
+        # 해당 인용이 포함된 문맥(문장) 추출
+        containing_seg = _extract_containing_segment(draft_answer, match.start(), match.end())
+        is_supported, reason = _check_claim_supported_by_source(containing_seg, matched_sources, raw_file)
+        if not is_supported:
+            if cite_id not in rejected_citation_ids:
+                rejected_citation_ids.append(cite_id)
+                rejection_reasons[cite_id] = reason or "UNSUPPORTED_BY_SOURCE_CONTENT"
+            if cite_label not in unsupported_labels:
+                unsupported_labels.append(cite_label)
+            if full_match_text not in unsupported_labels:
+                unsupported_labels.append(full_match_text)
+        else:
+            if cite_id not in validated_citation_ids:
+                validated_citation_ids.append(cite_id)
+            for ms in matched_sources:
+                ms_id = str(ms.get("source_id") or cite_id)
+                validated_sources_map[ms_id] = ms
+
+    # 2. [GRAPH:...] / [VECTOR:...] 인용 검증
+    for g_match in GRAPH_CITATION_PATTERN.finditer(draft_answer):
+        gid = g_match.group(1).strip()
+        if gid not in generated_citation_ids:
+            generated_citation_ids.append(gid)
+        matched_g = by_source_id.get(gid.lower())
+        if not matched_g:
+            if gid not in rejected_citation_ids:
+                rejected_citation_ids.append(gid)
+                rejection_reasons[gid] = "NOT_IN_SOURCE_REGISTRY"
+            label = f"[{gid}]"
+            if label not in unverified_labels:
+                unverified_labels.append(label)
+        else:
+            if gid not in validated_citation_ids:
+                validated_citation_ids.append(gid)
+            validated_sources_map[str(matched_g.get("source_id") or gid)] = matched_g
+
+    # 3. 임의 생성된 판례 사건번호(예: 2023다99999) 검증
+    for cn_match in CASE_NUMBER_PATTERN.finditer(draft_answer):
+        cn_clean = re.sub(r"\s+", "", cn_match.group(1))
+        cite_id = f"PRECEDENT:{cn_clean}"
+        if cite_id not in generated_citation_ids:
+            generated_citation_ids.append(cite_id)
+        if cn_clean not in known_case_numbers:
+            if cite_id not in rejected_citation_ids:
+                rejected_citation_ids.append(cite_id)
+                rejection_reasons[cite_id] = "UNVERIFIED_PRECEDENT_CASE_NUMBER"
+            if cn_clean not in unverified_labels:
+                unverified_labels.append(cn_clean)
+        else:
+            if cite_id not in validated_citation_ids:
+                validated_citation_ids.append(cite_id)
+
+    total_gen = len(generated_citation_ids)
+    not_exist_count = sum(
+        1 for cid in rejected_citation_ids
+        if rejection_reasons.get(cid) in ("NOT_IN_SOURCE_REGISTRY", "UNVERIFIED_PRECEDENT_CASE_NUMBER")
+    )
+    existence_rate = ((total_gen - not_exist_count) / total_gen) if total_gen > 0 else 1.0
+    support_rate = (len(validated_citation_ids) / total_gen) if total_gen > 0 else 1.0
+
+    # 검증된 최종 출처 목록: LLM이 출력한 파일명에 의존하지 않고 서버 Source Registry의 정규화된 메타데이터만 사용
+    # 단, 거부(rejected)된 출처 ID에 해당하는 문서는 제외
+    rejected_filenames = {
+        os.path.basename(cid.rsplit("_", 1)[0]).lower()
+        for cid in rejected_citation_ids
+        if "_" in cid
+    }
+    verified_sources: List[Dict[str, Any]] = []
+    seen_sids: set[str] = set()
+    for src in normalized_registry:
+        sid = str(src.get("source_id") or "")
+        fn_lower = os.path.basename(str(src.get("filename") or src.get("file") or "")).lower()
+        if sid in rejected_citation_ids or (fn_lower and fn_lower in rejected_filenames and sid not in validated_sources_map):
+            continue
+        if sid not in seen_sids:
+            seen_sids.add(sid)
+            verified_sources.append(src)
+
+    return {
+        "retrieval_source_ids": retrieval_source_ids,
+        "retrieval_methods": retrieval_methods,
+        "retrieved_chunk_ids": retrieved_chunk_ids,
+        "generated_citation_ids": generated_citation_ids,
+        "validated_citation_ids": validated_citation_ids,
+        "rejected_citation_ids": rejected_citation_ids,
+        "rejection_reasons": rejection_reasons,
+        "unverified_citations": unverified_labels,
+        "unsupported_citations": unsupported_labels,
+        "citation_existence_rate": round(existence_rate, 4),
+        "citation_support_rate": round(support_rate, 4),
+        "verified_sources": verified_sources,
+    }
+
+
+def validate_citations_against_sources(
+    draft_answer: str,
+    retrieved_sources: List[Dict[str, Any]],
+) -> List[str]:
+    """초안 답변에 포함된 인용이 실제 검색된 출처 목록에 존재하는지 검증한다 (하위 호환 함수).
+
+    Args:
+        draft_answer: 전문 에이전트들이 작성 및 종합한 초안 텍스트.
+        retrieved_sources: RAG 검색으로 수집된 실제 출처 딕셔너리 리스트.
+
+    Returns:
+        List[str]: 검색 결과에 존재하지 않는 미검증(허위) 인용 리스트.
+    """
+    audit = audit_citations_and_claims(draft_answer, retrieved_sources)
+    return audit["unverified_citations"]
+
+
+def sanitize_unverified_citations(
+    answer: str,
+    retrieved_sources: List[Dict[str, Any]],
+    case_context: str = "",
+) -> str:
+    """최종 답변에서 Source Registry에 존재하지 않거나 본문이 뒷받침하지 않는 허위 인용을 제거·정화한다.
+
+    Args:
+        answer: 정화 대상 답변 텍스트.
+        retrieved_sources: 실제 조회된 Source Registry 목록.
+        case_context: 사건 맥락 문자열.
+
+    Returns:
+        str: 미검증 파일명·사건번호·그래프 ID가 제거된 안전한 답변 텍스트.
+    """
+    if not answer:
+        return answer
+
+    audit = audit_citations_and_claims(answer, retrieved_sources, case_context=case_context)
+    unverified = set(audit.get("unverified_citations", []))
+    unsupported = set(audit.get("unsupported_citations", []))
+    bad_labels = unverified.union(unsupported)
+
+    if not bad_labels:
+        return answer
+
+    cleaned = answer
+    for label in bad_labels:
+        if label.startswith("(") and label.endswith(")"):
+            # 미검증 (파일명.pdf, p.페이지) 인용 제거 및 이중 괄호 변형 정화
+            cleaned = cleaned.replace(label, "[근거 미확인]")
+            if label.startswith("((") and label.endswith("))"):
+                inner = label[1:-1]
+                cleaned = cleaned.replace(inner, "[근거 미확인]")
+        elif label.startswith("[") and label.endswith("]"):
+            cleaned = cleaned.replace(label, "")
+        else:
+            # 미검증 판례 사건번호 마스킹
+            cleaned = cleaned.replace(label, "[사건번호 미확인]")
+
+    # 괄호 중복 등으로 남은 패턴 정리 (예: ([근거 미확인]) 또는 [근거 미확인]) -> [근거 미확인])
+    cleaned = re.sub(r"\(+\[근거 미확인\]\)+", "[근거 미확인]", cleaned)
+    cleaned = re.sub(r"\[근거 미확인\]\)+", "[근거 미확인]", cleaned)
+    cleaned = re.sub(r"\(+\[근거 미확인\]", "[근거 미확인]", cleaned)
+
+    # 불필요한 중복 공백 정리
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    return cleaned.strip()
+
+
+@trace
+def run_verification(
+    question: str,
+    draft_answer: str,
+    retrieved_sources: List[Dict[str, Any]],
+    case_context: str = "",
+) -> Dict[str, Any]:
+    """초안 답변이 검색된 출처에 의해 뒷받침되는지 결정론적 Citation Validator 및 LLM으로 검증한다.
+
+    Args:
+        question: 사용자의 원본 법률 상담 질문.
+        draft_answer: 여러 전문 에이전트가 작성하고 종합된 초안 답변.
+        retrieved_sources: 각 에이전트가 RAG 검색을 통해 참조한 실제 문서 메타데이터 목록.
+        case_context: 사건 기본 정보, 사실관계, 타임라인, 증거 브리핑 문자열.
+
+    Returns:
+        Dict[str, Any]: `VerificationOutput` 스키마 형태의 검증 결과 딕셔너리.
     """
     set_agent_name("verification_agent")
-    
+
+    # 1. 결정론적 Citation & Content Support 감사 실행
+    audit = audit_citations_and_claims(draft_answer, retrieved_sources, case_context=case_context)
+    unverified_citations = audit["unverified_citations"]
+    unsupported_citations = audit["unsupported_citations"]
+    valid_source_id_set = set(audit["retrieval_source_ids"])
+    rejected_id_set = set(audit["rejected_citation_ids"])
+
     formatted_sources = ""
-    for s in retrieved_sources:
-        formatted_sources += f"- ID: {s.get('source_id')} | Category: {s.get('category')}\n"
-        formatted_sources += f"  Content: {s.get('content')}\n\n"
-        
+    for s in audit["verified_sources"]:
+        fname = s.get("filename") or s.get("file_name") or s.get("source_id") or "UNKNOWN"
+        page = s.get("page") or "1"
+        stype = s.get("source_type") or "DOCUMENT"
+        method = s.get("retrieval_method") or "CHROMA_VECTOR"
+        formatted_sources += (
+            f"- ID: {s.get('source_id')} | Type: {stype} | Method: {method} | File: {fname} (p.{page})\n"
+            f"  Content: {s.get('content')}\n\n"
+        )
+
     if not formatted_sources.strip():
         formatted_sources = "(검색된 출처 없음)"
-        
+
     prompt = PromptTemplate.from_template(VERIFICATION_PROMPT)
     from ai_legal_helper.llm.gateway import get_llm
     llm = get_llm(temperature=0.0)
-    
+
     chain = prompt | llm
-    
+
     try:
         res = chain.invoke({
             "question": question,
             "draft_answer": draft_answer,
             "retrieved_sources": formatted_sources,
-            "case_context": case_context or "(사건 정보 없음)"
+            "case_context": case_context or "(사건 정보 없음)",
         })
-        
-        # parse json manually
-        text = res.content.strip()
+
+        text = res.content.strip() if hasattr(res, "content") else str(res).strip()
         if text.startswith("```json"):
             text = text[7:]
+        elif text.startswith("```"):
+            text = text[3:]
         if text.endswith("```"):
             text = text[:-3]
-            
-        import json
+
         data = json.loads(text.strip())
         result = VerificationOutput(**data)
-        
-        logger.info(f"[VERIFICATION] status={result.status}, claims={len(result.claims)}")
-        
+
+        # 2. LLM이 반환한 Claim별 source_ids가 실제 Source Registry에 존재하는지 교차 검증
+        for claim_obj in result.claims:
+            verified_claim_sids = [
+                sid for sid in claim_obj.source_ids
+                if sid in valid_source_id_set and sid not in rejected_id_set
+            ]
+            if claim_obj.source_ids and not verified_claim_sids:
+                claim_obj.grounding_status = "UNSUPPORTED"
+                claim_obj.reason = (claim_obj.reason + " (지정된 출처 ID가 실제 검색 결과에 존재하지 않거나 본문과 불일치함)").strip()
+            claim_obj.source_ids = verified_claim_sids
+
+        # 3. 결정론적 Citation Validator 결과 병합
+        if unverified_citations:
+            cite_str = ", ".join(unverified_citations)
+            result.warnings.append(f"검색 결과에서 확인되지 않은 출처 인용이 감지되었습니다: {cite_str}")
+            result.revision_instructions.append(
+                f"검색된 출처 목록에 존재하지 않는 허위 인용({cite_str})을 답변에서 제거하고 실제 검색된 출처만 인용하세요."
+            )
+            if result.status == "PASS":
+                result.status = "REVISE"
+
+        if unsupported_citations:
+            unsup_str = ", ".join(unsupported_citations)
+            result.warnings.append(f"출처 문서의 본문이 해당 주장을 뒷받침하지 않는 인용이 감지되었습니다: {unsup_str}")
+            result.revision_instructions.append(
+                f"출처 본문과 무관하게 인용된 출처({unsup_str})를 제거하고, 해당 주장을 수정하거나 근거 미확인으로 표시하세요."
+            )
+            if result.status == "PASS":
+                result.status = "REVISE"
+
+        # LLM 자체 평가에서 UNSUPPORTED 주장이 1건 이상이면 PASS 불가
+        unsupported_claim_count = sum(1 for c in result.claims if c.grounding_status == "UNSUPPORTED")
+        if unsupported_claim_count > 0 and result.status == "PASS":
+            result.status = "REVISE"
+            result.warnings.append(f"근거가 확인되지 않은 주장 {unsupported_claim_count}건이 포함되어 있습니다.")
+
+        result.citation_audit = audit
+
+        logger.info(
+            f"[VERIFICATION] status={result.status}, claims={len(result.claims)}, "
+            f"unverified={len(unverified_citations)}, unsupported={len(unsupported_citations)}"
+        )
+
         try:
-            unsupported = sum(1 for c in result.claims if c.grounding_status != "SUPPORTED")
+            unsupported_total = sum(1 for c in result.claims if c.grounding_status != "SUPPORTED")
             update_span(get_current_span_id(), {
                 "claims_count": len(result.claims),
-                "supported_count": len(result.claims) - unsupported,
+                "supported_count": len(result.claims) - unsupported_total,
                 "warnings_count": len(result.warnings),
                 "is_fail": result.status == "INSUFFICIENT",
                 "is_revise": result.status == "REVISE",
-                "unsupported_count": unsupported,
-                "missing_issues_count": len(result.missing_issues)
+                "reason_code": result.reason_code,
+                "candidate_laws": result.candidate_laws,
+                "recommended_action": result.recommended_action,
+                "missing_legal_issues": result.missing_legal_issues,
+                "unsupported_count": unsupported_total,
+                "missing_issues_count": len(result.missing_issues),
+                "unverified_citations_count": len(unverified_citations),
+                "unsupported_citations_count": len(unsupported_citations),
+                # 요구사항 5: Langfuse Observability 필수 필드 기록
+                "retrieval_source_ids": audit["retrieval_source_ids"],
+                "retrieval_methods": audit["retrieval_methods"],
+                "retrieved_chunk_ids": audit["retrieved_chunk_ids"],
+                "generated_citation_ids": audit["generated_citation_ids"],
+                "validated_citation_ids": audit["validated_citation_ids"],
+                "rejected_citation_ids": audit["rejected_citation_ids"],
+                "rejection_reasons": audit["rejection_reasons"],
+                "citation_existence_rate": audit["citation_existence_rate"],
+                "citation_support_rate": audit["citation_support_rate"],
             })
-        except:
+        except Exception:
             pass
         return result.model_dump()
-        
+
     except Exception as e:
         logger.error(f"Verification Agent 오류: {str(e)}")
+        has_citation_defect = bool(unverified_citations or unsupported_citations)
+        fallback_status = "REVISE" if has_citation_defect else "PASS"
+        fallback_warnings = [f"검증 중 오류 발생: {str(e)}"]
+        fallback_instructions: List[str] = []
+        if unverified_citations:
+            cite_str = ", ".join(unverified_citations)
+            fallback_warnings.append(f"검색 결과에서 확인되지 않은 출처 인용이 감지되었습니다: {cite_str}")
+            fallback_instructions.append(
+                f"검색된 출처 목록에 존재하지 않는 허위 인용({cite_str})을 답변에서 제거하세요."
+            )
+        if unsupported_citations:
+            unsup_str = ", ".join(unsupported_citations)
+            fallback_warnings.append(f"출처 문서의 본문이 해당 주장을 뒷받침하지 않는 인용이 감지되었습니다: {unsup_str}")
+            fallback_instructions.append(
+                f"출처 본문과 무관하게 인용된 출처({unsup_str})를 제거하세요."
+            )
         return {
-            "status": "PASS",
+            "status": fallback_status,
+            "reason_code": "NONE",
+            "missing_legal_issues": [],
+            "candidate_laws": [],
+            "recommended_action": "FINALIZE",
+            "explanation": f"검증 처리 중 오류 발생: {str(e)}",
             "claims": [],
             "missing_issues": [],
             "contradictions": [],
-            "revision_instructions": [],
-            "warnings": [f"검증 중 오류 발생: {str(e)}"]
+            "revision_instructions": fallback_instructions,
+            "warnings": fallback_warnings,
+            "citation_audit": audit,
         }

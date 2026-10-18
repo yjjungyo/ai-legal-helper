@@ -20,7 +20,10 @@ import filetype
 from sqlalchemy.orm import Session
 from fastapi import UploadFile, HTTPException
 
-from ai_legal_helper.database.models import EvidenceDocument, EvidenceSpan, Case
+from ai_legal_helper.database.models import EvidenceDocument, EvidenceSpan, EvidenceClaim, Case
+from ai_legal_helper.observability.decorators import trace
+from ai_legal_helper.observability.context import get_current_span_id
+from ai_legal_helper.observability.langfuse_client import update_span
 
 # 보안: 지원하는 MIME 타입 및 확장자 (추가 기능 플래그로 조절 가능)
 ALLOWED_MIME_TYPES = {
@@ -47,6 +50,7 @@ def get_storage_dir() -> str:
     os.makedirs(storage_path, exist_ok=True)
     return storage_path
 
+@trace
 async def ingest_evidence(db: Session, case_id: str, file: UploadFile) -> EvidenceDocument:
     """
     업로드된 증거 파일을 검증하고 저장한 뒤 EvidenceDocument 레코드를 생성한다.
@@ -97,8 +101,11 @@ async def ingest_evidence(db: Session, case_id: str, file: UploadFile) -> Eviden
     # 중복 해시 검사 (동일 사건 내에서)
     existing_doc = db.query(EvidenceDocument).filter_by(case_id=case_id, sha256=file_hash).first()
     if existing_doc:
-        os.remove(file_path) # 로컬 저장본 폐기
-        raise HTTPException(status_code=409, detail=f"이미 동일한 내용의 증거가 업로드되어 있습니다. (ID: {existing_doc.id})")
+        os.remove(file_path)  # 로컬 저장본 폐기
+        raise HTTPException(
+            status_code=409, 
+            detail=f"이미 동일한 내용의 증거 문서가 등록되어 있습니다. (기존 등록 파일: '{existing_doc.original_filename}')"
+        )
 
     # 5. DB 저장
     doc = EvidenceDocument(
@@ -116,8 +123,21 @@ async def ingest_evidence(db: Session, case_id: str, file: UploadFile) -> Eviden
     db.commit()
     db.refresh(doc)
     
+    cur_span = get_current_span_id()
+    if cur_span:
+        try:
+            update_span(cur_span, {
+                "document_id": doc.id,
+                "case_id": case_id,
+                "size_bytes": size_bytes,
+                "mime_type": mime_type,
+            })
+        except Exception:
+            pass
+
     return doc
 
+@trace
 def extract_text_from_evidence(db: Session, doc_id: str) -> bool:
     """
     EvidenceDocument에 저장된 파일에서 텍스트를 추출하고 EvidenceSpan 레코드들을 생성한다.
@@ -145,20 +165,57 @@ def extract_text_from_evidence(db: Session, doc_id: str) -> bool:
     db.commit()
     
     try:
+        # 재추출 시 이전 spans 및 승인되지 않은(PENDING) claims 중복 방지를 위한 정리
+        reviewed_claims_count = (
+            db.query(EvidenceClaim)
+            .filter_by(evidence_id=doc_id)
+            .filter(EvidenceClaim.review_status != "PENDING")
+            .count()
+        )
+        if reviewed_claims_count == 0:
+            db.query(EvidenceClaim).filter_by(evidence_id=doc_id).delete(synchronize_session=False)
+            db.query(EvidenceSpan).filter_by(evidence_id=doc_id).delete(synchronize_session=False)
+            db.flush()
+
         spans_to_create = []
         ext = Path(doc.original_filename).suffix.lower()
         
         if ext == ".pdf":
             import pdfplumber
+            import re
             with pdfplumber.open(file_path) as pdf:
                 for i, page in enumerate(pdf.pages):
-                    text = page.extract_text()
-                    if text and text.strip():
+                    page_text = page.extract_text()
+                    if not page_text or not page_text.strip():
+                        continue
+
+                    # 1차: 빈 줄(\n\s*\n) 기준 분할
+                    raw_paras = [p.strip() for p in re.split(r'\n\s*\n', page_text) if p.strip()]
+
+                    # 빈 줄 구분이 없거나 1개만 나온 경우, 조항(제N조) 또는 번호(1., 2.) 기준으로 세분화
+                    if len(raw_paras) <= 1:
+                        lines = [line.strip() for line in page_text.splitlines() if line.strip()]
+                        chunk = []
+                        raw_paras = []
+                        for line in lines:
+                            if chunk and re.match(r'^(제\s*\d+\s*조|\d+\.|\([0-9가-힣]\)|\[.+\])', line):
+                                raw_paras.append("\n".join(chunk))
+                                chunk = [line]
+                            else:
+                                chunk.append(line)
+                        if chunk:
+                            raw_paras.append("\n".join(chunk))
+
+                    if not raw_paras:
+                        raw_paras = [page_text.strip()]
+
+                    for p_idx, para in enumerate(raw_paras):
                         spans_to_create.append(EvidenceSpan(
                             evidence_id=doc.id,
                             page_number=i + 1,
-                            text_excerpt=text.strip(),
-                            extractor_version="pdfplumber-0.11",
+                            paragraph_index=p_idx,
+                            text_excerpt=para,
+                            extractor_version="pdfplumber-0.11-para",
                             location_quality="EXACT"
                         ))
         elif ext == ".docx":

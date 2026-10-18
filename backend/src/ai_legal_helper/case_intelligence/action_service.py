@@ -13,7 +13,7 @@ from datetime import datetime
 
 from ai_legal_helper.database.models import (
     Case, Fact, Event, EvidenceDocument, EvidenceClaim, LegalIssue,
-    LegalAction, ActionRequirement, ActionDependency, ActionDeadline, ActionRevision
+    LegalAction, ActionRequirement, ActionDependency, ActionDeadline, ActionRevision, LegalDocument
 )
 from ai_legal_helper.agents.action_planner import plan_legal_actions
 from ai_legal_helper.agents.deadline_engine import DeadlineEngine
@@ -31,9 +31,10 @@ def _build_context_for_planner(db: Session, case_id: str) -> str:
     facts = db.query(Fact).filter(Fact.case_id == case_id).all()
     events = db.query(Event).filter(Event.case_id == case_id).order_by(Event.event_date).all()
     
+    # 승인(APPROVED) 및 수정 승인(EDITED)된 증거 주장 모두 포함
     approved_claims = db.query(EvidenceClaim).filter(
         EvidenceClaim.case_id == case_id,
-        EvidenceClaim.review_status == "APPROVED"
+        EvidenceClaim.review_status.in_(["APPROVED", "EDITED"])
     ).all()
     
     issues = db.query(LegalIssue).filter(LegalIssue.case_id == case_id, LegalIssue.status == "OPEN").all()
@@ -64,8 +65,11 @@ def _build_context_for_planner(db: Session, case_id: str) -> str:
     return "\n".join(context_parts)
 
 def generate_action_plan(db: Session, case_id: str) -> List[LegalAction]:
-    """
-    기존의 Action Plan을 평가하고, 새로 생성/갱신한다.
+    """기존의 Action Plan을 정리하고 사건 최신 맥락에 맞춰 새로 생성/갱신한다.
+
+    벌크 DELETE 시 하위 ActionRequirement, ActionDeadline, ActionDependency가 고아 레코드로 남거나
+    LegalDocument.action_id 외래키 제약 조건이 깨지는 문제를 방지하기 위해,
+    연결된 문서의 action_id 참조를 먼저 해제하고 ORM cascade 삭제를 수행한다.
     """
     context_text = _build_context_for_planner(db, case_id)
     
@@ -76,8 +80,20 @@ def generate_action_plan(db: Session, case_id: str) -> List[LegalAction]:
     events = db.query(Event).filter(Event.case_id == case_id).all()
     deadline_engine = DeadlineEngine(events)
     
-    # 기존 Action 보존 및 삭제 (P3.1에서는 간단히 전체 재생성 전략 사용)
-    db.query(LegalAction).filter(LegalAction.case_id == case_id).delete(synchronize_session=False)
+    # 기존 Action을 참조하는 법률 문서의 외래키 연결 해제 후 ORM Cascade로 하위 요건·기한·의존성 일괄 정리
+    existing_actions = db.query(LegalAction).filter(LegalAction.case_id == case_id).all()
+    if existing_actions:
+        old_action_ids = [a.id for a in existing_actions]
+        db.query(LegalDocument).filter(LegalDocument.action_id.in_(old_action_ids)).update(
+            {LegalDocument.action_id: None}, synchronize_session=False
+        )
+        db.query(ActionDependency).filter(
+            (ActionDependency.action_id.in_(old_action_ids))
+            | (ActionDependency.depends_on_action_id.in_(old_action_ids))
+        ).delete(synchronize_session=False)
+        for old_act in existing_actions:
+            db.delete(old_act)
+        db.flush()
     
     new_actions = []
     action_map = {}

@@ -40,51 +40,56 @@ def _format_findings(results: Dict[str, str], per_cat_limit: int = 2400) -> str:
     return "\n".join(lines).strip()
 
 def _render_originals(results: Dict[str, str]) -> str:
-    lines: List[str] = ["### 참고 : 카테고리별 전문 답변"]
+    lines: List[str] = ["[참고 : 분야별 전문가 상세 답변]"]
     for cat, text in results.items():
-        lines.append(f"\n#### {cat} 분야 전문가(Agent) 답변")
+        lines.append(f"\n[분야: {cat}]")
         lines.append(text or "(답변 없음)")
     return "\n".join(lines)
 
 SYNTH_SYSTEM = """당신은 에이아이로 법률 전문가입니다.
-- 사용자의 질문과 카테고리별 에이전트 답변을 바탕으로, 하나의 통합된 최종 답변을 한국어로 작성하세요.
-- 사고 과정(Chain-of-Thought)을 출력하지 마세요. 최종 결론/근거 요약/주의사항을 명확하게 제시하세요.
+- 사용자의 질문과 카테고리별 에이전트 답변을 바탕으로, 하나의 통합된 최종 법률 의견서를 한국어로 작성하세요.
+- 사고 과정(Chain-of-Thought)을 출력하지 마세요.
+- 마크다운 특수문자(#, ##, ###, **, *, ---, > 등)를 절대 사용하지 마세요. 사용자 화면에 마크다운 기호가 그대로 노출되므로 플레인 텍스트 서식만 사용해야 합니다.
+- 섹션 제목은 [1. 핵심 결론], [2. 법적 근거 요약], [3. 실무상 대응 방안 및 입증사항], [4. 주의사항]과 같이 대괄호와 번호 체계를 사용하세요.
+- 세부 항목은 번호(1., 2., 3.) 또는 일반 불릿(- )으로 정돈하여 작성하세요.
 - 중복 내용은 합치고 모순되는 부분은 조정하거나 '쟁점'으로 분리하세요.
-- 법률 명칭/조문/판례 등 다른 에이전트가 찾은 출처(카테고리/문서/페이지 등)는 반드시 표기하세요.
-- 출력은 Markdown 형식으로 간결하고 구조화(번호/불릿/소제목)해 주세요.
+- 법률 명칭/조문/판례 등 참고한 법령 출처는 반드시 [카테고리별 에이전트 답변]에 실제로 등장한 '(파일명.pdf, p.페이지)' 또는 '[GRAPH:...]' 출처만 그대로 인용하세요.
+- 에이전트 답변에 출처 파일명이나 판례 사건번호가 없는데 임의로 파일명, 사건번호, 조문을 지어내어 기재하는 것은 엄격히 금지됩니다.
 """
 
 SYNTH_FEWSHOT = """
-예시)
-[질문] 전세보증금 반환 절차가 궁금합니다.
-[에이전트별 답변 요약]
-- 민법: 임대차종료/퇴거와 내용증명/소송 절차.
-- 행정: 주택도시보증 공사 보증 제도.
-- 조세: 원천징수/소득세 이슈 없음.
+[좋은 법률 종합 답변 작성 양식]
+[1. 핵심 결론]
+질문에 대한 명확한 법적 판단 및 핵심 결론을 제시합니다.
 
-[좋은 종합 답변의 특징]
-1) 핵심 결론: 반환 요구 절차 (증거 확보 -> 내용증명 -> 소송/집행)
-2) 선택지/분기: 보증보험 가입한 경로, 미가입 경로
-3) 주의: 임대차기간/우선변제권/대항력 등 체크리스트
-4) 참고: 민법 임대차규정, 관련제도 링크(가능시)
+[2. 법적 근거 요약]
+- 근거 조문 및 법률 원칙 요약
+- 출처: (실제검색된파일명.pdf, p.페이지)
+
+[3. 실무상 대응 방안 및 입증사항]
+1) 사실관계 확인 및 증거 확보
+2) 내용증명 발송 또는 절차 진행
+
+[4. 주의사항 및 한계]
+- 본 답변은 제공된 자료를 바탕으로 한 일반 법률정보이며 구체적 사실관계에 따라 결론이 달라질 수 있습니다.
 """
 
 SYNTH_PROMPT = PromptTemplate.from_template(
     """{system}
 
-# 대화 요약
+[대화 요약]
 {chat_brief}
 
-# 사용자 질문
+[사용자 질문]
 {question}
 
-# 카테고리별 에이전트 답변 (요약 입력)
+[카테고리별 에이전트 답변 (요약 입력)]
 {findings}
 
 {fewshot}
 
-# 지시
-위 정보를 종합하여, 하나의 통일된 **최종 답변**을 작성하세요.
+[지시]
+위 정보를 종합하여, 마크다운 기호(#, **, ---, >) 없는 깔끔한 플레인 텍스트 [최종 법률 의견서]를 작성하세요.
 - 불확실한 부분은 가정/한계를 명시하세요.
 - 핵심 조치/절차/기한/요건을 명확히 하세요.
 - 마지막에 간단한 면책 문구를 포함하세요.
@@ -93,6 +98,8 @@ SYNTH_PROMPT = PromptTemplate.from_template(
 
 @trace
 def synthesize(messages: List[AnyMessage], results: Dict[str, str]) -> List[AnyMessage]:
+    from ai_legal_helper.utils.text_formatter import clean_markdown_formatting
+
     if not results:
         final = "관련 카테고리에서 유의미한 답변을 생성하지 못했습니다. 질문을 구체화해 주세요."
         logger.debug("[SYN] empty results -> fallback")
@@ -117,7 +124,7 @@ def synthesize(messages: List[AnyMessage], results: Dict[str, str]) -> List[AnyM
         logger.exception("[SYN] LLM 생성 실패, 원문만 반환")
         summary = "종합 답변 생성 중 오류가 발생했습니다. 아래 카테고리별 답변을 참고해 주세요."
 
-    originals = _render_originals(results)
-    final_md = f"{summary}\n\n---\n{originals}"
-
-    return messages + [AIMessage(content=final_md)]
+    summary = clean_markdown_formatting(summary)
+    originals = clean_markdown_formatting(_render_originals(results))
+    final_text = f"{summary}\n\n========================================\n\n{originals}"
+    return messages + [AIMessage(content=final_text)]

@@ -58,6 +58,21 @@ _langfuse: Optional[Any] = None
 # 실행 중인 활성 Trace와 Span 인스턴스를 관리하는 딕셔너리
 _active_traces: Dict[str, Any] = {}
 _active_spans: Dict[str, Any] = {}
+# 노드명/함수명 기반 부모 탐색 지원을 위한 이름 매핑 인덱스
+_active_spans_by_name: Dict[str, str] = {}
+_span_names: Dict[str, str] = {}
+
+
+def get_system_name() -> str:
+    """환경변수 `LANGFUSE_SYSTEM_NAME`으로부터 현재 시스템 식별자를 반환한다.
+
+    기본값은 'LegalAgent'이며, 다중 애플리케이션(LegalChat, LegalRAG 등) 간의
+    비교 및 대시보드 필터링을 지원한다.
+
+    Returns:
+        str: 시스템 식별자 문자열 (예: 'LegalAgent', 'LegalChat', 'LegalRAG')
+    """
+    return os.getenv("LANGFUSE_SYSTEM_NAME", "LegalAgent")
 
 
 def get_langfuse() -> Optional[Any]:
@@ -91,11 +106,13 @@ def get_langfuse_callback_handler(
     user_id: Optional[str] = None,
     metadata: Optional[Dict[str, Any]] = None,
     trace_name: Optional[str] = None,
+    tags: Optional[List[str]] = None,
 ) -> Optional[Any]:
     """LangChain 및 LangGraph 실행 추적을 위한 Langfuse CallbackHandler를 생성한다.
 
     컨텍스트에 활성 Trace가 존재하는 경우 해당 Trace 하위에 스팬 및 생성을 연결하고,
     그렇지 않은 경우 독립적인 신규 추적 세션을 생성한다.
+    시스템 식별자(LANGFUSE_SYSTEM_NAME, 기본값 'LegalAgent')를 태그 및 메타데이터에 자동 주입한다.
 
     Args:
         trace_id: 연결할 상위 추적 ID (미지정 시 ContextVar 확인)
@@ -103,6 +120,7 @@ def get_langfuse_callback_handler(
         user_id: 사용자 ID (선택사항)
         metadata: 추가 메타데이터 딕셔너리
         trace_name: 추적 이름 (선택사항)
+        tags: 태그 목록 (선택사항)
 
     Returns:
         Optional[CallbackHandler]: Langfuse가 활성화된 경우 CallbackHandler 객체, 비활성화 시 None.
@@ -134,6 +152,15 @@ def get_langfuse_callback_handler(
         except ImportError:
             pass
 
+    sys_name = get_system_name()
+    combined_tags = list(tags) if tags else []
+    if sys_name and sys_name not in combined_tags:
+        combined_tags.append(sys_name)
+
+    combined_metadata = dict(metadata or {})
+    if sys_name and "system_name" not in combined_metadata:
+        combined_metadata["system_name"] = sys_name
+
     try:
         active_trace = _active_traces.get(trace_id) if trace_id else None
         if active_trace:
@@ -142,7 +169,8 @@ def get_langfuse_callback_handler(
                 secret_key=sec_key,
                 host=host,
                 stateful_client=active_trace,
-                metadata=metadata,
+                metadata=combined_metadata,
+                tags=combined_tags,
             )
 
         return CallbackHandler(
@@ -152,7 +180,8 @@ def get_langfuse_callback_handler(
             session_id=session_id,
             user_id=user_id,
             trace_name=trace_name,
-            metadata=metadata,
+            metadata=combined_metadata,
+            tags=combined_tags,
         )
     except Exception:
         return None
@@ -171,25 +200,45 @@ def flush_langfuse():
             pass
 
 
-def start_trace(trace_id: str, name: str, session_id: Optional[str] = None, metadata: Optional[Dict] = None):
+def start_trace(
+    trace_id: str,
+    name: str,
+    session_id: Optional[str] = None,
+    metadata: Optional[Dict] = None,
+    tags: Optional[List[str]] = None,
+):
     """새로운 최상위 Trace를 시작하고 내부 활성 목록에 등록한다.
+
+    시스템 식별자(LANGFUSE_SYSTEM_NAME, 기본값 'LegalAgent')를 기본 태그 및 메타데이터로 자동 주입하여,
+    다른 애플리케이션(LegalChat, LegalRAG 등)과 Langfuse 대시보드 상에서 비교 및 필터링할 수 있도록 지원한다.
 
     Args:
         trace_id: 고유 추적 ID
         name: 워크플로우 또는 태스크 이름
         session_id: 상담 세션 또는 사건 식별자
         metadata: 부가 메타데이터
+        tags: 태그 목록 (선택사항)
     """
     lf = get_langfuse()
     if not lf:
         return
     if trace_id not in _active_traces:
         try:
+            sys_name = get_system_name()
+            trace_tags = list(tags) if tags else []
+            if sys_name and sys_name not in trace_tags:
+                trace_tags.append(sys_name)
+
+            trace_metadata = dict(metadata or {})
+            if sys_name and "system_name" not in trace_metadata:
+                trace_metadata["system_name"] = sys_name
+
             trace = lf.trace(
                 id=trace_id,
                 name=name,
                 session_id=session_id,
-                metadata=metadata or {},
+                metadata=trace_metadata,
+                tags=trace_tags,
             )
             _active_traces[trace_id] = trace
         except Exception:
@@ -197,48 +246,90 @@ def start_trace(trace_id: str, name: str, session_id: Optional[str] = None, meta
 
 
 def end_trace(trace_id: str):
-    """지정된 Trace를 종료 처리한다."""
+    """지정된 Trace를 종료 처리하고 활성 추적 캐시에서 제거한다."""
     lf = get_langfuse()
     if not lf:
         return
-    if trace_id in _active_traces:
-        pass
+    _active_traces.pop(trace_id, None)
 
 
-def start_span(trace_id: str, span_id: str, name: str, parent_span_id: Optional[str] = None, input: Any = None):
-    """Trace 하위에 새로운 작업 구간(Span)을 생성한다.
+def start_span(
+    trace_id: str,
+    span_id: str,
+    name: str,
+    parent_span_id: Optional[str] = None,
+    input: Any = None,
+    metadata: Optional[Dict[str, Any]] = None,
+):
+    """Trace 하위에 새로운 작업 구간(Span)을 생성하고 계층 트리(Tree)에 연결한다.
+
+    상위 Trace가 아직 시작되지 않은 경우 자동으로 생성(Lazy Creation)하며,
+    `parent_span_id`로 UUID뿐만 아니라 노드명/함수명 문자열이 전달되더라도 활성 스팬 인덱스를 통해
+    올바른 부모 Span 객체를 찾아 연결한다. 시스템 식별자(LANGFUSE_SYSTEM_NAME)를 메타데이터 및 태그에 반영한다.
 
     Args:
         trace_id: 소속 Trace ID
         span_id: 고유 구간 ID
         name: 작업 또는 함수명
-        parent_span_id: 상위 구간 ID (선택사항)
+        parent_span_id: 상위 구간 ID 또는 노드명 (선택사항)
         input: 작업 입력 데이터 (LANGFUSE_CAPTURE_CONTENT 설정에 따라 마스킹)
+        metadata: 추가 메타데이터 (선택사항)
     """
     lf = get_langfuse()
     if not lf:
         return
+
+    sys_name = get_system_name()
+
+    # Trace가 아직 생성되지 않은 경우 자동 지연 생성 (Lazy Trace Creation)
     trace = _active_traces.get(trace_id)
     if not trace:
-        return
+        try:
+            from ai_legal_helper.observability.context import get_case_id
+            session_id = get_case_id()
+            trace = lf.trace(
+                id=trace_id,
+                name=f"Workflow:{name}",
+                session_id=session_id,
+                metadata={"system_name": sys_name},
+                tags=[sys_name],
+            )
+            _active_traces[trace_id] = trace
+        except Exception:
+            return
 
-    capture_content = os.getenv("LANGFUSE_CAPTURE_CONTENT", "false").lower() == "true"
-    safe_input = input if capture_content else "[MASKED FOR PRIVACY]"
+    capture_content = os.getenv("LANGFUSE_CAPTURE_CONTENT", "true").lower() == "true"
+    safe_input = input if capture_content else ("[MASKED FOR PRIVACY]" if input is not None else None)
 
-    parent = _active_spans.get(parent_span_id) if parent_span_id else trace
+    span_metadata = dict(metadata or {})
+    if sys_name and "system_name" not in span_metadata:
+        span_metadata["system_name"] = sys_name
+
+    # 부모 Span 탐색: 1) UUID 직접 매칭 -> 2) 노드명 매칭 -> 3) Root Trace
+    parent = None
+    if parent_span_id:
+        parent = _active_spans.get(parent_span_id)
+        if not parent and parent_span_id in _active_spans_by_name:
+            parent = _active_spans.get(_active_spans_by_name[parent_span_id])
+    if not parent:
+        parent = trace
+
     try:
         span = parent.span(
             id=span_id,
             name=name,
             input=safe_input,
+            metadata=span_metadata,
         )
         _active_spans[span_id] = span
+        _active_spans_by_name[name] = span_id
+        _span_names[span_id] = name
     except Exception:
         pass
 
 
 def end_span(span_id: str, output: Any = None, level: str = "DEFAULT", status_message: str = ""):
-    """작업 구간(Span)을 완료하고 결과를 기록한다.
+    """작업 구간(Span)을 완료하고 결과를 기록한 뒤 활성 구간 캐시에서 제거한다.
 
     Args:
         span_id: 완료할 구간 ID
@@ -249,10 +340,14 @@ def end_span(span_id: str, output: Any = None, level: str = "DEFAULT", status_me
     lf = get_langfuse()
     if not lf:
         return
-    span = _active_spans.get(span_id)
+    span = _active_spans.pop(span_id, None)
+    name = _span_names.pop(span_id, None)
+    if name and _active_spans_by_name.get(name) == span_id:
+        _active_spans_by_name.pop(name, None)
+
     if span:
-        capture_content = os.getenv("LANGFUSE_CAPTURE_CONTENT", "false").lower() == "true"
-        safe_output = output if capture_content else "[MASKED FOR PRIVACY]"
+        capture_content = os.getenv("LANGFUSE_CAPTURE_CONTENT", "true").lower() == "true"
+        safe_output = output if capture_content else ("[MASKED FOR PRIVACY]" if output is not None else None)
         try:
             span.end(output=safe_output, level=level, status_message=status_message)
         except Exception:
@@ -260,11 +355,16 @@ def end_span(span_id: str, output: Any = None, level: str = "DEFAULT", status_me
 
 
 def update_span(span_id: str, metadata: Dict[str, Any]):
-    """작업 구간(Span)의 메타데이터를 갱신한다."""
+    """작업 구간(Span)의 메타데이터를 갱신한다. UUID 또는 등록된 스팬 이름을 모두 지원한다."""
     lf = get_langfuse()
     if not lf:
         return
-    span = _active_spans.get(span_id)
+
+    target_span_id = span_id
+    if target_span_id not in _active_spans and target_span_id in _active_spans_by_name:
+        target_span_id = _active_spans_by_name[target_span_id]
+
+    span = _active_spans.get(target_span_id)
     if span:
         try:
             span.update(metadata=metadata)
@@ -281,17 +381,50 @@ def log_generation(
     end_time: float,
     usage: Dict[str, int],
     status_message: str = "",
+    input: Any = None,
+    output: Any = None,
+    metadata: Optional[Dict[str, Any]] = None,
 ):
     """LLM 단독 호출 결과를 수동으로 기록한다."""
     lf = get_langfuse()
     if not lf:
         return
+
+    sys_name = get_system_name()
+
     trace = _active_traces.get(trace_id)
     if not trace:
-        return
+        try:
+            from ai_legal_helper.observability.context import get_case_id
+            session_id = get_case_id()
+            trace = lf.trace(
+                id=trace_id,
+                name="LLM_Trace",
+                session_id=session_id,
+                metadata={"system_name": sys_name},
+                tags=[sys_name],
+            )
+            _active_traces[trace_id] = trace
+        except Exception:
+            return
 
-    parent = _active_spans.get(parent_span_id) if parent_span_id else trace
+    # 부모 Span 탐색: UUID -> 노드명 -> Root Trace
+    parent = None
+    if parent_span_id:
+        parent = _active_spans.get(parent_span_id)
+        if not parent and parent_span_id in _active_spans_by_name:
+            parent = _active_spans.get(_active_spans_by_name[parent_span_id])
+    if not parent:
+        parent = trace
+
     level = "ERROR" if status_message else "DEFAULT"
+    capture_content = os.getenv("LANGFUSE_CAPTURE_CONTENT", "true").lower() == "true"
+    safe_input = input if capture_content else ("[MASKED FOR PRIVACY]" if input is not None else None)
+    safe_output = output if capture_content else ("[MASKED FOR PRIVACY]" if output is not None else None)
+
+    gen_metadata = dict(metadata or {})
+    if sys_name and "system_name" not in gen_metadata:
+        gen_metadata["system_name"] = sys_name
 
     try:
         parent.generation(
@@ -300,10 +433,65 @@ def log_generation(
             start_time=start_time,
             end_time=end_time,
             usage=usage,
-            input="[MASKED FOR PRIVACY]",
-            output="[MASKED FOR PRIVACY]",
+            input=safe_input,
+            output=safe_output,
             level=level,
             status_message=status_message,
+            metadata=gen_metadata,
         )
+    except Exception:
+        pass
+
+
+def log_score(
+    trace_id: Optional[str],
+    name: str,
+    value: float,
+    comment: Optional[str] = None,
+    observation_id: Optional[str] = None,
+):
+    """Langfuse에 정량적/정성적 평가 점수(Score)를 기록한다.
+
+    대시보드의 Scores/Evaluation 화면에서 인용 존재율(citation_existence_rate),
+    근거 지지율(citation_support_rate), 검증 상태(verification_status) 등을 필터링·모니터링할 수 있다.
+
+    Args:
+        trace_id: 점수를 연결할 Trace 식별자 (미지정 시 현재 ContextVar 참조)
+        name: 점수 항목명 (예: 'citation_existence_rate', 'citation_support_rate', 'verification_status')
+        value: 수치 평가 점수 (0.0 ~ 1.0)
+        comment: 평가 사유 또는 상세 코멘트 (선택사항)
+        observation_id: 특정 Span 또는 Generation ID (선택사항)
+    """
+    lf = get_langfuse()
+    if not lf:
+        return
+
+    if not trace_id:
+        try:
+            from ai_legal_helper.observability.context import get_trace_id
+            trace_id = get_trace_id()
+        except ImportError:
+            pass
+
+    if not trace_id:
+        return
+
+    try:
+        trace = _active_traces.get(trace_id)
+        if trace and hasattr(trace, "score"):
+            trace.score(
+                name=name,
+                value=float(value),
+                comment=comment,
+                observation_id=observation_id,
+            )
+        elif hasattr(lf, "score"):
+            lf.score(
+                trace_id=trace_id,
+                name=name,
+                value=float(value),
+                comment=comment,
+                observation_id=observation_id,
+            )
     except Exception:
         pass

@@ -17,9 +17,10 @@ from typing import Dict, Any, List, Optional
 from langgraph.graph import StateGraph, START, END
 from pydantic import BaseModel, Field
 
+import re
 from ai_legal_helper.database.session import SessionLocal
 from ai_legal_helper.database.models import (
-    Case, LegalDocument, DocumentRevision, Fact, Event, EvidenceClaim
+    Case, LegalDocument, DocumentRevision, Fact, Event, EvidenceClaim, Party
 )
 from ai_legal_helper.llm.gateway import get_llm
 from langchain_core.prompts import PromptTemplate
@@ -53,14 +54,25 @@ class DocumentDraftSchema(BaseModel):
 
 @trace
 def context_node(state: DocumentState) -> DocumentState:
+    """사건 기본 정보, 당사자, 확정 사실(Fact), 타임라인(Event), 승인된 증거(EvidenceClaim)를 조회하여 문서 생성 컨텍스트를 구성한다."""
     db = SessionLocal()
     try:
         case = db.query(Case).filter(Case.id == state.case_id).first()
+        parties = db.query(Party).filter(Party.case_id == state.case_id).all()
         facts = db.query(Fact).filter(Fact.case_id == state.case_id).all()
         events = db.query(Event).filter(Event.case_id == state.case_id).order_by(Event.event_date).all()
-        approved_claims = db.query(EvidenceClaim).filter(EvidenceClaim.case_id == state.case_id, EvidenceClaim.review_status == "APPROVED").all()
+        approved_claims = db.query(EvidenceClaim).filter(
+            EvidenceClaim.case_id == state.case_id,
+            EvidenceClaim.review_status.in_(["APPROVED", "EDITED"]),
+        ).all()
 
-        parts = [f"[사건: {case.title}]"]
+        title = case.title if case else "미상 사건"
+        parts = [f"[사건: {title}]"]
+        if case and case.description:
+            parts.append(f"[사건 개요]\n{case.description}")
+        if parties:
+            parts.append("[당사자]")
+            parts.extend([f"- {p.role or '당사자'}: {p.name}" for p in parties])
         if facts:
             parts.append("[사실관계]")
             parts.extend([f"- {f.statement}" for f in facts])
@@ -78,11 +90,15 @@ def context_node(state: DocumentState) -> DocumentState:
 
 @trace
 def requirements_node(state: DocumentState) -> DocumentState:
-    # 간단한 요건 검사 로직 (실제로는 LLM 활용 가능)
+    """문서 초안 작성을 위한 최소 사건 맥락(사실관계, 증거, 당사자, 사건 개요 중 하나 이상) 존재 여부를 검증한다."""
     state.requirements_met = True
-    if "수신인" not in state.context_text and "임대인" not in state.context_text:
+    has_substance = any(
+        marker in state.context_text
+        for marker in ("[사실관계]", "[증거]", "[당사자]", "[사건 개요]", "수신인", "임대인")
+    )
+    if not has_substance:
         state.requirements_met = False
-        state.missing_info.append("수신인 정보 부족")
+        state.missing_info.append("사건 사실관계, 증거 또는 당사자 정보 부족")
     return state
 
 @trace
@@ -97,7 +113,8 @@ def generate_node(state: DocumentState) -> DocumentState:
         "[사건 정보]\n{context}\n\n"
         "객관적이고 정중한 어조를 사용하며, 증거가 없는 사실은 단정적으로 기재하지 마세요."
     )
-    llm = get_llm(temperature=0.0).with_structured_output(DocumentDraftSchema)
+    # Azure OpenAI 호환성을 위해 function_calling 방식으로 구조화 출력 호출
+    llm = get_llm(temperature=0.0).with_structured_output(DocumentDraftSchema, method="function_calling")
     
     try:
         res = llm.invoke(prompt.format(doc_type=state.document_type, context=state.context_text))
@@ -111,13 +128,37 @@ def generate_node(state: DocumentState) -> DocumentState:
 
 @trace
 def verification_node(state: DocumentState) -> DocumentState:
+    """생성된 문서 초안의 유효성 및 사건 컨텍스트 대비 미검증 날짜·금액 포함 여부를 검사한다."""
     if not state.requirements_met:
         state.verification_status = "FAIL"
         return state
 
-    # 간단한 검증: AI가 지어낸 날짜나 이름이 있는지 체크하는 로직
-    # P3.2 구현 범위에 맞게 임시 PASS 처리
-    state.verification_status = "PASS"
+    draft = (state.draft_content or "").strip()
+    if not draft or draft == "생성 오류 발생":
+        state.verification_status = "FAIL"
+        state.verification_warnings.append("문서 초안 생성에 실패했거나 본문이 비어 있습니다.")
+        return state
+
+    # 초안 내 연도/날짜(YYYY-MM-DD 또는 YYYY년) 및 금액 표현이 원본 컨텍스트에 존재하는지 대조
+    # 한국어 조사('까지', '을' 등)가 바로 붙는 경우에도 매칭되도록 단어 경계(\b) 대신 숫자 경계((?<!\d))를 사용한다.
+    context_normalized = state.context_text.replace(",", "")
+    draft_normalized = draft.replace(",", "")
+
+    date_tokens = set(re.findall(r"(?<!\d)20\d{2}[-.]\d{1,2}[-.]\d{1,2}(?!\d)|(?<!\d)20\d{2}년", draft_normalized))
+    unverified_dates = [d for d in date_tokens if d not in context_normalized]
+    if unverified_dates:
+        state.verification_warnings.append(
+            f"사건 기록에서 확인되지 않은 날짜 표현이 포함되었습니다: {', '.join(sorted(unverified_dates))}"
+        )
+
+    amount_tokens = set(re.findall(r"(?<!\d)\d+(?:억|천만|백만|십만|만)?\s*원", draft_normalized))
+    unverified_amounts = [a for a in amount_tokens if a.replace(" ", "") not in context_normalized.replace(" ", "")]
+    if unverified_amounts:
+        state.verification_warnings.append(
+            f"사건 기록에서 확인되지 않은 금액 표현이 포함되었습니다: {', '.join(sorted(unverified_amounts))}"
+        )
+
+    state.verification_status = "WARN" if state.verification_warnings else "PASS"
     return state
 
 @trace
@@ -149,8 +190,14 @@ def review_gate_node(state: DocumentState) -> DocumentState:
             doc.current_revision_id = rev.id
             db.commit()
             state.revision_id = rev.id
-            try: update_span(get_current_span_id(), {"document_type": state.document_type, "verification_status": state.verification_status, "revision_number": 1})
-            except: pass
+            try:
+                update_span(get_current_span_id(), {"document_type": state.document_type, "verification_status": state.verification_status, "revision_number": 1})
+                from ai_legal_helper.observability.langfuse_client import log_score
+                from ai_legal_helper.observability.context import get_trace_id
+                doc_score = 1.0 if state.verification_status == "PASS" else 0.0
+                log_score(get_trace_id(), "document_verification_score", doc_score, comment=state.verification_status)
+            except Exception:
+                pass
         finally:
             db.close()
     return state

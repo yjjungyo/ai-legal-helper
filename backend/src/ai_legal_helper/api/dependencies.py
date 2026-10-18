@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from ai_legal_helper.database.session import get_db
 from ai_legal_helper.database.models import User, UserSession, Case
 from ai_legal_helper.utils.datetime_utils import get_kst_now
+from ai_legal_helper.observability.context import set_case_id
 
 # 로컬 1인 테스트 모드 활성화 여부
 # 기본값은 로컬 실행 편의를 위해 True이나, 자동화 테스트(TESTING=1)에서는 False로 엄격 검증
@@ -56,10 +57,12 @@ def get_case_for_user(case_id: str, current_user: User = Depends(get_current_use
         if not case.user_id:
             case.user_id = current_user.id
             db.commit()
+        set_case_id(case.id)
         return case
 
     if case.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="해당 사건에 접근할 권한이 없습니다.")
 
+    set_case_id(case.id)
     return case
 

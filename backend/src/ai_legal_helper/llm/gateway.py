@@ -45,10 +45,13 @@ def get_llm(
 
     cb_list: List[Any] = [TokenTrackingCallbackHandler()]
 
-    # Langfuse 콜백 핸들러 자동 등록
-    lf_handler = get_langfuse_callback_handler()
-    if lf_handler:
-        cb_list.append(lf_handler)
+    # LANGFUSE_CAPTURE_CONTENT=true일 때만 LangChain 원본 콜백 핸들러를 추가 등록한다.
+    # 기본값(false)에서는 TokenTrackingCallbackHandler가 마스킹 정책을 준수하며 단일 Generation을 기록하므로
+    # 중복 Generation 기록 및 상담 원문 노출을 동시에 방지한다.
+    if os.getenv("LANGFUSE_CAPTURE_CONTENT", "false").lower() == "true":
+        lf_handler = get_langfuse_callback_handler()
+        if lf_handler:
+            cb_list.append(lf_handler)
 
     if callbacks:
         cb_list.extend(callbacks)

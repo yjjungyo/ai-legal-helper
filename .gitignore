@@ -4,14 +4,14 @@ __pycache__/
 *$py.class
 
 # Virtual environments
-.venv/
+backend/.venv/
 venv/
 ENV/
 
 # Environment variables and sensitive credentials
-.env
-*.key
-langfuse.key
+backend/.env
+backend/*.key
+backend/.langfuse.key
 
 # Logs and databases
 *.log
@@ -20,6 +20,10 @@ app.log
 storage/
 vectorstore/
 data/chroma/
+backend/logs/
+backend/storage/
+backend/vectorstore/
+backend/data/chroma/
 *.db
 *.sqlite3
 

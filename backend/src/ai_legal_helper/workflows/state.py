@@ -8,7 +8,7 @@ LangGraph 워크플로우에서 노드 간 전파되는 전역 상태(State) 스
 [주요 기능]
 1. 사용자 질문, 분류 범주, 실행 계획 상태 유지
 2. 병렬 에이전트들의 실행 결과 및 RAG 검색 문서 저장
-3. 초안 답변 및 수석 검증관(Verification)의 검증 결과 기록
+3. 초안 답변 및 법률검증 Agent(Verification)의 검증 결과 기록
 4. 무한 재검토 루프 방지를 위한 revision_count 추적
 5. 최종 답변 및 사용자 경고 상태 관리
 
@@ -50,3 +50,10 @@ class LegalState(MessagesState):
     # P2.4: Evidence GraphRAG 결과 (PostgreSQL 대조 검증을 통과한 경로만 valid_paths 에 저장)
     # {available, valid_paths, invalid_count, evidence_gaps, contradictions}
     graph_evidence: Optional[Dict[str, Any]]
+
+    # P4.1: Verifier-Guided HILT 법령 원문 검색 필드
+    approval_request: Optional[Dict[str, Any]]
+    approval_status: Optional[str]  # NONE, PENDING, APPROVED, REJECTED, EXPIRED
+    statute_search_results: Optional[List[Dict[str, Any]]]
+    hilt_executed: Optional[bool]
+

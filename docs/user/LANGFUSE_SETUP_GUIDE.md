@@ -9,7 +9,8 @@
 
 ## 2. 환경 변수 설정
 
-`.env` 파일에 다음 설정이 포함되어야 합니다 (`.env.example` 참고).
+`backend/.env` 파일에 다음 설정이 포함되어야 합니다 (`backend/.env.example` 참고).
+기존 루트 `.env`가 있으면 PowerShell 스크립트는 해당 파일을 우선 사용합니다.
 
 ```env
 # Langfuse 활성화 여부
@@ -32,17 +33,26 @@ Langfuse 대시보드와 백엔드를 모두 실행하려면 통합 스크립트
 
 ### Windows (PowerShell)
 ```powershell
-.\scripts\windows-langfuse-start.ps1
+.\backend\scripts\windows-langfuse-start.ps1
 ```
 
-이 스크립트는 `docker-compose.yml`과 `docker-compose.langfuse.yml`을 결합하여 실행합니다. 
+프로젝트 루트에서 실행합니다. 이 스크립트는 `docker-compose.yml`과 `docker-compose.langfuse.yml`을 결합하여 데이터베이스와 Langfuse를 시작합니다. 백엔드와 프론트엔드까지 Docker로 실행하려면 `-FullDocker`를 추가합니다.
+
+직접 실행할 때도 두 Compose 파일을 함께 지정해야 합니다.
+
+```powershell
+docker compose --env-file backend/.env -f docker-compose.yml -f docker-compose.langfuse.yml up -d postgres neo4j chromadb langfuse
+```
+
+`docker-compose.langfuse.yml`은 기본 파일의 `postgres` 서비스에 의존하는 확장 설정입니다. 단독으로 실행하면 `service "langfuse" depends on undefined service "postgres"` 오류가 발생합니다. PostgreSQL 컨테이너가 이미 실행 중이어도 Compose 설정에 두 파일을 모두 포함해야 합니다. 기존 루트 `.env`를 사용하는 경우 위 명령의 `--env-file backend/.env`를 `--env-file .env`로 바꿉니다.
+
 초기 실행 시 Langfuse DB 마이그레이션이 진행되며, 약 1~2분이 소요될 수 있습니다.
 
 ## 4. 접속 방법
 
 * **Langfuse Web UI**: [http://localhost:3001](http://localhost:3001)
   - 초기화면에서 회원가입(Sign Up) 버튼을 눌러 로컬 계정을 생성하세요. (이메일 인증 불필요)
-  - 프로젝트를 생성한 뒤 발급되는 API Key를 복사하여 `.env` 파일의 `LANGFUSE_PUBLIC_KEY` 및 `LANGFUSE_SECRET_KEY`를 업데이트하고 서버를 재시작하면 실제 연동이 완료됩니다.
+  - 프로젝트를 생성한 뒤 발급되는 API Key를 복사하여 `backend/.env` 파일의 `LANGFUSE_PUBLIC_KEY` 및 `LANGFUSE_SECRET_KEY`를 업데이트하고 서버를 재시작하면 실제 연동이 완료됩니다.
 
 ## 5. 확인 사항
 
@@ -53,7 +63,7 @@ Langfuse 대시보드와 백엔드를 모두 실행하려면 통합 스크립트
 ## 6. 서비스 중지
 
 ```powershell
-.\scripts\windows-langfuse-stop.ps1
+.\backend\scripts\windows-langfuse-stop.ps1
 ```
 위 명령은 메모리 점유를 해제하기 위해 Langfuse와 관련된 모든 컨테이너를 안전하게 중단합니다.
 

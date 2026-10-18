@@ -88,9 +88,11 @@ def search_graph(
     case: Case = Depends(get_case_for_user),
     db: Session = Depends(get_db),
 ):
-    """사건 그래프 검색. traversal/hybrid 경로는 PostgreSQL 대조 검증 결과를 함께 반환한다."""
+    """사건 그래프 검색. traversal/hybrid 경로는 PostgreSQL 대조 검증 결과를 함께 반환하며,
+    hybrid 전략은 Neo4j 미연결 시에도 ChromaDB 사건 증거 벡터 폴백 검색을 수행한다.
+    """
     driver = get_neo4j_driver()
-    if driver is None:
+    if driver is None and strategy != "hybrid":
         return {"available": False, "strategy": strategy, "results": []}
     r = GraphRAGRetriever(driver)
     if strategy == "baseline":
@@ -101,7 +103,11 @@ def search_graph(
         return {"available": True, "strategy": strategy, "results": checked["valid"],
                 "invalid": checked["invalid"]}
     result = r.search_hybrid(case.id, q)
-    checked = validate_graph_paths(db, case.id, result["traversal_paths"])
+    checked = (
+        validate_graph_paths(db, case.id, result.get("traversal_paths", []))
+        if result.get("traversal_paths")
+        else {"valid": [], "invalid": []}
+    )
     result["traversal_paths"] = checked["valid"]
     result["invalid"] = checked["invalid"]
     return result

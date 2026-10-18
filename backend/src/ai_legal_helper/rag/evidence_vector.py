@@ -43,3 +43,16 @@ def retrieve_evidence_vector(case_id: str, query: str, k: int = 5) -> List[Docum
         logger.error(f"Vector retrieval failed for case {case_id}: {e}")
         return []
 
+@trace
+def delete_evidence_vector(case_id: str) -> bool:
+    """해당 사건의 증거 벡터 데이터를 ChromaDB에서 모두 삭제한다."""
+    try:
+        vs = _get_vs(EVIDENCE_COLLECTION_NAME)
+        vs._collection.delete(where={"case_id": case_id})
+        logger.info(f"Vector deletion completed for case {case_id}")
+        return True
+    except Exception as e:
+        logger.warning(f"Chroma delete error for case {case_id}: {e}")
+        return False
+
+

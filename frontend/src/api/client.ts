@@ -28,5 +28,27 @@ export async function getCaseConsultations(caseId: string): Promise<Consultation
   return res.json();
 }
 
+/**
+ * HILT 법령 원문 검색 승인/거절 결정을 서버로 전송한다.
+ *
+ * @param requestId 대상 상담 요청 ID
+ * @param approved 사용자 승인 여부 (true: 승인, false: 거절)
+ * @param reason 승인 또는 거절 사유 메모
+ * @returns 갱신된 상담 응답 객체
+ */
+export async function approveStatuteSearch(
+  requestId: string,
+  approved: boolean,
+  reason?: string
+): Promise<ConsultationResponse> {
+  const res = await apiFetch(`/consultations/${requestId}/approve`, {
+    method: 'POST',
+    body: JSON.stringify({ approved, reason })
+  });
+  if (!res.ok) throw new Error('Failed to submit statute search approval decision');
+  return res.json();
+}
+
+
 
 

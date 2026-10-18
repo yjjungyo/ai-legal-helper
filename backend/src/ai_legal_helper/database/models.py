@@ -528,7 +528,8 @@ class ConsultationRecord(Base):
     trace_id = Column(String, nullable=True)
     question = Column(Text, nullable=False)
     answer = Column(Text, nullable=True)
-    status = Column(String, default="IN_PROGRESS")  # IN_PROGRESS, SUCCESS, ERROR
+    status = Column(String, default="IN_PROGRESS")  # IN_PROGRESS, APPROVAL_REQUIRED, SUCCESS, ERROR, REJECTED
+    approval_request = Column(JSON, nullable=True)
     sources = Column(JSON, nullable=True)
     verification_result = Column(JSON, nullable=True)
     warnings = Column(JSON, nullable=True)

@@ -1,4 +1,5 @@
-version: '3.8'
+# postgres와 기본 네트워크를 공유하므로 기본 Compose 파일과 함께 실행한다.
+# docker compose --env-file backend/.env -f docker-compose.yml -f docker-compose.langfuse.yml up -d langfuse
 
 services:
   langfuse:

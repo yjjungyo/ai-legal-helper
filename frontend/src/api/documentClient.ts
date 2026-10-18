@@ -1,9 +1,20 @@
+/**
+ * @fileoverview 법률 문서(LegalDocument) 생성, 목록 조회, 초안 수정(Revision 추가),
+ * DOCX/PDF 내보내기 API 클라이언트 모듈
+ */
 import { apiFetch } from './apiFetch';
 
 export interface DocumentCreateRequest {
     document_type: string;
     title: string;
     action_id?: string;
+}
+
+export interface DocumentUpdateRequest {
+    content?: string;
+    structured_content?: Record<string, any>;
+    review_status?: string;
+    review_comment?: string;
 }
 
 export interface LegalDocument {
@@ -42,8 +53,25 @@ export async function listDocuments(caseId: string): Promise<LegalDocument[]> {
     return response.json();
 }
 
+/**
+ * 법률 문서 초안 본문을 수정하여 새 리비전을 저장합니다.
+ */
+export async function updateDocument(
+    caseId: string,
+    documentId: string,
+    req: DocumentUpdateRequest,
+): Promise<LegalDocument> {
+    const response = await apiFetch(`/cases/${caseId}/documents/${documentId}`, {
+        method: 'PUT',
+        body: JSON.stringify(req),
+    });
+    if (!response.ok) throw new Error('Failed to update document');
+    return response.json();
+}
+
 export async function exportDocument(caseId: string, documentId: string, format: string = 'docx'): Promise<Blob> {
     const response = await apiFetch(`/cases/${caseId}/documents/${documentId}/export?format=${format}`, { method: 'POST' });
     if (!response.ok) throw new Error('Failed to export document');
     return response.blob();
 }
+
