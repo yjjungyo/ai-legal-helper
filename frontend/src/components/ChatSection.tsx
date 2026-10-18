@@ -28,7 +28,32 @@ function renderStatusBadge(item: ConsultationResponse) {
     return <span className="badge badge-blue">승인 대기</span>;
   }
   if (item.status === 'IN_PROGRESS') {
-    return <span className="badge badge-amber">처리 중</span>;
+    return (
+      <span
+        className="badge"
+        style={{
+          backgroundColor: '#eff6ff',
+          color: '#1d4ed8',
+          border: '1px solid #bfdbfe',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '5px',
+          fontWeight: 600,
+        }}
+      >
+        <span
+          className="spinner"
+          style={{
+            width: '10px',
+            height: '10px',
+            borderWidth: '2px',
+            borderColor: '#93c5fd',
+            borderTopColor: '#1d4ed8',
+          }}
+        />
+        법령 조회 및 재분석 중
+      </span>
+    );
   }
 
   // item.status === 'SUCCESS'인 경우 세부 answer_status 및 verification_status 판별
@@ -417,6 +442,7 @@ export function ChatSection({ caseId }: ChatSectionProps) {
                 </div>
               )}
 
+              {/* 5. 공식 법령 원문 추가 검색 HILT 승인 요청 박스 */}
               {item.status === 'APPROVAL_REQUIRED' && (
                 <div
                   style={{
@@ -463,7 +489,100 @@ export function ChatSection({ caseId }: ChatSectionProps) {
                 </div>
               )}
 
-              {item.answer ? (
+              {/* 5-1. 공식 법령 검색 승인 후 AI 재분석 진행 중 실시간 안내 배너 (P2-03) */}
+              {item.status === 'IN_PROGRESS' && (
+                <div
+                  style={{
+                    padding: '16px 20px',
+                    backgroundColor: '#f0fdf4',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid #bbf7d0',
+                    borderLeft: '4px solid #16a34a',
+                    marginBottom: '14px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '1.2em' }}>🔄</span>
+                    <strong style={{ color: '#15803d', fontSize: '0.98em' }}>
+                      공식 법령 원문 검색 및 AI 재분석 진행 중입니다...
+                    </strong>
+                  </div>
+                  <p style={{ fontSize: '0.88em', color: '#166534', margin: 0, lineHeight: 1.5 }}>
+                    국가법령정보공동활용(open.law.go.kr) 공식 API에서 최신 법령 조문을 조회하여 법률검증 및 답변을 재작성하고 있습니다. (약 10~20초 소요)
+                  </p>
+                </div>
+              )}
+
+              {/* 6. AI 법률 분석 및 조언 본문 또는 진행 중 / 판단 유보 상태 카드 (P0-02) */}
+              {item.status === 'IN_PROGRESS' ? (
+                <div
+                  style={{
+                    padding: '28px 24px',
+                    backgroundColor: 'var(--surface)',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px dashed var(--primary)',
+                    textAlign: 'center',
+                    marginBottom: '14px',
+                  }}
+                >
+                  <div style={{ fontSize: '2em', marginBottom: '10px' }}>⚖️</div>
+                  <strong style={{ display: 'block', marginBottom: '6px', color: 'var(--primary)', fontSize: '1.02em' }}>
+                    법률 전문 Agent가 공식 법령을 반영하여 답변을 다시 작성하고 있습니다
+                  </strong>
+                  <span style={{ fontSize: '0.88em', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                    국가법령 조문 대조, 입증 요건 재검토, 법률검증 Agent의 근거 검증을 마치는 대로 완성된 법률 의견서가 즉시 표시됩니다.
+                  </span>
+                </div>
+              ) : item.answer_status === 'WITHHELD' || item.status === 'APPROVAL_REQUIRED' ? (
+                /* WITHHELD: 미검증 법률 분석 초안은 노출하지 않고 판단 유보 카드 및 보강 안내문 표시 */
+                <div
+                  style={{
+                    padding: '20px 22px',
+                    backgroundColor: '#fffbeb',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid #fef3c7',
+                    borderLeft: '4px solid #d97706',
+                    marginBottom: '14px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '1.2em' }}>🛡️</span>
+                    <strong style={{ color: '#b45309', fontSize: '1.02em' }}>
+                      법률적 근거 부족으로 인한 판단 유보 안내
+                    </strong>
+                  </div>
+                  <div style={{ color: '#78350f', fontSize: '0.92em', lineHeight: 1.6 }}>
+                    {item.answer ? (
+                      <LegalAnswerView content={item.answer} />
+                    ) : (
+                      <p style={{ margin: 0 }}>
+                        현재 확보된 법률 조문 또는 사건 증거 자료만으로는 확정적인 법률 판단을 내릴 수 없어 의뢰인의 권리 보호를 위해 답변 제공을 안전하게 유보합니다.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : item.answer_status === 'CAUTIONARY' ? (
+                /* CAUTIONARY: 조건부 안내 및 주의 배너가 포함된 답변 */
+                <div
+                  style={{
+                    padding: '16px 18px',
+                    backgroundColor: 'var(--surface)',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid #e9d5ff',
+                    borderLeft: '4px solid #9333ea',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                    marginBottom: '14px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                    <strong style={{ color: '#7e22ce', fontSize: '0.98em' }}>
+                      ⚠️ AI 법률 분석 및 조언 (주의 및 조건부 안내 포함)
+                    </strong>
+                  </div>
+                  {item.answer && <LegalAnswerView content={item.answer} />}
+                </div>
+              ) : item.answer ? (
+                /* DELIVERED: 정밀 검증 통과(PASS) 답변 */
                 <div
                   style={{
                     padding: '16px 18px',
@@ -471,6 +590,7 @@ export function ChatSection({ caseId }: ChatSectionProps) {
                     borderRadius: 'var(--radius-md)',
                     border: '1px solid var(--border)',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                    marginBottom: '14px',
                   }}
                 >
                   <strong style={{ color: 'var(--primary)', display: 'block', marginBottom: '12px', fontSize: '0.98em' }}>
@@ -478,14 +598,10 @@ export function ChatSection({ caseId }: ChatSectionProps) {
                   </strong>
                   <LegalAnswerView content={item.answer} />
                 </div>
-              ) : (
-                item.status === 'IN_PROGRESS' && (
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.88em' }}>답변을 생성하는 중입니다...</p>
-                )
-              )}
+              ) : null}
 
               {/* 7. 답변 요약 바 및 Tier 2 인스펙터 토글 */}
-              {item.answer && (
+              {item.status !== 'IN_PROGRESS' && item.answer_status !== 'WITHHELD' && item.answer && (
                 (() => {
                   const legalSources = Array.from(
                     new Map(

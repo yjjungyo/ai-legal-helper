@@ -96,32 +96,55 @@ export function useConsultation(caseId?: string) {
     setLoading(true);
     setError(null);
 
+    // 1. 낙관적(Optimistic) UI 업데이트: 사용자가 승인 즉시 history 항목의 상태를 IN_PROGRESS로 전이
+    setHistory((prev) =>
+      prev.map((item) =>
+        item.request_id === requestId
+          ? {
+              ...item,
+              status: 'IN_PROGRESS',
+              execution_status: 'IN_PROGRESS',
+              answer_status: 'WITHHELD',
+              answer: '',
+            }
+          : item
+      )
+    );
+
     try {
       const updated = await approveStatuteSearch(requestId, approved, reason);
       setResult(updated);
+      setHistory((prev) =>
+        prev.map((item) => (item.request_id === requestId ? { ...item, ...updated } : item))
+      );
 
-      // 재개된 워크플로우 완료 시까지 2초 주기로 상태 폴링
+      // 2. 재개된 워크플로우 완료 시까지 2초 주기로 상태 폴링 및 history 실시간 동기화
       pollIntervalRef.current = setInterval(async () => {
         try {
           const current = await getConsultation(requestId);
           setResult(current);
+          setHistory((prev) =>
+            prev.map((item) => (item.request_id === requestId ? { ...item, ...current } : item))
+          );
+
           if (current.status !== 'IN_PROGRESS' && current.status !== 'APPROVAL_REQUIRED') {
             clearPollInterval();
             setLoading(false);
             setQuestion('');
-            loadHistory();
+            await loadHistory();
           }
         } catch (err) {
           clearPollInterval();
           setError(err instanceof Error ? err.message : String(err));
           setLoading(false);
-          loadHistory();
+          await loadHistory();
         }
       }, 2000);
     } catch (err) {
       clearPollInterval();
       setError(err instanceof Error ? err.message : String(err));
       setLoading(false);
+      await loadHistory();
     }
   };
 

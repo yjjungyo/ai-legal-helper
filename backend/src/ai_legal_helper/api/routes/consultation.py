@@ -162,7 +162,12 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
             resp.status = "SUCCESS"
             resp.execution_status = "COMPLETED"
             resp.verification_status = ver_status
-            resp.answer_status = "DELIVERED" if ver_status == "PASS" else "WITHHELD"
+            if ver_status == "PASS":
+                resp.answer_status = "DELIVERED"
+            elif ver_status == "REVISE":
+                resp.answer_status = "CAUTIONARY"
+            else:
+                resp.answer_status = "WITHHELD"
             resp.answer = result.get("answer", "")
             resp.approval_request = result.get("approval_request")
         
@@ -279,6 +284,19 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
         if c_token:
             reset_case_id(c_token)
 
+def _resolve_legacy_answer_status(raw_answer_status: Optional[str], verification_status: Optional[str], status: str) -> str:
+    """레거시 DB 기록의 answer_status를 안전하게 보정한다 (P0-02 호환성)."""
+    if raw_answer_status in ("DELIVERED", "CAUTIONARY", "WITHHELD"):
+        return raw_answer_status
+    if status == "APPROVAL_REQUIRED":
+        return "WITHHELD"
+    if verification_status == "PASS":
+        return "DELIVERED"
+    if verification_status == "REVISE":
+        return "CAUTIONARY"
+    return "WITHHELD"
+
+
 @router.get("/consultations/{request_id}", response_model=ConsultationResponse)
 async def get_consultation(
     request_id: str, 
@@ -309,13 +327,20 @@ async def get_consultation(
         if key not in seen_keys:
             seen_keys.add(key)
             sources.append(Source(**std_dict))
+
+    ans_status = _resolve_legacy_answer_status(
+        getattr(record, "answer_status", None),
+        getattr(record, "verification_status", None),
+        record.status,
+    )
+
     return ConsultationResponse(
         request_id=record.request_id,
         trace_id=record.trace_id or "",
         status=record.status,
         execution_status=getattr(record, "execution_status", record.status) or "COMPLETED",
         verification_status=getattr(record, "verification_status", None),
-        answer_status=getattr(record, "answer_status", None),
+        answer_status=ans_status,
         answer=record.answer,
         approval_request=record.approval_request,
         sources=sources,
@@ -392,6 +417,8 @@ async def decide_statute_search_approval(
     case_id = record.case_id if record else _consultations[request_id].case_id
 
     # 원자적 상태 변경 및 중복 Resume 방지 (P1-06)
+    # [P2-03] 재개(Resume) 접수 즉시 기존의 승인 요청 안내 임시 텍스트를 클리어하여
+    # 재분석 진행 중 사용자에게 이전 임시 문구가 노출되지 않고 진행 상태 UI가 표시되도록 함
     if record:
         updated_rows = db.query(ConsultationRecord).filter(
             ConsultationRecord.request_id == request_id,
@@ -399,6 +426,7 @@ async def decide_statute_search_approval(
         ).update({
             "status": "IN_PROGRESS",
             "execution_status": "IN_PROGRESS",
+            "answer": None,
         })
         db.commit()
         if updated_rows == 0:
@@ -407,11 +435,12 @@ async def decide_statute_search_approval(
                 detail="이미 다른 요청에 의해 승인/거절 처리가 진행 중이거나 완료되었습니다.",
             )
 
-    # 메모리 캐시 상태 동기화
+    # 메모리 캐시 상태 동기화 및 임시 답변 초기화
     if request_id in _consultations:
         resp = _consultations[request_id]
         resp.status = "IN_PROGRESS"
         resp.execution_status = "IN_PROGRESS"
+        resp.answer = None
     else:
         resp = ConsultationResponse(
             request_id=request_id,
@@ -420,6 +449,7 @@ async def decide_statute_search_approval(
             execution_status="IN_PROGRESS",
             verification_status="UNVERIFIED",
             answer_status="WITHHELD",
+            answer=None,
             question=record.question if record else None,
             case_id=case_id,
             created_at=get_kst_iso(record.created_at) if record and record.created_at else None,
@@ -494,7 +524,12 @@ async def process_consultation_resume(
         resp.status = "SUCCESS"
         resp.execution_status = "COMPLETED"
         resp.verification_status = ver_status
-        resp.answer_status = "DELIVERED" if ver_status == "PASS" else "WITHHELD"
+        if ver_status == "PASS":
+            resp.answer_status = "DELIVERED"
+        elif ver_status == "REVISE":
+            resp.answer_status = "CAUTIONARY"
+        else:
+            resp.answer_status = "WITHHELD"
         resp.answer = result.get("answer", "")
         resp.elapsed_ms = elapsed_ms
         resp.usage_summary = usage_summary
@@ -632,13 +667,18 @@ async def list_case_consultations(
             if key not in seen_keys:
                 seen_keys.add(key)
                 sources.append(Source(**std_dict))
+        ans_status = _resolve_legacy_answer_status(
+            getattr(rec, "answer_status", None),
+            getattr(rec, "verification_status", None),
+            rec.status,
+        )
         results.append(ConsultationResponse(
             request_id=rec.request_id,
             trace_id=rec.trace_id or "",
             status=rec.status,
             execution_status=getattr(rec, "execution_status", rec.status) or "COMPLETED",
             verification_status=getattr(rec, "verification_status", None),
-            answer_status=getattr(rec, "answer_status", None),
+            answer_status=ans_status,
             answer=rec.answer,
             approval_request=rec.approval_request,
             sources=sources,

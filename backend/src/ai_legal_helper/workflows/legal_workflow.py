@@ -545,61 +545,74 @@ def insufficient_node(state: LegalState) -> Dict:
     from ai_legal_helper.agents.verification import sanitize_unverified_citations
     from ai_legal_helper.utils.text_formatter import clean_markdown_formatting
 
+    # [P0-02] 미검증 초안은 내부 감사용(internal_draft)으로만 보존하고 고객용 final_answer에서는 완전 배제함
+    raw_draft = state.get("draft_answer", "")
     sanitized_draft = sanitize_unverified_citations(
-        state.get("draft_answer", ""),
+        raw_draft,
         state.get("retrieved_sources", []),
         case_context=state.get("case_context", ""),
     )
 
     ver_res = state.get("verification_result", {}) or {}
     missing_issues = ver_res.get("missing_issues", []) or []
+    missing_laws = ver_res.get("candidate_laws", []) or []
     contradictions = ver_res.get("contradictions", []) or []
     warnings_list = ver_res.get("warnings", []) or []
+    reason_code = ver_res.get("reason_code", "LEGAL_SOURCE_MISSING")
 
-    # 구조화된 법률의견서 플레인 텍스트 구성
+    # 고객용 판단 유보 안내문 (미검증 법률 단정 완전 배제)
     parts = []
-    parts.append("[안내: 법률적 근거 부족으로 인한 검증 안내 - INSUFFICIENT]\n")
-    parts.append("질문하신 사안에 대해 데이터베이스 내 관련 법령(특별법 등) 조문 또는 판례 근거가 충분히 확보되지 않았거나, "
-                 "인용된 법조문과의 법률적 모순이 확인되어 확정적인 법률 조언을 제공할 수 없습니다.\n")
+    parts.append("[안내: 법률적 근거 부족으로 인한 판단 유보 (WITHHELD)]\n")
+    parts.append(
+        "질문하신 사안에 대해 데이터베이스 내 관련 법령(특별법 등) 조문 또는 객관적 증거 근거가 충분히 확보되지 않았거나, "
+        "인용된 법조문과의 법률적 모순이 확인되어 의뢰인의 권리 보호를 위해 확정적인 법률 조언의 제공을 안전하게 유보합니다.\n"
+    )
 
-    if missing_issues:
-        parts.append("[1. 확인이 필요한 핵심 쟁점 및 법령 누락]")
+    if missing_issues or missing_laws:
+        parts.append("[1. 확인 및 보강이 필요한 핵심 쟁점 및 법령]")
+        for law in missing_laws:
+            parts.append(f"- 관련 법령: {law}")
         for issue in missing_issues:
-            parts.append(f"- {issue}")
+            parts.append(f"- 핵심 쟁점: {issue}")
         parts.append("")
 
     if contradictions:
-        parts.append("[2. 감지된 법률적 모순 및 불일치]")
+        parts.append("[2. 감지된 법률적 불일치 및 위험 요소]")
         for contra in contradictions:
             parts.append(f"- {contra}")
         parts.append("")
 
     if warnings_list:
-        parts.append("[3. 법률검증 Agent(Verification) 주의사항]")
+        parts.append("[3. 법률검증 Agent 주의사항]")
         for w in warnings_list:
             parts.append(f"- {w}")
         parts.append("")
 
-    parts.append("========================================\n")
-    parts.append("[참고: 미검증 참고 초안 (법적 효력 없음)]")
-    parts.append("경고: 아래 내용은 검색된 제한적 자료를 바탕으로 작성된 미검증 초안으로, "
-                 "실제 법률 사실과 다르거나 잘못된 법조문이 적용되었을 위험이 있습니다. "
-                 "절대 법적 판단이나 행동의 근거로 사용하지 마시고, 반드시 변호사 또는 대한법률구조공단 등 전문기관의 개별 상담을 받으시기 바랍니다.\n")
-    parts.append(clean_markdown_formatting(sanitized_draft))
+    parts.append("[4. 안전한 후속 행동 가이드]")
+    parts.append(
+        "- 미검증 법률 분석에 의존한 법적 조치는 불측의 손해를 야기할 수 있으므로, 반드시 계약서, 통지 내역, 객관적 증빙 자료를 지참하여 "
+        "대한법률구조공단(국번없이 132) 또는 변호사 등 법률전문가의 정밀 대면 상담을 받으시기 바랍니다."
+    )
 
     final = clean_markdown_formatting("\n".join(parts))
-    warnings = state.get("warnings", []) + ["답변의 근거가 부족하여 INSUFFICIENT 처리되었습니다."]
+    warnings = list(state.get("warnings", []) or []) + ["답변의 근거가 부족하여 INSUFFICIENT(WITHHELD) 처리되었습니다."]
+
     return {
         "final_answer": final,
+        "internal_draft": sanitized_draft,
+        "verification_failure_reason": ver_res.get("explanation") or reason_code,
+        "missing_evidence": missing_issues,
+        "unresolved_issues": ver_res.get("missing_legal_issues", []),
         "warnings": warnings,
-        "messages": [HumanMessage(content="dummy", name="system"), final]
+        "messages": [HumanMessage(content="dummy", name="system"), final],
     }
+
 
 @trace
 def finalize_node(state: LegalState) -> Dict:
     """검증 통과 시 혹시 남아 있을 수 있는 미검증 인용을 정화하고 마크다운 기호를 정제하여 답변을 확정한다."""
     set_node_name("finalize")
-    from ai_legal_helper.agents.verification import sanitize_unverified_citations
+    from ai_legal_helper.agents.verification import sanitize_unverified_citations, audit_citations_and_claims
     from ai_legal_helper.utils.text_formatter import clean_markdown_formatting
 
     sanitized = sanitize_unverified_citations(
@@ -608,7 +621,15 @@ def finalize_node(state: LegalState) -> Dict:
         case_context=state.get("case_context", ""),
     )
     final = clean_markdown_formatting(sanitized)
-    
+
+    # [P0-03] 최종 확정된 답변(final)에 기반하여 실제 인용·검증된 출처(cited_sources)를 최종 산출
+    final_audit = audit_citations_and_claims(
+        final,
+        state.get("retrieved_sources", []),
+        case_context=state.get("case_context", ""),
+    )
+    cited_sources = final_audit.get("cited_sources") or final_audit.get("verified_sources", [])
+
     # 법률검증 Agent의 실무 권고 및 유의사항(warnings)을 정제하여 전달
     ver_res = state.get("verification_result", {}) or {}
     warnings = list(state.get("warnings", []) or [])
@@ -619,8 +640,9 @@ def finalize_node(state: LegalState) -> Dict:
 
     return {
         "final_answer": final,
+        "sources": cited_sources,
         "warnings": warnings,
-        "messages": [final] # append to MessagesState
+        "messages": [final]
     }
 
 
@@ -770,16 +792,10 @@ def statute_search_result_condition(state: LegalState) -> str:
 
 @trace
 def re_analyze_node(state: LegalState) -> Dict:
-    """공식 법령 원문 검색으로 확보된 법령 조문을 바탕으로 법률 분석을 재수행하고 답변을 재작성한다.
+    """공식 법령 원문 검색으로 확보된 법령 조문을 바탕으로 법률 분석을 재수행하고 답변을 재작성한다 (P0-04).
 
-    법률검증 Agent의 1차 검토 경과와 법제처 국가법령정보공동활용(open.law.go.kr) API를 통한 공식 법령 출처
-    및 조문 원문이 답변에 어떻게 반영되었는지 서두에 명확히 밝히도록 작성한다.
-
-    Args:
-        state: 현재 LangGraph 워크플로우 상태.
-
-    Returns:
-        Dict: 재작성된 초안(`draft_answer`), 증가된 재검토 횟수(`revision_count`).
+    전세보증금 사건 하드코딩을 제거하고, 사건 유형(categories) 및 기존 전문 에이전트 분석을 동적으로 반영하는
+    도메인 중립적 4단계 표준 구조([1. 핵심 결론], [2. 지금 해야 할 일], [3. 쟁점별 상세 법률 분석], [4. 추가 확인사항 및 유의사항])를 적용한다.
     """
     set_node_name("re_analyze")
     from ai_legal_helper.llm.gateway import get_llm
@@ -789,12 +805,22 @@ def re_analyze_node(state: LegalState) -> Dict:
     q = state.get("question", "")
     case_ctx = state.get("case_context", "") or "(사건 맥락 없음)"
     statute_results = state.get("statute_search_results", []) or []
+    categories = state.get("categories", []) or []
+    categories_str = ", ".join(categories) if categories else "일반 법률"
+
+    # 기존 전문 에이전트들의 분야별 분석 결과 보존 및 맥락 활용
+    agent_analyses = []
+    agent_results = state.get("agent_results", {}) or {}
+    for agent_name, a_res in agent_results.items():
+        if isinstance(a_res, dict) and a_res.get("analysis"):
+            agent_analyses.append(f"[{agent_name} 전문 분석]:\n{a_res.get('analysis')}")
+    agent_context_text = "\n\n".join(agent_analyses) if agent_analyses else "(전문 분야 분석 초안 없음)"
 
     statute_names = list(dict.fromkeys([
         s.get("statute_name") or s.get("title") or "법령"
         for s in statute_results if s.get("statute_name") or s.get("title")
     ]))
-    statute_names_str = ", ".join(statute_names) if statute_names else "관련 특별법"
+    statute_names_str = ", ".join(statute_names) if statute_names else "관련 법령"
 
     statute_lines = []
     for s in statute_results:
@@ -805,48 +831,39 @@ def re_analyze_node(state: LegalState) -> Dict:
         statute_lines.append(f"- 인용 표기: ({law} {art})\n  법령명 및 조문: {law} {art}\n  내용: {content}\n  공식URL: {url}")
     official_statutes_text = "\n\n".join(statute_lines) if statute_lines else "(조회된 공식 법령 없음)"
 
-    # 동적 조문 요약 목록 (하드코딩 배제: 조회된 실제 법령 및 조문 번호만 추출)
-    retrieved_articles = [
-        f"{s.get('statute_name', '')} {s.get('article', '')}".strip()
-        for s in statute_results if s.get("article")
-    ]
-    retrieved_articles_summary = ", ".join(dict.fromkeys([a for a in retrieved_articles if a])) or statute_names_str
-
+    # 도메인 중립적 4단계 표준 프롬프트
     prompt = PromptTemplate.from_template(
         "당신은 공인 법률 분석 전문가입니다.\n"
-        "내부 데이터베이스 검색 결과 법률 근거 부족으로 인해 법률검증 Agent의 검토를 거쳐, 의뢰인의 승인(HITL) 후 외부 공식 법령 원문 검색 시스템(법제처 국가법령정보공동활용 open.law.go.kr)에서 아래의 신뢰할 수 있는 공식 법령 조문을 확보했습니다.\n\n"
+        "의뢰인의 질문과 사건 사실관계, 그리고 외부 공식 법령 검색(법제처 국가법령정보공동활용 open.law.go.kr)에서 새로 확보된 아래 공식 법령 조문 및 전문 에이전트 분석을 바탕으로, 객관적이고 정확한 법률 의견서를 작성하세요.\n\n"
         "[사용자 질문]\n{question}\n\n"
-        "[사건 맥락]\n{case_context}\n\n"
-        "[새로 확보된 공식 법령 원문]\n{official_statutes_text}\n\n"
-        "[작성 규칙]\n"
-        "1. [서두 안내]\n"
-        "   답변의 맨 처음에 다음 1줄의 정돈된 안내 섹션만 작성하세요 (조문 번호들을 쉼표로 끝없이 나열하지 마세요):\n"
-        "   [안내: 공식 법령 원문 반영]\n"
-        "   - 본 답변은 의뢰인의 승인(HITL)을 거쳐 법제처 국가법령정보공동활용 시스템(open.law.go.kr)의 {statute_names_str} 공식 조문을 조회하여 재분석된 결과입니다.\n\n"
-        "2. [답변 구성 체계]\n"
-        "   실제 의뢰인(고객)에게 실질적인 도움이 되도록 다음 4개 섹션 체계로 명확하고 전문성 있게 작성하세요:\n"
-        "   [1. 핵심 결론 (한눈에 보기)]\n"
-        "   - 의뢰인이 질문한 핵심 사항(보증금 반환 가능성, 상대방의 사전 인식 인정 여부, 추가 손해배상 청구 가능 여부)에 대해 3줄 이내로 명쾌하게 답을 요약하세요.\n"
-        "   [2. 지금 당장 취해야 할 행동 가이드 (Action Plan)]\n"
-        "   - 1단계(임대인 본인에게 내용증명 발송 및 손해 사전 고지), 2단계(입증 증거 수집 및 백업), 3단계(계약 종료 후 임차권등기명령 신청 및 법적 절차) 등 구체적인 실무 조치 순서를 제시하세요.\n"
-        "   [3. 쟁점별 심층 법률 분석]\n"
-        "   - 묵시적 갱신과 해지의 효력, 배우자 통지의 도달 인정 가능성 및 집을 보여준 사실의 법적 의미, 다른 집 보증금 반환 지연으로 인한 추가 손해배상(특별손해와 예견가능성 요건)을 법령 조문에 근거하여 분석하세요.\n"
-        "   [4. 입증 필요사항 및 실무상 유의사항]\n"
-        "   - 소송 또는 분쟁 시 의뢰인이 반드시 입증해야 할 증거 자료와 법원 판단 리스크를 명확히 안내하세요.\n\n"
-        "3. [법령 및 증거 인용 규칙]\n"
-        "   - 법령 조문 인용 시 가상의 PDF 파일명(예: 주택임대차보호법.pdf)을 절대 쓰지 마시고, 반드시 `(법령명 제O조)` 형태(예: `(주택임대차보호법 제6조의2)`, `(민법 제551조)`)로 정확하게 인용하세요.\n"
-        "   - 사건 증거 인용 시 실제 사건 증거 파일명(예: `(2022_주택임대차계약서.pdf, p.1)`) 형태로 인용하세요.\n"
-        "4. [서식 규칙]\n"
-        "   - 섹션 제목은 대괄호 `[제목]` 형태로 작성하고, 중요한 핵심 단어에는 **볼드** 강조를 적절히 사용하세요."
+        "[사건 분야 및 맥락]\n분야: {categories_str}\n사건 사실관계: {case_context}\n\n"
+        "[기존 전문 에이전트 분석 참고사항]\n{agent_context_text}\n\n"
+        "[새로 확보된 공식 법령 조문 원문]\n{official_statutes_text}\n\n"
+        "[작성 규칙 및 4단계 표준 구조]\n"
+        "특정 사건에 국한된 편향 없이, 사용자의 실제 질문과 사건 유형({categories_str})에 정확히 부합하도록 다음 4개 표준 섹션으로 작성하세요.\n"
+        "서두에 불필요한 시스템 실행 경과나 안내 문구를 작성하지 마시고, 곧바로 [1. 핵심 결론]부터 시작하세요.\n\n"
+        "[1. 핵심 결론]\n"
+        "- 사용자의 핵심 질문에 대해 3줄 이내로 명쾌하게 조건부 또는 확정 가능한 결론을 제시하세요.\n\n"
+        "[2. 지금 해야 할 일]\n"
+        "- 사건 유형({categories_str})과 현재 진행 상태에 맞는 우선순위별 구체적인 실행 조치(Action Plan)를 단계별(1단계, 2단계, 3단계 등)로 제시하세요.\n\n"
+        "[3. 쟁점별 상세 법률 분석]\n"
+        "- 확보된 공식 법령 조문과 사건 사실을 바탕으로 주요 쟁점별 법률요건 충족 여부, 법률 효과, 상대방의 예상 항변 및 법적 위험을 심층 분석하세요.\n\n"
+        "[4. 추가 확인사항 및 유의사항]\n"
+        "- 현재 부족한 증거 자료, 입증 책임이 있는 사실, 불확실한 법적 한계 및 실무상 유의사항을 명확히 안내하세요.\n\n"
+        "[인용 및 서식 규칙]\n"
+        "- 법령 조문 인용 시 가상의 PDF 파일명을 쓰지 마시고, 반드시 `(법령명 제O조)` 형태(예: `(주택임대차보호법 제6조의2)`, `(민법 제598조)`)로 정확하게 인용하세요.\n"
+        "- 사건 증거 인용 시 실제 사건 증거 파일명(예: `(차용증.pdf, p.1)`) 형태로 인용하세요.\n"
+        "- 섹션 제목은 대괄호 `[제목]` 형태로 작성하고, 중요한 핵심 단어에는 **볼드** 강조를 적절히 사용하세요."
+    )
+    formatted_prompt = prompt.format(
+        question=q,
+        categories_str=categories_str,
+        case_context=case_ctx,
+        agent_context_text=agent_context_text,
+        official_statutes_text=official_statutes_text,
     )
     llm = get_llm(temperature=0.0)
-    res = (prompt | llm).invoke({
-        "question": q,
-        "case_context": case_ctx,
-        "official_statutes_text": official_statutes_text,
-        "statute_names_str": statute_names_str,
-        "retrieved_articles_summary": retrieved_articles_summary,
-    })
+    res = llm.invoke(formatted_prompt)
     raw_content = str(res.content) if hasattr(res, "content") else str(res)
 
     return {

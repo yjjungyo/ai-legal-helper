@@ -61,6 +61,10 @@ _STOPWORDS = {
 class ClaimVerification(BaseModel):
     """개별 법률 주장에 대한 근거 검증 결과 스키마."""
     claim: str = Field(description="검증할 법률 주장")
+    claim_type: Optional[str] = Field(
+        default="LEGAL_APPLICATION",
+        description="주장 유형: LEGAL_RULE (법률 규범/조문), CASE_FACT (사건 사실), LEGAL_APPLICATION (법률 적용 판단), RECOMMENDATION (후속 행동 제안)"
+    )
     source_ids: List[str] = Field(default_factory=list, description="주장을 뒷받침하는 출처 ID 목록 (없으면 빈 배열)")
     grounding_status: str = Field(default="UNCERTAIN", description="SUPPORTED, UNSUPPORTED, 또는 UNCERTAIN")
     reason: str = Field(default="", description="검증 사유")
@@ -105,12 +109,19 @@ VERIFICATION_PROMPT = """당신은 법률검증 Agent(Legal Verification Agent)�
 {retrieved_sources}
 
 [검증 기준 및 정책 (Grounding Policy)]
-1. 답변의 주요 법률 주장을 추출하고, [검색된 출처 목록] 또는 [사건 맥락]에 의해 정확히 뒷받침되는지 판정하세요.
-2. 출처 문서는 존재하더라도 그 본문(Content)이 해당 주장을 실제로 뒷받침하지 않는다면 반드시 UNSUPPORTED로 판정하세요.
-3. 종합 상태(status) 결정:
-   - PASS: 모든 주요 주장이 출처 본문에 의해 뒷받침되고 허위 인용·누락·모순이 없음.
-   - REVISE: 근거 부족, 허위 인용, 출처 본문 불일치, 누락, 내부 모순이 있으나 수정으로 개선 가능한 경우.
-   - INSUFFICIENT: 답변의 핵심 논리가 근거에 전혀 없거나 수정이 불가능할 정도로 부족한 경우.
+1. 답변의 주요 법률 주장을 추출하고, 주장 유형(claim_type)별로 [검색된 출처 목록] 또는 [사건 맥락]에 의해 정확히 뒷받침되는지 판정하세요.
+   - LEGAL_RULE: 법령 조문 또는 판례 규범 설명
+   - CASE_FACT: 사건에 관한 구체적 사실관계
+   - LEGAL_APPLICATION: 법률 요건을 사건 사실에 적용하여 도출한 법적 판단
+   - RECOMMENDATION: 고객을 위한 후속 법적·실무적 행동 권고
+
+2. 출처 문서는 존재하더라도 그 본문(Content)이 해당 주장을 실질적으로 뒷받침하지 않는다면 반드시 UNSUPPORTED로 판정하세요.
+   - 사건 사실에 적용하기 위한 법률요건이 누락되었거나, 미확인 사실을 확인된 사실처럼 단정한 경우에도 SUPPORTED로 판정해서는 안 됩니다.
+
+3. 종합 상태(status) 결정 원칙:
+   - PASS: 모든 주요 주장이 출처 본문에 의해 충실히 뒷받침되고, 결론에 영향을 미치는 핵심 쟁점의 법률요건 누락·모순·허위 인용이 일체 없음.
+   - REVISE: 근거 부족, 허위 인용, 출처 본문 불일치, 누락, 내부 모순이 있으나 수정 지침을 통해 개선 가능한 경우.
+   - INSUFFICIENT: 답변의 핵심 논리가 근거에 전혀 없거나 법률요건이 결여되어 수정이 불가능할 정도로 부족한 경우.
 
 4. 근거 부족 원인 분류 (reason_code):
    - LEGAL_SOURCE_MISSING: 답변에 필요한 핵심 법률/조문이 검색 결과에 완전히 없음 (예: 질문은 주택임대차보호법에 관한 것인데 민법만 검색된 경우). 이 경우 candidate_laws에 해당 법령명을 반드시 명시하고, recommended_action을 "REQUEST_STATUTE_SEARCH_APPROVAL"로 설정하세요. 후보 법령 지정 시 일반법(민법 등)보다 질문의 특수한 법률관계를 직접 규율하는 특별법(예: 주택임대차보호법, 상가임대차법, 근로기준법 등)을 1순위로 최우선 지정하세요.
@@ -126,10 +137,11 @@ VERIFICATION_PROMPT = """당신은 법률검증 Agent(Legal Verification Agent)�
    - 이러한 입증 주의사항이나 권고사항이 초안에 기재되어 있다고 해서 이를 "사건 증거 부족(CASE_EVIDENCE_MISSING)"이나 "근거 부족(INSUFFICIENT/REVISE)"으로 판정해서는 절대 안 됩니다.
    - 오직 답변이 객관적 사실이나 법리가 없음에도 허위 사실을 단정적으로 주장하거나, 존재하지 않는 법적 권리를 기정사실로 왜곡 확정할 때만 REVISE 또는 INSUFFICIENT로 판정하세요.
 
-6. 공식 법령 원문 연동(OFFICIAL_STATUTE_SEARCH) 결과 반영 시:
-   - [검색된 출처 목록]에 retrieval_method가 "OFFICIAL_STATUTE_SEARCH"인 법령 조문이 포함되어 있고, 초안이 해당 조문 원문과 일치하게 분석되었다면 status는 반드시 "PASS"로 판정하세요.
-   - 서두의 [공식 법령 원문 연동 및 근거 보강 안내]는 시스템 규격에 따라 작성된 경과 안내문이므로, 서두의 요약 문구와 본문의 세부 설명 간의 사소한 서술 차이를 "내부 모순(contradictions)"이나 "근거 부족(INSUFFICIENT/REVISE)"으로 지적하지 마세요.
-   - 의뢰인의 질문에 포함된 사실관계(예: 질문자가 진술한 일시, 상대방의 구체적 언행, 연락 및 통지 정황 등)를 답변자가 전제하여 법률적 의미나 입증 필요성을 설명한 것을 두고 "사건 증거 목록에 없다"거나 "사실 불일치"로 문제 삼지 마세요.
+6. 공식 법령 원문 연동(OFFICIAL_STATUTE_SEARCH) 결과 반영 및 법률적 검증 원칙 (P0-01):
+   - OFFICIAL_STATUTE_SEARCH는 근거 출처의 신뢰성을 높이는 검색 경로일 뿐, 답변 전체의 법률적 정확성이나 사건 적용 타당성을 보증하지 않습니다.
+   - 공식 법령 검색 성공만을 이유로 PASS를 반환해서는 절대 안 됩니다.
+   - 공식 조문이 검색되었더라도 법률요건 일부 누락, 관련된 다른 법률 조문 누락, 법령 적용 시점 오류, 사실관계의 잘못된 확정, 법률 효과의 잘못된 해석, 손해배상 청구 주체의 혼동, 주장과 실제 인용 출처의 불일치가 존재한다면 반드시 REVISE 또는 INSUFFICIENT로 엄격히 판정하세요.
+   - 의뢰인의 진술은 사실관계의 전제로 참고할 수 있으나, 독립적으로 입증된 객관적 증거와 혼동하지 마세요.
 
 [출력 형식 (반드시 순수 JSON만 출력)]
 {{
@@ -142,6 +154,7 @@ VERIFICATION_PROMPT = """당신은 법률검증 Agent(Legal Verification Agent)�
   "claims": [
     {{
       "claim": "검증할 주장 문장",
+      "claim_type": "LEGAL_RULE | CASE_FACT | LEGAL_APPLICATION | RECOMMENDATION",
       "source_ids": ["출처 ID"],
       "grounding_status": "SUPPORTED | UNSUPPORTED | UNCERTAIN",
       "reason": "검증 판단 사유"
@@ -345,7 +358,8 @@ def audit_citations_and_claims(
             "citation_existence_rate": "N/A",
             "citation_support_rate": "N/A",
             "citation_coverage_rate": 0.0,
-            "verified_sources": normalized_registry,
+            "cited_sources": [],
+            "verified_sources": [],
         }
 
     # 문장/줄 단위로 분리하여 인용 문맥 파악
@@ -505,23 +519,25 @@ def audit_citations_and_claims(
             )
             coverage_rate = round(cited_count / len(substantive_segs), 4)
 
-    # 검증된 최종 출처 목록: LLM이 출력한 파일명에 의존하지 않고 서버 Source Registry의 정규화된 메타데이터만 사용
-    # 단, 거부(rejected)된 출처 ID에 해당하는 문서는 제외
-    rejected_filenames = {
-        os.path.basename(cid.rsplit("_", 1)[0]).lower()
-        for cid in rejected_citation_ids
-        if "_" in cid
-    }
-    verified_sources: List[Dict[str, Any]] = []
-    seen_sids: set[str] = set()
-    for src in normalized_registry:
-        sid = str(src.get("source_id") or "")
-        fn_lower = os.path.basename(str(src.get("filename") or src.get("file") or "")).lower()
-        if sid in rejected_citation_ids or (fn_lower and fn_lower in rejected_filenames and sid not in validated_sources_map):
-            continue
-        if sid not in seen_sids:
-            seen_sids.add(sid)
-            verified_sources.append(src)
+    # [P0-03] 검증된 최종 출처 목록(cited_sources):
+    # 검색된 전체 출처(retrieval_source_ids, retrieved_chunk_ids)는 감사용으로 100% 보존하되,
+    # 최종 답변에서 실제 인용되고 본문 뒷받침까지 검증된 출처만 cited_sources로 선정함.
+    # 답변에 인용되지 않은 법령/문서는 고객용 검증 출처에서 엄격히 배제함.
+    cited_sources: List[Dict[str, Any]] = []
+    seen_cited_keys: set[Any] = set()
+    for vs in validated_sources_map.values():
+        sid = str(vs.get("source_id") or "")
+        stype = vs.get("source_type") or "DOCUMENT"
+        if stype == "STATUTE":
+            key = (stype, vs.get("statute_name") or vs.get("title"), vs.get("article"))
+        elif stype == "CASE_EVIDENCE":
+            key = (stype, vs.get("file") or vs.get("filename"), str(vs.get("page") or "1"))
+        else:
+            key = (sid, vs.get("file") or vs.get("filename"))
+
+        if key not in seen_cited_keys:
+            seen_cited_keys.add(key)
+            cited_sources.append(vs)
 
     return {
         "retrieval_source_ids": retrieval_source_ids,
@@ -536,7 +552,8 @@ def audit_citations_and_claims(
         "citation_existence_rate": existence_rate,
         "citation_support_rate": support_rate,
         "citation_coverage_rate": coverage_rate,
-        "verified_sources": verified_sources,
+        "cited_sources": cited_sources,
+        "verified_sources": cited_sources,
     }
 
 
@@ -635,8 +652,9 @@ def run_verification(
     valid_source_id_set = set(audit["retrieval_source_ids"])
     rejected_id_set = set(audit["rejected_citation_ids"])
 
+    # 2. 검증 LLM용 출처 목록 포맷팅 (검색된 전체 출처를 제공하여 초안의 주장이 뒷받침되는지 검증)
     formatted_sources = ""
-    for s in audit["verified_sources"]:
+    for s in (retrieved_sources or []):
         fname = s.get("filename") or s.get("file_name") or s.get("source_id") or "UNKNOWN"
         page = s.get("page") or "1"
         stype = s.get("source_type") or "DOCUMENT"
@@ -686,7 +704,7 @@ def run_verification(
         data = json.loads(text.strip())
         result = VerificationOutput(**data)
 
-        # 2. LLM이 반환한 Claim별 source_ids가 실제 Source Registry에 존재하는지 교차 검증
+        # 3. LLM이 반환한 Claim별 source_ids가 실제 Source Registry에 존재하는지 교차 검증
         for claim_obj in result.claims:
             verified_claim_sids = [
                 sid for sid in claim_obj.source_ids
@@ -697,7 +715,34 @@ def run_verification(
                 claim_obj.reason = (claim_obj.reason + " (지정된 출처 ID가 실제 검색 결과에 존재하지 않거나 본문과 불일치함)").strip()
             claim_obj.source_ids = verified_claim_sids
 
-        # 3. 결정론적 Citation Validator 결과 병합
+        # 4. [P0-01] 결정론적 종합 PASS 판정 및 모순 방지 검사 (Deterministic Policy Enforcement)
+        # A) 주요 법률 주장 목록(claims)이 비어있는 경우 검증 완료(PASS) 불가
+        if not result.claims:
+            if result.status == "PASS":
+                result.status = "REVISE"
+                result.reason_code = "ANSWER_REVISION_REQUIRED" if result.reason_code == "NONE" else result.reason_code
+                result.recommended_action = "REVISE_DRAFT"
+            result.warnings.append("검증 대상 답변에서 추출된 주요 법률 주장(claims)이 없어 검증을 완료할 수 없습니다.")
+
+        # B) UNSUPPORTED 또는 UNCERTAIN 주장 존재 시 PASS 엄격 차단
+        unsupported_claims = [c for c in result.claims if c.grounding_status == "UNSUPPORTED"]
+        uncertain_claims = [c for c in result.claims if c.grounding_status == "UNCERTAIN"]
+
+        if unsupported_claims and result.status == "PASS":
+            result.status = "REVISE"
+            if result.reason_code == "NONE":
+                result.reason_code = "LEGAL_SOURCE_INSUFFICIENT"
+            result.recommended_action = "REVISE_DRAFT"
+            result.warnings.append(f"출처 본문에 의해 뒷받침되지 않는 주장 {len(unsupported_claims)}건이 감지되어 PASS가 취소되었습니다.")
+
+        if uncertain_claims and result.status == "PASS":
+            result.status = "REVISE"
+            if result.reason_code == "NONE":
+                result.reason_code = "ANSWER_REVISION_REQUIRED"
+            result.recommended_action = "REVISE_DRAFT"
+            result.warnings.append(f"근거 확인이 불확실한 주장 {len(uncertain_claims)}건이 포함되어 있어 조건부 보완이 필요합니다.")
+
+        # C) 인용 오류나 미확인 출처가 있는 경우 PASS 엄격 차단
         if unverified_citations:
             cite_str = ", ".join(unverified_citations)
             result.warnings.append(f"검색 결과에서 확인되지 않은 출처 인용이 감지되었습니다: {cite_str}")
@@ -706,6 +751,9 @@ def run_verification(
             )
             if result.status == "PASS":
                 result.status = "REVISE"
+                if result.reason_code == "NONE":
+                    result.reason_code = "CITATION_INVALID"
+                result.recommended_action = "REVISE_DRAFT"
 
         if unsupported_citations:
             unsup_str = ", ".join(unsupported_citations)
@@ -715,12 +763,14 @@ def run_verification(
             )
             if result.status == "PASS":
                 result.status = "REVISE"
+                if result.reason_code == "NONE":
+                    result.reason_code = "LEGAL_SOURCE_INSUFFICIENT"
+                result.recommended_action = "REVISE_DRAFT"
 
-        # LLM 자체 평가에서 UNSUPPORTED 주장이 1건 이상이면 PASS 불가
-        unsupported_claim_count = sum(1 for c in result.claims if c.grounding_status == "UNSUPPORTED")
-        if unsupported_claim_count > 0 and result.status == "PASS":
+        # D) status=PASS인데 reason_code가 결함 코드인 논리적 모순 방지
+        if result.status == "PASS" and result.reason_code != "NONE":
             result.status = "REVISE"
-            result.warnings.append(f"근거가 확인되지 않은 주장 {unsupported_claim_count}건이 포함되어 있습니다.")
+            result.recommended_action = "REVISE_DRAFT"
 
         result.citation_audit = audit
 
