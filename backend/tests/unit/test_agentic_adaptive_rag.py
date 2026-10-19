@@ -89,7 +89,7 @@ def test_verification_condition_pass_goes_to_finalize():
 
 
 def test_insufficient_node_surfaces_missing_issues_and_contradictions():
-    """insufficient_node가 검증관 지적사항(missing_issues, contradictions, warnings)을 투명하게 안내하는지 검증."""
+    """insufficient_node가 근거 부족 시 안전한 판단 유보 및 확인 필요 쟁점을 고객에게 안내하는지 검증."""
     state: LegalState = {
         "messages": [],
         "draft_answer": "임차인은 1개월 후 해지 효력이 발생합니다 (민법.pdf, p.53)",
@@ -99,6 +99,7 @@ def test_insufficient_node_surfaces_missing_issues_and_contradictions():
         "verification_result": {
             "status": "INSUFFICIENT",
             "missing_issues": ["주택임대차보호법 제6조의2 제2항(3개월) 누락"],
+            "candidate_laws": ["주택임대차보호법"],
             "contradictions": ["주택임대차 질문에 일반 민법 1개월을 적용한 모순"],
             "warnings": ["핵심 특별법 근거가 확보되지 않은 상태입니다."],
         },
@@ -106,15 +107,17 @@ def test_insufficient_node_surfaces_missing_issues_and_contradictions():
     res = insufficient_node(state)
     final_text = res.get("final_answer", "")
 
-    # 핵심 지적사항이 플레인 텍스트 서식으로 최종 답변에 포함되어 있는지 검증
-    assert "[안내: 법률적 근거 부족으로 인한 검증 안내 - INSUFFICIENT]" in final_text
+    # 1. P0-02 & P0-1: 판단 유보 안내문 및 final_disposition WITHHELD 검증
+    assert "[안내: 법률적 근거 부족으로 인한 판단 유보 (WITHHELD)]" in final_text
+    assert res.get("final_disposition") == "WITHHELD"
     assert "주택임대차보호법 제6조의2 제2항(3개월) 누락" in final_text
-    assert "주택임대차 질문에 일반 민법 1개월을 적용한 모순" in final_text
-    assert "핵심 특별법 근거가 확보되지 않은 상태입니다." in final_text
-    assert "[참고: 미검증 참고 초안 (법적 효력 없음)]" in final_text
-    assert "[근거 미확인]" in final_text  # sanitize_unverified_citations 동작
 
-    # 마크다운 원시 기호(#, **)가 최종 텍스트에 포함되지 않아야 함
+    # 2. P0-02 & P0-2: 미검증 초안 고객 노출 원천 배제 검증
+    assert "[참고: 미검증 참고 초안 (법적 효력 없음)]" not in final_text
+    assert "임차인은 1개월 후 해지 효력이 발생합니다" not in final_text
+
+    # 3. 마크다운 원시 기호(#, **)가 최종 텍스트에 포함되지 않아야 함
     assert "#" not in final_text, "최종 답변에 마크다운 # 헤더 기호가 잔존해서는 안 됨"
     assert "**" not in final_text, "최종 답변에 마크다운 ** 볼드 기호가 잔존해서는 안 됨"
+
 

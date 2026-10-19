@@ -24,8 +24,14 @@ from typing import Annotated
 class LegalState(MessagesState):
     """법률 상담 LangGraph 파이프라인의 전역 상태 객체.
     
-    기존 단일 흐름 파이프라인 상태에서, P2.1 Supervisor 도입에 맞춰
-    검증 결과와 재검토 횟수 등을 추가로 관리하도록 확장되었다.
+    Supervisor, 병렬 분석 에이전트, Verifier Agent, HILT 법령 원문 검색,
+    그리고 최종 고객 응답 처분(final_disposition) 상태를 관리한다.
+    
+    Attributes:
+        final_disposition: 최종 응답 처분 정책 ('DELIVERED', 'CAUTIONARY', 'WITHHELD').
+            - DELIVERED: Verifier PASS 통과 완료
+            - CAUTIONARY: 핵심 법리 확보 및 주의 안내/조건부 확정 (REVISE 후 finalize)
+            - WITHHELD: 근거 부족 또는 중대 결함으로 확정 조언 유보 (insufficient)
     """
     # Existing fields for compatibility
     question: str
@@ -56,4 +62,7 @@ class LegalState(MessagesState):
     approval_status: Optional[str]  # NONE, PENDING, APPROVED, REJECTED, EXPIRED
     statute_search_results: Optional[List[Dict[str, Any]]]
     hilt_executed: Optional[bool]
+
+    # P0 개선: 최종 고객 응답 처분 상태 ('DELIVERED', 'CAUTIONARY', 'WITHHELD')
+    final_disposition: Optional[str]
 

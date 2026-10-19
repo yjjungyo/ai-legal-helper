@@ -436,9 +436,13 @@ def verification_condition(state: LegalState) -> str:
         if status == "REVISE" or (status == "INSUFFICIENT" and reason_code in ("ANSWER_REVISION_REQUIRED", "NONE")):
             return "revise"
 
-    # 4. HILT 실행 후 또는 재검토 한도(1회) 도달 후에도 PASS하지 못한 경우:
-    #    HILT 이력만으로 결함 답변을 finalize하지 않고, 반드시 insufficient_node로 안전 종료하여
-    #    미검증/결함 답변이 확정되는 경로를 원천 차단한다 (P0-02 준수).
+    # 4. HILT 실행 후 또는 재검토 한도(1회) 도달 후:
+    #    - REVISE 상태: 법률적 핵심 뼈대를 갖추고 경미한 보완/주의가 필요한 상태이므로,
+    #      답변을 일방적으로 폐기하지 않고 finalize_node로 라우팅하여 조건부 답변과 유의사항(CAUTIONARY)을 제공한다 (P0-1, P0-2).
+    #    - INSUFFICIENT / FAIL 상태: 중대한 법률적 모순이나 치명적 근거 부재이므로 insufficient_node로 안전 종료(WITHHELD)한다.
+    if status == "REVISE":
+        return "finalize"
+
     return "insufficient"
 
 
@@ -541,12 +545,19 @@ def revise_node(state: LegalState) -> Dict:
 
 @trace
 def insufficient_node(state: LegalState) -> Dict:
-    """근거 부족(INSUFFICIENT) 판정 시 검증 지적사항과 모순을 마크다운 기호 없는 표준 플레인 텍스트로 안내한다."""
+    """근거 부족(INSUFFICIENT) 또는 판단 유보 시 고객에게 안전한 가이드와 불확실한 사항을 안내한다.
+
+    [P0-02 & P0-1 & P0-2 원칙]
+    1. 미검증 초안은 내부 감사용(internal_draft)으로만 보존하고 고객용 final_answer에서는 완전 배제한다.
+    2. Verifier 내부 감수용 디버그 표현('표현상 긴장', '다소 넓다', 'X건 미연결', '초안은' 등)이나
+       개발자용 모순/경고 배열을 고객 답변에 날것(raw)으로 노출하지 않고, 고객이 이해 가능한 법률 가이드로 정제한다.
+    3. 내부 검증 데이터(contradictions, warnings, claims 등)는 Tier 2 검증 결과(verification_result)에 온전히 보존한다.
+    4. final_disposition은 항상 'WITHHELD'로 확정하여 answer_status 불일치를 원천 차단한다.
+    """
     set_node_name("insufficient")
     from ai_legal_helper.agents.verification import sanitize_unverified_citations
     from ai_legal_helper.utils.text_formatter import clean_markdown_formatting
 
-    # [P0-02] 미검증 초안은 내부 감사용(internal_draft)으로만 보존하고 고객용 final_answer에서는 완전 배제함
     raw_draft = state.get("draft_answer", "")
     sanitized_draft = sanitize_unverified_citations(
         raw_draft,
@@ -557,11 +568,9 @@ def insufficient_node(state: LegalState) -> Dict:
     ver_res = state.get("verification_result", {}) or {}
     missing_issues = ver_res.get("missing_issues", []) or []
     missing_laws = ver_res.get("candidate_laws", []) or []
-    contradictions = ver_res.get("contradictions", []) or []
-    warnings_list = ver_res.get("warnings", []) or []
     reason_code = ver_res.get("reason_code", "LEGAL_SOURCE_MISSING")
 
-    # 고객용 판단 유보 안내문 (미검증 법률 단정 완전 배제)
+    # 고객용 판단 유보 안내문 (미검증 법률 단정 및 내부 감수 메모 배제)
     parts = []
     parts.append("[안내: 법률적 근거 부족으로 인한 판단 유보 (WITHHELD)]\n")
     parts.append(
@@ -569,29 +578,28 @@ def insufficient_node(state: LegalState) -> Dict:
         "인용된 법조문과의 법률적 모순이 확인되어 의뢰인의 권리 보호를 위해 확정적인 법률 조언의 제공을 안전하게 유보합니다.\n"
     )
 
-    if missing_issues or missing_laws:
+    # 1. 확인이 필요한 쟁점 및 법령 (고객 친화적 정제)
+    if missing_laws or missing_issues:
         parts.append("[1. 확인 및 보강이 필요한 핵심 쟁점 및 법령]")
         for law in missing_laws:
             parts.append(f"- 관련 법령: {law}")
         for issue in missing_issues:
-            parts.append(f"- 핵심 쟁점: {issue}")
+            # 내부 감수 문구('초안', 'draft' 등) 정제
+            cleaned_issue = issue
+            for bad_word in ["초안은 ", "초안이 ", "초안의 ", "초안을 ", "초안 "]:
+                cleaned_issue = cleaned_issue.replace(bad_word, "사안의 검토 ")
+            parts.append(f"- 핵심 쟁점: {cleaned_issue}")
         parts.append("")
 
-    if contradictions:
-        parts.append("[2. 감지된 법률적 불일치 및 위험 요소]")
-        for contra in contradictions:
-            parts.append(f"- {contra}")
-        parts.append("")
+    # 2. 사실관계 및 입증 리스크 안내 (내부 디버그 문구 없는 실무적 객관 가이드)
+    parts.append("[2. 사실관계 및 입증 리스크 안내]")
+    parts.append("- 법률상 권리 주장은 상대방에 대한 적법한 의사표시 도달 및 이를 증명할 수 있는 객관적 입증 자료(계약서, 내용증명, 서면 확인서 등)에 기초해야 합니다.")
+    parts.append("- 객관적 증빙 자료 없이 구두 진술이나 정황에만 기초하여 법적 절차를 진행할 경우 법률적 불이익이 발생할 수 있습니다.\n")
 
-    if warnings_list:
-        parts.append("[3. 법률검증 Agent 주의사항]")
-        for w in warnings_list:
-            parts.append(f"- {w}")
-        parts.append("")
-
-    parts.append("[4. 안전한 후속 행동 가이드]")
+    # 3. 안전한 후속 행동 가이드
+    parts.append("[3. 안전한 후속 행동 가이드]")
     parts.append(
-        "- 미검증 법률 분석에 의존한 법적 조치는 불측의 손해를 야기할 수 있으므로, 반드시 계약서, 통지 내역, 객관적 증빙 자료를 지참하여 "
+        "- 미검증 법률 분석에 의존한 일방적 법적 조치는 불측의 손해를 야기할 수 있으므로, 반드시 계약서, 통지 내역(내용증명, 문자 등), 객관적 증빙 자료를 지참하여 "
         "대한법률구조공단(국번없이 132) 또는 변호사 등 법률전문가의 정밀 대면 상담을 받으시기 바랍니다."
     )
 
@@ -601,6 +609,7 @@ def insufficient_node(state: LegalState) -> Dict:
     return {
         "final_answer": final,
         "internal_draft": sanitized_draft,
+        "final_disposition": "WITHHELD",
         "verification_failure_reason": ver_res.get("explanation") or reason_code,
         "missing_evidence": missing_issues,
         "unresolved_issues": ver_res.get("missing_legal_issues", []),
@@ -611,7 +620,7 @@ def insufficient_node(state: LegalState) -> Dict:
 
 @trace
 def finalize_node(state: LegalState) -> Dict:
-    """검증 통과 시 혹시 남아 있을 수 있는 미검증 인용을 정화하고 마크다운 기호를 정제하여 답변을 확정한다."""
+    """검증 통과 또는 조건부 통과(REVISE) 시 미검증 인용을 정화하고 마크다운 기호를 정제하여 답변을 확정한다."""
     set_node_name("finalize")
     from ai_legal_helper.agents.verification import sanitize_unverified_citations, audit_citations_and_claims
     from ai_legal_helper.utils.text_formatter import clean_markdown_formatting
@@ -633,16 +642,21 @@ def finalize_node(state: LegalState) -> Dict:
 
     # 법률검증 Agent의 실무 권고 및 유의사항(warnings)을 정제하여 전달
     ver_res = state.get("verification_result", {}) or {}
+    ver_status = ver_res.get("status", "PASS")
     warnings = list(state.get("warnings", []) or [])
     ver_warnings = ver_res.get("warnings", []) or []
     for w in ver_warnings:
         if w not in warnings:
             warnings.append(w)
 
+    # [P0-1] 최종 응답 처분 상태 결정: Verifier가 PASS이면 DELIVERED, REVISE이면 CAUTIONARY
+    final_disp = "DELIVERED" if ver_status == "PASS" else "CAUTIONARY"
+
     return {
         "final_answer": final,
         "sources": cited_sources,
         "warnings": warnings,
+        "final_disposition": final_disp,
         "messages": [final]
     }
 
@@ -1036,10 +1050,15 @@ async def _execute_consultation(
         }
 
     final_answer = final_state.get("final_answer", "답변을 생성하지 못했습니다.")
+    final_disp = final_state.get("final_disposition")
+    if not final_disp:
+        ver_status = (final_state.get("verification_result") or {}).get("status")
+        final_disp = "DELIVERED" if ver_status == "PASS" else "WITHHELD"
 
     return {
         "status": "SUCCESS",
         "answer": final_answer,
+        "final_disposition": final_disp,
         "sources": final_state.get("retrieved_sources", []),
         "verification_result": final_state.get("verification_result", {}),
         "warnings": final_state.get("warnings", []),

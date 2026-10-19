@@ -162,7 +162,10 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
             resp.status = "SUCCESS"
             resp.execution_status = "COMPLETED"
             resp.verification_status = ver_status
-            if ver_status == "PASS":
+            final_disp = result.get("final_disposition")
+            if final_disp in ("DELIVERED", "CAUTIONARY", "WITHHELD"):
+                resp.answer_status = final_disp
+            elif ver_status == "PASS":
                 resp.answer_status = "DELIVERED"
             elif ver_status == "REVISE":
                 resp.answer_status = "CAUTIONARY"
@@ -524,7 +527,10 @@ async def process_consultation_resume(
         resp.status = "SUCCESS"
         resp.execution_status = "COMPLETED"
         resp.verification_status = ver_status
-        if ver_status == "PASS":
+        final_disp = result.get("final_disposition")
+        if final_disp in ("DELIVERED", "CAUTIONARY", "WITHHELD"):
+            resp.answer_status = final_disp
+        elif ver_status == "PASS":
             resp.answer_status = "DELIVERED"
         elif ver_status == "REVISE":
             resp.answer_status = "CAUTIONARY"
