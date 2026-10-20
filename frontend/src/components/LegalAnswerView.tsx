@@ -17,7 +17,6 @@ interface LegalAnswerViewProps {
  */
 interface SectionCategoryConfig {
   icon: string;
-  badgeLabel?: string;
   theme: 'summary' | 'facts' | 'issues' | 'statutes' | 'analysis' | 'uncertain' | 'action' | 'sources' | 'banner' | 'warning' | 'normal';
 }
 
@@ -30,44 +29,43 @@ function classifySectionTitle(title: string): SectionCategoryConfig {
   const t = title.toLowerCase();
 
   // 특수 시스템 배너 및 경고
-  if (t.includes('insufficient') || t.includes('근거 불충분') || t.includes('검증 안내') || t.includes('안내:')) {
-    return { icon: '🛡️', badgeLabel: '시스템 검증 안내', theme: 'banner' };
+  if (t.includes('insufficient') || t.includes('근거 불충분') || t.includes('검증 안내') || t.includes('판단 유보') || t.includes('withheld') || t.includes('안내:')) {
+    return { icon: '🛡️', theme: 'banner' };
   }
   if (t.includes('미검증') || t.includes('초안 주의') || t.includes('주의사항') || t.includes('경고')) {
-    return { icon: '⚠️', badgeLabel: '주의 사항', theme: 'warning' };
+    return { icon: '⚠️', theme: 'warning' };
   }
 
-  // 1. 사건 요약
-  if (t.includes('사건 요약') || t.includes('상담 요약') || t.includes('개요')) {
-    return { icon: '📋', badgeLabel: '사건 요약', theme: 'summary' };
+  // 1. 핵심 결론
+  if (t.includes('핵심 결론') || t.includes('사건 요약') || t.includes('상담 요약') || t.includes('개요')) {
+    return { icon: '📋', theme: 'summary' };
   }
-  // 2. 확인된 사실
-  if (t.includes('확인된 사실') || t.includes('사실관계') || t.includes('확정 사실') || t.includes('기초 사실')) {
-    return { icon: '🔍', badgeLabel: '확인된 사실', theme: 'facts' };
+  // 2. 사건 사실관계 및 증거
+  if (t.includes('사실관계') || t.includes('확인된 사실') || t.includes('사건 사실') || t.includes('증거 자료') || t.includes('기초 사실')) {
+    return { icon: '🔍', theme: 'facts' };
   }
-  // 3. 법률 쟁점
-  if (t.includes('법률 쟁점') || t.includes('주요 쟁점') || t.includes('핵심 쟁점') || t.includes('쟁점')) {
-    return { icon: '⚖️', badgeLabel: '법률 쟁점', theme: 'issues' };
+  // 3. 쟁점별 법률 분석
+  if (t.includes('쟁점별 법률 분석') || t.includes('법률 분석') || t.includes('법적 근거 및 심층 분석') || t.includes('법률 쟁점') || t.includes('주요 쟁점') || t.includes('쟁점')) {
+    return { icon: '⚖️', theme: 'issues' };
   }
-  // 4. 적용 법령 및 근거
+  // 4. 우선순위별 다음 행동
+  if (t.includes('우선순위') || t.includes('다음 행동') || t.includes('action plan') || t.includes('조치 사항') || t.includes('대응 방안') || t.includes('행동 가이드')) {
+    return { icon: '🚀', theme: 'action' };
+  }
+  // 5. 추가 확인사항
+  if (t.includes('추가 확인') || t.includes('확인사항') || t.includes('유의사항') || t.includes('입증 필요') || t.includes('불확실')) {
+    return { icon: '⚠️', theme: 'uncertain' };
+  }
+
+  // 보조 분류 (기존 호환성)
   if (t.includes('적용 법령') || t.includes('관련 법령') || t.includes('법적 근거') || t.includes('관련 조문') || t.includes('판례')) {
-    return { icon: '📜', badgeLabel: '적용 법령 및 근거', theme: 'statutes' };
+    return { icon: '📜', theme: 'statutes' };
   }
-  // 5. 분석 결과
-  if (t.includes('분석 결과') || t.includes('법률 검토') || t.includes('종합 의견') || t.includes('판단 결과') || t.includes('검토 의견')) {
-    return { icon: '💡', badgeLabel: '분석 결과', theme: 'analysis' };
+  if (t.includes('분석 결과') || t.includes('법률 검토') || t.includes('종합 의견') || t.includes('판단 결과')) {
+    return { icon: '💡', theme: 'analysis' };
   }
-  // 6. 불확실하거나 추가 확인이 필요한 사항
-  if (t.includes('불확실') || t.includes('추가 확인') || t.includes('확인 필요') || t.includes('유의사항') || t.includes('한계')) {
-    return { icon: '⚠️', badgeLabel: '불확실 / 추가 확인 필요', theme: 'uncertain' };
-  }
-  // 7. 다음 행동
-  if (t.includes('다음 행동') || t.includes('조치 사항') || t.includes('대응 방안') || t.includes('권장 조치') || t.includes('향후 절차')) {
-    return { icon: '🚀', badgeLabel: '권장 다음 행동', theme: 'action' };
-  }
-  // 8. 검증된 출처
   if (t.includes('검증된 출처') || t.includes('참고 자료') || t.includes('출처 목록')) {
-    return { icon: '📚', badgeLabel: '검증된 출처', theme: 'sources' };
+    return { icon: '📚', theme: 'sources' };
   }
 
   return { icon: '▪', theme: 'normal' };
@@ -223,7 +221,6 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content }) => 
     type: SectionCategoryConfig['theme'];
     title?: string;
     icon?: string;
-    badgeLabel?: string;
     lines: string[];
   }> = [];
 
@@ -231,7 +228,6 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content }) => 
     type: SectionCategoryConfig['theme'];
     title?: string;
     icon?: string;
-    badgeLabel?: string;
     lines: string[];
   } = { type: 'normal', lines: [] };
 
@@ -268,7 +264,6 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content }) => 
         type: cat.theme,
         title: detectedTitle,
         icon: cat.icon,
-        badgeLabel: cat.badgeLabel,
         lines: [],
       };
       continue;
@@ -360,20 +355,7 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content }) => 
               >
                 <span>{sec.icon || '⚠️'}</span>
                 <span>{sec.title}</span>
-                {sec.badgeLabel && (
-                  <span
-                    style={{
-                      fontSize: '0.75em',
-                      backgroundColor: '#ffedd5',
-                      color: '#9a3412',
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                      marginLeft: '4px',
-                    }}
-                  >
-                    {sec.badgeLabel}
-                  </span>
-                )}
+
               </div>
               <div style={{ fontSize: '0.89em', color: 'var(--text-secondary, #475569)' }}>
                 {sec.lines.map((l, lIdx) => renderFormattedLine(l, lIdx))}
@@ -409,20 +391,7 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content }) => 
               >
                 <span>{sec.icon || '🚀'}</span>
                 <span>{sec.title}</span>
-                {sec.badgeLabel && (
-                  <span
-                    style={{
-                      fontSize: '0.75em',
-                      backgroundColor: '#dcfce7',
-                      color: '#166534',
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                      marginLeft: '4px',
-                    }}
-                  >
-                    {sec.badgeLabel}
-                  </span>
-                )}
+
               </div>
               <div style={{ fontSize: '0.91em', color: 'var(--text-main)' }}>
                 {sec.lines.map((l, lIdx) => renderFormattedLine(l, lIdx))}
@@ -456,21 +425,7 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content }) => 
               >
                 <span>{sec.icon || '▪'}</span>
                 <span>{sec.title}</span>
-                {sec.badgeLabel && (
-                  <span
-                    style={{
-                      fontSize: '0.75em',
-                      fontWeight: 600,
-                      backgroundColor: '#eff6ff',
-                      color: '#1d4ed8',
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                      marginLeft: '4px',
-                    }}
-                  >
-                    {sec.badgeLabel}
-                  </span>
-                )}
+
               </div>
             )}
             <div style={{ fontSize: '0.92em', color: 'var(--text-main)' }}>
