@@ -124,7 +124,7 @@ VERIFICATION_PROMPT = """당신은 법률검증 Agent(Legal Verification Agent)�
    - INSUFFICIENT: 답변의 핵심 논리가 근거에 전혀 없거나 법률요건이 결여되어 수정이 불가능할 정도로 부족한 경우.
 
 4. 근거 부족 원인 분류 (reason_code):
-   - LEGAL_SOURCE_MISSING: 답변에 필요한 핵심 법률/조문이 검색 결과에 완전히 없음 (예: 질문은 주택임대차보호법에 관한 것인데 민법만 검색된 경우). 이 경우 candidate_laws에 해당 법령명을 반드시 명시하고, recommended_action을 "REQUEST_STATUTE_SEARCH_APPROVAL"로 설정하세요. 후보 법령 지정 시 일반법(민법 등)보다 질문의 특수한 법률관계를 직접 규율하는 특별법(예: 주택임대차보호법, 상가임대차법, 근로기준법 등)을 1순위로 최우선 지정하세요.
+   - LEGAL_SOURCE_MISSING: 답변에 필요한 핵심 법률/조문이 검색 결과에 완전히 없음 (예: 질문은 주택임대차보호법에 관한 것인데 민법만 검색된 경우). 이 경우 candidate_laws에 해당 법령명을 반드시 명시하고, recommended_action을 "REQUEST_STATUTE_SEARCH_APPROVAL"로 설정하세요. 후보 법령 지정 시 일반법(민법 등)보다 질문의 특수한 법률관계를 직접 규율하는 특별법(예: 주택임대차보호법, 상가임대차법, 근로기준법 등)을 1순위로 최우선 지정하되, 손해배상·특별손해·지연손해금 등 일반 민사상 손해배상 쟁점이 포함된 경우 민법(제393조 등)도 후보 법령(candidate_laws)에 함께 포함하세요.
    - LEGAL_SOURCE_INSUFFICIENT: 관련 법률 조문은 검색되었으나 쟁점 해결에 불충분한 경우.
    - CASE_EVIDENCE_MISSING: 법령은 충분하나 사건의 필수 사실관계나 증거(예: 통보 도달일, 계약서 특약 등)가 누락된 경우 (recommended_action: "REQUEST_EVIDENCE").
    - EVIDENCE_CONFLICT: 사용자 진술이나 사건 증거 간에 모순이 감지된 경우.

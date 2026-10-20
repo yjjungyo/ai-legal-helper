@@ -226,3 +226,89 @@ async def test_p0_7_execute_consultation_returns_final_disposition():
         assert "final_disposition" in res, "_execute_consultation 반환 결과에 final_disposition이 누락되었습니다."
         assert res["final_disposition"] == "WITHHELD"
 
+
+def test_p0_8_revise_with_unsupported_legal_claim_routes_to_insufficient():
+    """P0-8: REVISE 상태이더라도 핵심 법률 주장(LEGAL_RULE/LEGAL_APPLICATION)이 UNSUPPORTED이면 insufficient로 차단되어야 함."""
+    state = {
+        "question": "특별손해 청구 가능한지",
+        "draft_answer": "특별손해 배상 청구가 인정됩니다.",
+        "retrieved_sources": [],
+        "hilt_executed": True,
+        "revision_count": 1,
+        "verification_result": {
+            "status": "REVISE",
+            "reason_code": "ANSWER_REVISION_REQUIRED",
+            "claims": [
+                {
+                    "claim": "특별손해 배상 청구가 인정됩니다.",
+                    "claim_type": "LEGAL_APPLICATION",
+                    "grounding_status": "UNSUPPORTED",
+                    "reason": "예견가능성 법리 근거 조문 없음",
+                }
+            ],
+            "candidate_laws": [],
+            "warnings": [],
+        },
+    }
+    next_node = verification_condition(state)
+    assert next_node == "insufficient", f"미뒷받침 법률 주장이 포함된 REVISE가 {next_node}로 전이되었습니다 (insufficient 기대)."
+
+
+def test_p0_9_revise_with_severe_reason_code_routes_to_insufficient():
+    """P0-9: REVISE 상태이더라도 중대 결함 사유(LEGAL_SOURCE_MISSING 등)가 있으면 finalize로 가지 않고 insufficient로 차단되어야 함."""
+    state = {
+        "question": "특별손해 청구",
+        "draft_answer": "특별손해 청구 가능",
+        "retrieved_sources": [],
+        "hilt_executed": True,
+        "revision_count": 1,
+        "verification_result": {
+            "status": "REVISE",
+            "reason_code": "LEGAL_SOURCE_MISSING",
+            "candidate_laws": ["민법"],
+            "claims": [],
+            "warnings": [],
+        },
+    }
+    next_node = verification_condition(state)
+    assert next_node == "insufficient", f"LEGAL_SOURCE_MISSING 결함이 있는 REVISE가 {next_node}로 전이되었습니다."
+
+
+def test_p0_10_finalize_node_exposes_cited_sources():
+    """P0-10: finalize_node가 실제 인용된 출처를 cited_sources 및 sources로 정상 반환하는지 검증."""
+    state = {
+        "draft_answer": "[1. 핵심 결론]\n3개월 후 반환 청구 가능 (주택임대차보호법 제6조의2)",
+        "retrieved_sources": [{
+            "source_id": "law_6_2",
+            "statute_name": "주택임대차보호법",
+            "article": "제6조의2",
+            "content": "임차인은 언제든지 계약해지를 통고할 수 있고 3개월이 지나면 효력이 발생한다.",
+        }],
+        "verification_result": {
+            "status": "PASS",
+            "warnings": [],
+        },
+        "warnings": [],
+    }
+    res = finalize_node(state)
+    assert "cited_sources" in res
+    assert len(res["cited_sources"]) == 1
+    assert res["sources"] == res["cited_sources"]
+
+
+def test_p0_11_insufficient_node_clears_sources():
+    """P0-11: insufficient_node는 고객에게 제공되는 sources와 cited_sources를 빈 배열로 안전하게 격리해야 함."""
+    from ai_legal_helper.workflows.legal_workflow import insufficient_node
+    state = {
+        "draft_answer": "미검증 내용",
+        "retrieved_sources": [{"source_id": "temp_1", "content": "내용"}],
+        "verification_result": {
+            "status": "INSUFFICIENT",
+            "reason_code": "LEGAL_SOURCE_MISSING",
+        },
+        "warnings": [],
+    }
+    res = insufficient_node(state)
+    assert res.get("final_disposition") == "WITHHELD"
+    assert res.get("sources") == []
+    assert res.get("cited_sources") == []

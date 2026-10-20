@@ -145,6 +145,6 @@ def synthesize(messages: List[AnyMessage], results: Dict[str, str]) -> List[AnyM
         summary = "종합 답변 생성 중 오류가 발생했습니다. 아래 카테고리별 답변을 참고해 주세요."
 
     summary = clean_markdown_formatting(summary)
-    originals = clean_markdown_formatting(_render_originals(results))
-    final_text = f"{summary}\n\n========================================\n\n{originals}"
+    # P0-4 & P1: 원시 에이전트 초안(render_originals) 중복 첨부를 배제하고 정제된 5단계 종합의견서만 고객용 초안으로 전달
+    final_text = summary
     return messages + [AIMessage(content=final_text)]

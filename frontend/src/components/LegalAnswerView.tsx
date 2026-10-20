@@ -293,6 +293,21 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content }) => 
           );
         }
 
+        // 첫 번째 본문 행이 섹션 제목(sec.title)과 완전히 중복되는 경우(예: [1. 핵심 결론] 바로 아래 "1. 핵심 결론" 또는 "**1. 핵심 결론**" 재출력) 필터링하여 이중 제목 노출 방지
+        const normalizeTitle = (t: string) => t.replace(/[*#_`~[\]]/g, '').trim().toLowerCase();
+        const normSecTitle = sec.title ? normalizeTitle(sec.title) : '';
+        const linesToRender: string[] = [];
+        let skippedDuplicate = false;
+
+        for (const l of sec.lines) {
+          const normL = normalizeTitle(l);
+          if (!skippedDuplicate && normSecTitle && (normL === normSecTitle || normL === normSecTitle.replace(/^[0-9.]+\s*/, ''))) {
+            skippedDuplicate = true;
+            continue;
+          }
+          linesToRender.push(l);
+        }
+
         // 2. 검증 실패 / 불충분 근거 안내 배너
         if (sec.type === 'banner') {
           return (
@@ -322,7 +337,7 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content }) => 
                 <span>{sec.title}</span>
               </div>
               <div style={{ fontSize: '0.9em', color: 'var(--text-main)' }}>
-                {sec.lines.map((l, lIdx) => renderFormattedLine(l, lIdx))}
+                {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx))}
               </div>
             </div>
           );
@@ -358,7 +373,7 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content }) => 
 
               </div>
               <div style={{ fontSize: '0.89em', color: 'var(--text-secondary, #475569)' }}>
-                {sec.lines.map((l, lIdx) => renderFormattedLine(l, lIdx))}
+                {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx))}
               </div>
             </div>
           );
@@ -394,7 +409,7 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content }) => 
 
               </div>
               <div style={{ fontSize: '0.91em', color: 'var(--text-main)' }}>
-                {sec.lines.map((l, lIdx) => renderFormattedLine(l, lIdx))}
+                {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx))}
               </div>
             </div>
           );
@@ -429,7 +444,7 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content }) => 
               </div>
             )}
             <div style={{ fontSize: '0.92em', color: 'var(--text-main)' }}>
-              {sec.lines.map((l, lIdx) => renderFormattedLine(l, lIdx))}
+              {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx))}
             </div>
           </div>
         );

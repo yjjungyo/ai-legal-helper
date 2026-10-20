@@ -437,13 +437,37 @@ def verification_condition(state: LegalState) -> str:
             return "revise"
 
     # 4. HILT 실행 후 또는 재검토 한도(1회) 도달 후:
-    #    - REVISE 상태: 법률적 핵심 뼈대를 갖추고 경미한 보완/주의가 필요한 상태이므로,
-    #      답변을 일방적으로 폐기하지 않고 finalize_node로 라우팅하여 조건부 답변과 유의사항(CAUTIONARY)을 제공한다 (P0-1, P0-2).
-    #    - INSUFFICIENT / FAIL 상태: 중대한 법률적 모순이나 치명적 근거 부재이므로 insufficient_node로 안전 종료(WITHHELD)한다.
+    #    - REVISE 상태이더라도 중대 결함(법률 근거 부재, 허위/미검증 인용, 증거 모순, 시스템 오류)이 존재하거나
+    #      핵심 법률 주장(LEGAL_RULE, LEGAL_APPLICATION) 중 미뒷받침(UNSUPPORTED) 주장이 있는 경우
+    #      고객에게 미검증 주장을 전달하지 않고 insufficient_node(WITHHELD)로 안전 종료한다 (P0-1, P0-2).
+    #    - 법률적 핵심 뼈대가 검증된 출처에 의해 뒷받침되고 사실관계 입증 주의사항(CASE_EVIDENCE_MISSING)이나
+    #      경미한 문구 보완만 남아있는 경우에만 finalize_node로 라우팅하여 조건부 답변(CAUTIONARY)을 제공한다.
     if status == "REVISE":
+        # A) 중대 결함 사유(법령 미확보, 허위/미검증 인용, 증거 상충, 시스템 오류) 존재 시 전달 차단
+        if reason_code in ("LEGAL_SOURCE_MISSING", "CITATION_INVALID", "EVIDENCE_CONFLICT", "VERIFICATION_ERROR"):
+            logger.info(f"[GATING] REVISE 상태이나 중대 결함({reason_code})으로 finalize 차단 -> insufficient(WITHHELD)")
+            return "insufficient"
+
+        # B) 핵심 법률 주장 중 미뒷받침(UNSUPPORTED) 주장 존재 시 전달 차단
+        claims = ver_res.get("claims", []) or []
+        unsupported_legal_claims = [
+            c for c in claims
+            if c.get("grounding_status") == "UNSUPPORTED" and c.get("claim_type") in ("LEGAL_RULE", "LEGAL_APPLICATION")
+        ]
+        if unsupported_legal_claims:
+            logger.info(f"[GATING] REVISE 상태이나 미뒷받침 법률 주장 {len(unsupported_legal_claims)}건 존재로 finalize 차단 -> insufficient(WITHHELD)")
+            return "insufficient"
+
+        # C) 미검증 인용 라벨 잔존 시 전달 차단
+        audit = ver_res.get("citation_audit", {}) or {}
+        if audit.get("unverified_citations"):
+            logger.info("[GATING] REVISE 상태이나 미검증 인용 감지로 finalize 차단 -> insufficient(WITHHELD)")
+            return "insufficient"
+
+        # D) 핵심 법리는 확보되었고 사실관계 입증 주의(CASE_EVIDENCE_MISSING) 또는 경미한 문구 보완인 경우에만 조건부 확정(CAUTIONARY)
         return "finalize"
 
-    return "insufficient"
+    return "insufficient" 
 
 
 @trace
@@ -614,6 +638,8 @@ def insufficient_node(state: LegalState) -> Dict:
         "missing_evidence": missing_issues,
         "unresolved_issues": ver_res.get("missing_legal_issues", []),
         "warnings": warnings,
+        "sources": [],
+        "cited_sources": [],
         "messages": [HumanMessage(content="dummy", name="system"), final],
     }
 
@@ -655,6 +681,7 @@ def finalize_node(state: LegalState) -> Dict:
     return {
         "final_answer": final,
         "sources": cited_sources,
+        "cited_sources": cited_sources,
         "warnings": warnings,
         "final_disposition": final_disp,
         "messages": [final]
@@ -801,6 +828,12 @@ def execute_statute_search_node(state: LegalState) -> Dict:
     missing_issues = ver_res.get("missing_legal_issues", []) or ver_res.get("missing_issues", [])
     q = state.get("question", "")
 
+    # 손해배상, 특별손해, 지연손해금 등 일반 민사상 손해 쟁점이 포함된 경우 민법을 후보 법령에 보강 (P0-1 & P0-2)
+    damages_keywords = ("손해", "손해배상", "특별손해", "추가 손해", "지연손해금", "지연이자")
+    if any(k in q for k in damages_keywords) or any(any(k in iss for k in damages_keywords) for iss in missing_issues):
+        if "민법" not in candidate_laws:
+            candidate_laws.append("민법")
+
     # 특별법 우선 정렬: 일반법(민법, 형법 등)보다 특별법(주택임대차보호법 등)을 1순위로 탐색
     candidate_laws.sort(key=lambda law: 1 if law in ("민법", "형법", "상법", "민사소송법") else 0)
 
@@ -871,6 +904,8 @@ def re_analyze_node(state: LegalState) -> Dict:
     for agent_name, a_res in agent_results.items():
         if isinstance(a_res, dict) and a_res.get("analysis"):
             agent_analyses.append(f"[{agent_name} 전문 분석]:\n{a_res.get('analysis')}")
+        elif isinstance(a_res, str) and a_res.strip():
+            agent_analyses.append(f"[{agent_name} 전문 분석]:\n{a_res.strip()}")
     agent_context_text = "\n\n".join(agent_analyses) if agent_analyses else "(전문 분야 분석 초안 없음)"
 
     statute_names = list(dict.fromkeys([
@@ -1047,7 +1082,9 @@ async def _execute_consultation(
             "status": "APPROVAL_REQUIRED",
             "approval_request": approval_payload,
             "answer": "해당 쟁점에 필요한 공식 법령(특별법 등) 원문 검색을 진행하기 위해 사용자 승인이 필요합니다.",
-            "sources": final_state.get("retrieved_sources", []),
+            "sources": final_state.get("cited_sources") or final_state.get("sources") or [],
+            "cited_sources": final_state.get("cited_sources") or [],
+            "retrieved_sources": final_state.get("retrieved_sources", []),
             "verification_result": final_state.get("verification_result", {}),
             "warnings": final_state.get("warnings", []),
             "revision_count": final_state.get("revision_count", 0),
@@ -1066,7 +1103,9 @@ async def _execute_consultation(
         "status": "SUCCESS",
         "answer": final_answer,
         "final_disposition": final_disp,
-        "sources": final_state.get("retrieved_sources", []),
+        "sources": final_state.get("cited_sources") or final_state.get("sources") or [],
+        "cited_sources": final_state.get("cited_sources") or [],
+        "retrieved_sources": final_state.get("retrieved_sources", []),
         "verification_result": final_state.get("verification_result", {}),
         "warnings": final_state.get("warnings", []),
         "revision_count": final_state.get("revision_count", 0),

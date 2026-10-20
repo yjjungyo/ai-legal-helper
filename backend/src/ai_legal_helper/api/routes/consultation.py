@@ -176,7 +176,7 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
         
         # Map sources (서버 Source Registry 기반 표준 Source 스키마 정규화 및 의미 기반 중복 제거)
         from ai_legal_helper.rag.source_schema import normalize_source_dict
-        sources_data = result.get("sources", [])
+        sources_data = result.get("cited_sources") or result.get("sources", [])
         dedup_sources = []
         seen_source_keys = set()
         for s in sources_data:
@@ -547,7 +547,7 @@ async def process_consultation_resume(
 
         # Sources 정규화 (의미 기반 중복 제거)
         from ai_legal_helper.rag.source_schema import normalize_source_dict
-        sources_data = result.get("sources", [])
+        sources_data = result.get("cited_sources") or result.get("sources", [])
         dedup_sources = []
         seen_source_keys = set()
         for s in sources_data:

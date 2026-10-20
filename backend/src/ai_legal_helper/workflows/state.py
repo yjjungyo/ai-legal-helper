@@ -48,7 +48,8 @@ class LegalState(MessagesState):
     retrieved_sources: List[Dict[str, Any]]
     draft_answer: str
     verification_result: Dict[str, Any]
-    revision_count: Annotated[int, operator.add]
+    revision_count: int
+    cited_sources: Optional[List[Dict[str, Any]]] = None
     final_answer: str
     warnings: List[str]
     case_context: Optional[str]
