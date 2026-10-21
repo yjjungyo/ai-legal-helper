@@ -64,6 +64,11 @@ class LegalState(MessagesState):
     statute_search_results: Optional[List[Dict[str, Any]]]
     hilt_executed: Optional[bool]
 
+    # Router v2.0 분류 상태 관리 필드
+    router_status: Optional[str] = None
+    router_reason: Optional[str] = None
+    router_error_code: Optional[str] = None
+
     # P0 개선: 최종 고객 응답 처분 상태 ('DELIVERED', 'CAUTIONARY', 'WITHHELD')
     final_disposition: Optional[str]
 

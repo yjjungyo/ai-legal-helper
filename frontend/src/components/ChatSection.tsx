@@ -4,7 +4,7 @@
  * 상담 내역 데이터베이스 영구 저장 및 질문의 사건 사실관계(Fact) 1-클릭 등록을 지원합니다.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useConsultation } from '../hooks/useConsultation';
 import { addStatement } from '../api/caseClient';
 import type { ConsultationResponse } from '../types/consultation';
@@ -21,6 +21,36 @@ interface ChatSectionProps {
  * @returns 상태에 부합하는 배지 JSX
  */
 function renderStatusBadge(item: ConsultationResponse) {
+  if (item.routing_status === 'NEEDS_CLARIFICATION') {
+    return (
+      <span
+        className="badge"
+        style={{
+          backgroundColor: '#eff6ff',
+          color: '#1d4ed8',
+          border: '1px solid #bfdbfe',
+          fontWeight: 600,
+        }}
+      >
+        ℹ️ 추가 정보 필요
+      </span>
+    );
+  }
+  if (item.routing_status === 'ROUTER_ERROR') {
+    return (
+      <span
+        className="badge"
+        style={{
+          backgroundColor: '#fef2f2',
+          color: '#b91c1c',
+          border: '1px solid #fecaca',
+          fontWeight: 600,
+        }}
+      >
+        ⚠️ 시스템 오류
+      </span>
+    );
+  }
   if (item.status === 'ERROR') {
     return <span className="badge badge-red">오류</span>;
   }
@@ -108,6 +138,7 @@ export function ChatSection({ caseId }: ChatSectionProps) {
   } = useConsultation(caseId);
   const [registering, setRegistering] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
 
   /**
@@ -195,6 +226,7 @@ export function ChatSection({ caseId }: ChatSectionProps) {
       {/* 3. 질문 입력 카드 */}
       <div className="card">
         <textarea
+          ref={textareaRef}
           placeholder="법률 상담 질문이나 새로운 분쟁 상황을 입력하세요 (예: 임대차 계약이 만료되었는데 임대인이 보증금을 돌려주지 않습니다. 내용증명 발송과 임차권등기명령 절차가 어떻게 되나요?)"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
@@ -485,9 +517,81 @@ export function ChatSection({ caseId }: ChatSectionProps) {
                 </div>
               )}
 
-              {/* 5. AI 법률 분석 및 조언 본문 또는 판단 유보 상태 카드 (P0-02) */}
-              {item.answer_status === 'WITHHELD' ? (
-                /* WITHHELD: 미검증 법률 분석 초안은 노출하지 않고 판단 유보 카드 및 보강 안내문 표시 */
+              {/* 5. 상태별 UI 카드 분리: 추가 정보 필요(파랑), 시스템 오류(빨강), 근거 부족 판단 유보(노랑) (P0-02/Router v2.0) */}
+              {item.routing_status === 'NEEDS_CLARIFICATION' ? (
+                /* 1. NEEDS_CLARIFICATION: 파란색 계열 카드 */
+                <div
+                  style={{
+                    padding: '20px 22px',
+                    backgroundColor: '#eff6ff',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid #bfdbfe',
+                    borderLeft: '4px solid #2563eb',
+                    marginBottom: '14px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '1.2em' }}>ℹ️</span>
+                    <strong style={{ color: '#1d4ed8', fontSize: '1.02em' }}>
+                      원활한 법률 상담을 위해 추가 정보가 필요합니다
+                    </strong>
+                  </div>
+                  <div style={{ color: '#1e3a8a', fontSize: '0.92em', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                    {item.answer || '질문 내용만으로는 핵심 법률 쟁점을 파악하기 어렵습니다.'}
+                  </div>
+                  <div style={{ marginTop: '14px', display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={() => {
+                        if (item.question) {
+                          setQuestion(item.question + '\n[추가 정보]: ');
+                        }
+                        textareaRef.current?.focus();
+                      }}
+                      className="btn btn-primary btn-sm"
+                      style={{ backgroundColor: '#2563eb', borderColor: '#1d4ed8' }}
+                    >
+                      ✏️ 질문 보완하여 다시 상담하기
+                    </button>
+                  </div>
+                </div>
+              ) : item.routing_status === 'ROUTER_ERROR' ? (
+                /* 2. ROUTER_ERROR: 빨간색 계열 카드 */
+                <div
+                  style={{
+                    padding: '20px 22px',
+                    backgroundColor: '#fef2f2',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid #fecaca',
+                    borderLeft: '4px solid #dc2626',
+                    marginBottom: '14px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '1.2em' }}>⚠️</span>
+                    <strong style={{ color: '#b91c1c', fontSize: '1.02em' }}>
+                      일시적 시스템 오류 안내
+                    </strong>
+                  </div>
+                  <div style={{ color: '#991b1b', fontSize: '0.92em', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                    {item.answer || '법률 분야 분류 중 기술적 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.'}
+                  </div>
+                  <div style={{ marginTop: '14px', display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={() => {
+                        if (item.question) {
+                          setQuestion(item.question);
+                        }
+                        textareaRef.current?.focus();
+                      }}
+                      className="btn btn-secondary btn-sm"
+                      style={{ borderColor: '#f87171', color: '#b91c1c' }}
+                    >
+                      🔄 다시 시도하기
+                    </button>
+                  </div>
+                </div>
+              ) : item.answer_status === 'WITHHELD' ? (
+                /* 3. WITHHELD: 기존 노란색/주황색 주의 카드 유지 (법률적 근거 부족) */
                 <div
                   style={{
                     padding: '20px 22px',

@@ -78,6 +78,7 @@ class ConsultationResponse(BaseModel):
     execution_status: Optional[str] = "COMPLETED"  # IN_PROGRESS | APPROVAL_REQUIRED | COMPLETED | ERROR
     verification_status: Optional[str] = None      # PASS | REVISE | INSUFFICIENT | UNVERIFIED
     answer_status: Optional[str] = None            # DELIVERED | WITHHELD | CAUTIONARY | REVISED
+    routing_status: Optional[str] = None           # CLASSIFIED | NEEDS_CLARIFICATION | ROUTER_ERROR
 
     answer: Optional[str] = None
     sources: List[Source] = []

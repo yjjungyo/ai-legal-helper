@@ -253,11 +253,87 @@ def _collect_graph_evidence(db, case_id: str, question: str) -> Dict[str, Any]:
 
 @trace
 def route_node(state: LegalState) -> Dict:
+    """Router v2.0: 사용자 질문과 사건 맥락을 바탕으로 Specialist 분야를 선정하고 상태를 기록한다."""
     set_node_name("route")
+    from ai_legal_helper.agents.router import route_categories_detailed
+
     q = state.get("question", "(질문 미확인)")
-    cats = route_categories(q)
-    logger.debug(f"[NODE:route] q_len={len(q)} cats={cats}")
-    return {"categories": cats, "selected_agents": cats}
+    case_ctx = state.get("case_context") or ""
+    decision = route_categories_detailed(question=q, case_context=case_ctx)
+
+    logger.debug(
+        f"[NODE:route] status={decision.status.value} cats={decision.categories} reason={decision.reason}"
+    )
+    return {
+        "categories": decision.categories,
+        "selected_agents": decision.categories,
+        "router_status": decision.status.value,
+        "router_reason": decision.reason,
+        "router_error_code": decision.error_code,
+    }
+
+
+def route_condition(state: LegalState) -> str:
+    """Router 분류 상태에 따라 LangGraph 실행 경로를 분기한다.
+
+    - CLASSIFIED: 정상 분류되었으므로 전문 에이전트 계획 수립('plan')으로 전이.
+    - NEEDS_CLARIFICATION: 정보 부족으로 판단 보류 안내 노드('routing_exit')로 전이.
+    - ROUTER_ERROR: 기술적 오류로 시스템 오류 안내 노드('routing_exit')로 전이.
+    """
+    from ai_legal_helper.agents.router import RouterStatus
+    status = state.get("router_status")
+    if status == RouterStatus.CLASSIFIED.value or (not status and state.get("categories")):
+        return "plan"
+    return "routing_exit"
+
+
+@trace
+def routing_exit_node(state: LegalState) -> Dict:
+    """Router에서 정보 부족(NEEDS_CLARIFICATION) 또는 오류(ROUTER_ERROR)로 종료할 때
+    고객용 최종 안내 메시지를 생성하고 파이프라인을 안전하게 종료한다.
+
+    [원칙]
+    1. 전문 분석 Agent, Synthesizer, Verifier를 일체 실행하지 않는다.
+    2. Verifier를 실행하지 않았으므로 verification_result를 생성하거나 PASS로 설정하지 않는다.
+    3. 출처(sources, cited_sources)는 빈 배열로 반환한다.
+    4. final_disposition은 'WITHHELD'로 설정한다.
+    """
+    set_node_name("routing_exit")
+    from ai_legal_helper.agents.router import RouterStatus
+
+    r_status = state.get("router_status") or RouterStatus.NEEDS_CLARIFICATION.value
+
+    if r_status == RouterStatus.ROUTER_ERROR.value:
+        final_answer = (
+            "[안내: 일시적 시스템 오류]\n\n"
+            "법률 분야를 확인하는 과정에서 일시적인 문제가 발생했습니다. 잠시 후 다시 시도해 주세요."
+        )
+        warnings = ["법률 분야 분류 중 시스템 오류가 발생했습니다."]
+    else:  # NEEDS_CLARIFICATION
+        clarification_msg = (
+            "입력해주신 질문과 사건 맥락만으로는 구체적인 법률 분야를 판단하기 어렵습니다.\n\n"
+            "정확하고 신뢰할 수 있는 법률 상담을 위해 다음 사항을 조금 더 자세히 알려주세요:\n"
+            "1. 구체적으로 어떤 사건이나 분쟁이 발생했는지\n"
+            "2. 상대방과 어떤 관계(임대인-임차인, 고용주-근로자, 개인 간 금전 거래 등)인지\n"
+            "3. 법률적으로 어떤 해결이나 조치(손해배상 청구, 고소, 계약 해지, 대금 반환 등)를 원하시는지"
+        )
+        final_answer = f"[안내: 추가 정보 필요]\n\n{clarification_msg}"
+        warnings = []
+
+    return {
+        "final_answer": final_answer,
+        "answer": final_answer,
+        "final_disposition": "WITHHELD",
+        "verification_status": "UNVERIFIED",
+        "verification_result": {},
+        "categories": [],
+        "selected_agents": [],
+        "sources": [],
+        "cited_sources": [],
+        "retrieved_sources": [],
+        "warnings": warnings,
+        "messages": [HumanMessage(content="dummy", name="system"), final_answer],
+    }
 
 @trace
 def plan_node(state: LegalState) -> Dict:
@@ -996,10 +1072,15 @@ def build_legal_graph(checkpointer: Optional[Any] = None):
     graph.add_node("statute_search_approval", statute_search_approval_node)
     graph.add_node("execute_statute_search", execute_statute_search_node)
     graph.add_node("re_analyze", re_analyze_node)
+    graph.add_node("routing_exit", routing_exit_node)
 
     graph.add_edge(START, "supervisor_initialize")
     graph.add_edge("supervisor_initialize", "route")
-    graph.add_edge("route", "plan")
+    graph.add_conditional_edges("route", route_condition, {
+        "plan": "plan",
+        "routing_exit": "routing_exit",
+    })
+    graph.add_edge("routing_exit", END)
     graph.add_edge("plan", "run_agents")
     graph.add_edge("run_agents", "synthesize")
     graph.add_edge("synthesize", "verification")
@@ -1091,6 +1172,7 @@ async def _execute_consultation(
             "trace_id": final_state.get("trace_id", ""),
             "request_id": final_state.get("request_id", thread_id),
             "selected_agents": final_state.get("selected_agents", []),
+            "routing_status": "CLASSIFIED",
         }
 
     final_answer = final_state.get("final_answer", "답변을 생성하지 못했습니다.")
@@ -1099,14 +1181,32 @@ async def _execute_consultation(
         ver_status = (final_state.get("verification_result") or {}).get("status")
         final_disp = "DELIVERED" if ver_status == "PASS" else "WITHHELD"
 
+    from ai_legal_helper.agents.router import RouterStatus
+    router_st = final_state.get("router_status")
+    if router_st == RouterStatus.ROUTER_ERROR.value:
+        status_val = "ERROR"
+        exec_status = "ERROR"
+        routing_status = "ROUTER_ERROR"
+    elif router_st == RouterStatus.NEEDS_CLARIFICATION.value:
+        status_val = "SUCCESS"
+        exec_status = "COMPLETED"
+        routing_status = "NEEDS_CLARIFICATION"
+    else:
+        status_val = "SUCCESS"
+        exec_status = "COMPLETED"
+        routing_status = "CLASSIFIED"
+
     return {
-        "status": "SUCCESS",
+        "status": status_val,
+        "execution_status": exec_status,
+        "routing_status": routing_status,
         "answer": final_answer,
         "final_disposition": final_disp,
         "sources": final_state.get("cited_sources") or final_state.get("sources") or [],
         "cited_sources": final_state.get("cited_sources") or [],
         "retrieved_sources": final_state.get("retrieved_sources", []),
         "verification_result": final_state.get("verification_result", {}),
+        "verification_status": final_state.get("verification_status", "UNVERIFIED"),
         "warnings": final_state.get("warnings", []),
         "revision_count": final_state.get("revision_count", 0),
         "trace_id": final_state.get("trace_id", ""),

@@ -71,6 +71,7 @@ async def start_consultation(
         execution_status="IN_PROGRESS",
         verification_status="UNVERIFIED",
         answer_status="WITHHELD",
+        routing_status=None,
         question=req.question,
         case_id=req.case_id,
         created_at=get_kst_iso(),
@@ -91,6 +92,7 @@ async def start_consultation(
             execution_status="IN_PROGRESS",
             verification_status="UNVERIFIED",
             answer_status="WITHHELD",
+            routing_status=None,
         )
         db.add(record)
         db.commit()
@@ -148,10 +150,19 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
         
         resp = _consultations[request_id]
         is_approval_required = (result.get("status") == "APPROVAL_REQUIRED")
+        is_error = (result.get("status") == "ERROR")
         ver_res = result.get("verification_result") or {}
         ver_status = ver_res.get("status") or "UNVERIFIED"
+        resp.routing_status = result.get("routing_status")
 
-        if is_approval_required:
+        if is_error:
+            resp.status = "ERROR"
+            resp.execution_status = "ERROR"
+            resp.verification_status = ver_status
+            resp.answer_status = "WITHHELD"
+            resp.approval_request = None
+            resp.answer = result.get("answer", "처리 중 오류가 발생했습니다.")
+        elif is_approval_required:
             resp.status = "APPROVAL_REQUIRED"
             resp.execution_status = "APPROVAL_REQUIRED"
             resp.verification_status = ver_status
@@ -271,6 +282,7 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
                     rec.execution_status = getattr(resp, "execution_status", resp.status)
                     rec.verification_status = getattr(resp, "verification_status", None)
                     rec.answer_status = getattr(resp, "answer_status", None)
+                    rec.routing_status = getattr(resp, "routing_status", None)
                     rec.answer = resp.answer
                     rec.approval_request = resp.approval_request
                     rec.sources = [s.model_dump() for s in resp.sources] if resp.sources else []
@@ -344,6 +356,7 @@ async def get_consultation(
         execution_status=getattr(record, "execution_status", record.status) or "COMPLETED",
         verification_status=getattr(record, "verification_status", None),
         answer_status=ans_status,
+        routing_status=getattr(record, "routing_status", None),
         answer=record.answer,
         approval_request=record.approval_request,
         sources=sources,
@@ -452,6 +465,7 @@ async def decide_statute_search_approval(
             execution_status="IN_PROGRESS",
             verification_status="UNVERIFIED",
             answer_status="WITHHELD",
+            routing_status="CLASSIFIED",
             answer=None,
             question=record.question if record else None,
             case_id=case_id,
@@ -527,6 +541,7 @@ async def process_consultation_resume(
         resp.status = "SUCCESS"
         resp.execution_status = "COMPLETED"
         resp.verification_status = ver_status
+        resp.routing_status = result.get("routing_status", "CLASSIFIED")
         final_disp = result.get("final_disposition")
         if final_disp in ("DELIVERED", "CAUTIONARY", "WITHHELD"):
             resp.answer_status = final_disp
@@ -633,6 +648,7 @@ async def process_consultation_resume(
                     rec.execution_status = getattr(resp, "execution_status", resp.status)
                     rec.verification_status = getattr(resp, "verification_status", None)
                     rec.answer_status = getattr(resp, "answer_status", None)
+                    rec.routing_status = getattr(resp, "routing_status", None)
                     rec.answer = resp.answer
                     rec.approval_request = resp.approval_request
                     rec.sources = [s.model_dump() for s in resp.sources] if resp.sources else []
@@ -685,6 +701,7 @@ async def list_case_consultations(
             execution_status=getattr(rec, "execution_status", rec.status) or "COMPLETED",
             verification_status=getattr(rec, "verification_status", None),
             answer_status=ans_status,
+            routing_status=getattr(rec, "routing_status", None),
             answer=rec.answer,
             approval_request=rec.approval_request,
             sources=sources,

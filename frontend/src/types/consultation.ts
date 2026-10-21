@@ -71,6 +71,7 @@ export interface ConsultationResponse {
   execution_status?: 'IN_PROGRESS' | 'APPROVAL_REQUIRED' | 'COMPLETED' | 'ERROR';
   verification_status?: 'PASS' | 'REVISE' | 'INSUFFICIENT' | 'UNVERIFIED' | string;
   answer_status?: 'DELIVERED' | 'WITHHELD' | 'CAUTIONARY' | 'REVISED' | string;
+  routing_status?: 'CLASSIFIED' | 'NEEDS_CLARIFICATION' | 'ROUTER_ERROR' | string;
   answer?: string;
   sources: Source[];
   elapsed_ms?: number;
