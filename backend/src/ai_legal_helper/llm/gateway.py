@@ -15,10 +15,14 @@ Azure OpenAI 모델 인스턴스 생성 및 통합 콜백(Token Tracking, Langfu
 - 토큰 카운팅 및 비용 통계를 위해 내부 TokenTrackingCallbackHandler가 항상 기본 등록된다.
 """
 import os
+from pathlib import Path
 from typing import Optional, List, Any
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
-load_dotenv()
+load_dotenv(find_dotenv(usecwd=True))
+_env_path = Path(__file__).resolve().parents[3] / ".env"
+if _env_path.exists():
+    load_dotenv(_env_path)
 
 from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
 from langchain_core.language_models.chat_models import BaseChatModel

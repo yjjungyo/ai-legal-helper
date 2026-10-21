@@ -294,7 +294,9 @@ def retrieve_with_status(query: str, k: int = 3, category: Optional[str] = None)
 
             reranked = rerank_with_article_and_keywords(query, raw_scored, top_k=fetch_k)
             candidate_docs = [d for d, _ in reranked]
-            deduped_docs = deduplicate_chunks(candidate_docs)[:k]
+            from ai_legal_helper.rag.hybrid_retrieval import restore_parent_content
+            restored_candidates = [restore_parent_content(d) for d in candidate_docs]
+            deduped_docs = deduplicate_chunks(restored_candidates)[:k]
             norm_docs = [_normalize_doc(d) for d in deduped_docs]
             st = RetrievalStatus.SUCCESS if norm_docs else RetrievalStatus.NO_MATCH
             logger.debug(f"[RET] hits={len(norm_docs)} coll={coll}")
