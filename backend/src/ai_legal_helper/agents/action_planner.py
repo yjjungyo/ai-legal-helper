@@ -30,18 +30,18 @@ from ai_legal_helper.observability.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-# 주택 임대차 Action Catalog
+# 표준 법률 분쟁 대응 Action Catalog (민사, 노동, 상사, 형사, 가사 등 범용 대응)
 ACTION_CATALOG = [
-    "계약 종료 의사표시 및 도달 사실 확인",
-    "보증금 반환 요구",
-    "내용증명 작성 준비",
-    "계약서 및 통지 기록 확보",
-    "임대차 관련 법률 요건 확인",
-    "임차권등기명령 신청 가능성 검토",
-    "지급명령 또는 보증금 반환 청구 소송 검토",
-    "강제집행 등 후속 절차 검토",
-    "보증보험 가입·보증이행 관련 사항 확인",
-    "전문 법률 상담 권고"
+    "사실관계 확인 및 입증 증거 자료 확보",
+    "계약 체결 및 의사표시 도달 사실 확인",
+    "상대방에 대한 권리행사 및 최고(내용증명 등 통지)",
+    "관련 법령 요건 및 판례 적합성 검토",
+    "원상회복, 손해배상 또는 반환 청구",
+    "합의·조정 등 비소송적 분쟁 해결 시도",
+    "가압류·가처분 등 보전처분 검토",
+    "지급명령, 본안 소송 또는 권리구제 절차 검토",
+    "판결 및 집행권원 확보 후 강제집행 절차 검토",
+    "전문 변호사·법률전문가 정밀 대면 상담 권고",
 ]
 
 class PlannedRequirement(BaseModel):
@@ -54,7 +54,7 @@ class PlannedDependency(BaseModel):
     dependency_type: str = Field(description="의존성 유형 (PREREQUISITE, OPTIONAL_PRECURSOR 중 택 1)")
 
 class PlannedAction(BaseModel):
-    action_type: str = Field(description="주택 임대차 Action Catalog에서 선택하거나, 기타 필요한 행동 유형")
+    action_type: str = Field(description="Action Catalog에서 선택하거나, 사건에 특화된 필요한 행동 유형")
     title: str = Field(description="행동의 짧은 제목")
     description: str = Field(description="행동에 대한 상세 설명 및 실행 방법")
     priority: str = Field(description="우선순위 (HIGH, MEDIUM, LOW 중 택 1)")
@@ -81,14 +81,14 @@ def plan_legal_actions(context_text: str) -> ActionPlanResponse:
     catalog_str = "\n".join(f"- {c}" for c in ACTION_CATALOG)
     
     prompt = PromptTemplate.from_template(
-        "당신은 대한민국 주택 임대차 분쟁 대응 전략을 수립하는 AI 법률 보조원입니다.\n"
+        "당신은 대한민국 법률 분쟁 대응 전략을 수립하는 AI 법률 보조원입니다.\n"
         "다음 사건의 현황(사실, 증거, 분석 결과)을 읽고 사용자가 취해야 할 실질적인 법률 대응 계획을 수립하세요.\n\n"
         "[Action Catalog - 다음 항목들을 우선적으로 검토하여 필요한 행동을 선별하세요]\n"
         "{catalog_str}\n\n"
         "[사건 컨텍스트]\n"
         "{context_text}\n\n"
         "[지침]\n"
-        "1. 제공된 사건 정보만을 바탕으로 논리적으로 타당한 행동만 추천하세요.\n"
+        "1. 제공된 사건 정보만을 바탕으로 사건의 실제 성격(민사, 노동, 상사, 형사, 가사 등)에 부합하는 논리적이고 실질적인 행동을 추천하세요.\n"
         "2. 행동은 구체적이어야 하며, 선행되어야 할 행동(Dependency)이 있다면 명시하세요.\n"
         "3. 각 행동을 취하기 위한 법적, 사실적 요건(Requirement)이 만족되었는지(SATISFIED) 부족한지(UNSATISFIED/UNKNOWN) 평가하세요.\n"
         "4. 환각을 방지하기 위해 증거가 없는 주장은 UNSATISFIED 로 처리하세요.\n"

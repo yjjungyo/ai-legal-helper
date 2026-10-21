@@ -94,7 +94,7 @@ def requirements_node(state: DocumentState) -> DocumentState:
     state.requirements_met = True
     has_substance = any(
         marker in state.context_text
-        for marker in ("[사실관계]", "[증거]", "[당사자]", "[사건 개요]", "수신인", "임대인")
+        for marker in ("[사실관계]", "[증거]", "[당사자]", "[사건 개요]", "수신인", "발신인", "의뢰인", "상대방", "임대인", "채무자")
     )
     if not has_substance:
         state.requirements_met = False

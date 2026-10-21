@@ -30,7 +30,9 @@ class DeadlineEngine:
             events: 데이터베이스의 Event 모델 객체 리스트
         """
         self.events = events
-        self.lease_end_date = self._find_lease_end_date()
+        self.contract_end_date = self._find_lease_end_date()
+        # 하위 호환성을 위해 lease_end_date 속성 유지
+        self.lease_end_date = self.contract_end_date
     
     def _parse_date(self, date_str: str) -> Optional[datetime]:
         if not date_str:
@@ -93,11 +95,11 @@ class DeadlineEngine:
             result["calculation_basis"] = "주택임대차보호법 제3조의3: 임대차가 끝난 후 보증금이 반환되지 아니한 경우 임차권등기명령 신청 가능"
             result["verification_status"] = "VERIFIED"
 
-        elif "지급명령" in action_title or "소송" in action_title or "보증금 반환 요구" in action_title:
-            # 보증금 반환 청구 소송 권고일 (계약 종료 후)
+        elif "지급명령" in action_title or "소송" in action_title or "보증금 반환 요구" in action_title or "손해배상" in action_title or "반환 청구" in action_title:
+            # 법적 조치 권고일 (계약 종료 또는 채무불이행 발생 후)
             result["deadline_type"] = "RECOMMENDED_DATE"
             result["deadline_date"] = self.lease_end_date + timedelta(days=1)
-            result["calculation_basis"] = "임대차가 끝난 후 보증금을 반환받지 못한 경우 법적 조치 진행 가능"
+            result["calculation_basis"] = "계약 종료 또는 채무불이행 발생 후 법적 조치(소송/지급명령/청구) 진행 권고"
             result["verification_status"] = "VERIFIED"
             
         return result

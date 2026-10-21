@@ -23,7 +23,9 @@ data/chroma/
 backend/logs/
 backend/storage/
 backend/vectorstore/
+backend/data
 backend/data/chroma/
+backend/data/exports
 *.db
 *.sqlite3
 
