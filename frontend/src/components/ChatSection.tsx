@@ -20,6 +20,69 @@ interface ChatSectionProps {
  * @param item 상담 응답 객체
  * @returns 상태에 부합하는 배지 JSX
  */
+
+function renderIntentBadge(intent?: string) {
+  if (!intent) return null;
+  switch (intent) {
+    case 'FOLLOWUP_ACTION':
+      return (
+        <span
+          className="badge"
+          style={{ backgroundColor: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', fontSize: '0.78em' }}
+        >
+          🚀 후속 조치
+        </span>
+      );
+    case 'FOLLOWUP_QUESTION':
+      return (
+        <span
+          className="badge"
+          style={{ backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', fontSize: '0.78em' }}
+        >
+          🔍 세부 질의
+        </span>
+      );
+    case 'FACT_CLARIFICATION':
+      return (
+        <span
+          className="badge"
+          style={{ backgroundColor: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', fontSize: '0.78em' }}
+        >
+          📝 사실 정정
+        </span>
+      );
+    case 'DOCUMENT_REQUEST':
+      return (
+        <span
+          className="badge"
+          style={{ backgroundColor: '#f5f3ff', color: '#6d28d9', border: '1px solid #ddd6fe', fontSize: '0.78em' }}
+        >
+          📄 서식 초안
+        </span>
+      );
+    case 'GENERAL_CONVERSATION':
+      return (
+        <span
+          className="badge"
+          style={{ backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', fontSize: '0.78em' }}
+        >
+          💬 일반 대화
+        </span>
+      );
+    case 'NEW_LEGAL_ANALYSIS':
+      return (
+        <span
+          className="badge"
+          style={{ backgroundColor: '#fdf2f8', color: '#be185d', border: '1px solid #fbcfe8', fontSize: '0.78em' }}
+        >
+          ⚖️ 심층 분석
+        </span>
+      );
+    default:
+      return null;
+  }
+}
+
 function renderStatusBadge(item: ConsultationResponse) {
   if (item.routing_status === 'NEEDS_CLARIFICATION') {
     return (
@@ -128,6 +191,8 @@ export function ChatSection({ caseId }: ChatSectionProps) {
   const {
     question,
     setQuestion,
+    activeConversationId,
+    startNewConversation,
     history,
     loadHistory,
     submit,
@@ -137,6 +202,7 @@ export function ChatSection({ caseId }: ChatSectionProps) {
     error,
   } = useConsultation(caseId);
   const [registering, setRegistering] = useState<string | null>(null);
+  const [showOnlyActiveConversation, setShowOnlyActiveConversation] = useState<boolean>(true);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -236,15 +302,28 @@ export function ChatSection({ caseId }: ChatSectionProps) {
           style={{ resize: 'vertical', lineHeight: 1.5 }}
         />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
-          <span style={{ fontSize: '0.82em', color: 'var(--text-muted)' }}>
-            💡 상담 내역은 데이터베이스에 안전하게 영구 보존됩니다.
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '0.82em', color: 'var(--text-muted)' }}>
+              {activeConversationId ? '🔗 이전 대화 맥락이 연결되어 있습니다.' : '💡 새로운 대화 세션입니다.'}
+            </span>
+            {activeConversationId && (
+              <button
+                type="button"
+                onClick={startNewConversation}
+                className="btn btn-secondary btn-sm"
+                style={{ fontSize: '0.78em', padding: '2px 8px' }}
+                title="이전 대화 맥락을 끊고 새로운 주제로 대화를 시작합니다"
+              >
+                + 새 대화 시작
+              </button>
+            )}
+          </div>
           <button
             onClick={submit}
             disabled={loading || !question.trim()}
             className="btn btn-primary"
           >
-            {loading ? 'AI 분석 및 상담 진행 중...' : '🚀 상담 요청하기'}
+            {loading ? 'AI 분석 및 상담 진행 중...' : (activeConversationId ? '💬 이어서 질문하기' : '🚀 상담 요청하기')}
           </button>
         </div>
       </div>
@@ -455,11 +534,30 @@ export function ChatSection({ caseId }: ChatSectionProps) {
       <div style={{ marginTop: '10px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
           <h3 style={{ fontSize: '1.1em', fontWeight: 700, margin: 0 }}>
-            📋 상담 이력 ({history.length}건)
+            {showOnlyActiveConversation && activeConversationId
+              ? `💬 현재 연속 상담 대화 (${history.filter(i => i.conversation_id === activeConversationId).length}턴)`
+              : `📋 전체 상담 이력 (${history.length}건)`}
           </h3>
-          <button onClick={loadHistory} className="btn btn-secondary btn-sm">
-            새로고침
-          </button>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {activeConversationId && (
+              <button
+                type="button"
+                onClick={() => setShowOnlyActiveConversation(!showOnlyActiveConversation)}
+                className="btn btn-outline btn-sm"
+                style={{
+                  fontSize: '0.82em',
+                  borderColor: showOnlyActiveConversation ? '#2563eb' : '#cbd5e1',
+                  color: showOnlyActiveConversation ? '#2563eb' : '#64748b',
+                  fontWeight: 600,
+                }}
+              >
+                {showOnlyActiveConversation ? '📋 전체 이력 보기' : '💬 현재 대화만 보기'}
+              </button>
+            )}
+            <button onClick={loadHistory} className="btn btn-secondary btn-sm">
+              새로고침
+            </button>
+          </div>
         </div>
 
         {history.length === 0 && !loading && (
@@ -469,7 +567,13 @@ export function ChatSection({ caseId }: ChatSectionProps) {
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {history.map((item: ConsultationResponse) => (
+          {(
+            showOnlyActiveConversation && activeConversationId
+              ? history
+                  .filter((i) => i.conversation_id === activeConversationId)
+                  .sort((a, b) => (a.turn_index || 1) - (b.turn_index || 1))
+              : history
+          ).map((item: ConsultationResponse) => (
             <div key={item.request_id} className="card">
               <div
                 style={{
@@ -482,6 +586,22 @@ export function ChatSection({ caseId }: ChatSectionProps) {
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {item.turn_index && (
+                    <span
+                      style={{
+                        fontSize: '0.75em',
+                        backgroundColor: '#f1f5f9',
+                        color: '#475569',
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        fontWeight: 600,
+                        border: '1px solid #cbd5e1',
+                      }}
+                    >
+                      Turn {item.turn_index}
+                    </span>
+                  )}
+                  {renderIntentBadge(item.intent)}
                   <span style={{ fontSize: '0.82em', color: 'var(--text-muted)' }}>
                     {item.created_at ? new Date(item.created_at).toLocaleString() : '상담 기록'}
                   </span>

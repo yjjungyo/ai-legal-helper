@@ -48,6 +48,11 @@ GRAPH_CITATION_PATTERN = re.compile(r"\[((?:GRAPH|VECTOR):[^\]]+)\]")
 CASE_NUMBER_PATTERN = re.compile(r"(?<!\d)((?:19|20)\d{2}\s*[가-힣]{1,3}\s*\d{3,7})(?!\d)")
 # 조문 번호 패턴 (예: 제3조, 제621조의2)
 ARTICLE_PATTERN = re.compile(r"(제\s*\d+\s*조(?:\s*의\s*\d+)?)")
+# 사건 증거 번호 패턴 (예: "증거 1", "증거 7호", "[증거 2]", "증 제1호증")
+EVIDENCE_LABEL_PATTERN = re.compile(
+    r"(\[\s*증거\s*([0-9]+호?|[A-Za-z0-9_\-]+)\s*(?::[^\]]+)?\]|증거\s*([0-9]+)(?:호)?(?:증)?(?=[\s은는이가의을를에로서와과,.:\-\)\]]|\Z)|증\s*제?\s*([0-9]+호?증?))",
+    re.IGNORECASE,
+)
 # 한국어 핵심 명사/어근 추출용 패턴 (2글자 이상 한글 또는 영숫자)
 TOKEN_PATTERN = re.compile(r"[가-힣]{2,}|[A-Za-z0-9]{2,}")
 
@@ -63,10 +68,14 @@ class ClaimVerification(BaseModel):
     claim: str = Field(description="검증할 법률 주장")
     claim_type: Optional[str] = Field(
         default="LEGAL_APPLICATION",
-        description="주장 유형: LEGAL_RULE (법률 규범/조문), CASE_FACT (사건 사실), LEGAL_APPLICATION (법률 적용 판단), RECOMMENDATION (후속 행동 제안)"
+        description="주장 유형: LEGAL_RULE (법령/판례 규범), CASE_FACT (사건 객관적 사실), LEGAL_APPLICATION (법률 적용 및 효과 판단), RECOMMENDATION (후속 행동/절차 가이드), USER_STATEMENT (사용자 진술 사실)"
+    )
+    fact_status: Optional[str] = Field(
+        default="USER_STATEMENT",
+        description="사실 상태: VERIFIED_FACT (유효한 등록 증거로 확인된 사실), USER_STATEMENT (사용자 진술, 독립 증빙 미확인), INFERENCE (AI 정황 추론), EVIDENCE_NEEDED (향후 확보 필요 자료), CONFLICTED (상충 사실/증거)"
     )
     source_ids: List[str] = Field(default_factory=list, description="주장을 뒷받침하는 출처 ID 목록 (없으면 빈 배열)")
-    grounding_status: str = Field(default="UNCERTAIN", description="SUPPORTED, UNSUPPORTED, 또는 UNCERTAIN")
+    grounding_status: str = Field(default="UNCERTAIN", description="SUPPORTED, UNSUPPORTED, UNCERTAIN, 또는 NOT_APPLICABLE")
     reason: str = Field(default="", description="검증 사유")
 
 
@@ -146,6 +155,20 @@ VERIFICATION_PROMPT = """당신은 법률검증 Agent(Legal Verification Agent)�
    - 공식 조문이 검색되었더라도 법률요건 일부 누락, 관련된 다른 법률 조문 누락, 법령 적용 시점 오류, 사실관계의 잘못된 확정, 법률 효과의 잘못된 해석, 손해배상 청구 주체의 혼동, 주장과 실제 인용 출처의 불일치가 존재한다면 반드시 REVISE 또는 INSUFFICIENT로 엄격히 판정하세요.
    - 의뢰인의 진술은 사실관계의 전제로 참고할 수 있으나, 독립적으로 입증된 객관적 증거와 혼동하지 마세요.
 
+7. 현재 답변 범위 기반 적응형 검증 (Adaptive Claim-level Scope):
+   - 질문의 범위를 넘어선 과도한 쟁점이나 답변에 실제로 포함되지 않은 법률 주장의 근거 부족을 이유로 전체 답변을 INSUFFICIENT로 차단하지 마세요.
+   - RECOMMENDATION(후속 조치 가이드) 및 USER_STATEMENT(사용자 진술 요약)는 법률 조문 RAG 출처가 없더라도 그 자체로 정상적인 실무 조언 또는 사실 정리이므로, 법조문이 없다는 이유로 UNSUPPORTED로 판정하지 마세요 (grounding_status를 NOT_APPLICABLE 또는 SUPPORTED로 설정).
+   - 오직 LEGAL_RULE(법령/판례 규범) 및 LEGAL_APPLICATION(구체적 법률효과 단정) 주장이 검색된 법령 본문에 의해 뒷받침되지 않을 때만 UNSUPPORTED로 판정하세요.
+
+8. 사실 상태 구분 및 임의 증거번호 금지 (Fact Status & Evidence Policy):
+   - 사실의 확인 수준(fact_status)을 엄격히 구분하세요:
+     * VERIFIED_FACT: 실제 등록된 증거 자료(파일명.pdf 등)로 확인된 사실
+     * USER_STATEMENT: 사용자의 구두 진술(독립 증빙 미확인)
+     * INFERENCE: AI 정황 추론
+     * EVIDENCE_NEEDED: 향후 입증을 위해 추가 확보가 필요한 자료
+   - 의뢰인의 진술(USER_STATEMENT)을 마치 독립 증거로 증명된 사실(VERIFIED_FACT)인 것처럼 단정해서는 안 됩니다.
+   - 실제 사건 증거 목록에 등록되지 않은 임의의 증거 번호(예: '증거 1', '증거 2', '증거 7호' 등)가 답변에 사용된 경우, 반드시 CITATION_INVALID 및 REVISE로 판정하고 수정 지침에 '임의 증거번호 제거 및 사용자 진술/확보 필요 자료로 정제'를 명시하세요.
+
 [출력 형식 (반드시 순수 JSON만 출력)]
 {{
   "status": "PASS | REVISE | INSUFFICIENT",
@@ -157,9 +180,10 @@ VERIFICATION_PROMPT = """당신은 법률검증 Agent(Legal Verification Agent)�
   "claims": [
     {{
       "claim": "검증할 주장 문장",
-      "claim_type": "LEGAL_RULE | CASE_FACT | LEGAL_APPLICATION | RECOMMENDATION",
+      "claim_type": "LEGAL_RULE | CASE_FACT | LEGAL_APPLICATION | RECOMMENDATION | USER_STATEMENT",
+      "fact_status": "VERIFIED_FACT | USER_STATEMENT | INFERENCE | EVIDENCE_NEEDED | CONFLICTED",
       "source_ids": ["출처 ID"],
-      "grounding_status": "SUPPORTED | UNSUPPORTED | UNCERTAIN",
+      "grounding_status": "SUPPORTED | UNSUPPORTED | UNCERTAIN | NOT_APPLICABLE",
       "reason": "검증 판단 사유"
     }}
   ],
@@ -299,6 +323,7 @@ def audit_citations_and_claims(
     by_source_id: Dict[str, Dict[str, Any]] = {}
     by_statute_article: Dict[Tuple[str, str], List[Dict[str, Any]]] = {}
     known_case_numbers: set[str] = set()
+    known_evidence_ids: set[str] = set()
 
     for src in normalized_registry:
         sid = str(src.get("source_id") or "")
@@ -334,10 +359,22 @@ def audit_citations_and_claims(
             known_case_numbers.add(re.sub(r"\s+", "", str(src["case_number"])))
         for cn in CASE_NUMBER_PATTERN.findall(str(src.get("content") or "")):
             known_case_numbers.add(re.sub(r"\s+", "", cn))
+        stype = str(src.get("source_type") or "").upper()
+        if stype == "CASE_EVIDENCE" or sid.startswith("EVIDENCE:") or "evidence" in sid.lower():
+            known_evidence_ids.add(sid.lower())
+            for fn in (src.get("filename"), src.get("file_name"), src.get("file")):
+                if fn:
+                    known_evidence_ids.add(str(fn).lower())
+                    known_evidence_ids.add(os.path.basename(str(fn)).lower())
 
     if case_context:
         for cn in CASE_NUMBER_PATTERN.findall(case_context):
             known_case_numbers.add(re.sub(r"\s+", "", cn))
+        for ev_match in re.findall(r"EVIDENCE:([A-Za-z0-9_\-]+)", case_context, re.IGNORECASE):
+            known_evidence_ids.add(f"evidence:{ev_match.lower()}")
+            known_evidence_ids.add(ev_match.lower())
+        for ev_match in re.findall(r"\[(?:증거|EVIDENCE)\s*([A-Za-z0-9_\-]+)\]", case_context, re.IGNORECASE):
+            known_evidence_ids.add(ev_match.lower())
 
     generated_citation_ids: List[str] = []
     validated_citation_ids: List[str] = []
@@ -490,6 +527,33 @@ def audit_citations_and_claims(
             if cite_id not in validated_citation_ids:
                 validated_citation_ids.append(cite_id)
 
+    # 5. 임의 생성된 사건 증거번호 (예: "증거 1", "증거 7호", "[증거 2]") 검증 (T05)
+    for ev_match in EVIDENCE_LABEL_PATTERN.finditer(draft_answer):
+        full_match_text = ev_match.group(0).strip()
+        ev_num = ev_match.group(2) or ev_match.group(3) or ev_match.group(4) or full_match_text
+        ev_num_clean = str(ev_num).strip().lower()
+        cite_id = f"EVIDENCE:{ev_num_clean}"
+        if cite_id not in generated_citation_ids:
+            generated_citation_ids.append(cite_id)
+
+        # 등록된 증거 목록과 매칭 여부 대조
+        is_known = False
+        if known_evidence_ids:
+            for ke in known_evidence_ids:
+                if ev_num_clean in ke or ke in ev_num_clean:
+                    is_known = True
+                    break
+
+        if not is_known:
+            if cite_id not in rejected_citation_ids:
+                rejected_citation_ids.append(cite_id)
+                rejection_reasons[cite_id] = "UNREGISTERED_EVIDENCE_NUMBER"
+            if full_match_text not in unverified_labels:
+                unverified_labels.append(full_match_text)
+        else:
+            if cite_id not in validated_citation_ids:
+                validated_citation_ids.append(cite_id)
+
     total_gen = len(generated_citation_ids)
     not_exist_count = sum(
         1 for cid in rejected_citation_ids
@@ -605,6 +669,13 @@ def sanitize_unverified_citations(
         return answer
 
     cleaned = answer
+    # 미등록 가상 증거번호 우선 정제 (T05)
+    for label in bad_labels:
+        if "증거" in label or "증 제" in label:
+            cleaned = cleaned.replace(label, "[미등록 증거번호 제거]")
+    cleaned = re.sub(r"\[미등록 증거번호 제거\]\s*:\s*", "(확보 필요) ", cleaned)
+    cleaned = re.sub(r"\[미등록 증거번호 제거\]\s*", "", cleaned)
+
     for label in bad_labels:
         if label.startswith("(") and label.endswith(")"):
             # 미검증 (파일명.pdf, p.페이지) 인용 제거 및 이중 괄호 변형 정화
@@ -727,23 +798,49 @@ def run_verification(
                 result.recommended_action = "REVISE_DRAFT"
             result.warnings.append("검증 대상 답변에서 추출된 주요 법률 주장(claims)이 없어 검증을 완료할 수 없습니다.")
 
-        # B) UNSUPPORTED 또는 UNCERTAIN 주장 존재 시 PASS 엄격 차단
-        unsupported_claims = [c for c in result.claims if c.grounding_status == "UNSUPPORTED"]
-        uncertain_claims = [c for c in result.claims if c.grounding_status == "UNCERTAIN"]
+        # B) UNSUPPORTED 또는 UNCERTAIN 핵심 법률 주장 존재 시 PASS 엄격 차단 (적응형 스코프)
+        # 실무 권고(RECOMMENDATION)나 단순 진술(USER_STATEMENT)은 조문 RAG 출처가 없어도 정상 실무 조언으로 인정함
+        unsupported_core_claims = [
+            c for c in result.claims
+            if c.grounding_status == "UNSUPPORTED"
+            and c.claim_type in ("LEGAL_RULE", "LEGAL_APPLICATION")
+        ]
+        uncertain_core_claims = [
+            c for c in result.claims
+            if c.grounding_status == "UNCERTAIN"
+            and c.claim_type in ("LEGAL_RULE", "LEGAL_APPLICATION")
+        ]
 
-        if unsupported_claims and result.status == "PASS":
+        if unsupported_core_claims and result.status == "PASS":
             result.status = "REVISE"
             if result.reason_code == "NONE":
                 result.reason_code = "LEGAL_SOURCE_INSUFFICIENT"
             result.recommended_action = "REVISE_DRAFT"
-            result.warnings.append(f"출처 본문에 의해 뒷받침되지 않는 주장 {len(unsupported_claims)}건이 감지되어 PASS가 취소되었습니다.")
+            result.warnings.append(f"법률 조문 또는 판례에 의해 뒷받침되지 않는 핵심 법적 판단 {len(unsupported_core_claims)}건이 감지되어 조건부 수정(REVISE)이 요구됩니다.")
 
-        if uncertain_claims and result.status == "PASS":
+        if uncertain_core_claims and result.status == "PASS":
             result.status = "REVISE"
             if result.reason_code == "NONE":
                 result.reason_code = "ANSWER_REVISION_REQUIRED"
             result.recommended_action = "REVISE_DRAFT"
-            result.warnings.append(f"근거 확인이 불확실한 주장 {len(uncertain_claims)}건이 포함되어 있어 조건부 보완이 필요합니다.")
+            result.warnings.append(f"법적 근거 확인이 불확실한 판단 {len(uncertain_core_claims)}건이 포함되어 있어 비확정적 안내로 보완이 필요합니다.")
+
+        # B-1) 미등록 임의 가상 증거번호 감지 시 PASS 차단 및 REVISE 강제 (T05)
+        unregistered_evidences = [
+            cid for cid, r in audit.get("rejection_reasons", {}).items()
+            if r == "UNREGISTERED_EVIDENCE_NUMBER"
+        ]
+        if unregistered_evidences:
+            ev_str = ", ".join(audit.get("unverified_citations", []))
+            result.warnings.append(f"DB에 등록되지 않은 임의의 가상 증거번호({ev_str})가 감지되었습니다.")
+            result.revision_instructions.append(
+                f"등록되지 않은 임의의 증거번호({ev_str})를 답변에서 제거하고, '사용자 진술' 또는 '확보 필요 자료'로 수정하세요."
+            )
+            if result.status == "PASS":
+                result.status = "REVISE"
+                if result.reason_code == "NONE":
+                    result.reason_code = "CITATION_INVALID"
+                result.recommended_action = "REVISE_DRAFT"
 
         # C) 인용 오류나 미확인 출처가 있는 경우 PASS 엄격 차단
         if unverified_citations:

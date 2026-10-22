@@ -19,6 +19,7 @@ class ConsultationRequest(BaseModel):
     question: str
     case_id: Optional[str] = None
     session_id: Optional[str] = None
+    conversation_id: Optional[str] = None  # 연속된 대화 식별자 (미전달 시 서버가 신규 생성)
 
 class Source(BaseModel):
     """법률 RAG 및 사건 증거 RAG 통합 표준 출처 응답 스키마.
@@ -72,6 +73,8 @@ class UsageSummary(BaseModel):
 
 class ConsultationResponse(BaseModel):
     request_id: str
+    conversation_id: Optional[str] = None  # 연속된 대화 식별자
+    turn_index: Optional[int] = 1          # 대화 내 턴 순서 (1부터 시작)
     trace_id: str
     status: str
     # 3계층 상태 분리 (P1-05 Three-Tier Status Model)
@@ -79,6 +82,9 @@ class ConsultationResponse(BaseModel):
     verification_status: Optional[str] = None      # PASS | REVISE | INSUFFICIENT | UNVERIFIED
     answer_status: Optional[str] = None            # DELIVERED | WITHHELD | CAUTIONARY | REVISED
     routing_status: Optional[str] = None           # CLASSIFIED | NEEDS_CLARIFICATION | ROUTER_ERROR
+    # Phase 2 Adaptive Workflow fields
+    intent: Optional[str] = None                   # FOLLOWUP_ACTION, FOLLOWUP_QUESTION, NEW_LEGAL_ANALYSIS 등
+    resolved_query: Optional[str] = None           # 대화 문맥이 결합되어 복원된 내부 검색 질의
 
     answer: Optional[str] = None
     sources: List[Source] = []
@@ -105,3 +111,24 @@ class ApprovalDecisionRequest(BaseModel):
     approved: bool = Field(description="승인 여부 (True: 승인 후 공식 법령 원문 검색 진행, False: 거절 후 판단 유보)")
     reason: Optional[str] = Field(default=None, description="거절 또는 승인 사유 메모")
 
+
+
+class ConversationSummary(BaseModel):
+    """사건 내 개별 대화 세션의 요약 정보 스키마."""
+    conversation_id: str
+    case_id: Optional[str] = None
+    first_question: str
+    last_question: str
+    last_answer: Optional[str] = None
+    turns_count: int
+    last_status: str
+    last_answer_status: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class ConversationDetail(BaseModel):
+    """특정 대화 세션의 전체 질의응답 이력 스키마."""
+    conversation_id: str
+    case_id: Optional[str] = None
+    turns: List[ConsultationResponse] = []

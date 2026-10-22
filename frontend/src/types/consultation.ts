@@ -1,4 +1,9 @@
 /**
+ * @fileoverview 법률 상담 관련 표준 TypeScript 타입 정의 모듈
+ * (RAG 출처, 사용량 요약, 승인 요청, 상담 응답 및 대화 세션 모델)
+ */
+
+/**
  * 표준 RAG 근거 출처 인터페이스 (법령, 판례, 사건 증거, 일반 문서 통합)
  */
 export interface Source {
@@ -65,6 +70,8 @@ export interface StatuteSearchApprovalRequest {
 
 export interface ConsultationResponse {
   request_id: string;
+  conversation_id?: string;
+  turn_index?: number;
   trace_id: string;
   status: 'IN_PROGRESS' | 'SUCCESS' | 'ERROR' | 'APPROVAL_REQUIRED';
   // 3계층 상태 분리 (P1-05 Three-Tier Status Model)
@@ -72,6 +79,8 @@ export interface ConsultationResponse {
   verification_status?: 'PASS' | 'REVISE' | 'INSUFFICIENT' | 'UNVERIFIED' | string;
   answer_status?: 'DELIVERED' | 'WITHHELD' | 'CAUTIONARY' | 'REVISED' | string;
   routing_status?: 'CLASSIFIED' | 'NEEDS_CLARIFICATION' | 'ROUTER_ERROR' | string;
+  intent?: string;
+  resolved_query?: string;
   answer?: string;
   sources: Source[];
   elapsed_ms?: number;
@@ -102,4 +111,27 @@ export interface ConsultationResponse {
   approval_request?: StatuteSearchApprovalRequest | null;
 }
 
+/**
+ * 사건 내 개별 대화 세션 요약 인터페이스
+ */
+export interface ConversationSummary {
+  conversation_id: string;
+  case_id?: string;
+  first_question: string;
+  last_question: string;
+  last_answer?: string | null;
+  turns_count: number;
+  last_status: string;
+  last_answer_status?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
 
+/**
+ * 특정 대화 세션의 상세 턴 이력 인터페이스
+ */
+export interface ConversationDetail {
+  conversation_id: string;
+  case_id?: string;
+  turns: ConsultationResponse[];
+}

@@ -5,7 +5,7 @@
  * 불확실/추가확인 사항, 다음 행동, 검증된 출처)를 가독성 높은 카드/섹션 양식으로 렌더링합니다.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 
 interface LegalAnswerViewProps {
   /** 렌더링할 법률 답변 텍스트 */
@@ -211,7 +211,16 @@ function renderFormattedLine(line: string, index: number): React.ReactNode {
  * 구조화된 법률의견서 및 마크다운 텍스트를 섹션별 UI 요소로 파싱하여 렌더링하는 컴포넌트
  */
 export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content }) => {
+  const [collapsedSections, setCollapsedSections] = useState<Record<number, boolean>>({});
+
   if (!content) return null;
+
+  const toggleSection = (index: number) => {
+    setCollapsedSections((prev) => ({
+      ...prev,
+      [index]: !prev[index],
+    }));
+  };
 
   // 줄바꿈 단위로 분할하여 파싱
   const rawLines = content.split('\n');
@@ -299,11 +308,16 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content }) => 
         const linesToRender: string[] = [];
         let skippedDuplicate = false;
 
+        let disclaimerSeen = false;
         for (const l of sec.lines) {
           const normL = normalizeTitle(l);
           if (!skippedDuplicate && normSecTitle && (normL === normSecTitle || normL === normSecTitle.replace(/^[0-9.]+\s*/, ''))) {
             skippedDuplicate = true;
             continue;
+          }
+          if (l.includes("본 답변은 제공된 자료를 바탕으로 한 법률정보이며") || l.includes("구체적 사실관계에 따라 결론이 달라질 수 있습니다")) {
+            if (disclaimerSeen) continue;
+            disclaimerSeen = true;
           }
           linesToRender.push(l);
         }
@@ -375,6 +389,79 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content }) => 
               <div style={{ fontSize: '0.89em', color: 'var(--text-secondary, #475569)' }}>
                 {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx))}
               </div>
+            </div>
+          );
+        }
+
+        // 3-1. 쟁점별 심층 법률 분석 (접기/펼치기 아코디언 지원 - Phase 4)
+        if (sec.type === 'issues') {
+          const isCollapsed = !!collapsedSections[idx];
+          return (
+            <div
+              key={idx}
+              style={{
+                backgroundColor: 'var(--surface, #ffffff)',
+                border: '1px solid var(--border, #e2e8f0)',
+                borderLeft: '4px solid #2563eb',
+                borderRadius: 'var(--radius-md, 6px)',
+                padding: '12px 14px',
+                color: 'var(--text-main, #1e293b)',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  paddingBottom: isCollapsed ? '0' : '8px',
+                  borderBottom: isCollapsed ? 'none' : '1px solid var(--border, #e2e8f0)',
+                }}
+                onClick={() => toggleSection(idx)}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, fontSize: '0.96em', color: '#1e40af' }}>
+                  <span>{sec.icon || '⚖️'}</span>
+                  <span>{sec.title}</span>
+                </div>
+                <button
+                  type="button"
+                  style={{
+                    background: '#f1f5f9',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '4px',
+                    padding: '2px 8px',
+                    fontSize: '0.8em',
+                    color: '#475569',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleSection(idx);
+                  }}
+                >
+                  {isCollapsed ? '▶ 심층 분석 펼치기' : '▼ 심층 분석 접기'}
+                </button>
+              </div>
+              {isCollapsed ? (
+                <div
+                  style={{
+                    fontSize: '0.86em',
+                    color: '#64748b',
+                    padding: '8px 0 2px 0',
+                    fontStyle: 'italic',
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => toggleSection(idx)}
+                >
+                  상세 법률 요건 및 쟁점별 조문 분석이 접혀 있습니다. (클릭하여 확인)
+                </div>
+              ) : (
+                <div style={{ fontSize: '0.91em', color: 'var(--text-main)', marginTop: '8px' }}>
+                  {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx))}
+                </div>
+              )}
             </div>
           );
         }

@@ -107,8 +107,9 @@ def test_insufficient_node_surfaces_missing_issues_and_contradictions():
     res = insufficient_node(state)
     final_text = res.get("final_answer", "")
 
-    # 1. P0-02 & P0-1: 판단 유보 안내문 및 final_disposition WITHHELD 검증
-    assert "[안내: 법률적 근거 부족으로 인한 판단 유보 (WITHHELD)]" in final_text
+    # 1. P0-02 & P0-1: 판단 유보 안내문 및 final_disposition WITHHELD 검증 (고객용 텍스트에 시스템 코드 미노출)
+    assert ("[안내: 추가 법률 검토 및 객관적 사실 확인 필요]" in final_text or "[안내: 법률적 근거 부족으로 인한 판단 유보]" in final_text)
+    assert "WITHHELD" not in final_text
     assert res.get("final_disposition") == "WITHHELD"
     assert "주택임대차보호법 제6조의2 제2항(3개월) 누락" in final_text
 

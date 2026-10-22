@@ -1,5 +1,24 @@
 # -*- coding: utf-8 -*-
-from typing import List
+"""
+모듈명: query_rewrite.py
+
+[모듈 개요]
+사용자의 자연어 질문과 대화 맥락(resolved_query)을 바탕으로, 법률 분야별 핵심 법조문 및
+전문 법률 용어 중심의 검색 키워드를 생성하여 RAG 검색 적중률을 극대화하는 모듈이다.
+
+[주요 기능]
+1. `rewrite_query`:
+   - 단문 후속 질의("이제 뭘 해야 하죠?", "언제 신청하나요?") 발생 시, 문맥이 복원된 `resolved_query`를
+     참조하여 정확한 조문/법률 키워드를 도출
+   - 원문 사용자 질문(`question`)을 보존하면서 핵심 키워드를 보강
+2. Zero-shot / Few-shot 프롬프트 기반의 고속 키워드 추출
+3. LLM 장애 시 결정론적 명사 토큰 기반의 Fallback 지원
+
+[주의사항]
+- 원문 사용자 질문을 왜곡하지 않으며, 추가된 키워드는 검색용 보조 정보로만 활용한다.
+"""
+
+from typing import List, Optional
 import json
 import re
 
@@ -33,7 +52,9 @@ LLM_REWRITE_PROMPT = PromptTemplate.from_template(
 """
 )
 
+
 def _parse_terms(text: str) -> List[str]:
+    """LLM 출력 텍스트에서 JSON 블록을 찾아 키워드 리스트를 파싱한다."""
     if not text:
         return []
     i, j = text.find("{"), text.rfind("}")
@@ -46,7 +67,9 @@ def _parse_terms(text: str) -> List[str]:
     except Exception:
         return []
 
+
 def _cheap_fallback_terms(q: str, k: int = 3) -> List[str]:
+    """LLM 호출 불가 시 질문 문자열에서 2글자 이상 명사 어근을 추출하는 폴백."""
     q = (q or "").strip()
     tokens = re.findall(r"[가-힣0-9A-Za-z]{2,}", q)
     seen, out = set(), []
@@ -58,28 +81,51 @@ def _cheap_fallback_terms(q: str, k: int = 3) -> List[str]:
             break
     return out
 
+
 @trace
-def rewrite_query(question: str, category_ko: str, *, max_terms: int = 3) -> str:
-    q = (question or "").strip().replace("\n", " ")
+def rewrite_query(
+    question: str,
+    category_ko: str,
+    *,
+    resolved_query: Optional[str] = None,
+    max_terms: int = 3,
+) -> str:
+    """사용자의 질문을 법률 조문 및 전문 용어 중심의 검색 키워드로 보강한다.
+
+    후속 질의의 경우 문맥이 복원된 resolved_query를 우선 활용하여,
+    단문 질문('그다음은요?', '언제 신청하나요?')에서도 정확한 법률 검색어를 추출한다.
+    원래 사용자의 원문 질문 형태를 보존하면서 키워드를 덧붙인다.
+
+    Args:
+        question: 사용자의 원문 질문
+        category_ko: 법률 카테고리 한국어 명칭 (예: '민법')
+        resolved_query: 이전 대화 맥락이 연결되어 구체화된 내부 질의문 (선택)
+        max_terms: 추출할 최대 키워드 수 (기본값: 3)
+
+    Returns:
+        str: 키워드가 보강된 최종 검색 질의 문자열
+    """
+    effective_q = (resolved_query or question or "").strip().replace("\n", " ")
+    user_orig = (question or "").strip().replace("\n", " ")
 
     terms: List[str] = []
     try:
         llm = get_llm(temperature=0.0)
-        prompt = LLM_REWRITE_PROMPT.format(category=category_ko, question=q)
+        prompt = LLM_REWRITE_PROMPT.format(category=category_ko, question=effective_q)
         raw = llm.invoke(prompt)
         text = (getattr(raw, "content", str(raw)) or "").strip()
         terms = _parse_terms(text)[:max_terms]
-        logger.debug(f"[REWRITE] llm_terms={terms}")
+        logger.debug(f"[REWRITE] llm_terms={terms} (from effective_q='{effective_q[:40]}...')")
     except Exception as e:
         logger.warning(f"[REWRITE] LLM 실패: {e}")
 
     if not terms:
-        fb = _cheap_fallback_terms(q, k=min(3, max_terms))
+        fb = _cheap_fallback_terms(effective_q, k=min(3, max_terms))
         logger.debug(f"[REWRITE] fallback_terms={fb}")
         terms = fb
 
-    final = q
+    final = user_orig
     if terms:
-        final = f"{q}\n키워드: {', '.join(terms)}"
+        final = f"{user_orig}\n키워드: {', '.join(terms)}"
     logger.debug(f"[REWRITE] final_len={len(final)} final=[{final}]")
     return final

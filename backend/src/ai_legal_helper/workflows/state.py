@@ -71,4 +71,12 @@ class LegalState(MessagesState):
 
     # P0 개선: 최종 고객 응답 처분 상태 ('DELIVERED', 'CAUTIONARY', 'WITHHELD')
     final_disposition: Optional[str]
+    # Phase 1: Context-Aware Multi-turn Conversation Fields
+    conversation_id: Optional[str] = None
+    conversation_context: Optional[Dict[str, Any]] = None
+    turn_index: Optional[int] = 1
+    # Phase 2: Adaptive Workflow Fields
+    intent: Optional[str] = None
+    resolved_query: Optional[str] = None
+    intent_decision: Optional[Dict[str, Any]] = None
 

@@ -525,6 +525,8 @@ class ConsultationRecord(Base):
     case_id = Column(String, ForeignKey("cases.id", ondelete="CASCADE"), nullable=True)
     user_id = Column(String, ForeignKey("users.id"), nullable=True)
     request_id = Column(String, unique=True, index=True, nullable=False)
+    conversation_id = Column(String(100), index=True, nullable=True)
+    turn_index = Column(Integer, default=1, nullable=False)
     trace_id = Column(String, nullable=True)
     question = Column(Text, nullable=False)
     answer = Column(Text, nullable=True)

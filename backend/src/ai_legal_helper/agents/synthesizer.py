@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from typing import Dict, List
+from typing import Any, Dict, List, Optional
 from langchain_core.messages import AIMessage, HumanMessage, AnyMessage
 from langchain_core.prompts import PromptTemplate
 from ai_legal_helper.llm.gateway import get_llm
@@ -55,6 +55,11 @@ SYNTH_SYSTEM = """당신은 대한민국 법률 전문가입니다.
   [3. 쟁점별 법률 분석]
   [4. 우선순위별 다음 행동]
   [5. 추가 확인사항]
+- [2. 사건 사실관계 및 증거]에서는 사실 상태를 엄격히 구분하여 작성하세요:
+  1) [확인된 객관적 사실]: 실제 등록된 증거 자료(파일명.pdf, p.페이지)로 확인된 사실만 명시
+  2) [사용자 진술 사실]: 독립적 증거가 확인되지 않은 의뢰인의 진술은 "사용자 진술에 따르면...", "의뢰인께서 말씀하신 정황에 비추어..."로 명시
+  3) [확보 필요 자료]: 상대방의 항변을 방어하거나 입증을 위해 추가 확보가 필요한 서류 목록 명시
+  4) 주의: 실제 등록되지 않은 가상의 증거 번호(예: '증거 1', '증거 2', '증거 7호' 등)를 절대 임의로 붙이지 마세요.
 - [3. 쟁점별 법률 분석]에서는 각 주요 쟁점별로 다음 5가지 요소를 빠짐없이 구조화하여 분석하세요:
   1) 적용 법률요건: 관련 법령 조문 및 판례가 요구하는 법률적 성립 요건
   2) 사건 사실과의 연결: 의뢰인의 진술 및 확보된 사실이 위 요건에 부합하는지 여부
@@ -94,6 +99,56 @@ SYNTH_FEWSHOT = """
 - 본 답변은 제공된 자료를 바탕으로 한 법률정보이며 구체적 사실관계에 따라 결론이 달라질 수 있습니다.
 """
 
+
+SYNTH_FOLLOWUP_SYSTEM = """당신은 대한민국 법률 전문가입니다.
+- 의뢰인의 후속 세부 질문에 대해 직전 상담 내용을 바탕으로 직접적이고 명쾌하게 한국어로 답변하세요.
+- 사고 과정(Chain-of-Thought)을 출력하지 마세요.
+- 중요 원칙:
+  1. 이전 상담의 서론이나 일반 법리를 처음부터 장황하게 반복하지 마세요.
+  2. 5단계 의견서 형식을 강제하지 마세요. 질문받은 세부 쟁점에 집중하여 다음 3개 핵심 구조로 간결하게 답변하세요:
+     [1. 질문에 대한 핵심 결론 및 직접 답변]
+     [2. 세부 법적 요건 및 근거] (관련 조문 및 판례 근거만 간결하게 설명)
+     [3. 실무상 유의사항 및 다음 조치]
+  3. 사실 상태를 엄격히 구분하여 작성하고, 실제 등록되지 않은 가상의 증거 번호('증거 1', '증거 2' 등)를 절대 생성하지 마세요.
+  4. 중요한 핵심 단어에는 **볼드** 강조를 적절히 사용하세요.
+  5. 법률 조문은 '(법령명 제O조)', 증거는 '(파일명.pdf, p.페이지)' 형태로만 인용하세요.
+"""
+
+SYNTH_FOLLOWUP_FEWSHOT = """
+[후속 질문 답변 양식 예시]
+[1. 질문에 대한 핵심 결론 및 직접 답변]
+- 의뢰인이 질문하신 임차권등기명령은 임대차계약 기간이 만료된 익일부터 신청할 수 있습니다. 계약 존속 중에는 신청할 수 없습니다.
+
+[2. 세부 법적 요건 및 근거]
+- 법적 요건: (1) 임대차계약의 종료, (2) 임차보증금 전액 또는 일부의 미반환
+- 근거 법령: (주택임대차보호법 제3조의3 제1항)
+- 대항력 유지 효과: 등기명령이 집행 완료되면 이사를 가거나 주민등록을 이전하더라도 기존에 취득한 대항력과 우선변제권이 상실되지 않고 유지됩니다.
+
+[3. 실무상 유의사항 및 다음 조치]
+- 유의사항: 관할 법원에 신청서를 제출한 후 등기부등본(을구)에 임차권등기가 실제로 기재된 것을 확인한 후에 퇴거(이사)하셔야 대항력이 안전하게 유지됩니다.
+- 구비 서류: 임대차계약서 사본, 계약 해지 통지 증빙(문자/내용증명), 부동산등기부등본, 주민등록초본
+"""
+
+SYNTH_FACT_CLARIFICATION_SYSTEM = """당신은 대한민국 법률 전문가입니다.
+- 의뢰인이 추가로 진술하거나 정정한 사실관계에 대해, 이것이 기존 법률 분석 결론 및 권리 관계에 미치는 영향을 신속하고 명쾌하게 분석하세요.
+- 사고 과정(Chain-of-Thought)을 출력하지 마세요.
+- 다음 3가지 핵심 구조로 작성하세요:
+  [1. 정정/추가된 사실관계가 결론에 미치는 영향]
+  [2. 변경된 법률 요건 검토 및 관련 근거]
+  [3. 향후 입증 및 권리 행사 시 유의점]
+- 임의의 가상 증거번호를 생성하지 마세요.
+"""
+
+SYNTH_DOCUMENT_SYSTEM = """당신은 대한민국 법률 전문가입니다.
+- 의뢰인이 요청한 법률 서식(내용증명, 계약서, 신청서 등)의 실무 표준 초안과 작성 가이드를 작성하세요.
+- 사고 과정(Chain-of-Thought)을 출력하지 마세요.
+- 다음 구조로 작성하세요:
+  [1. 법률 문서 표준 초안]
+  (제목, 발신인, 수신인, 목적물 표시, 본문, 작성일자, 발신인 서명란)
+  [2. 작성 및 발송/제출 시 실무 유의사항]
+- 임의의 가상 증거번호를 생성하지 마세요.
+"""
+
 SYNTH_PROMPT = PromptTemplate.from_template(
     """{system}
 
@@ -117,7 +172,11 @@ SYNTH_PROMPT = PromptTemplate.from_template(
 )
 
 @trace
-def synthesize(messages: List[AnyMessage], results: Dict[str, str]) -> List[AnyMessage]:
+def synthesize(
+    messages: List[AnyMessage],
+    results: Dict[str, str],
+    intent: Optional[str] = None,
+) -> List[AnyMessage]:
     from ai_legal_helper.utils.text_formatter import clean_markdown_formatting
 
     if not results:
@@ -131,12 +190,25 @@ def synthesize(messages: List[AnyMessage], results: Dict[str, str]) -> List[AnyM
 
     try:
         llm = get_llm(temperature=0.0)
+        # 의도(intent)에 따른 적응형 프롬프트 및 양식 선택 (P1 / Section 8)
+        cur_system = SYNTH_SYSTEM
+        cur_fewshot = SYNTH_FEWSHOT
+        if intent == "FOLLOWUP_QUESTION":
+            cur_system = SYNTH_FOLLOWUP_SYSTEM
+            cur_fewshot = SYNTH_FOLLOWUP_FEWSHOT
+        elif intent == "FACT_CLARIFICATION":
+            cur_system = SYNTH_FACT_CLARIFICATION_SYSTEM
+            cur_fewshot = ""
+        elif intent == "DOCUMENT_REQUEST":
+            cur_system = SYNTH_DOCUMENT_SYSTEM
+            cur_fewshot = ""
+
         prompt = SYNTH_PROMPT.format(
-            system=SYNTH_SYSTEM,
+            system=cur_system,
             chat_brief=chat_brief,
             question=question or "(질문 없음)",
             findings=findings,
-            fewshot=SYNTH_FEWSHOT,
+            fewshot=cur_fewshot,
         )
         resp = llm.invoke(prompt)
         summary = (getattr(resp, "content", str(resp)) or "").strip()

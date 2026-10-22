@@ -24,7 +24,8 @@ from sqlalchemy.orm import Session
 from typing import Dict, Any, List, Optional
 
 from ai_legal_helper.api.schemas.consultation import (
-    ConsultationRequest, ConsultationResponse, Source, UsageSummary, ApprovalDecisionRequest
+    ConsultationRequest, ConsultationResponse, Source, UsageSummary, ApprovalDecisionRequest,
+    ConversationSummary, ConversationDetail
 )
 from ai_legal_helper.observability.context import (
     set_trace_id, reset_trace_id, set_case_id, reset_case_id
@@ -63,9 +64,28 @@ async def start_consultation(
     request_id = get_request_id() or str(uuid.uuid4())
     trace_id = get_trace_id() or str(uuid.uuid4())
     
-    # Initial status (P1-05 3-tier status model)
+    # 연속 대화 세션 식별자 결정 및 대화 맥락 복원 (Phase 1)
+    conversation_id = req.conversation_id or str(uuid.uuid4())
+    from ai_legal_helper.workflows.conversation_context import load_conversation_context
+    try:
+        conv_context = load_conversation_context(
+            db=db,
+            conversation_id=conversation_id,
+            current_question=req.question,
+            case_id=req.case_id,
+            user_id=current_user.id,
+            auth_bypass=AUTH_BYPASS,
+        )
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+    
+    turn_index = conv_context.turn_index
+
+    # Initial status (P1-05 3-tier status model + Phase 1 Context)
     resp = ConsultationResponse(
         request_id=request_id,
+        conversation_id=conversation_id,
+        turn_index=turn_index,
         trace_id=trace_id,
         status="IN_PROGRESS",
         execution_status="IN_PROGRESS",
@@ -76,7 +96,7 @@ async def start_consultation(
         case_id=req.case_id,
         created_at=get_kst_iso(),
     )
-    # Store user_id to authorize GET later (Note: We'll inject it manually since it's not in the response schema)
+    # Store user_id to authorize GET later
     _consultations[request_id] = resp
     setattr(resp, "_user_id", current_user.id)
     
@@ -86,6 +106,8 @@ async def start_consultation(
             case_id=req.case_id,
             user_id=current_user.id,
             request_id=request_id,
+            conversation_id=conversation_id,
+            turn_index=turn_index,
             trace_id=trace_id,
             question=req.question,
             status="IN_PROGRESS",
@@ -98,13 +120,14 @@ async def start_consultation(
         db.commit()
     except Exception as e:
         db.rollback()
+        logger.warning(f"[START_CONSULTATION] DB record initial save failed: {e}")
     
-    # Schedule background task
-    background_tasks.add_task(process_consultation, request_id, trace_id, req)
+    # Schedule background task with conversation context
+    background_tasks.add_task(process_consultation, request_id, trace_id, req, conv_context)
     
     return resp
 
-async def process_consultation(request_id: str, trace_id: str, req: ConsultationRequest):
+async def process_consultation(request_id: str, trace_id: str, req: ConsultationRequest, conv_context: Optional[Any] = None):
     """실제 LangGraph 워크플로우를 실행하고 결과를 업데이트하는 백그라운드 태스크."""
     t_token = set_trace_id(trace_id)
     c_token = None
@@ -120,7 +143,7 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
     start_time = time.time()
     try:
         # Run unified workflow
-        result = await run_legal_consultation(req.question, thread_id=request_id)
+        result = await run_legal_consultation(req.question, thread_id=request_id, conversation_context=conv_context)
         
         elapsed_ms = (time.time() - start_time) * 1000
         
@@ -149,6 +172,15 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
         )
         
         resp = _consultations[request_id]
+        if hasattr(result, "get"):
+            if result.get("conversation_id"):
+                resp.conversation_id = result.get("conversation_id")
+            if result.get("turn_index"):
+                resp.turn_index = result.get("turn_index")
+            if result.get("intent"):
+                resp.intent = result.get("intent")
+            if result.get("resolved_query"):
+                resp.resolved_query = result.get("resolved_query")
         is_approval_required = (result.get("status") == "APPROVAL_REQUIRED")
         is_error = (result.get("status") == "ERROR")
         ver_res = result.get("verification_result") or {}
@@ -245,6 +277,10 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
                     "total_tokens": usage_summary.total_tokens,
                     "elapsed_ms": round(elapsed_ms, 2),
                 },
+                conversation_id=getattr(resp, "conversation_id", None),
+                turn_index=getattr(resp, "turn_index", 1) or 1,
+                intent=getattr(resp, "intent", None),
+                resolved_query=getattr(resp, "resolved_query", None),
             )
             update_span(get_current_span_id(), summary_dict)
 
@@ -290,6 +326,10 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
                     rec.warnings = resp.warnings
                     rec.selected_agents = resp.selected_agents
                     rec.elapsed_ms = resp.elapsed_ms
+                    if getattr(resp, "conversation_id", None):
+                        rec.conversation_id = resp.conversation_id
+                    if getattr(resp, "turn_index", None):
+                        rec.turn_index = resp.turn_index
                     db_session.commit()
         except Exception:
             pass
@@ -351,6 +391,8 @@ async def get_consultation(
 
     return ConsultationResponse(
         request_id=record.request_id,
+        conversation_id=record.conversation_id,
+        turn_index=record.turn_index or 1,
         trace_id=record.trace_id or "",
         status=record.status,
         execution_status=getattr(record, "execution_status", record.status) or "COMPLETED",
@@ -669,15 +711,17 @@ async def process_consultation_resume(
 @router.get("/cases/{case_id}/consultations", response_model=List[ConsultationResponse])
 async def list_case_consultations(
     case_id: str,
+    conversation_id: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     case: Case = Depends(get_case_for_user),
     db: Session = Depends(get_db)
 ):
-    """특정 사건에 저장된 모든 상담 내역을 최신순으로 조회한다."""
+    """특정 사건에 저장된 모든 상담 내역을 최신순으로 조회한다. conversation_id 필터링을 지원한다."""
     from ai_legal_helper.rag.source_schema import normalize_source_dict
-    records = db.query(ConsultationRecord).filter(
-        ConsultationRecord.case_id == case_id
-    ).order_by(ConsultationRecord.created_at.desc()).all()
+    query = db.query(ConsultationRecord).filter(ConsultationRecord.case_id == case_id)
+    if conversation_id:
+        query = query.filter(ConsultationRecord.conversation_id == conversation_id)
+    records = query.order_by(ConsultationRecord.created_at.desc()).all()
     
     results = []
     for rec in records:
@@ -696,6 +740,8 @@ async def list_case_consultations(
         )
         results.append(ConsultationResponse(
             request_id=rec.request_id,
+            conversation_id=rec.conversation_id,
+            turn_index=rec.turn_index or 1,
             trace_id=rec.trace_id or "",
             status=rec.status,
             execution_status=getattr(rec, "execution_status", rec.status) or "COMPLETED",
@@ -716,3 +762,126 @@ async def list_case_consultations(
     return results
 
 
+
+
+@router.get("/cases/{case_id}/conversations", response_model=List[ConversationSummary])
+async def list_case_conversations(
+    case_id: str,
+    current_user: User = Depends(get_current_user),
+    case: Case = Depends(get_case_for_user),
+    db: Session = Depends(get_db)
+):
+    """특정 사건 내의 모든 대화 세션(Conversation) 목록을 최신 활동순으로 요약 조회한다."""
+    records = (
+        db.query(ConsultationRecord)
+        .filter(ConsultationRecord.case_id == case_id)
+        .order_by(ConsultationRecord.created_at.asc())
+        .all()
+    )
+
+    # conversation_id별로 레코드 그룹화
+    conv_groups: Dict[str, List[ConsultationRecord]] = {}
+    for r in records:
+        cid = r.conversation_id or r.request_id
+        if cid not in conv_groups:
+            conv_groups[cid] = []
+        conv_groups[cid].append(r)
+
+    summaries: List[ConversationSummary] = []
+    for cid, items in conv_groups.items():
+        first_item = items[0]
+        last_item = items[-1]
+        summaries.append(
+            ConversationSummary(
+                conversation_id=cid,
+                case_id=case_id,
+                first_question=first_item.question,
+                last_question=last_item.question,
+                last_answer=last_item.answer,
+                turns_count=len(items),
+                last_status=last_item.status,
+                last_answer_status=getattr(last_item, "answer_status", None),
+                created_at=get_kst_iso(first_item.created_at) if first_item.created_at else None,
+                updated_at=get_kst_iso(last_item.updated_at or last_item.created_at) if last_item.created_at else None,
+            )
+        )
+
+    # 최신 대화 순으로 정렬
+    summaries.sort(key=lambda s: s.updated_at or s.created_at or "", reverse=True)
+    return summaries
+
+
+@router.get("/cases/{case_id}/conversations/{conversation_id}", response_model=ConversationDetail)
+async def get_case_conversation_detail(
+    case_id: str,
+    conversation_id: str,
+    current_user: User = Depends(get_current_user),
+    case: Case = Depends(get_case_for_user),
+    db: Session = Depends(get_db)
+):
+    """특정 대화 세션의 모든 턴(Turn) 질의응답 이력을 시간순으로 상세 조회한다."""
+    from ai_legal_helper.rag.source_schema import normalize_source_dict
+
+    records = (
+        db.query(ConsultationRecord)
+        .filter(
+            ConsultationRecord.case_id == case_id,
+            ConsultationRecord.conversation_id == conversation_id
+        )
+        .order_by(ConsultationRecord.created_at.asc(), ConsultationRecord.turn_index.asc())
+        .all()
+    )
+
+    if not records:
+        raise HTTPException(status_code=404, detail="해당 대화 세션을 찾을 수 없습니다.")
+
+    # 권한 검증: 첫 번째 레코드의 user_id 확인
+    if not AUTH_BYPASS and records[0].user_id and records[0].user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="해당 대화에 접근할 권한이 없습니다.")
+
+    turns: List[ConsultationResponse] = []
+    for rec in records:
+        sources = []
+        seen_keys = set()
+        for s in (rec.sources or []):
+            std_dict = normalize_source_dict(s)
+            key = (std_dict.get("source_id"), std_dict.get("file"), str(std_dict.get("page") or ""))
+            if key not in seen_keys:
+                seen_keys.add(key)
+                sources.append(Source(**std_dict))
+
+        ans_status = _resolve_legacy_answer_status(
+            getattr(rec, "answer_status", None),
+            getattr(rec, "verification_status", None),
+            rec.status,
+        )
+
+        turns.append(
+            ConsultationResponse(
+                request_id=rec.request_id,
+                conversation_id=rec.conversation_id,
+                turn_index=rec.turn_index or 1,
+                trace_id=rec.trace_id or "",
+                status=rec.status,
+                execution_status=getattr(rec, "execution_status", rec.status) or "COMPLETED",
+                verification_status=getattr(rec, "verification_status", None),
+                answer_status=ans_status,
+                routing_status=getattr(rec, "routing_status", None),
+                answer=rec.answer,
+                approval_request=rec.approval_request,
+                sources=sources,
+                elapsed_ms=rec.elapsed_ms,
+                warnings=rec.warnings or [],
+                verification_result=rec.verification_result or {},
+                selected_agents=rec.selected_agents or [],
+                question=rec.question,
+                case_id=rec.case_id,
+                created_at=get_kst_iso(rec.created_at) if rec.created_at else None,
+            )
+        )
+
+    return ConversationDetail(
+        conversation_id=conversation_id,
+        case_id=case_id,
+        turns=turns,
+    )

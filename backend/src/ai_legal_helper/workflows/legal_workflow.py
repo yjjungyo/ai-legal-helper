@@ -1,3 +1,4 @@
+from ai_legal_helper.agents.intent_analyzer import analyze_consultation_intent, ConsultationIntent
 # -*- coding: utf-8 -*-
 """
 모듈명: legal_workflow.py
@@ -42,7 +43,7 @@ import sys
 import asyncio
 import re
 from langgraph.graph import StateGraph, START, END
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage
 from langgraph.types import interrupt, Command, Send
 from langgraph.checkpoint.memory import MemorySaver
 try:
@@ -57,6 +58,7 @@ from ai_legal_helper.agents.router import route_categories
 from ai_legal_helper.agents.planner import plan_tools
 from ai_legal_helper.agents.specialist import run_specialist_agent
 from ai_legal_helper.agents.synthesizer import synthesize
+from ai_legal_helper.llm.gateway import get_llm
 from ai_legal_helper.observability.decorators import trace
 from ai_legal_helper.observability.logging_config import get_logger
 from ai_legal_helper.observability.context import set_node_name
@@ -147,6 +149,10 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
     trace_id = get_trace_id() or "unknown_trace"
     case_id = get_case_id()
     
+    conv_id = state.get("conversation_id")
+    conv_ctx = state.get("conversation_context")
+    turn_idx = state.get("turn_index") or 1
+
     case_context = ""
     # 사건이 지정되지 않은 일반 상담에서는 GraphRAG 를 사용하지 않는다.
     graph_evidence: Dict[str, Any] = {"available": False, "valid_paths": [], "invalid_count": 0,
@@ -189,9 +195,23 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
         finally:
             db.close()
             
+    # 대화 맥락이 존재하는 경우 case_context 전두부에 대화 이력 요약 결합
+    if conv_ctx:
+        try:
+            from ai_legal_helper.workflows.conversation_context import ConversationContext
+            c_obj = ConversationContext(**conv_ctx) if isinstance(conv_ctx, dict) else conv_ctx
+            conv_summary_text = c_obj.format_context_for_prompt(max_turns=3)
+            if conv_summary_text and "(이전 상담 대화 없음" not in conv_summary_text:
+                case_context = f"{conv_summary_text}\n\n{case_context}" if case_context else conv_summary_text
+        except Exception as e:
+            logger.warning(f"[INIT] 대화 맥락 포맷팅 중 예외: {e}")
+
     return {
         "request_id": req_id,
         "trace_id": trace_id,
+        "conversation_id": conv_id,
+        "conversation_context": conv_ctx,
+        "turn_index": turn_idx,
         "question": q or "(질문 미확인)",
         "revision_count": 0,
         "warnings": [],
@@ -257,7 +277,7 @@ def route_node(state: LegalState) -> Dict:
     set_node_name("route")
     from ai_legal_helper.agents.router import route_categories_detailed
 
-    q = state.get("question", "(질문 미확인)")
+    q = state.get("resolved_query") or state.get("question", "(질문 미확인)")
     case_ctx = state.get("case_context") or ""
     decision = route_categories_detailed(question=q, case_context=case_ctx)
 
@@ -332,7 +352,7 @@ def routing_exit_node(state: LegalState) -> Dict:
         "cited_sources": [],
         "retrieved_sources": [],
         "warnings": warnings,
-        "messages": [HumanMessage(content="dummy", name="system"), final_answer],
+        "messages": [AIMessage(content=final_answer)],
     }
 
 @trace
@@ -347,7 +367,7 @@ def plan_node(state: LegalState) -> Dict:
 async def run_agents_node(state: LegalState) -> Dict:
     set_node_name("run_agents")
     cats = state.get("categories", [])
-    q = state.get("question", "")
+    q = state.get("resolved_query") or state.get("question", "")
     brief = _brief_history(state.get("messages", []))
     
     case_ctx = state.get("case_context")
@@ -376,7 +396,8 @@ async def run_agents_node(state: LegalState) -> Dict:
 @trace
 def synthesize_node(state: LegalState) -> Dict:
     set_node_name("synthesize")
-    msgs = synthesize(state.get("messages", []), state.get("results", {}))
+    intent_val = state.get("intent")
+    msgs = synthesize(state.get("messages", []), state.get("results", {}), intent=intent_val)
     draft = msgs[-1].content
     # don't append to messages yet, just save to draft_answer
     return {"draft_answer": draft}
@@ -670,36 +691,56 @@ def insufficient_node(state: LegalState) -> Dict:
     missing_laws = ver_res.get("candidate_laws", []) or []
     reason_code = ver_res.get("reason_code", "LEGAL_SOURCE_MISSING")
 
-    # 고객용 판단 유보 안내문 (미검증 법률 단정 및 내부 감수 메모 배제)
+    # 고객용 판단 유보 안내문 (내부 시스템 용어 WITHHELD, INSUFFICIENT 완전 배제 및 사건 맥락 동적 구성)
     parts = []
-    parts.append("[안내: 법률적 근거 부족으로 인한 판단 유보 (WITHHELD)]\n")
-    parts.append(
-        "질문하신 사안에 대해 데이터베이스 내 관련 법령(특별법 등) 조문 또는 객관적 증거 근거가 충분히 확보되지 않았거나, "
-        "인용된 법조문과의 법률적 모순이 확인되어 의뢰인의 권리 보호를 위해 확정적인 법률 조언의 제공을 안전하게 유보합니다.\n"
-    )
+    parts.append("[안내: 추가 법률 검토 및 객관적 사실 확인 필요]\n")
 
-    # 1. 확인이 필요한 쟁점 및 법령 (고객 친화적 정제)
+    q_text = state.get("question", "")
+    case_ctx_text = state.get("case_context", "")
+
+    # 부족 사유별 동적 원인 설명
+    if reason_code in ("LEGAL_SOURCE_MISSING", "LEGAL_SOURCE_INSUFFICIENT"):
+        lead_reason = "질문하신 사안의 권리 관계를 확정하기 위해 공식 법령 조문 또는 관련 판례 법리의 추가적인 확인 및 검토가 필요한 상태입니다."
+    elif reason_code == "CASE_EVIDENCE_MISSING":
+        lead_reason = "법률적 권리를 확정적으로 행사하기 위해 필수적인 구체적 사실관계(일자, 통지 도달 여부 등)나 객관적 입증 증빙이 아직 충분히 확인되지 않았습니다."
+    elif reason_code == "EVIDENCE_CONFLICT":
+        lead_reason = "현재 진술하신 사실관계와 제출된 자료 또는 법적 요건 간에 불일치나 상충이 감지되어 사실관계의 정리가 우선적으로 요구됩니다."
+    else:
+        lead_reason = "정확하고 신뢰할 수 있는 법적 조언을 위해 관련 법령 근거 및 객관적 증빙의 추가 확인이 필요합니다."
+    parts.append(f"{lead_reason}\n의뢰인의 권리 보호를 위해 성급한 단정 대신 확인이 필요한 사항과 안전한 대처 방안을 안내해 드립니다.\n")
+
+    # 1. 확인 및 보강이 필요한 핵심 쟁점 및 법령
     if missing_laws or missing_issues:
         parts.append("[1. 확인 및 보강이 필요한 핵심 쟁점 및 법령]")
         for law in missing_laws:
             parts.append(f"- 관련 법령: {law}")
         for issue in missing_issues:
-            # 내부 감수 문구('초안', 'draft' 등) 정제
             cleaned_issue = issue
-            for bad_word in ["초안은 ", "초안이 ", "초안의 ", "초안을 ", "초안 "]:
+            for bad_word in ["초안은 ", "초안이 ", "초안의 ", "초안을 ", "초안 ", "draft ", "Draft "]:
                 cleaned_issue = cleaned_issue.replace(bad_word, "사안의 검토 ")
             parts.append(f"- 핵심 쟁점: {cleaned_issue}")
         parts.append("")
 
-    # 2. 사실관계 및 입증 리스크 안내 (내부 디버그 문구 없는 실무적 객관 가이드)
+    # 2. 사실관계 및 입증 리스크 동적 안내 (사건 분야별 맞춤형 서류 안내)
     parts.append("[2. 사실관계 및 입증 리스크 안내]")
-    parts.append("- 법률상 권리 주장은 상대방에 대한 적법한 의사표시 도달 및 이를 증명할 수 있는 객관적 입증 자료(계약서, 내용증명, 서면 확인서 등)에 기초해야 합니다.")
-    parts.append("- 객관적 증빙 자료 없이 구두 진술이나 정황에만 기초하여 법적 절차를 진행할 경우 법률적 불이익이 발생할 수 있습니다.\n")
+    is_housing = any(k in q_text or k in case_ctx_text for k in ["전세", "보증금", "임대", "임차", "월세"])
+    is_labor = any(k in q_text or k in case_ctx_text for k in ["근로", "해고", "임금", "퇴직금", "노동", "출근"])
+    is_contract = any(k in q_text or k in case_ctx_text for k in ["계약", "대금", "채무", "빌려", "손해배상", "차용"])
+
+    if is_housing:
+        parts.append("- 법률상 권리 주장은 임대차계약서, 보증금 이체 영수증, 계약 해지 또는 갱신 거절 통지 도달 증빙(내용증명, 문자/카카오톡 등)에 기초해야 합니다.")
+    elif is_labor:
+        parts.append("- 노동 관계상 권리 주장은 근로계약서, 급여명세서 및 입금내역, 출퇴근 기록, 서면 해고 통지서 등 객관적 증빙에 기초해야 합니다.")
+    elif is_contract:
+        parts.append("- 계약 및 금전 청구는 계약서 또는 차용증, 금융 거래 내역, 약정 해제 통지 내역 등 객관적 증빙에 기초해야 합니다.")
+    else:
+        parts.append("- 법률상 권리 주장은 당사자 간의 계약 서면, 의사표시 도달 증빙, 금융 거래 내역 등 객관적 입증 자료에 기초해야 합니다.")
+    parts.append("- 객관적 증빙 없이 구두 주장만으로 법적 절차를 섣불리 진행할 경우 입증 부족으로 인한 불이익이 발생할 수 있습니다.\n")
 
     # 3. 안전한 후속 행동 가이드
     parts.append("[3. 안전한 후속 행동 가이드]")
     parts.append(
-        "- 미검증 법률 분석에 의존한 일방적 법적 조치는 불측의 손해를 야기할 수 있으므로, 반드시 계약서, 통지 내역(내용증명, 문자 등), 객관적 증빙 자료를 지참하여 "
+        "- 미검증 법률 판단에 의존한 일방적 법적 조치는 불측의 손해를 초래할 수 있으므로, 관련 서류 및 객관적 입증 자료를 지참하여 "
         "대한법률구조공단(국번없이 132) 또는 변호사 등 법률전문가의 정밀 대면 상담을 받으시기 바랍니다."
     )
 
@@ -716,7 +757,7 @@ def insufficient_node(state: LegalState) -> Dict:
         "warnings": warnings,
         "sources": [],
         "cited_sources": [],
-        "messages": [HumanMessage(content="dummy", name="system"), final],
+        "messages": [AIMessage(content=final)],
     }
 
 
@@ -760,7 +801,7 @@ def finalize_node(state: LegalState) -> Dict:
         "cited_sources": cited_sources,
         "warnings": warnings,
         "final_disposition": final_disp,
-        "messages": [final]
+        "messages": [AIMessage(content=final)]
     }
 
 
@@ -1047,6 +1088,134 @@ def re_analyze_node(state: LegalState) -> Dict:
     }
 
 
+
+@trace
+def intent_analysis_node(state: LegalState) -> Dict:
+    """사용자 질문의 의도(ConsultationIntent)와 문맥 복원 질의(resolved_query)를 도출한다."""
+    set_node_name("intent_analysis")
+    q = state.get("question", "")
+    conv_ctx = state.get("conversation_context")
+    case_ctx = state.get("case_context") or ""
+
+    from ai_legal_helper.workflows.conversation_context import ConversationContext
+    c_obj = None
+    if conv_ctx:
+        try:
+            c_obj = ConversationContext(**conv_ctx) if isinstance(conv_ctx, dict) else conv_ctx
+        except Exception:
+            c_obj = None
+
+    decision = analyze_consultation_intent(question=q, conversation_context=c_obj, case_context=case_ctx)
+    logger.info(f"[NODE:intent_analysis] intent={decision.intent.value}, resolved_q='{decision.resolved_query[:60]}...'")
+
+    return {
+        "intent": decision.intent.value,
+        "resolved_query": decision.resolved_query,
+        "intent_decision": decision.model_dump(),
+    }
+
+
+def intent_condition(state: LegalState) -> str:
+    """의도 분석 결과에 따라 워크플로우 분기 경로를 결정한다."""
+    intent_val = state.get("intent")
+    if intent_val == ConsultationIntent.GENERAL_CONVERSATION.value:
+        return "general_conversation"
+    if intent_val == ConsultationIntent.NEEDS_CLARIFICATION.value:
+        return "routing_exit"
+    if intent_val == ConsultationIntent.FOLLOWUP_ACTION.value:
+        return "followup_action"
+    return "route"
+
+
+@trace
+def general_conversation_node(state: LegalState) -> Dict:
+    """일상적 인사나 감사 표현에 대해 친절하고 전문적인 법률 도우미 안내를 생성한다."""
+    set_node_name("general_conversation")
+    q = state.get("question", "")
+    
+    # 간결하고 정중한 인사말 생성
+    if any(k in q for k in ["감사", "고마", "수고"]):
+        answer = "도움이 되어 기쁩니다. 사건 관련하여 추가로 궁금하신 쟁점이나 절차상 확인이 필요한 사항이 있으시면 언제든지 질문해 주시기 바랍니다."
+    else:
+        answer = "안녕하세요! 의뢰인님의 법률 문제를 신속하고 정확하게 도와드리는 AI Legal Helper입니다. 현재 사안에 대해 궁금하신 점이나 조언이 필요한 부분을 편하게 말씀해 주세요."
+
+    return {
+        "final_answer": answer,
+        "draft_answer": answer,
+        "final_disposition": "DELIVERED",
+        "verification_status": "PASS",
+        "categories": [],
+        "selected_agents": [],
+        "sources": [],
+        "cited_sources": [],
+        "retrieved_sources": [],
+        "warnings": [],
+        "messages": [AIMessage(content=answer)],
+    }
+
+
+FOLLOWUP_ACTION_PROMPT = """당신은 전문 변호사이자 실무 법률 가이드입니다.
+의뢰인이 앞선 법률 분석을 확인한 후 "이제 뭘 해야 하죠?", "그다음 절차는요?"와 같이 실무적 행동 요령을 묻고 있습니다.
+
+[의뢰인의 현재 질문]
+{question}
+
+[이전 상담 대화 맥락]
+{conversation_context}
+
+[사건 사실관계 및 확인된 정보]
+{case_context}
+
+[작성 지침]
+- 복잡한 5단계 법률 의견서 형식을 쓰지 마세요. 불필요한 서론과 법리 반복을 생략하세요.
+- 의뢰인이 지금 당장 실천할 수 있는 우선순위별 실행 가이드를 간결하고 명확하게 제시하세요.
+- 반드시 다음 3가지 핵심 구조로 작성하세요:
+  [1. 핵심 결론 및 우선순위 요약]
+  [2. 단계별 구체적 실행 조치] (1단계: 즉시 조치, 2단계: 필수 서류 구비, 3단계: 법적 절차 신청)
+  [3. 실무상 유의사항 및 사전 선행조건]
+- 이전 상담에서 확인된 사실과 법률 조문이 있다면 일관성 있게 인용하되, 가상의 증거번호나 확인되지 않은 사실을 지어내지 마세요.
+"""
+
+
+@trace
+def followup_action_node(state: LegalState) -> Dict:
+    """이전 분석 결과를 바탕으로 불필요한 Specialist/RAG 중복 호출 없이 신속한 행동 플랜을 작성한다."""
+    set_node_name("followup_action")
+    q = state.get("question", "")
+    conv_ctx_dict = state.get("conversation_context")
+    case_ctx = state.get("case_context") or ""
+
+    from ai_legal_helper.workflows.conversation_context import ConversationContext
+    c_obj = None
+    conv_summary = "(이전 대화 없음)"
+    reusable_sources = []
+    if conv_ctx_dict:
+        try:
+            c_obj = ConversationContext(**conv_ctx_dict) if isinstance(conv_ctx_dict, dict) else conv_ctx_dict
+            conv_summary = c_obj.format_context_for_prompt(max_turns=3)
+            reusable_sources = c_obj.previously_cited_sources
+        except Exception:
+            pass
+
+    prompt_str = FOLLOWUP_ACTION_PROMPT.format(
+        question=q,
+        conversation_context=conv_summary,
+        case_context=case_ctx[:1000] if case_ctx else "(사건 정보 없음)",
+    )
+
+    llm = get_llm(temperature=0.0)
+    res = llm.invoke(prompt_str)
+    raw_content = getattr(res, "content", str(res)).strip()
+
+    logger.info(f"[NODE:followup_action] Generated actionable guide ({len(raw_content)} chars)")
+
+    return {
+        "draft_answer": raw_content,
+        "retrieved_sources": reusable_sources,  # 직전 검증된 출처 재사용하여 Verifier Grounding 보장
+        "categories": ["민법"],
+        "selected_agents": ["민법"],
+    }
+
 @trace
 def build_legal_graph(checkpointer: Optional[Any] = None):
     """법률 상담 LangGraph 상태 머신을 구성 및 컴파일한다.
@@ -1061,6 +1230,9 @@ def build_legal_graph(checkpointer: Optional[Any] = None):
     """
     graph = StateGraph(LegalState)
     graph.add_node("supervisor_initialize", supervisor_initialize_node)
+    graph.add_node("intent_analysis", intent_analysis_node)
+    graph.add_node("general_conversation", general_conversation_node)
+    graph.add_node("followup_action", followup_action_node)
     graph.add_node("route", route_node)
     graph.add_node("plan", plan_node)
     graph.add_node("run_agents", run_agents_node)
@@ -1075,7 +1247,15 @@ def build_legal_graph(checkpointer: Optional[Any] = None):
     graph.add_node("routing_exit", routing_exit_node)
 
     graph.add_edge(START, "supervisor_initialize")
-    graph.add_edge("supervisor_initialize", "route")
+    graph.add_edge("supervisor_initialize", "intent_analysis")
+    graph.add_conditional_edges("intent_analysis", intent_condition, {
+        "general_conversation": "general_conversation",
+        "routing_exit": "routing_exit",
+        "followup_action": "followup_action",
+        "route": "route",
+    })
+    graph.add_edge("general_conversation", END)
+    graph.add_edge("followup_action", "verification")
     graph.add_conditional_edges("route", route_condition, {
         "plan": "plan",
         "routing_exit": "routing_exit",
@@ -1119,6 +1299,7 @@ async def _execute_consultation(
     thread_id: str,
     resume_data: Optional[Dict[str, Any]],
     checkpointer: Any,
+    conversation_context: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """지정된 체크포인터 환경에서 실제 LangGraph 워크플로우를 실행하고 결과를 수합한다."""
     from ai_legal_helper.observability.langfuse_client import flush_langfuse, get_langfuse_callback_handler
@@ -1146,7 +1327,17 @@ async def _execute_consultation(
 
             final_state = await app.ainvoke(Command(resume=resume_data), config)
         else:
-            inputs = {"messages": [HumanMessage(content=question)]}
+            history_messages = conversation_context.to_chat_history_messages(max_turns=5) if conversation_context and hasattr(conversation_context, "to_chat_history_messages") else []
+            conv_id = getattr(conversation_context, "conversation_id", None) or ""
+            conv_dump = conversation_context.model_dump() if (conversation_context and hasattr(conversation_context, "model_dump")) else (conversation_context if isinstance(conversation_context, dict) else None)
+            t_idx = getattr(conversation_context, "turn_index", 1) or 1
+
+            inputs = {
+                "messages": history_messages + [HumanMessage(content=question)],
+                "conversation_id": conv_id,
+                "conversation_context": conv_dump,
+                "turn_index": t_idx,
+            }
             final_state = await app.ainvoke(inputs, config)
     finally:
         flush_langfuse()
@@ -1173,6 +1364,11 @@ async def _execute_consultation(
             "request_id": final_state.get("request_id", thread_id),
             "selected_agents": final_state.get("selected_agents", []),
             "routing_status": "CLASSIFIED",
+            "conversation_id": final_state.get("conversation_id") or getattr(conversation_context, "conversation_id", None),
+            "turn_index": final_state.get("turn_index") or getattr(conversation_context, "turn_index", 1),
+            "intent": final_state.get("intent"),
+            "resolved_query": final_state.get("resolved_query"),
+            "intent_decision": final_state.get("intent_decision"),
         }
 
     final_answer = final_state.get("final_answer", "답변을 생성하지 못했습니다.")
@@ -1214,6 +1410,11 @@ async def _execute_consultation(
         "selected_agents": final_state.get("selected_agents", []),
         "approval_request": final_state.get("approval_request"),
         "approval_status": final_state.get("approval_status"),
+        "conversation_id": final_state.get("conversation_id") or getattr(conversation_context, "conversation_id", None),
+        "turn_index": final_state.get("turn_index") or getattr(conversation_context, "turn_index", 1),
+        "intent": final_state.get("intent"),
+        "resolved_query": final_state.get("resolved_query"),
+        "intent_decision": final_state.get("intent_decision"),
     }
 
 
@@ -1223,6 +1424,7 @@ async def run_legal_consultation(
     thread_id: str, 
     resume_data: Optional[Dict[str, Any]] = None,
     checkpointer: Optional[Any] = None,
+    conversation_context: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """법률 상담 슈퍼바이저 워크플로우를 실행하고 최종 답변, 출처 또는 승인 대기 상태를 반환한다.
 
@@ -1244,7 +1446,7 @@ async def run_legal_consultation(
             pass
 
     if checkpointer is not None:
-        return await _execute_consultation(question, thread_id, resume_data, checkpointer)
+        return await _execute_consultation(question, thread_id, resume_data, checkpointer, conversation_context=conversation_context)
 
     checkpointer_type = os.getenv("CHECKPOINTER_TYPE", "postgres").lower()
     if checkpointer_type == "memory" or AsyncPostgresSaver is None:
@@ -1254,9 +1456,9 @@ async def run_legal_consultation(
                 "로컬 MemorySaver로 폴백합니다. 영구 체크포인팅을 위해 pip install langgraph-checkpoint-postgres가 권장됩니다."
             )
         mem_saver = get_memory_checkpointer()
-        return await _execute_consultation(question, thread_id, resume_data, mem_saver)
+        return await _execute_consultation(question, thread_id, resume_data, mem_saver, conversation_context=conversation_context)
     else:
         conn_string = get_postgres_conn_string()
         async with AsyncPostgresSaver.from_conn_string(conn_string) as pg_saver:
-            return await _execute_consultation(question, thread_id, resume_data, pg_saver)
+            return await _execute_consultation(question, thread_id, resume_data, pg_saver, conversation_context=conversation_context)
 

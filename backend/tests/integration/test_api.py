@@ -28,7 +28,7 @@ def test_start_consultation():
     # Check status endpoint
     status_response = client.get(f"/api/v1/consultations/{req_id}/status")
     assert status_response.status_code == 200
-    assert status_response.json()["status"] in ["IN_PROGRESS", "SUCCESS", "ERROR"]
+    assert status_response.json()["status"] in ["IN_PROGRESS", "SUCCESS", "ERROR", "APPROVAL_REQUIRED"]
 
     # Check full result endpoint
     result_response = client.get(f"/api/v1/consultations/{req_id}")

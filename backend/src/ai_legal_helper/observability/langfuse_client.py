@@ -540,6 +540,10 @@ def build_consultation_trace_summary(
     verification_info: Optional[Dict[str, Any]] = None,
     usage_info: Optional[Dict[str, Any]] = None,
     hilt_info: Optional[Dict[str, Any]] = None,
+    conversation_id: Optional[str] = None,
+    turn_index: int = 1,
+    intent: Optional[str] = None,
+    resolved_query: Optional[str] = None,
 ) -> Dict[str, Any]:
     """한 번의 상담 세션에 대한 의사결정 및 실행 전체 흐름을 일목요연하게 요약한 구조화 메타데이터를 생성한다 (P2-02).
 
@@ -564,6 +568,10 @@ def build_consultation_trace_summary(
     """
     return {
         "request_id": request_id,
+        "conversation_id": conversation_id,
+        "turn_index": turn_index,
+        "conversation_intent": intent,
+        "resolved_query": resolved_query,
         "case_id": case_id,
         "execution_status": execution_status,
         "verification_status": verification_status,
