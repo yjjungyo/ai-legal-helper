@@ -155,8 +155,16 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
 
     case_context = ""
     # 사건이 지정되지 않은 일반 상담에서는 GraphRAG 를 사용하지 않는다.
-    graph_evidence: Dict[str, Any] = {"available": False, "valid_paths": [], "invalid_count": 0,
-                                      "evidence_gaps": [], "contradictions": []}
+    graph_evidence: Dict[str, Any] = {
+        "available": False,
+        "search_mode": "NONE",
+        "valid_paths": [],
+        "structured_matches": [],
+        "sources": [],
+        "invalid_count": 0,
+        "evidence_gaps": [],
+        "contradictions": [],
+    }
     if case_id:
         db = SessionLocal()
         try:
@@ -165,28 +173,34 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
                 facts = db.query(Fact).filter(Fact.case_id == case_id).all()
                 events = db.query(Event).filter(Event.case_id == case_id).order_by(Event.event_date).all()
                 
-                # Fetch approved evidence claims to serve as case evidence
+                # 승인(APPROVED) 및 수정승인(EDITED)된 증거 Claim을 사건 증거로 조회
                 approved_claims = db.query(EvidenceClaim).filter(
                     EvidenceClaim.case_id == case_id,
-                    EvidenceClaim.review_status == "APPROVED"
+                    EvidenceClaim.review_status.in_(["APPROVED", "EDITED"])
                 ).all()
 
                 context_parts = [f"[사건 기본 정보]\n제목: {case.title}"]
                 if facts:
-                    fact_lines = "\n".join([f"- {f.statement} (유형: {f.fact_type}, 신뢰도: {f.confidence})" for f in facts])
+                    fact_lines = "\n".join([
+                        f"- {f.statement} (유형: {f.fact_type}, 검증상태: {f.verification_status or 'UNVERIFIED'}, 출처유형: {f.source_type or 'UNKNOWN'}, 신뢰도: {f.confidence})"
+                        for f in facts
+                    ])
                     context_parts.append(f"\n[기존 사실관계]\n{fact_lines}")
                 if events:
                     event_lines = "\n".join([f"- {e.event_date or '날짜미상'}: {e.title}" for e in events])
                     context_parts.append(f"\n[타임라인]\n{event_lines}")
                 if approved_claims:
-                    claim_lines = "\n".join([f"- {c.statement} (종류: {c.claim_type}, 파일ID: {c.evidence_id})" for c in approved_claims])
+                    claim_lines = "\n".join([
+                        f"- {c.statement} (종류: {c.claim_type}, 단언상태: {c.assertion_status or 'DOCUMENT_STATES'}, 파일ID: {c.evidence_id})"
+                        for c in approved_claims
+                    ])
                     context_parts.append(f"\n[사건 증거(승인된 추출 정보)]\n{claim_lines}")
 
                 case_context = "\n".join(context_parts)
                 
-                # [P2.4 GraphRAG 통합]
-                # 그래프 검색 → PostgreSQL 대조 검증 → 검증 통과 경로만 컨텍스트에 추가한다.
-                # Neo4j 장애/미구성 시 graph_evidence.available=False 로 기존 흐름을 그대로 진행한다.
+                # [Structured Evidence GraphRAG v2.0 통합]
+                # PostgreSQL 구조화 증거 검색 + Neo4j 그래프 관계 탐색 → PostgreSQL 대조 검증 → 컨텍스트 추가.
+                # Neo4j 장애/미구성 시에도 PostgreSQL 기반 사건 증거 검색 결과를 그대로 활용한다.
                 graph_evidence = _collect_graph_evidence(db, case_id, q or "")
                 graph_text = graph_evidence.pop("context_text", "")
                 if graph_text:
@@ -226,30 +240,44 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
 
 
 def _collect_graph_evidence(db, case_id: str, question: str) -> Dict[str, Any]:
-    """사건 그래프에서 질문 관련 증거 경로를 검색하고 코드 레벨로 검증한다.
+    """PostgreSQL 구조화 증거 검색 + Neo4j 사건 그래프 탐색을 수행하고 코드 레벨로 검증한다.
 
     Args:
-        db: SQLAlchemy 세션(검증용).
+        db: SQLAlchemy 세션(PostgreSQL 증거 검색 및 그래프 경로 검증용).
         case_id: 사건 ID.
-        question: 사용자 질문(키워드 추출 대상).
+        question: 사용자 질문 또는 resolved_query(키워드 및 엔티티 추출 대상).
 
     Returns:
-        {available, valid_paths, invalid_count, evidence_gaps, contradictions, context_text}
+        {available, search_mode, valid_paths, structured_matches, sources,
+         invalid_count, evidence_gaps, contradictions, context_text}
         context_text 는 호출자가 꺼내 쓴 뒤 state 에서는 제거한다(중복 저장 방지).
 
     Notes:
         어떤 예외도 전파하지 않는다. GraphRAG 는 보조 근거이므로 실패해도 상담은 계속된다.
     """
-    empty = {"available": False, "valid_paths": [], "invalid_count": 0,
-             "evidence_gaps": [], "contradictions": [], "context_text": ""}
+    empty = {
+        "available": False,
+        "search_mode": "NONE",
+        "valid_paths": [],
+        "structured_matches": [],
+        "sources": [],
+        "invalid_count": 0,
+        "evidence_gaps": [],
+        "contradictions": [],
+        "context_text": "",
+    }
     try:
         from ai_legal_helper.database.neo4j import get_neo4j_driver
         from ai_legal_helper.rag.graph_rag import (
-            GraphRAGRetriever, validate_graph_paths, format_graph_context,
+            GraphRAGRetriever,
+            validate_graph_paths,
+            format_graph_context,
+            graph_paths_to_sources,
+            evidence_hits_to_sources,
         )
         driver = get_neo4j_driver()
-        # Neo4j 드라이버가 None이더라도 GraphRAGRetriever.search_hybrid 내부의 ChromaDB 벡터 폴백을 실행한다.
-        result = GraphRAGRetriever(driver).search_hybrid(case_id, question)
+        # Neo4j 드라이버가 None이더라도 search_hybrid 내부에서 PostgreSQL 구조화 증거 폴백을 수행한다.
+        result = GraphRAGRetriever(driver).search_hybrid(case_id, question, db=db)
         checked = (
             validate_graph_paths(db, case_id, result.get("traversal_paths", []))
             if result.get("traversal_paths")
@@ -258,10 +286,22 @@ def _collect_graph_evidence(db, case_id: str, question: str) -> Dict[str, Any]:
         if checked["invalid"]:
             # 원문 대신 ID/사유만 기록 (개인정보 보호)
             logger.warning(f"[GRAPH_RAG] 검증 실패 경로 {len(checked['invalid'])}건 제외")
+
+        structured_matches = result.get("structured_matches", [])
+        ev_sources: List[Dict[str, Any]] = []
+        seen_src_ids = set()
+        for s in graph_paths_to_sources(checked["valid"]) + evidence_hits_to_sources(structured_matches):
+            sid = s.get("source_id")
+            if sid and sid not in seen_src_ids:
+                seen_src_ids.add(sid)
+                ev_sources.append(s)
+
         return {
             "available": result.get("available", False),
+            "search_mode": result.get("search_mode", "POSTGRESQL_ONLY"),
             "valid_paths": checked["valid"],
-            "vector_matches": result.get("vector_matches", []),
+            "structured_matches": structured_matches,
+            "sources": ev_sources,
             "invalid_count": len(checked["invalid"]),
             "evidence_gaps": result.get("evidence_gaps", []),
             "contradictions": result.get("contradictions", []),
@@ -417,7 +457,11 @@ def verification_node(state: LegalState) -> Dict:
     """
     set_node_name("verification")
     from ai_legal_helper.agents.verification import run_verification
-    from ai_legal_helper.rag.graph_rag import graph_paths_to_sources, validate_graph_paths
+    from ai_legal_helper.rag.graph_rag import (
+        graph_paths_to_sources,
+        evidence_hits_to_sources,
+        validate_graph_paths,
+    )
     from ai_legal_helper.observability.context import get_case_id
 
     q = state.get("question", "")
@@ -425,7 +469,7 @@ def verification_node(state: LegalState) -> Dict:
     sources = list(state.get("retrieved_sources", []))
     graph_ev = state.get("graph_evidence") or {}
     graph_paths = graph_ev.get("valid_paths", [])
-    vector_matches = graph_ev.get("vector_matches", [])
+    structured_matches = graph_ev.get("structured_matches", [])
 
     graph_checks = {"available": bool(graph_ev.get("available")), "checked": 0,
                     "valid": 0, "invalid": []}
@@ -445,14 +489,19 @@ def verification_node(state: LegalState) -> Dict:
                             invalid=[{"claim_id": i["path"].get("claim_id"), "reasons": i["reasons"]}
                                      for i in rechecked["invalid"]])
 
-    extra_sources = graph_paths_to_sources(graph_paths)
-    if not graph_ev.get("available") and vector_matches:
-        # Fallback: add vector matches as StandardSource(CASE_EVIDENCE, HYBRID_VECTOR_FALLBACK)
-        from ai_legal_helper.rag.source_schema import build_source_from_vector_match
-        for v in vector_matches[:10]:
-            extra_sources.append(build_source_from_vector_match(v))
+    extra_sources = list(graph_paths_to_sources(graph_paths))
+    if structured_matches:
+        extra_sources.extend(evidence_hits_to_sources(structured_matches[:10]))
 
-    combined_sources = sources + extra_sources
+    existing_source_ids = {s.get("source_id") for s in sources if s.get("source_id")}
+    dedup_extra_sources = []
+    for es in extra_sources:
+        sid = es.get("source_id")
+        if sid and sid not in existing_source_ids:
+            existing_source_ids.add(sid)
+            dedup_extra_sources.append(es)
+
+    combined_sources = sources + dedup_extra_sources
     result = run_verification(q, draft, combined_sources,
                               state.get("case_context", ""))
 
@@ -1091,7 +1140,12 @@ def re_analyze_node(state: LegalState) -> Dict:
 
 @trace
 def intent_analysis_node(state: LegalState) -> Dict:
-    """사용자 질문의 의도(ConsultationIntent)와 문맥 복원 질의(resolved_query)를 도출한다."""
+    """사용자 질문의 의도(ConsultationIntent)와 문맥 복원 질의(resolved_query)를 도출한다.
+
+    후속 질문에서 대명사·생략 표현이 복원되어 resolved_query가 원문 question과 달라진 경우,
+    사건 ID가 존재하면 resolved_query로 PostgreSQL + Neo4j 사건 증거를 보강 검색하여
+    graph_evidence 및 case_context에 반영한다.
+    """
     set_node_name("intent_analysis")
     q = state.get("question", "")
     conv_ctx = state.get("conversation_context")
@@ -1108,11 +1162,39 @@ def intent_analysis_node(state: LegalState) -> Dict:
     decision = analyze_consultation_intent(question=q, conversation_context=c_obj, case_context=case_ctx)
     logger.info(f"[NODE:intent_analysis] intent={decision.intent.value}, resolved_q='{decision.resolved_query[:60]}...'")
 
-    return {
+    updates: Dict[str, Any] = {
         "intent": decision.intent.value,
         "resolved_query": decision.resolved_query,
         "intent_decision": decision.model_dump(),
     }
+
+    # resolved_query가 원문 질문과 다르고 법률/사실 검토가 필요한 경우 사건 증거 보강 검색 수행
+    from ai_legal_helper.observability.context import get_case_id
+    case_id = get_case_id()
+    if (
+        case_id
+        and decision.resolved_query
+        and decision.resolved_query.strip() != q.strip()
+        and decision.intent not in (ConsultationIntent.GENERAL_CONVERSATION, ConsultationIntent.NEEDS_CLARIFICATION)
+    ):
+        from ai_legal_helper.database.session import SessionLocal
+        db = SessionLocal()
+        try:
+            refreshed_ev = _collect_graph_evidence(db, case_id, decision.resolved_query)
+            refreshed_text = refreshed_ev.pop("context_text", "")
+            prev_ev = dict(state.get("graph_evidence") or {})
+            if refreshed_ev.get("valid_paths") or refreshed_ev.get("structured_matches"):
+                updates["graph_evidence"] = refreshed_ev
+                if refreshed_text and refreshed_text not in case_ctx:
+                    updates["case_context"] = f"{case_ctx}\n\n{refreshed_text}" if case_ctx else refreshed_text
+            elif not prev_ev:
+                updates["graph_evidence"] = refreshed_ev
+        except Exception as e:
+            logger.warning(f"[NODE:intent_analysis] resolved_query 기반 증거 재검색 실패: {e}")
+        finally:
+            db.close()
+
+    return updates
 
 
 def intent_condition(state: LegalState) -> str:

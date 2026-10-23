@@ -43,8 +43,6 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
-from langchain_core.documents import Document
-from ai_legal_helper.rag.evidence_vector import sync_evidence_to_vector_store
 
 from ai_legal_helper.database.models import (
     Case, Party, Fact, Event, LegalIssue,
@@ -186,7 +184,8 @@ def collect_case_snapshot(db: Session, case_id: str) -> Optional[Dict[str, Any]]
         "documents": [{"id": d.id, "filename": d.original_filename, "media_type": d.media_type,
                        "status": d.status, "source_kind": d.source_kind} for d in docs],
         "spans": [{"id": s.id, "evidence_id": s.evidence_id, "text_excerpt": _truncate(s.text_excerpt),
-                   "page_number": s.page_number, "location_quality": s.location_quality} for s in spans],
+                   "page_number": s.page_number, "paragraph_index": s.paragraph_index,
+                   "location_quality": s.location_quality} for s in spans],
         "claims": [{"id": c.id, "evidence_id": c.evidence_id, "statement": c.statement,
                     "claim_type": c.claim_type, "assertion_status": c.assertion_status,
                     "review_status": c.review_status, "confidence": c.confidence} for c in claims],
@@ -343,25 +342,8 @@ def sync_case_to_graph(db: Session, driver, case_id: str) -> Dict[str, Any]:
 
     with driver.session() as session:
         stats = session.execute_write(_write_snapshot_tx, snap)
-        
-    # ChromaDB (Vector Store) 동기화
-    docs = []
-    # 대상: Fact, Event, LegalIssue, EvidenceClaim, EvidenceSpan
-    for f in snap["facts"]:
-        docs.append(Document(page_content=f["statement"], metadata={"case_id": case_id, "node_id": f["id"], "node_type": "Fact"}))
-    for e in snap["events"]:
-        docs.append(Document(page_content=e["title"], metadata={"case_id": case_id, "node_id": e["id"], "node_type": "Event"}))
-    for i in snap["issues"]:
-        docs.append(Document(page_content=f"{i['title']}\n{i.get('description', '')}", metadata={"case_id": case_id, "node_id": i["id"], "node_type": "LegalIssue"}))
-    for c in snap["claims"]:
-        if c.get("review_status") in APPROVED_REVIEW_STATUSES:
-            docs.append(Document(page_content=c["statement"], metadata={"case_id": case_id, "node_id": c["id"], "node_type": "EvidenceClaim"}))
-    for s in snap["spans"]:
-        docs.append(Document(page_content=s.get("text_excerpt", ""), metadata={"case_id": case_id, "node_id": s["id"], "node_type": "EvidenceSpan"}))
-    
-    sync_evidence_to_vector_store(case_id, docs)
 
-    logger.info(f"[GRAPH_SYNC] case={case_id} nodes={stats['nodes']} links={stats['evidence_links']} vectors={len(docs)}")
+    logger.info(f"[GRAPH_SYNC] case={case_id} nodes={stats['nodes']} links={stats['evidence_links']}")
     return {"status": "SYNCED", "case_id": case_id, **stats}
 
 

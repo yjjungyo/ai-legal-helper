@@ -286,7 +286,6 @@ def delete_case(
     
     1. 로컬 파일 저장소의 실제 증거 파일 및 다운로드 문서 삭제
     2. Neo4j Knowledge Graph 내 사건 서브그래프 노드/관계 삭제
-    3. ChromaDB Vector Store 내 사건 관련 임베딩 삭제
     4. RDB 내 연관 동기화 작업 큐(GraphSyncTask) 삭제
     5. RDB Cascade를 통한 Case 및 하위 전체 레코드(증거, 사실, 상담, 대응계획 등) 영구 삭제
     """
@@ -294,7 +293,6 @@ def delete_case(
     from ai_legal_helper.case_intelligence.evidence_ingestion import get_storage_dir
     from ai_legal_helper.database.graph_sync import delete_case_graph
     from ai_legal_helper.database.neo4j import get_neo4j_driver
-    from ai_legal_helper.rag.evidence_vector import delete_evidence_vector
     from ai_legal_helper.database.models import GraphSyncTask
 
     case_title = case.title
@@ -333,12 +331,6 @@ def delete_case(
             delete_case_graph(driver, case.id)
     except Exception as e:
         logger.warning(f"Failed to delete Neo4j graph for case {case.id}: {e}")
-
-    # 4. ChromaDB 벡터 임베딩 삭제
-    try:
-        delete_evidence_vector(case.id)
-    except Exception as e:
-        logger.warning(f"Failed to delete vector embeddings for case {case.id}: {e}")
 
     # 5. 비동기 작업 큐 정리
     try:

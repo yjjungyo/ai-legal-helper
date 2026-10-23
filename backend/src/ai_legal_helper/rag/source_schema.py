@@ -9,7 +9,7 @@
 [주요 기능]
 1. 공통 필드(source_id, source_type, document_id, title, content, retrieval_method, chunk_id,
    source_url, version_date, retrieved_at) 및 유형별 필드(법령, 판례, 사건 증거, 일반 문서) 정의
-2. ChromaDB 문서, Neo4j GraphRAG 경로, 증거 벡터 폴백 결과를 표준 Source 스키마로 변환
+2. ChromaDB 법령 문서, Neo4j GraphRAG 경로, PostgreSQL 구조화 증거 검색 결과를 표준 Source 스키마로 변환
 3. 실제 메타데이터·본문에서 확인된 값만 기록하고 확인되지 않은 필드는 모두 None(null)으로 처리
 """
 from datetime import datetime, timezone
@@ -71,6 +71,9 @@ class StandardSource(BaseModel):
 
     # 4. 사건 증거(CASE_EVIDENCE) 및 일반 문서(DOCUMENT) 전용 필드
     evidence_id: Optional[str] = None
+    span_id: Optional[str] = None
+    claim_id: Optional[str] = None
+    paragraph_index: Optional[int] = None
     filename: Optional[str] = None
     page: Optional[str] = None
 
@@ -181,7 +184,7 @@ def build_source_from_chroma_doc(
         source_type = "PRECEDENT"
     elif statute_name or (filename and any(k in filename for k in ("법률", "시행령", "시행규칙", "보호법", "민법", "형법", "상법", "근로기준법"))):
         source_type = "STATUTE"
-    elif meta.get("evidence_id") or category in ("EVIDENCE_VECTOR", "EVIDENCE_GRAPH"):
+    elif meta.get("evidence_id") or category in ("EVIDENCE_POSTGRES", "EVIDENCE_GRAPH", "EVIDENCE_VECTOR"):
         source_type = "CASE_EVIDENCE"
     else:
         source_type = "DOCUMENT"
@@ -242,7 +245,8 @@ def build_source_from_graph_path(path: Dict[str, Any]) -> Dict[str, Any]:
     evidence_id = path.get("evidence_id")
     raw_fn = path.get("filename")
     filename = os.path.basename(str(raw_fn)).strip() if raw_fn else None
-    page = str(path.get("page_or_section")).strip() if path.get("page_or_section") is not None else None
+    raw_page = path.get("page_or_section") if path.get("page_or_section") is not None else path.get("page_number")
+    page = str(raw_page).strip() if raw_page is not None and str(raw_page).strip() != "" else None
     source_id = f"GRAPH:{span_or_claim_id}"
     content = (
         f"{path.get('claim_statement') or path.get('evidence_text') or ''} "
@@ -261,6 +265,9 @@ def build_source_from_graph_path(path: Dict[str, Any]) -> Dict[str, Any]:
         version_date=None,
         retrieved_at=_utc_now_iso(),
         evidence_id=str(evidence_id) if evidence_id else None,
+        span_id=str(path.get("span_id")).strip() if path.get("span_id") else None,
+        claim_id=str(path.get("claim_id")).strip() if path.get("claim_id") else None,
+        paragraph_index=int(path["paragraph_index"]) if path.get("paragraph_index") is not None else None,
         filename=filename,
         page=page,
         file=filename or source_id,
@@ -270,16 +277,79 @@ def build_source_from_graph_path(path: Dict[str, Any]) -> Dict[str, Any]:
     return std.model_dump()
 
 
+def build_source_from_evidence_search_result(hit: Any) -> Dict[str, Any]:
+    """PostgreSQL Evidence Search 결과(EvidenceSearchHit 또는 dict)를 표준 CASE_EVIDENCE Source로 변환한다.
+
+    출처 식별자(source_id)는 실제 Evidence ID와 Span/Claim ID를 기반으로 생성하여
+    법령 Source ID와 혼동되지 않도록 보장한다.
+    """
+    d: Dict[str, Any] = hit.model_dump() if hasattr(hit, "model_dump") else dict(hit or {})
+    evidence_id = str(d.get("evidence_id") or d.get("document_id") or "").strip() or None
+    span_id = str(d.get("span_id") or "").strip() or None
+    claim_id = str(d.get("claim_id") or "").strip() or None
+    fact_id = str(d.get("fact_id") or "").strip() or None
+    node_id = span_id or claim_id or fact_id or str(d.get("node_id") or "unknown").strip()
+
+    if evidence_id and span_id:
+        source_id = f"EVIDENCE:{evidence_id}:SPAN:{span_id}"
+    elif evidence_id and claim_id:
+        source_id = f"EVIDENCE:{evidence_id}:CLAIM:{claim_id}"
+    elif span_id:
+        source_id = f"EVIDENCE:SPAN:{span_id}"
+    elif claim_id:
+        source_id = f"EVIDENCE:CLAIM:{claim_id}"
+    else:
+        source_id = f"EVIDENCE:{node_id}"
+
+    raw_fn = d.get("document_name") or d.get("filename") or d.get("file_name")
+    filename = os.path.basename(str(raw_fn)).strip() if raw_fn else None
+    raw_page = d.get("page_number") if d.get("page_number") is not None else d.get("page")
+    page = str(raw_page).strip() if raw_page is not None and str(raw_page).strip() != "" else None
+
+    stmt = (d.get("claim_statement") or d.get("statement") or "").strip()
+    excerpt = (d.get("source_excerpt") or d.get("content") or "").strip()
+    if stmt and excerpt and stmt != excerpt:
+        content = f"{stmt} [원문 발췌: {excerpt}]"
+    else:
+        content = stmt or excerpt or None
+
+    std = StandardSource(
+        source_id=source_id,
+        source_type="CASE_EVIDENCE",
+        document_id=evidence_id or node_id,
+        title=filename or (f"사건 증거 ({evidence_id})" if evidence_id else "사건 증거 (PostgreSQL)"),
+        content=content,
+        retrieval_method="POSTGRES_EVIDENCE_SEARCH",
+        chunk_id=span_id or claim_id or node_id,
+        source_url=None,
+        version_date=None,
+        retrieved_at=_utc_now_iso(),
+        evidence_id=evidence_id,
+        span_id=span_id,
+        claim_id=claim_id,
+        paragraph_index=int(d["paragraph_index"]) if d.get("paragraph_index") is not None else None,
+        filename=filename,
+        page=page,
+        file=filename or source_id,
+        file_name=filename,
+        category="EVIDENCE_POSTGRES",
+    )
+    return std.model_dump()
+
+
 def build_source_from_vector_match(v: Dict[str, Any]) -> Dict[str, Any]:
-    """GraphDB 폴백 시 조회된 사건 증거 벡터 매치를 표준 CASE_EVIDENCE Source 딕셔너리로 변환한다."""
+    """[Deprecated] 기존 벡터 매치 하위 호환용 변환 함수.
+
+    운영 경로에서는 build_source_from_evidence_search_result()를 사용한다.
+    """
     node_id = str(v.get("node_id") or "unknown")
     node_type = str(v.get("node_type") or "Evidence")
-    raw_fn = v.get("filename") or v.get("file_name")
+    raw_fn = v.get("filename") or v.get("file_name") or v.get("document_name")
     filename = os.path.basename(str(raw_fn)).strip() if raw_fn else None
     evidence_id = str(v.get("evidence_id")).strip() if v.get("evidence_id") else None
-    page = str(v.get("page")).strip() if v.get("page") is not None else None
+    page = str(v.get("page") or v.get("page_number") or "").strip() or None
     source_id = f"VECTOR:{node_id}"
-    content = f"{node_type}: {v.get('content') or ''}".strip()
+    content = f"{node_type}: {v.get('content') or v.get('statement') or ''}".strip()
 
     std = StandardSource(
         source_id=source_id,
@@ -318,16 +388,21 @@ def normalize_source_dict(raw: Any) -> Dict[str, Any]:
             file_name=fn,
         ).model_dump()
 
-    raw_fn = raw.get("filename") or raw.get("file_name") or raw.get("file")
+    raw_fn = raw.get("filename") or raw.get("file_name") or raw.get("file") or raw.get("document_name")
     filename = os.path.basename(str(raw_fn)).strip() if raw_fn and str(raw_fn).strip() not in ("", "?") else None
-    page = str(raw.get("page")).strip() if raw.get("page") not in (None, "", "?") else None
+    raw_page = raw.get("page") if raw.get("page") is not None else raw.get("page_number")
+    page = str(raw_page).strip() if raw_page not in (None, "", "?") else None
     source_id = str(raw.get("source_id") or (f"{filename}_{page}" if filename and page else (filename or "UNKNOWN")))
 
     # 이미 source_type과 retrieval_method가 있으면 그대로 보존하되 누락 필드를 StandardSource로 보완
     source_type = raw.get("source_type")
     if not source_type:
         cat = str(raw.get("category") or "")
-        if cat in ("EVIDENCE_GRAPH", "EVIDENCE_VECTOR") or raw.get("evidence_id") or source_id.startswith(("GRAPH:", "VECTOR:")):
+        if (
+            cat in ("EVIDENCE_GRAPH", "EVIDENCE_POSTGRES", "EVIDENCE_VECTOR")
+            or raw.get("evidence_id")
+            or source_id.startswith(("GRAPH:", "EVIDENCE:", "VECTOR:"))
+        ):
             source_type = "CASE_EVIDENCE"
         elif raw.get("case_number") or raw.get("court") or (filename and ("판례" in filename or "판결" in filename)):
             source_type = "PRECEDENT"
@@ -363,6 +438,7 @@ def normalize_source_dict(raw: Any) -> Dict[str, Any]:
         content=content,
         retrieval_method=raw.get("retrieval_method") or (
             "NEO4J_GRAPH" if source_id.startswith("GRAPH:")
+            else "POSTGRES_EVIDENCE_SEARCH" if source_id.startswith("EVIDENCE:")
             else "HYBRID_VECTOR_FALLBACK" if source_id.startswith("VECTOR:")
             else "CHROMA_VECTOR"
         ),
@@ -393,9 +469,6 @@ def normalize_source_dict(raw: Any) -> Dict[str, Any]:
 def is_statute_applicable_to_date(source_dict: Dict[str, Any], target_date_str: str) -> bool:
     """주어진 법령 출처가 사건 발생일(또는 계약/해지 기준일)에 시행 중이었는지 검증한다.
 
-    대한민국 법령의 효력 발생 시점(시행일자)을 기준으로 사건 당시 적용 가능한 법령인지 판별하며,
-    최신 법령과 사건 당시 법령을 혼동하지 않도록 돕는다.
-
     Args:
         source_dict: 법령 출처 정보 딕셔너리 (effective_date, promulgation_date, version_date 등 포함).
         target_date_str: 사건 발생일 또는 계약/해지 기준일자 (예: '2026-10-17' 또는 '20261017').
@@ -408,7 +481,6 @@ def is_statute_applicable_to_date(source_dict: Dict[str, Any], target_date_str: 
         return True
 
     def _parse_clean_date(d: Any) -> Optional[datetime]:
-        """임의 형식의 날짜 문자열을 datetime 객체로 파싱한다."""
         if not d:
             return None
         s = str(d).strip().replace(".", "-").replace("/", "-")
@@ -423,17 +495,14 @@ def is_statute_applicable_to_date(source_dict: Dict[str, Any], target_date_str: 
     if not target_dt:
         return True
 
-    # 1. 시행일자(effective_date) 우선 비교
     eff_str = source_dict.get("effective_date") or source_dict.get("version_date")
     eff_dt = _parse_clean_date(eff_str)
     if eff_dt:
         return target_dt >= eff_dt
 
-    # 2. 공포일자(promulgation_date) 비교 (시행일자 미기재 시 참고)
     prom_str = source_dict.get("promulgation_date")
     prom_dt = _parse_clean_date(prom_str)
     if prom_dt:
         return target_dt >= prom_dt
 
     return True
-

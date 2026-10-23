@@ -35,7 +35,8 @@ def test_p1_01_retrieval_status_distinguishes_no_match_and_infra_error():
     assert res_missing.error_detail is not None
 
     # 2. ChromaDB 연결/검색 예외 시 RETRIEVER_UNAVAILABLE 상태 반환 검증
-    with patch("ai_legal_helper.rag.retrieval._get_vs", side_effect=ConnectionError("ChromaDB connection refused")):
+    with patch("ai_legal_helper.rag.retrieval._list_collections", return_value=["law_docs_civil"]), \
+         patch("ai_legal_helper.rag.retrieval._get_vs", side_effect=ConnectionError("ChromaDB connection refused")):
         res_error = retrieve_with_status("임대차 계약 해지", category="civil")
         assert res_error.status == RetrievalStatus.RETRIEVER_UNAVAILABLE
         assert "ChromaDB connection refused" in str(res_error.error_detail)

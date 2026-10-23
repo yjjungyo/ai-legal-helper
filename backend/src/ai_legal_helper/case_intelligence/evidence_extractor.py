@@ -2,9 +2,10 @@
 """
 증거 인공지능 추출 서비스 (Evidence AI Extractor)
 
-추출된 텍스트 Span들을 기반으로 LLM을 활용하여 사실관계, 당사자, 날짜 등의 
+추출된 텍스트 Span들을 기반으로 LLM을 활용하여 사실관계, 당사자, 날짜 등의
 EvidenceClaim 후보를 추출한다.
 추출된 후보는 사용자의 승인을 거치기 위해 REVIEW_STATUS="PENDING"으로 생성된다.
+문서가 긴 경우 Span을 배치 단위(EXTRACTION_BATCH_SIZE=20)로 분할 처리하여 컨텍스트 초과 및 누락을 방지한다.
 """
 
 import logging
@@ -30,6 +31,8 @@ from ai_legal_helper.observability.context import get_current_span_id
 from ai_legal_helper.observability.langfuse_client import update_span
 
 logger = logging.getLogger(__name__)
+
+EXTRACTION_BATCH_SIZE = 20
 
 # LLM 출력을 위한 Pydantic 스키마 정의
 # 9가지 법률 도메인 세분화 카테고리 매핑
@@ -224,12 +227,45 @@ class EvidenceExtractionResultSchema(BaseModel):
     claims: List[ExtractedClaimSchema] = Field(description="추출된 주장 목록")
 
 
+def _extract_batch_claims_via_llm(
+    llm: Any,
+    prompt: ChatPromptTemplate,
+    context_str: str,
+) -> Optional[EvidenceExtractionResultSchema]:
+    """단일 배치의 증거 원문 Span 컨텍스트에 대해 LLM 구조화 추출을 수행한다."""
+    try:
+        structured_llm = llm.with_structured_output(EvidenceExtractionResultSchema, method="function_calling")
+        chain = prompt | structured_llm
+        return chain.invoke({"context": context_str})
+    except Exception as e:
+        logger.warning(f"with_structured_output failed, falling back to JSON parsing: {str(e)}")
+        fallback_prompt = ChatPromptTemplate.from_messages([
+            ("system", "당신은 법률 증거 분석 보조 AI입니다. 주어진 문서 내용을 바탕으로 중요한 사실들을 추출하세요.\n"
+                       "각 사실의 claim_type은 다음 영문 코드 중 하나로 지정하세요: PROPERTY, RIGHT_DUTY, DOC_INFO, DATE, AMOUNT, PARTY_INFO, ACTION, CONDITION, GENERAL.\n"
+                       "기존 사실과 상충하면 assertion_status를 CONTRADICTION_CANDIDATE로 설정하세요.\n"
+                       "반드시 다음과 같은 JSON 형식으로만 응답해야 합니다:\n"
+                       "{{\"claims\": [{{\"statement\": \"...\", \"claim_type\": \"DATE\", \"assertion_status\": \"DOCUMENT_STATES\", \"confidence\": 0.9, \"source_span_ids\": [\"...\"], \"contradicts_fact_id\": null}}]}}\n"
+                       "결과물은 반드시 유효한 JSON 포맷이어야 합니다."),
+            ("human", "{context}"),
+        ])
+        fallback_chain = fallback_prompt | llm
+        response = fallback_chain.invoke({"context": context_str})
+        text_content = response.content if hasattr(response, "content") else str(response)
+        if text_content.startswith("```json"):
+            text_content = text_content[7:-3]
+        elif text_content.startswith("```"):
+            text_content = text_content[3:-3]
+        data = json.loads(text_content)
+        return EvidenceExtractionResultSchema(**data)
+
+
 @trace
 def extract_claims_from_evidence(db: Session, doc_id: str) -> bool:
     """특정 EvidenceDocument의 텍스트를 LLM에 전달하여 EvidenceClaim 후보들을 도출하고 상충 여부를 검사한다.
 
     도출된 후보는 9종의 세분화 카테고리로 분류되며, 기존 사건 사실관계(Fact)와 상충하는 경우
     `assertion_status='CONTRADICTION_CANDIDATE'` 및 `EvidenceLink(link_type='CONTRADICTS')`를 생성한다.
+    문서의 Span이 많을 경우 배치(EXTRACTION_BATCH_SIZE) 단위로 분할 호출하고 중복 Claim을 병합한다.
 
     Args:
         db (Session): 데이터베이스 세션.
@@ -242,7 +278,12 @@ def extract_claims_from_evidence(db: Session, doc_id: str) -> bool:
     if not doc:
         return False
 
-    spans = db.query(EvidenceSpan).filter_by(evidence_id=doc_id).order_by(EvidenceSpan.created_at).all()
+    spans = (
+        db.query(EvidenceSpan)
+        .filter_by(evidence_id=doc_id)
+        .order_by(EvidenceSpan.page_number.asc().nullsfirst(), EvidenceSpan.paragraph_index.asc().nullsfirst(), EvidenceSpan.created_at.asc())
+        .all()
+    )
     if not spans:
         logger.warning(f"No spans found for document {doc_id}")
         return False
@@ -250,13 +291,6 @@ def extract_claims_from_evidence(db: Session, doc_id: str) -> bool:
     existing_facts = db.query(Fact).filter_by(case_id=doc.case_id).all()
     facts_by_id = {f.id: f for f in existing_facts}
     existing_facts_str = "\n".join([f"- [Fact ID: {f.id}] {f.statement}" for f in existing_facts]) or "(등록된 기존 사실관계 없음)"
-
-    span_texts = []
-    for s in spans:
-        loc = f"Page {s.page_number}" if s.page_number else f"Para {s.paragraph_index}"
-        span_texts.append(f"[Span ID: {s.id}] ({loc}): {s.text_excerpt}")
-
-    context_str = f"[기존 사건 사실관계]\n{existing_facts_str}\n\n[증거 문서 원문 Span]\n" + "\n\n".join(span_texts)
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", "당신은 법률 증거 분석 보조 AI입니다. 주어진 문서 내용을 바탕으로 중요한 사실관계 후보를 추출하세요.\n"
@@ -273,47 +307,38 @@ def extract_claims_from_evidence(db: Session, doc_id: str) -> bool:
                    "만약 추출된 사실이 [기존 사건 사실관계]와 모순·상충된다면 assertion_status를 'CONTRADICTION_CANDIDATE'로 지정하고 contradicts_fact_id에 해당 Fact ID를 기재하세요.\n"
                    "반드시 제공된 'Span ID'를 source_span_ids에 포함하여 출처를 명확히 해야 합니다.\n"
                    "결과물은 JSON 형식으로 반환해야 합니다. 거짓 정보를 생성하지 마세요."),
-        ("human", "다음 문서 텍스트에서 중요한 사실들을 추출해주세요.\n\n{context}")
+        ("human", "다음 문서 텍스트에서 중요한 사실들을 추출해주세요.\n\n{context}"),
     ])
 
     llm = get_llm(temperature=0.0)
+    all_extracted_claims: List[ExtractedClaimSchema] = []
 
-    # Azure OpenAI의 json_schema 400 에러를 방지하기 위해 function_calling 방식으로 구조화 출력 호출
-    try:
-        structured_llm = llm.with_structured_output(EvidenceExtractionResultSchema, method="function_calling")
-        chain = prompt | structured_llm
-        result = chain.invoke({"context": context_str})
-    except Exception as e:
-        logger.warning(f"with_structured_output failed, falling back to JSON parsing: {str(e)}")
-        fallback_prompt = ChatPromptTemplate.from_messages([
-            ("system", "당신은 법률 증거 분석 보조 AI입니다. 주어진 문서 내용을 바탕으로 중요한 사실들을 추출하세요.\n"
-                       "각 사실의 claim_type은 다음 영문 코드 중 하나로 지정하세요: PROPERTY, RIGHT_DUTY, DOC_INFO, DATE, AMOUNT, PARTY_INFO, ACTION, CONDITION, GENERAL.\n"
-                       "기존 사실과 상충하면 assertion_status를 CONTRADICTION_CANDIDATE로 설정하세요.\n"
-                       "반드시 다음과 같은 JSON 형식으로만 응답해야 합니다:\n"
-                       "{{\"claims\": [{{\"statement\": \"...\", \"claim_type\": \"DATE\", \"assertion_status\": \"DOCUMENT_STATES\", \"confidence\": 0.9, \"source_span_ids\": [\"...\"], \"contradicts_fact_id\": null}}]}}\n"
-                       "결과물은 반드시 유효한 JSON 포맷이어야 합니다."),
-            ("human", "{context}")
-        ])
-        fallback_chain = fallback_prompt | llm
-        response = fallback_chain.invoke({"context": context_str})
+    # 긴 문서를 위한 Span 배치 분할 처리
+    batches = [
+        spans[i:i + EXTRACTION_BATCH_SIZE]
+        for i in range(0, len(spans), EXTRACTION_BATCH_SIZE)
+    ]
+
+    for batch_spans in batches:
+        span_texts = []
+        for s in batch_spans:
+            loc = f"Page {s.page_number}" if s.page_number else f"Para {s.paragraph_index}"
+            span_texts.append(f"[Span ID: {s.id}] ({loc}): {s.text_excerpt}")
+        context_str = f"[기존 사건 사실관계]\n{existing_facts_str}\n\n[증거 문서 원문 Span]\n" + "\n\n".join(span_texts)
 
         try:
-            text_content = response.content
-            if text_content.startswith("```json"):
-                text_content = text_content[7:-3]
-            elif text_content.startswith("```"):
-                text_content = text_content[3:-3]
-
-            data = json.loads(text_content)
-            result = EvidenceExtractionResultSchema(**data)
+            batch_res = _extract_batch_claims_via_llm(llm, prompt, context_str)
+            if batch_res and batch_res.claims:
+                all_extracted_claims.extend(batch_res.claims)
         except Exception as parse_error:
             logger.error(f"Failed to parse LLM JSON response: {str(parse_error)}")
-            doc.status = "FAILED"
-            doc.error_code = "AI_EXTRACTION_FAILED"
-            db.commit()
-            return False
+            if not all_extracted_claims:
+                doc.status = "FAILED"
+                doc.error_code = "AI_EXTRACTION_FAILED"
+                db.commit()
+                return False
 
-    if not result or not result.claims:
+    if not all_extracted_claims:
         doc.status = "REVIEW_REQUIRED"
         db.commit()
         return True
@@ -323,11 +348,17 @@ def extract_claims_from_evidence(db: Session, doc_id: str) -> bool:
     new_claims = []
     links_to_create = []
     contradiction_links_to_create = []
+    seen_norm_statements = set()
 
-    for c_idx, claim_data in enumerate(result.claims):
+    for claim_data in all_extracted_claims:
         filtered_span_ids = [sid for sid in claim_data.source_span_ids if sid in valid_span_ids]
 
         if filtered_span_ids:
+            norm_stmt = "".join((claim_data.statement or "").split())
+            if not norm_stmt or norm_stmt in seen_norm_statements:
+                continue
+            seen_norm_statements.add(norm_stmt)
+
             normalized_code = normalize_to_claim_code(claim_data.claim_type)
             # LLM이 표시했거나 규칙 기반 상충 탐지기가 감지한 기존 Fact 확인
             conflicting_fact = None
@@ -353,21 +384,25 @@ def extract_claims_from_evidence(db: Session, doc_id: str) -> bool:
             db.add(new_claim)
             db.flush()  # id 할당을 위해 flush
 
-            for sid in filtered_span_ids:
-                links_to_create.append(EvidenceSpanClaimLink(
-                    claim_id=new_claim.id,
-                    span_id=sid,
-                ))
+            for sid in dict.fromkeys(filtered_span_ids):
+                links_to_create.append(
+                    EvidenceSpanClaimLink(
+                        claim_id=new_claim.id,
+                        span_id=sid,
+                    )
+                )
 
             # 상충하는 기존 Fact가 확인되면 CONTRADICTS 링크를 생성하여 불일치 탐지 API(EVT-024) 및 그래프에 반영
             if conflicting_fact:
-                contradiction_links_to_create.append(EvidenceLink(
-                    evidence_id=doc.id,
-                    claim_id=new_claim.id,
-                    target_type="FACT",
-                    target_id=conflicting_fact.id,
-                    link_type="CONTRADICTS",
-                ))
+                contradiction_links_to_create.append(
+                    EvidenceLink(
+                        evidence_id=doc.id,
+                        claim_id=new_claim.id,
+                        target_type="FACT",
+                        target_id=conflicting_fact.id,
+                        link_type="CONTRADICTS",
+                    )
+                )
 
             new_claims.append(new_claim)
 
@@ -377,20 +412,22 @@ def extract_claims_from_evidence(db: Session, doc_id: str) -> bool:
         db.add_all(contradiction_links_to_create)
 
     doc.status = "REVIEW_REQUIRED"  # 사용자 검토 대기 상태
-    doc.extraction_version = "llm-v1"
+    doc.extraction_version = "llm-v2-batched"
     db.commit()
 
     cur_span = get_current_span_id()
     if cur_span:
         try:
-            update_span(cur_span, {
-                "document_id": doc_id,
-                "claims_count": len(new_claims),
-                "contradictions_count": len(contradiction_links_to_create),
-            })
+            update_span(
+                cur_span,
+                {
+                    "document_id": doc_id,
+                    "claims_count": len(new_claims),
+                    "contradictions_count": len(contradiction_links_to_create),
+                    "batches_count": len(batches),
+                },
+            )
         except Exception:
             pass
 
     return True
-
-
