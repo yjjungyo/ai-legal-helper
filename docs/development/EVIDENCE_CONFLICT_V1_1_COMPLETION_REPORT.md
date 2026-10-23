@@ -112,3 +112,4 @@ python -m pytest backend/tests/unit/test_conflict_detector.py backend/tests/unit
 
 1. **복합 표(Table) 및 스캔 이미지 OCR 내 수치 맥락 추출:** 현재 금액·날짜 역할 분류는 텍스트 문맥 윈도우와 LLM 구조화 추출을 결합하여 동작하므로, 표 구조가 깨진 OCR 텍스트에서는 Stage 3 선택적 LLM 검증(`CONFLICT_LLM_VERIFICATION_ENABLED=true`)을 활성화하면 정확도를 높일 수 있다.
 2. **당사자(Party) 자동 승격 연계:** 현재 `EvidenceClaim(claim_type="PARTY_INFO")` 승인 시 `Fact` 및 `Event` 타임라인은 자동 갱신되며, 향후 `PARTY_INFO` Claim에서 정규화된 당사자 성명·역할을 `Party` 테이블에도 자동 병합하면 사건 요약 탭의 당사자 목록 편의성을 추가로 높일 수 있다.
+

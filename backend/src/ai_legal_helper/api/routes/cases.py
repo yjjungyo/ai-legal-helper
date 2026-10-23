@@ -76,10 +76,51 @@ def list_cases(current_user: User = Depends(get_current_user), db: Session = Dep
     return cases
 
 @router.get("/{case_id}", response_model=CaseDetailSchema)
-def get_case_detail(case: Case = Depends(get_case_for_user)):
-    """사건 상세 정보를 조회한다 (당사자, 사실관계, 타임라인 등 포함)."""
+def get_case_detail(
+    case: Case = Depends(get_case_for_user),
+    db: Session = Depends(get_db),
+):
+    """사건 상세 정보를 조회한다 (당사자, 사실관계, 타임라인 등 포함).
+
+    확정 사실(Fact)이 존재하지만 당사자(Parties)와 타임라인(Events)이 모두 비어 있는
+    레거시 사건의 경우 조회 시점에 `synchronize_case_entities`를 자동 실행하여 복구한다.
+    """
+    if case.facts and not case.parties and not case.events:
+        try:
+            from ai_legal_helper.case_intelligence.entity_sync import synchronize_case_entities
+
+            sync_res = synchronize_case_entities(
+                db=db,
+                case_id=case.id,
+                dry_run=False,
+                queue_graph_sync=True,
+            )
+            if (
+                sync_res["parties"]["total_derived"] > 0
+                or sync_res["timeline"]["derived_events_count"] > 0
+            ):
+                db.commit()
+                db.refresh(case)
+        except Exception as e:
+            db.rollback()
+            logger.warning(f"Failed to auto-sync case entities on detail view for {case.id}: {e}")
+
     logger.info(f"사건 상세 정보 조회 완료: '{case.title}'")
     return case
+
+
+@router.post("/{case_id}/rebuild-entities")
+def trigger_rebuild_case_entities(
+    case_id: str,
+    dry_run: bool = False,
+    current_user: User = Depends(get_current_user),
+    case: Case = Depends(get_case_for_user),
+    db: Session = Depends(get_db),
+):
+    """사건의 확정 사실(Fact) 및 승인된 증거 주장(EvidenceClaim)을 재스캔하여 Parties와 Timeline을 복구한다."""
+    from ai_legal_helper.case_intelligence.entity_sync import rebuild_case_entities
+
+    return rebuild_case_entities(db=db, case_id=case.id, dry_run=dry_run)
 
 
 @router.patch("/{case_id}", response_model=CaseDetailSchema)

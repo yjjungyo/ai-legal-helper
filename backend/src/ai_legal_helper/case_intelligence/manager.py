@@ -93,17 +93,14 @@ def process_new_statement(db: Session, case_id: str, statement: str) -> Case:
         # 4. 플러시하여 ID를 생성받음
         db.flush()
         
-        # 5. 모든 사실을 모아 타임라인 재구축
-        all_facts = db.query(Fact).filter(Fact.case_id == case.id).all()
-        
-        # 기존 이벤트 삭제 후 재생성 (간소화된 방식)
-        db.query(Event).filter(Event.case_id == case.id).delete()
-        db.flush()
-        
-        new_events = build_timeline_from_facts(all_facts)
-        for ev in new_events:
-            ev.case_id = case.id
-            db.add(ev)
+        # 5. 모든 사실을 모아 당사자(Party) 보강 및 타임라인(Event) 동기화 (수동 Party/Event 보존)
+        from ai_legal_helper.case_intelligence.entity_sync import synchronize_case_entities
+        synchronize_case_entities(
+            db=db,
+            case_id=case.id,
+            dry_run=False,
+            queue_graph_sync=False,
+        )
             
         # 6. 추가 질문(Missing Info)은 LegalIssue 형태로 임시 저장
         # 실무에서는 별도 테이블이 좋지만, 여기서는 이슈로 처리

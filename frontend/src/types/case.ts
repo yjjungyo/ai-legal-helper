@@ -4,6 +4,10 @@ export interface Party {
   role?: string;
   party_relationship?: string;
   notes?: string;
+  source_type?: string;
+  verification_status?: string;
+  related_fact_ids?: string[];
+  related_claim_ids?: string[];
 }
 
 export interface Fact {
@@ -23,6 +27,9 @@ export interface Event {
   event_date?: string;
   date_precision: string;
   event_type?: string;
+  occurrence_status?: string;
+  source_type?: string;
+  related_fact_ids?: string[];
 }
 
 export interface LegalIssue {

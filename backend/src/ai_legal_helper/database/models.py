@@ -100,16 +100,22 @@ class Party(Base):
     """
     사건 당사자(Party) 모델
     
-    사건에 연루된 인물이나 단체(임대인, 임차인 등)를 나타낸다.
+    사건에 연루된 인물이나 단체(임대인, 임차인, 원고, 피고 등)를 나타낸다.
+    수동 등록(MANUAL)과 증거/진술 파생(EVIDENCE_DERIVED, STATEMENT_EXTRACTED) 출처 및
+    근거 Fact/Claim ID 목록을 함께 관리하여 증거 수정·반려 시 정합성을 보장한다.
     """
     __tablename__ = "parties"
 
     id = Column(String, primary_key=True, default=generate_uuid)
     case_id = Column(String, ForeignKey("cases.id", ondelete="CASCADE"), nullable=False)
     name = Column(String, nullable=False)
-    role = Column(String, nullable=True)  # 임차인, 임대인 등
+    role = Column(String, nullable=True)  # 임차인, 임대인, 원고, 피고 등
     party_relationship = Column(String, nullable=True)
     notes = Column(Text, nullable=True)
+    source_type = Column(String, default="MANUAL", nullable=True)  # MANUAL, STATEMENT_EXTRACTED, EVIDENCE_DERIVED
+    verification_status = Column(String, default="VERIFIED", nullable=True)  # VERIFIED, DOCUMENT_VERIFIED, PARTY_ASSERTED, UNVERIFIED
+    related_fact_ids = Column(JSON, nullable=True)  # 연관된 Fact ID 목록
+    related_claim_ids = Column(JSON, nullable=True)  # 연관된 EvidenceClaim ID 목록
 
     case = relationship("Case", back_populates="parties")
 
@@ -139,7 +145,8 @@ class Event(Base):
     타임라인 이벤트(Event) 모델
     
     시간순으로 정렬 가능한 사건의 전개 단위를 나타낸다. 추출된 사실관계 중 
-    날짜 정보가 있는 것들이 모여 이벤트를 구성한다.
+    날짜 정보가 있는 것들이 모여 이벤트를 구성하며, 실제 발생(ACTUAL)과
+    예정/기일(SCHEDULED), 요청 기한(REQUESTED) 및 출처(source_type)를 구분한다.
     """
     __tablename__ = "events"
 
@@ -149,7 +156,9 @@ class Event(Base):
     description = Column(Text, nullable=True)
     event_date = Column(String, nullable=True)  # YYYY-MM-DD 또는 대략적 시기
     date_precision = Column(String, default="EXACT")  # EXACT, APPROXIMATE, UNKNOWN
-    event_type = Column(String, nullable=True)  # 계약, 통지, 지급 등
+    event_type = Column(String, nullable=True)  # 계약 체결, 계약 시작, 계약 종료, 지급기일, 통지 발송 등
+    occurrence_status = Column(String, default="ACTUAL", nullable=True)  # ACTUAL, SCHEDULED, REQUESTED, NEEDS_VERIFICATION
+    source_type = Column(String, default="MANUAL", nullable=True)  # MANUAL, STATEMENT_EXTRACTED, EVIDENCE_DERIVED
     related_fact_ids = Column(JSON, nullable=True)  # 연관된 Fact ID 목록
     created_at = Column(DateTime, default=get_kst_now)
 

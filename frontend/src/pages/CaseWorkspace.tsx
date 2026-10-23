@@ -279,11 +279,13 @@ export function CaseWorkspace() {
   const [isAddStmtOpen, setIsAddStmtOpen] = useState(false);
   const [isEditCaseOpen, setIsEditCaseOpen] = useState(false);
 
+  const currentTab = location.pathname.split('/').pop() || 'overview';
+
   useEffect(() => {
-    if (caseId) {
+    if (caseId && (!activeCase || activeCase.id !== caseId || currentTab === 'facts' || currentTab === 'overview')) {
       loadCase(caseId);
     }
-  }, [caseId]);
+  }, [caseId, currentTab]);
 
   /**
    * 사건 상세 데이터 조회
@@ -320,8 +322,6 @@ export function CaseWorkspace() {
     { id: 'action', icon: '📋', label: '대응 계획 (Action Plan)' },
     { id: 'docs', icon: '📄', label: '법률 문서 (Documents)' },
   ];
-
-  const currentTab = location.pathname.split('/').pop() || 'overview';
 
   return (
     <div className="workspace-wrapper">
@@ -739,8 +739,20 @@ function FactsTab({ activeCase }: { activeCase: CaseDetail }) {
             <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '0.9em', color: 'var(--text-main)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {activeCase.parties.map((p) => (
                 <li key={p.id}>
-                  <strong>{p.name}</strong> <span className="badge badge-gray" style={{ marginLeft: '4px' }}>{p.role}</span>
-                  {p.party_relationship && <span style={{ color: 'var(--text-secondary)', fontSize: '0.85em' }}> ({p.party_relationship})</span>}
+                  <div>
+                    <strong>{p.name}</strong>
+                    {p.role && <span className="badge badge-gray" style={{ marginLeft: '6px' }}>{p.role}</span>}
+                    {p.party_relationship && (
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '0.85em', marginLeft: '6px' }}>
+                        ({p.party_relationship})
+                      </span>
+                    )}
+                  </div>
+                  {p.notes && (
+                    <div style={{ fontSize: '0.8em', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      {p.notes}
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
@@ -782,12 +794,40 @@ function FactsTab({ activeCase }: { activeCase: CaseDetail }) {
             <p style={{ color: 'var(--text-muted)', fontSize: '0.88em' }}>등록된 시간순 일정이 없습니다.</p>
           ) : (
             <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '0.9em', color: 'var(--text-main)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {activeCase.events.map((e) => (
-                <li key={e.id}>
-                  <span style={{ fontWeight: 600, color: 'var(--primary)', marginRight: '6px' }}>{e.event_date || '일자 미상'}</span>
-                  <span>{e.title}</span>
-                </li>
-              ))}
+              {activeCase.events.map((e) => {
+                const occLabel =
+                  e.occurrence_status === 'SCHEDULED'
+                    ? '예정/기일'
+                    : e.occurrence_status === 'REQUESTED'
+                      ? '요청 기한'
+                      : e.occurrence_status === 'NEEDS_VERIFICATION'
+                        ? '확인 필요'
+                        : '실제 발생';
+                const occBadge =
+                  e.occurrence_status === 'SCHEDULED'
+                    ? 'badge-blue'
+                    : e.occurrence_status === 'REQUESTED'
+                      ? 'badge-orange'
+                      : e.occurrence_status === 'NEEDS_VERIFICATION'
+                        ? 'badge-red'
+                        : 'badge-green';
+                return (
+                  <li key={e.id}>
+                    <span style={{ fontWeight: 600, color: 'var(--primary)', marginRight: '6px' }}>
+                      {e.event_date || '일자 미상'}
+                    </span>
+                    {e.event_type && (
+                      <span className="badge badge-gray" style={{ fontSize: '0.75em', marginRight: '5px' }}>
+                        {e.event_type}
+                      </span>
+                    )}
+                    <span className={`badge ${occBadge}`} style={{ fontSize: '0.72em', marginRight: '6px' }}>
+                      {occLabel}
+                    </span>
+                    <span>{e.title}</span>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

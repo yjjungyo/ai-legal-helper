@@ -53,3 +53,4 @@ def downgrade() -> None:
     op.drop_column("evidence_claims", "scope")
     op.drop_column("evidence_claims", "predicate_key")
     op.drop_column("evidence_claims", "subject_key")
+

@@ -17,9 +17,13 @@ class PartySchema(BaseModel):
 
     id: Optional[str] = None
     name: str = Field(..., description="당사자 이름 또는 지칭")
-    role: Optional[str] = Field(None, description="임차인, 임대인 등 역할")
+    role: Optional[str] = Field(None, description="임차인, 임대인, 원고, 피고 등 역할")
     party_relationship: Optional[str] = Field(None, description="상대방과의 관계")
     notes: Optional[str] = None
+    source_type: Optional[str] = Field("MANUAL", description="MANUAL, STATEMENT_EXTRACTED, EVIDENCE_DERIVED")
+    verification_status: Optional[str] = Field("VERIFIED", description="VERIFIED, DOCUMENT_VERIFIED, PARTY_ASSERTED, UNVERIFIED")
+    related_fact_ids: Optional[List[str]] = Field(default_factory=list)
+    related_claim_ids: Optional[List[str]] = Field(default_factory=list)
 
 
 class FactSchema(BaseModel):
@@ -45,6 +49,8 @@ class EventSchema(BaseModel):
     event_date: Optional[str] = Field(None, description="YYYY-MM-DD 또는 대략적 시기")
     date_precision: str = Field("EXACT")
     event_type: Optional[str] = None
+    occurrence_status: Optional[str] = Field("ACTUAL", description="ACTUAL, SCHEDULED, REQUESTED, NEEDS_VERIFICATION")
+    source_type: Optional[str] = Field("MANUAL", description="MANUAL, STATEMENT_EXTRACTED, EVIDENCE_DERIVED")
     related_fact_ids: Optional[List[str]] = Field(default_factory=list)
 
 

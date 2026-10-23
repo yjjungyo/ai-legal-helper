@@ -37,6 +37,12 @@ from ai_legal_helper.case_intelligence.conflict_detector import (
     build_structured_slots,
     evaluate_claim_conflicts,
 )
+from ai_legal_helper.case_intelligence.entity_sync import (
+    rebuild_case_entities,
+    synchronize_case_entities,
+    synchronize_case_parties,
+    synchronize_case_timeline,
+)
 
 
 def derive_fact_trust_status(
@@ -241,15 +247,17 @@ def _recalculate_case_disputed_facts(db: Session, case_id: str) -> None:
 
 
 def _rebuild_case_timeline(db: Session, case_id: str) -> None:
-    """사건의 현재 Fact 목록을 기준으로 Event 타임라인을 재구축한다."""
-    from ai_legal_helper.case_intelligence.timeline import build_timeline_from_facts
+    """사건의 현재 Fact 목록을 기준으로 당사자(Party)와 타임라인(Event)을 일괄 동기화한다.
 
-    all_facts = db.query(Fact).filter_by(case_id=case_id).all()
-    db.query(Event).filter_by(case_id=case_id).delete(synchronize_session=False)
-    db.flush()
-    for ev in build_timeline_from_facts(all_facts):
-        ev.case_id = case_id
-        db.add(ev)
+    기존 호출부(`evidence.py` 등)와의 하위 호환성을 유지하면서 수동(MANUAL) 데이터는 보존하고
+    증거 파생 Party 및 Event를 원자적으로 갱신한다.
+    """
+    synchronize_case_entities(
+        db=db,
+        case_id=case_id,
+        dry_run=False,
+        queue_graph_sync=False,
+    )
 
 
 def process_evidence_review(

@@ -174,14 +174,34 @@ def collect_case_snapshot(db: Session, case_id: str) -> Optional[Dict[str, Any]]
     return {
         "case": {"id": case.id, "title": case.title, "case_type": case.case_type,
                  "status": case.status, "version": case.version},
-        "parties": [{"id": p.id, "name": p.name, "role": p.role} for p in parties],
+        "parties": [
+            {
+                "id": p.id,
+                "name": p.name,
+                "role": p.role,
+                "party_relationship": p.party_relationship,
+                "source_type": getattr(p, "source_type", "MANUAL"),
+                "verification_status": getattr(p, "verification_status", "VERIFIED"),
+            }
+            for p in parties
+        ],
         "facts": [{"id": f.id, "statement": f.statement, "fact_type": f.fact_type,
                    "occurred_at": f.occurred_at, "source_type": f.source_type,
                    "verification_status": f.verification_status,
                    "source_evidence_id": f.source_ref if f.source_type == "DOCUMENT_SUPPORTED" else None}
                   for f in facts],
-        "events": [{"id": e.id, "title": e.title, "event_date": e.event_date,
-                    "date_precision": e.date_precision, "event_type": e.event_type} for e in events],
+        "events": [
+            {
+                "id": e.id,
+                "title": e.title,
+                "event_date": e.event_date,
+                "date_precision": e.date_precision,
+                "event_type": e.event_type,
+                "occurrence_status": getattr(e, "occurrence_status", "ACTUAL"),
+                "source_type": getattr(e, "source_type", "MANUAL"),
+            }
+            for e in events
+        ],
         "issues": [{"id": i.id, "title": i.title, "description": _truncate(i.description),
                     "status": i.status} for i in issues],
         "documents": [{"id": d.id, "filename": d.original_filename, "media_type": d.media_type,
