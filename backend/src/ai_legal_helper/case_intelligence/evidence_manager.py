@@ -5,10 +5,10 @@
 [모듈 개요]
 증거 및 사실관계 리뷰 매니저 (Evidence Review Manager).
 사용자가 EvidenceClaim(추출된 사실 후보)을 검토(승인/수정/반려)할 때 이를 처리하며,
-승인된 경우 기존 Fact와 상충 여부를 확인해 SUPPORTS/CONTRADICTS 링크를 생성하고 공식 Fact로 편입한다.
+승인된 경우 3단계 상충 검증 엔진(`conflict_detector.evaluate_claim_conflicts`)을 통해
+기존 Fact와의 일치(CONSISTENT) 및 상충(CONTRADICTION) 여부를 검증해 SUPPORTS/CONTRADICTS 링크를 생성하고 공식 Fact로 편입한다.
 또한 사용자 승인(review_status)과 사실의 객관적 검증 수준(verification_status)을 분리하여
 문서 기재 사실(DOCUMENT_VERIFIED), 일방 주장(PARTY_ASSERTED), 상충 사실(DISPUTED), AI 추론(UNVERIFIED)을 구분한다.
-이 모든 과정은 단일 트랜잭션으로 처리되며 CaseRevision으로 이력을 남긴다.
 """
 
 from typing import Optional, Tuple
@@ -23,7 +23,7 @@ from ai_legal_helper.database.models import (
     Fact,
     Event,
 )
-from ai_legal_helper.case_intelligence.evidence_extractor import detect_conflicting_fact
+from ai_legal_helper.case_intelligence.conflict_detector import evaluate_claim_conflicts
 
 
 def derive_fact_trust_status(
@@ -32,12 +32,9 @@ def derive_fact_trust_status(
 ) -> Tuple[str, str]:
     """EvidenceClaim의 단언 상태(assertion_status)와 상충 여부에 따라 Fact의 검증 상태 및 출처 유형을 산출한다.
 
-    사용자 승인(APPROVE/EDIT)과 객관적 사실 입증 수준을 분리하여,
-    일방 당사자의 주장 문서나 상충 후보가 무조건 'VERIFIED'로 둔갑하는 문제를 방지한다.
-
     Args:
         assertion_status: EvidenceClaim.assertion_status 값.
-        has_conflict: 기존 사건 Fact와의 상충 감지 여부.
+        has_conflict: 검증 엔진을 통해 확인된 기존 사건 Fact와의 상충 여부.
 
     Returns:
         Tuple[str, str]: (Fact.verification_status, Fact.source_type) 튜플.
@@ -62,8 +59,9 @@ def process_evidence_review(
     """EvidenceClaim에 대한 사용자의 리뷰 액션(APPROVE, EDIT, REJECT)을 처리한다.
 
     트랜잭션으로 처리되며 변경 이력은 EvidenceReview와 CaseRevision에 남는다.
-    승인(APPROVE) 또는 수정(EDIT) 시 공식 Fact로 편입하고, 기존 Fact와 상충하는 경우
-    `CONTRADICTS` EvidenceLink를 함께 생성하여 불일치 탐지(EVT-024) 및 그래프 동기화에 반영한다.
+    승인(APPROVE) 또는 수정(EDIT) 시 구조화 상충 검증 엔진으로 기존 Fact와의 관계를 판별하여
+    오탐 DISPUTED 전파를 차단하고, 실제 모순(CONTRADICTION)인 경우에만 CONTRADICTS 링크를 생성한다.
+    반려(REJECT) 시에는 해당 Claim에 연결되어 있던 기존 EvidenceLink를 정리한다.
 
     Args:
         db: 데이터베이스 세션.
@@ -88,6 +86,8 @@ def process_evidence_review(
         claim.review_status = "REJECTED"
         new_statement = None
         change_type = "CLAIM_REJECTED"
+        # 반려된 Claim이 남긴 기존 EvidenceLink(SUPPORTS/CONTRADICTS) 제거
+        db.query(EvidenceLink).filter_by(claim_id=claim.id).delete()
     elif action == "EDIT":
         if not new_statement:
             raise ValueError("new_statement is required for EDIT action.")
@@ -125,37 +125,58 @@ def process_evidence_review(
     )
     db.add(review)
 
-    # 승인 또는 수정된 경우 기존 Fact와의 상충 여부 확인 후 공식 Fact 승격 및 타임라인 재구축
+    # 승인 또는 수정된 경우 3단계 상충 검증 엔진으로 기존 Fact와의 관계 판별 후 Fact 승격 및 타임라인 재구축
     if claim.review_status in ["APPROVED", "EDITED"]:
         existing_facts = db.query(Fact).filter_by(case_id=case.id).all()
-        conflicting_fact = detect_conflicting_fact(claim.statement, existing_facts)
-        if conflicting_fact:
+        facts_by_id = {f.id: f for f in existing_facts}
+
+        eval_res = evaluate_claim_conflicts(
+            statement=claim.statement,
+            existing_facts=existing_facts,
+            claim_type=claim.claim_type,
+            evidence_id=claim.evidence_id,
+            claim_id=claim.id,
+            enable_llm_verification=False,
+        )
+        verified_contradictions = eval_res["contradictions"]
+        verified_consistent = eval_res["consistent"]
+
+        if verified_contradictions:
             claim.assertion_status = "CONTRADICTION_CANDIDATE"
-            conflicting_fact.verification_status = "DISPUTED"
-            existing_contra = (
-                db.query(EvidenceLink)
-                .filter_by(
-                    claim_id=claim.id,
-                    target_type="FACT",
-                    target_id=conflicting_fact.id,
-                    link_type="CONTRADICTS",
-                )
-                .first()
-            )
-            if not existing_contra:
-                db.add(
-                    EvidenceLink(
-                        evidence_id=claim.evidence_id,
+            for c_dec in verified_contradictions:
+                conflicting_fact = facts_by_id.get(c_dec.target_fact_id)
+                if not conflicting_fact:
+                    continue
+                conflicting_fact.verification_status = "DISPUTED"
+                existing_contra = (
+                    db.query(EvidenceLink)
+                    .filter_by(
                         claim_id=claim.id,
                         target_type="FACT",
                         target_id=conflicting_fact.id,
                         link_type="CONTRADICTS",
                     )
+                    .first()
                 )
+                if not existing_contra:
+                    db.add(
+                        EvidenceLink(
+                            evidence_id=claim.evidence_id,
+                            claim_id=claim.id,
+                            target_type="FACT",
+                            target_id=conflicting_fact.id,
+                            link_type="CONTRADICTS",
+                        )
+                    )
+        else:
+            # 검증 결과 실제 모순이 아닌 경우, 과거 오탐으로 기록된 CONTRADICTION_CANDIDATE 및 CONTRADICTS 링크를 제거
+            if claim.assertion_status == "CONTRADICTION_CANDIDATE":
+                claim.assertion_status = "DOCUMENT_STATES"
+            db.query(EvidenceLink).filter_by(claim_id=claim.id, link_type="CONTRADICTS").delete()
 
         ver_status, src_type = derive_fact_trust_status(
             claim.assertion_status,
-            has_conflict=conflicting_fact is not None,
+            has_conflict=bool(verified_contradictions),
         )
 
         # 동일 문장 중복 Fact 생성 방지
@@ -193,7 +214,7 @@ def process_evidence_review(
 
         revision.changed_entity_ids = {"claim_id": claim.id, "fact_id": target_fact.id}
 
-        # EvidenceLink 생성 (SUPPORTS, 중복 방지)
+        # 1) 자기 자신의 Fact에 대한 SUPPORTS EvidenceLink 생성 (중복 방지)
         existing_sup = (
             db.query(EvidenceLink)
             .filter_by(
@@ -214,6 +235,31 @@ def process_evidence_review(
                     link_type="SUPPORTS",
                 )
             )
+
+        # 2) 다중 증거 교차 지지(CONSISTENT): 다른 문서의 기존 Fact와 정규화 금액/일자가 일치하면 교차 SUPPORTS 연결
+        for cons_dec in verified_consistent:
+            if cons_dec.target_fact_id == target_fact.id:
+                continue
+            cross_sup = (
+                db.query(EvidenceLink)
+                .filter_by(
+                    claim_id=claim.id,
+                    target_type="FACT",
+                    target_id=cons_dec.target_fact_id,
+                    link_type="SUPPORTS",
+                )
+                .first()
+            )
+            if not cross_sup:
+                db.add(
+                    EvidenceLink(
+                        evidence_id=claim.evidence_id,
+                        claim_id=claim.id,
+                        target_type="FACT",
+                        target_id=cons_dec.target_fact_id,
+                        link_type="SUPPORTS",
+                    )
+                )
 
     from ai_legal_helper.database.graph_sync_worker import queue_sync_task
 

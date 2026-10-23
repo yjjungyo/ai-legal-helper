@@ -735,7 +735,7 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
         </div>
       </div>
 
-      {/* 3. 증거 상충(Conflicts) 경고 카드 */}
+      {/* 3. 증거 상충(Conflicts) 경고 카드 — JSON 원문 노출을 제거하고 구조화된 비교 카드로 렌더링 */}
       {conflicts.length > 0 && (
         <div
           className="card"
@@ -744,17 +744,91 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
             backgroundColor: 'var(--danger-bg)',
           }}
         >
-          <h4 style={{ margin: '0 0 8px 0', color: 'var(--danger)', fontSize: '1em', fontWeight: 700 }}>
-            ⚠️ 증거 자료 간 상충 및 모순 발생 ({conflicts.length}건)
+          <h4 style={{ margin: '0 0 6px 0', color: 'var(--danger)', fontSize: '1em', fontWeight: 700 }}>
+            ⚠️ 증거 자료 간 상충 및 모순 검토 필요 ({conflicts.length}건)
           </h4>
-          <p style={{ fontSize: '0.88em', color: 'var(--text-secondary)', marginBottom: '10px' }}>
-            등록된 증거 문서 간 내용이 상충되는 부분이 발견되었습니다. 법률 검토 시 주의가 필요합니다.
+          <p style={{ fontSize: '0.86em', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+            동일한 사실 대상·속성에 대해 서로 양립할 수 없는 진술이 감지되었습니다. 원문 출처와 경위를 확인해 주세요.
           </p>
-          <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '0.85em', color: 'var(--danger)' }}>
-            {conflicts.map((c, i) => (
-              <li key={i}>{typeof c === 'string' ? c : JSON.stringify(c)}</li>
-            ))}
-          </ul>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {conflicts.map((c, i) => {
+              if (typeof c === 'string') {
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: 'var(--radius-sm)',
+                      backgroundColor: 'var(--surface)',
+                      border: '1px solid var(--danger-border)',
+                      fontSize: '0.86em',
+                      color: 'var(--danger)',
+                    }}
+                  >
+                    {c}
+                  </div>
+                );
+              }
+              const explanation = c.explanation || c.description || '증거 진술과 기존 사건 사실 간 상충이 감지되었습니다.';
+              return (
+                <div
+                  key={c.conflict_id || i}
+                  style={{
+                    padding: '12px 14px',
+                    borderRadius: 'var(--radius-sm)',
+                    backgroundColor: 'var(--surface)',
+                    border: '1px solid var(--danger-border)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                  }}
+                >
+                  <div style={{ fontSize: '0.88em', fontWeight: 600, color: 'var(--danger)' }}>
+                    • {explanation}
+                  </div>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                      gap: '8px',
+                      fontSize: '0.84em',
+                    }}
+                  >
+                    {c.claim_statement && (
+                      <div
+                        style={{
+                          padding: '8px 10px',
+                          borderRadius: 'var(--radius-sm)',
+                          backgroundColor: 'var(--bg-secondary)',
+                          border: '1px solid var(--border-color)',
+                        }}
+                      >
+                        <div style={{ fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                          📄 증거 문서 진술 {c.document_name ? `(${c.document_name})` : ''}
+                        </div>
+                        <div style={{ color: 'var(--text-primary)' }}>{c.claim_statement}</div>
+                      </div>
+                    )}
+                    {c.target_description && (
+                      <div
+                        style={{
+                          padding: '8px 10px',
+                          borderRadius: 'var(--radius-sm)',
+                          backgroundColor: 'var(--bg-secondary)',
+                          border: '1px solid var(--border-color)',
+                        }}
+                      >
+                        <div style={{ fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                          📌 비교 대상 기존 사실 {c.target_document_name ? `(${c.target_document_name})` : ''}
+                        </div>
+                        <div style={{ color: 'var(--text-primary)' }}>{c.target_description}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

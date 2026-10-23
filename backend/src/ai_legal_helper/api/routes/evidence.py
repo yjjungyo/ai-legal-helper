@@ -22,6 +22,11 @@ from ai_legal_helper.case_intelligence.evidence_extractor import (
     extract_claims_from_evidence, normalize_claim_type, normalize_to_claim_code
 )
 from ai_legal_helper.case_intelligence.evidence_manager import process_evidence_review
+from ai_legal_helper.case_intelligence.conflict_detector import (
+    build_structured_slots,
+    evaluate_claim_against_fact,
+    evaluate_claim_conflicts,
+)
 from ai_legal_helper.database.graph_sync import safe_sync_case
 
 router = APIRouter(prefix="/cases/{case_id}/evidence", tags=["evidence"])
@@ -98,21 +103,33 @@ def get_evidence_conflicts(
     case: Case = Depends(get_case_for_user),
     db: Session = Depends(get_db)
 ):
-    """사건 내 증거들 간의 상충 및 모순(충돌 후보) 목록을 조회한다.
+    """사건 내 증거들 간의 검증된 상충 및 모순 목록을 중복 없이 조회한다.
 
-    1. RDB EvidenceLink의 CONTRADICTS 관계 조회
-    2. EvidenceClaim 중 상충 후보(CONTRADICTION_CANDIDATE / CONTRADICTION) 조회
-    3. Neo4j GraphRAG의 find_contradictions 조회 (가능한 경우)
+    1. RDB EvidenceLink의 CONTRADICTS 관계를 3단계 상충 탐지 엔진으로 검증하여 조회
+    2. EvidenceClaim 중 미연결 상충 후보(CONTRADICTION_CANDIDATE)를 검증하여 조회
+    3. Neo4j GraphRAG의 find_contradictions 결과를 PostgreSQL 원본과 대조 및 중복 제거하여 통합
+    4. 반려(REJECTED)된 주장은 제외하며, (claim_id, target_id) 기준으로 단일화한다.
 
     Args:
         case (Case): 현재 로그인 사용자가 접근 권한을 가진 사건 엔티티.
         db (Session): 데이터베이스 세션.
 
     Returns:
-        dict: {"conflicts": List[Dict]} 형태의 충돌 후보 목록.
+        dict: {"conflicts": List[Dict]} 형태의 검증된 상충 목록.
     """
     conflicts = []
-    seen_keys = set()
+    seen_pairs = set()
+    seen_claim_ids = set()
+
+    case_docs = db.query(EvidenceDocument).filter_by(case_id=case.id).all()
+    doc_map = {d.id: d for d in case_docs}
+    case_facts = db.query(Fact).filter_by(case_id=case.id).all()
+    fact_map = {f.id: f for f in case_facts}
+    fact_doc_names = {
+        f.id: doc_map[f.source_ref].original_filename
+        for f in case_facts
+        if f.source_ref and f.source_ref in doc_map
+    }
 
     # 1. RDB EvidenceLink (link_type == 'CONTRADICTS')
     links = (
@@ -122,14 +139,40 @@ def get_evidence_conflicts(
         .all()
     )
     for link in links:
-        doc = db.query(EvidenceDocument).filter_by(id=link.evidence_id).first()
+        doc = doc_map.get(link.evidence_id)
         claim = db.query(EvidenceClaim).filter_by(id=link.claim_id).first() if link.claim_id else None
+        if claim and claim.review_status == "REJECTED":
+            continue
 
         target_desc = f"{link.target_type}:{link.target_id}"
+        target_doc_name = None
+        reason_code = "VERIFIED_LINK_CONFLICT"
+        explanation = None
+
         if link.target_type == "FACT":
-            fact = db.query(Fact).filter_by(id=link.target_id).first()
-            if fact:
-                target_desc = f"사실 '{fact.statement}'"
+            fact = fact_map.get(link.target_id)
+            if not fact:
+                continue
+            target_desc = fact.statement
+            target_doc_name = fact_doc_names.get(fact.id)
+            if claim:
+                claim_slots = build_structured_slots(
+                    statement=claim.statement or "",
+                    claim_type=claim.claim_type,
+                    evidence_id=claim.evidence_id,
+                    document_name=doc.original_filename if doc else None,
+                )
+                decision = evaluate_claim_against_fact(
+                    claim_slots=claim_slots,
+                    fact=fact,
+                    fact_doc_name=target_doc_name,
+                    claim_id=claim.id,
+                    enable_llm_verification=False,
+                )
+                if decision.status != "CONTRADICTION":
+                    continue
+                reason_code = decision.reason_code
+                explanation = decision.explanation
         elif link.target_type == "EVENT":
             evt = db.query(Event).filter_by(id=link.target_id).first()
             if evt:
@@ -139,18 +182,29 @@ def get_evidence_conflicts(
             if issue:
                 target_desc = f"쟁점 '{issue.title}'"
 
-        item_key = f"link:{link.id}"
-        seen_keys.add(item_key)
+        pair_key = (link.claim_id or f"link:{link.id}", link.target_id)
+        if pair_key in seen_pairs:
+            continue
+        seen_pairs.add(pair_key)
+        if link.claim_id:
+            seen_claim_ids.add(link.claim_id)
+
+        default_desc = f"증거 주장 '{claim.statement if claim else ''}'이(가) 기존 사실 '{target_desc}'와(과) 상충됩니다."
         conflicts.append({
             "conflict_id": link.id,
             "type": "LINK_CONTRADICTION",
+            "status": "CONTRADICTION",
+            "reason_code": reason_code,
             "evidence_id": link.evidence_id,
             "document_name": doc.original_filename if doc else None,
+            "claim_id": link.claim_id,
             "claim_statement": claim.statement if claim else None,
             "target_type": link.target_type,
             "target_id": link.target_id,
             "target_description": target_desc,
-            "description": f"증거 주장 '{claim.statement if claim else ''}'이(가) {target_desc}와(과) 상충됩니다."
+            "target_document_name": target_doc_name,
+            "explanation": explanation or default_desc,
+            "description": explanation or default_desc,
         })
 
     # 2. EvidenceClaim 중 상충 후보(CONTRADICTION_CANDIDATE 또는 CONTRADICTION)
@@ -158,26 +212,58 @@ def get_evidence_conflicts(
         db.query(EvidenceClaim)
         .filter(
             EvidenceClaim.case_id == case.id,
+            EvidenceClaim.review_status != "REJECTED",
             (EvidenceClaim.assertion_status == "CONTRADICTION_CANDIDATE") | (EvidenceClaim.claim_type == "CONTRADICTION")
         )
         .all()
     )
     for c in cand_claims:
-        doc = db.query(EvidenceDocument).filter_by(id=c.evidence_id).first()
-        item_key = f"claim:{c.id}"
-        if item_key not in seen_keys:
-            seen_keys.add(item_key)
+        if c.id in seen_claim_ids:
+            continue
+        doc = doc_map.get(c.evidence_id)
+        other_facts = [
+            f
+            for f in case_facts
+            if not (f.source_ref == c.evidence_id and (f.statement or "").strip() == (c.statement or "").strip())
+        ]
+        eval_res = evaluate_claim_conflicts(
+            statement=c.statement or "",
+            existing_facts=other_facts,
+            claim_type=c.claim_type,
+            evidence_id=c.evidence_id,
+            document_name=doc.original_filename if doc else None,
+            claim_id=c.id,
+            fact_doc_names=fact_doc_names,
+            enable_llm_verification=False,
+        )
+        for decision in eval_res["contradictions"]:
+            pair_key = (c.id, decision.target_fact_id)
+            if pair_key in seen_pairs:
+                continue
+            seen_pairs.add(pair_key)
+            seen_claim_ids.add(c.id)
+            target_fact = fact_map.get(decision.target_fact_id)
+            target_desc = target_fact.statement if target_fact else decision.target_fact_id
+            target_doc_name = fact_doc_names.get(decision.target_fact_id)
             conflicts.append({
                 "conflict_id": c.id,
                 "type": "CLAIM_CONTRADICTION",
+                "status": "CONTRADICTION",
+                "reason_code": decision.reason_code,
                 "evidence_id": c.evidence_id,
                 "document_name": doc.original_filename if doc else None,
+                "claim_id": c.id,
                 "claim_statement": c.statement,
+                "target_type": "FACT",
+                "target_id": decision.target_fact_id,
+                "target_description": target_desc,
+                "target_document_name": target_doc_name,
                 "confidence": c.confidence,
-                "description": f"문서 '{doc.original_filename if doc else ''}'에서 상충 가능성이 있는 사실관계가 발견되었습니다: {c.statement}"
+                "explanation": decision.explanation,
+                "description": decision.explanation,
             })
 
-    # 3. Neo4j GraphRAG (가능한 경우 보강: GraphRAGRetriever와 Neo4j 드라이버를 통해 상충 관계 조회)
+    # 3. Neo4j GraphRAG (PostgreSQL 원본 대조 및 중복 제거 후 보강)
     try:
         from ai_legal_helper.database.neo4j import get_neo4j_driver
         from ai_legal_helper.rag.graph_rag import GraphRAGRetriever
@@ -187,18 +273,52 @@ def get_evidence_conflicts(
             grag = GraphRAGRetriever(driver)
             g_conflicts = grag.find_contradictions(case.id)
             for gc in g_conflicts:
-                item_key = f"graph:{gc.get('contradicting_id')}:{gc.get('target_id')}"
-                if item_key not in seen_keys:
-                    seen_keys.add(item_key)
-                    conflicts.append({
-                        "conflict_id": gc.get("contradicting_id"),
-                        "type": "GRAPH_CONTRADICTION",
-                        "target_type": gc.get("target_type"),
-                        "target_id": gc.get("target_id"),
-                        "target_description": gc.get("target_content"),
-                        "supporting_claim_ids": gc.get("supporting_claim_ids", []),
-                        "description": f"그래프 분석 상 충돌: {gc.get('target_content')}"
-                    })
+                c_id = gc.get("contradicting_id")
+                t_id = gc.get("target_id")
+                pair_key = (c_id or "", t_id or "")
+                if pair_key in seen_pairs or (c_id and c_id in seen_claim_ids):
+                    continue
+                claim = db.query(EvidenceClaim).filter_by(id=c_id, case_id=case.id).first() if c_id else None
+                if not claim or claim.review_status == "REJECTED":
+                    continue
+                fact = fact_map.get(t_id) if t_id else None
+                if not fact:
+                    continue
+                doc = doc_map.get(claim.evidence_id)
+                claim_slots = build_structured_slots(
+                    statement=claim.statement or "",
+                    claim_type=claim.claim_type,
+                    evidence_id=claim.evidence_id,
+                    document_name=doc.original_filename if doc else None,
+                )
+                decision = evaluate_claim_against_fact(
+                    claim_slots=claim_slots,
+                    fact=fact,
+                    fact_doc_name=fact_doc_names.get(fact.id),
+                    claim_id=claim.id,
+                    enable_llm_verification=False,
+                )
+                if decision.status != "CONTRADICTION":
+                    continue
+                seen_pairs.add(pair_key)
+                seen_claim_ids.add(claim.id)
+                conflicts.append({
+                    "conflict_id": c_id,
+                    "type": "GRAPH_CONTRADICTION",
+                    "status": "CONTRADICTION",
+                    "reason_code": decision.reason_code,
+                    "evidence_id": claim.evidence_id,
+                    "document_name": doc.original_filename if doc else None,
+                    "claim_id": claim.id,
+                    "claim_statement": claim.statement,
+                    "target_type": gc.get("target_type") or "FACT",
+                    "target_id": t_id,
+                    "target_description": fact.statement,
+                    "target_document_name": fact_doc_names.get(fact.id),
+                    "supporting_claim_ids": gc.get("supporting_claim_ids", []),
+                    "explanation": decision.explanation,
+                    "description": decision.explanation,
+                })
     except Exception:
         pass
 
