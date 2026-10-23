@@ -282,6 +282,7 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [claims, setClaims] = useState<EvidenceClaim[]>([]);
   const [conflicts, setConflicts] = useState<any[]>([]);
+  const [conflictError, setConflictError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [showReanalyzePrompt, setShowReanalyzePrompt] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -331,13 +332,16 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
 
   /**
    * 증거 간 모순/상충 내역 로드
+   * API 호출 실패 시 상충 0건으로 오인되지 않도록 명시적 오류 상태를 기록합니다.
    */
   const loadConflicts = async () => {
     try {
+      setConflictError(null);
       const data = await getEvidenceConflicts(caseId);
       setConflicts(data.conflicts || []);
-    } catch (e) {
+    } catch (e: any) {
       console.error('증거 모순 분석 로딩 실패:', e);
+      setConflictError(e?.message || '증거 상충 분석 결과를 불러오지 못했습니다. 네트워크 또는 서버 상태를 확인해 주세요.');
     }
   };
 
@@ -735,102 +739,197 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
         </div>
       </div>
 
-      {/* 3. 증거 상충(Conflicts) 경고 카드 — JSON 원문 노출을 제거하고 구조화된 비교 카드로 렌더링 */}
-      {conflicts.length > 0 && (
+      {/* 3. 증거 상충(Conflicts) 조회 오류 배너 및 확정 상충 / 추가 확인 필요 분리 카드 */}
+      {conflictError && (
         <div
           className="card"
           style={{
             borderColor: 'var(--danger-border)',
             backgroundColor: 'var(--danger-bg)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '12px',
           }}
         >
-          <h4 style={{ margin: '0 0 6px 0', color: 'var(--danger)', fontSize: '1em', fontWeight: 700 }}>
-            ⚠️ 증거 자료 간 상충 및 모순 검토 필요 ({conflicts.length}건)
-          </h4>
-          <p style={{ fontSize: '0.86em', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-            동일한 사실 대상·속성에 대해 서로 양립할 수 없는 진술이 감지되었습니다. 원문 출처와 경위를 확인해 주세요.
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {conflicts.map((c, i) => {
-              if (typeof c === 'string') {
-                return (
-                  <div
-                    key={i}
-                    style={{
-                      padding: '10px 12px',
-                      borderRadius: 'var(--radius-sm)',
-                      backgroundColor: 'var(--surface)',
-                      border: '1px solid var(--danger-border)',
-                      fontSize: '0.86em',
-                      color: 'var(--danger)',
-                    }}
-                  >
-                    {c}
-                  </div>
-                );
-              }
-              const explanation = c.explanation || c.description || '증거 진술과 기존 사건 사실 간 상충이 감지되었습니다.';
-              return (
-                <div
-                  key={c.conflict_id || i}
-                  style={{
-                    padding: '12px 14px',
-                    borderRadius: 'var(--radius-sm)',
-                    backgroundColor: 'var(--surface)',
-                    border: '1px solid var(--danger-border)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px',
-                  }}
-                >
-                  <div style={{ fontSize: '0.88em', fontWeight: 600, color: 'var(--danger)' }}>
-                    • {explanation}
-                  </div>
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-                      gap: '8px',
-                      fontSize: '0.84em',
-                    }}
-                  >
-                    {c.claim_statement && (
-                      <div
-                        style={{
-                          padding: '8px 10px',
-                          borderRadius: 'var(--radius-sm)',
-                          backgroundColor: 'var(--bg-secondary)',
-                          border: '1px solid var(--border-color)',
-                        }}
-                      >
-                        <div style={{ fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                          📄 증거 문서 진술 {c.document_name ? `(${c.document_name})` : ''}
-                        </div>
-                        <div style={{ color: 'var(--text-primary)' }}>{c.claim_statement}</div>
-                      </div>
-                    )}
-                    {c.target_description && (
-                      <div
-                        style={{
-                          padding: '8px 10px',
-                          borderRadius: 'var(--radius-sm)',
-                          backgroundColor: 'var(--bg-secondary)',
-                          border: '1px solid var(--border-color)',
-                        }}
-                      >
-                        <div style={{ fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                          📌 비교 대상 기존 사실 {c.target_document_name ? `(${c.target_document_name})` : ''}
-                        </div>
-                        <div style={{ color: 'var(--text-primary)' }}>{c.target_description}</div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+          <div>
+            <strong style={{ color: 'var(--danger)', fontSize: '0.95em', display: 'block', marginBottom: '2px' }}>
+              ⚠️ 증거 상충 분석 결과를 불러오지 못했습니다
+            </strong>
+            <span style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>
+              {conflictError}
+            </span>
           </div>
+          <button onClick={loadConflicts} className="btn btn-secondary btn-sm">
+            다시 시도
+          </button>
         </div>
       )}
+
+      {!conflictError && conflicts.length > 0 && (() => {
+        const confirmedConflicts = conflicts.filter(
+          (c) => typeof c === 'string' || c?.status !== 'POTENTIAL_CONFLICT'
+        );
+        const potentialConflicts = conflicts.filter(
+          (c) => typeof c === 'object' && c?.status === 'POTENTIAL_CONFLICT'
+        );
+
+        const formatSpanLocation = (item: any): string | null => {
+          const parts: string[] = [];
+          if (item?.page_number !== undefined && item?.page_number !== null) {
+            parts.push(`p.${item.page_number}`);
+          }
+          if (item?.paragraph_index !== undefined && item?.paragraph_index !== null) {
+            parts.push(`문단 ${Number(item.paragraph_index) + 1}`);
+          }
+          return parts.length > 0 ? parts.join(', ') : null;
+        };
+
+        const renderConflictCard = (c: any, idx: number, isPotential: boolean) => {
+          if (typeof c === 'string') {
+            return (
+              <div
+                key={idx}
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 'var(--radius-sm)',
+                  backgroundColor: 'var(--surface)',
+                  border: '1px solid var(--danger-border)',
+                  fontSize: '0.86em',
+                  color: 'var(--danger)',
+                }}
+              >
+                {c}
+              </div>
+            );
+          }
+          const explanation =
+            c.explanation ||
+            c.description ||
+            (isPotential
+              ? '추가 사실관계 또는 시점 확인이 필요한 잠재 상충 항목입니다.'
+              : '증거 진술과 기존 사건 사실 간 상충이 감지되었습니다.');
+          const spanLoc = formatSpanLocation(c);
+
+          return (
+            <div
+              key={c.conflict_id || idx}
+              style={{
+                padding: '12px 14px',
+                borderRadius: 'var(--radius-sm)',
+                backgroundColor: 'var(--surface)',
+                border: isPotential ? '1px solid var(--border)' : '1px solid var(--danger-border)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span className={isPotential ? 'badge badge-amber' : 'badge badge-red'}>
+                  {isPotential ? '추가 확인 필요' : '확정 상충'}
+                </span>
+                <span
+                  style={{
+                    fontSize: '0.88em',
+                    fontWeight: 600,
+                    color: isPotential ? 'var(--text-main)' : 'var(--danger)',
+                  }}
+                >
+                  {explanation}
+                </span>
+              </div>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                  gap: '8px',
+                  fontSize: '0.84em',
+                }}
+              >
+                {c.claim_statement && (
+                  <div
+                    style={{
+                      padding: '8px 10px',
+                      borderRadius: 'var(--radius-sm)',
+                      backgroundColor: 'var(--bg-secondary)',
+                      border: '1px solid var(--border-color)',
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                      📄 증거 문서 진술 {c.document_name ? `(${c.document_name})` : ''}
+                      {spanLoc && (
+                        <span style={{ marginLeft: '6px', color: 'var(--primary)' }}>
+                          [{spanLoc}]
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ color: 'var(--text-primary)' }}>{c.claim_statement}</div>
+                  </div>
+                )}
+                {c.target_description && (
+                  <div
+                    style={{
+                      padding: '8px 10px',
+                      borderRadius: 'var(--radius-sm)',
+                      backgroundColor: 'var(--bg-secondary)',
+                      border: '1px solid var(--border-color)',
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                      📌 비교 대상 기존 사실 {c.target_document_name ? `(${c.target_document_name})` : ''}
+                    </div>
+                    <div style={{ color: 'var(--text-primary)' }}>{c.target_description}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        };
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {confirmedConflicts.length > 0 && (
+              <div
+                className="card"
+                style={{
+                  borderColor: 'var(--danger-border)',
+                  backgroundColor: 'var(--danger-bg)',
+                }}
+              >
+                <h4 style={{ margin: '0 0 6px 0', color: 'var(--danger)', fontSize: '1em', fontWeight: 700 }}>
+                  ⚠️ 확정 상충 ({confirmedConflicts.length}건)
+                </h4>
+                <p style={{ fontSize: '0.86em', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                  동일한 사실 대상·속성에 대해 서로 양립할 수 없는 진술이 확인되었습니다. 원문 출처와 경위를 확인해 주세요.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {confirmedConflicts.map((c, i) => renderConflictCard(c, i, false))}
+                </div>
+              </div>
+            )}
+
+            {potentialConflicts.length > 0 && (
+              <div
+                className="card"
+                style={{
+                  borderColor: 'var(--border)',
+                  backgroundColor: 'var(--surface-alt)',
+                }}
+              >
+                <h4 style={{ margin: '0 0 6px 0', color: 'var(--text-main)', fontSize: '1em', fontWeight: 700 }}>
+                  🔎 추가 확인 필요 ({potentialConflicts.length}건)
+                </h4>
+                <p style={{ fontSize: '0.86em', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                  시점·조건 또는 문맥에 따라 양립 가능 여부가 달라질 수 있는 진술입니다. 계약 변경이나 후속 합의 여부를 확인해 주세요.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {potentialConflicts.map((c, i) => renderConflictCard(c, i, true))}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* 사실 검토(수정 승인 / 반려) 인라인 모달 */}
       <ReviewModal

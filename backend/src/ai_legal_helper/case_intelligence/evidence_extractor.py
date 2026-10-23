@@ -27,6 +27,7 @@ from ai_legal_helper.database.models import (
     Fact,
 )
 from ai_legal_helper.case_intelligence.conflict_detector import (
+    build_structured_slots,
     evaluate_claim_conflicts,
 )
 from ai_legal_helper.llm.gateway import get_llm
@@ -202,6 +203,7 @@ class ExtractedClaimSchema(BaseModel):
     subject: Optional[str] = Field(default=None, description="서술의 핵심 대상 또는 주체 (예: '임대차계약', '임차인', '임대인', '근로계약', '문서자체')")
     predicate: Optional[str] = Field(default=None, description="서술하는 구체적 속성이나 행위 종류 (예: '약정보증금', '반환요청금액', '반환요청일자', '계약기간', '문서제목', '해지통지')")
     scope: Optional[str] = Field(default="CASE_GLOBAL", description="적용 범위: 해당 문서 자체의 제목·형식·작성정보이면 DOCUMENT_LOCAL, 사건의 실체적 사실이면 CASE_GLOBAL")
+    temporal_context: Optional[str] = Field(default=None, description="시간적 문맥 또는 단계 (예: 'INITIAL_CONTRACT', 'MODIFICATION_OR_RENEWAL', 'RETURN_REQUEST', 'ACTUAL_PERFORMANCE')")
     assertion_status: str = Field(description="단언 상태. 문서에 확정적으로 쓰여진 사실이면 DOCUMENT_STATES, 일방의 주장이면 PARTY_ALLEGES, 기존 사실과 명백히 양립 불가능한 모순이면 CONTRADICTION_CANDIDATE, AI가 추론한 것이면 AI_INFERENCE, 불확실하면 UNCERTAIN.")
     confidence: float = Field(description="추출 결과의 신뢰도 (0.0 ~ 1.0)")
     source_span_ids: List[str] = Field(description="이 주장을 뒷받침하는 제공된 문단(span)의 ID 목록. 반드시 제공된 ID 중에 있어야 함.")
@@ -371,6 +373,17 @@ def extract_claims_from_evidence(db: Session, doc_id: str) -> bool:
             seen_norm_statements.add(norm_stmt)
 
             normalized_code = normalize_to_claim_code(claim_data.claim_type)
+            claim_slots = build_structured_slots(
+                statement=claim_data.statement,
+                claim_type=normalized_code,
+                subject=getattr(claim_data, "subject", None),
+                predicate=getattr(claim_data, "predicate", None),
+                scope=getattr(claim_data, "scope", None),
+                temporal_context=getattr(claim_data, "temporal_context", None),
+                evidence_id=doc.id,
+                document_name=doc.original_filename,
+                source_span_ids=filtered_span_ids,
+            )
 
             # 3단계 상충 검증 엔진을 통해 기존 Fact들과의 관계 검증
             # 중요: LLM이 1차 추출에서 CONTRADICTION_CANDIDATE로 표시했더라도
@@ -379,23 +392,25 @@ def extract_claims_from_evidence(db: Session, doc_id: str) -> bool:
                 statement=claim_data.statement,
                 existing_facts=existing_facts,
                 claim_type=normalized_code,
-                subject=getattr(claim_data, "subject", None),
-                predicate=getattr(claim_data, "predicate", None),
-                scope=getattr(claim_data, "scope", None),
+                subject=claim_slots.subject_key,
+                predicate=claim_slots.predicate_key,
+                scope=claim_slots.scope,
+                temporal_context=claim_slots.temporal_context,
                 evidence_id=doc.id,
                 document_name=doc.original_filename,
                 source_span_ids=filtered_span_ids,
                 llm_suggested_fact_id=getattr(claim_data, "contradicts_fact_id", None),
                 fact_doc_names=fact_doc_names,
-                enable_llm_verification=False,
+                enable_llm_verification=None,
             )
             verified_contradictions = eval_res["contradictions"]
+            potential_conflicts = eval_res.get("potential_conflicts", [])
 
             assertion_status = claim_data.assertion_status
             if verified_contradictions:
                 assertion_status = "CONTRADICTION_CANDIDATE"
             elif assertion_status == "CONTRADICTION_CANDIDATE":
-                # 검증 엔진이 오탐(CONSISTENT 또는 DIFFERENT_CONTEXT)으로 기각한 경우 정상 상태로 복원
+                # 검증 엔진이 오탐(CONSISTENT, DIFFERENT_CONTEXT, POTENTIAL_CONFLICT 등)으로 기각한 경우 정상 상태로 복원
                 assertion_status = "DOCUMENT_STATES"
 
             new_claim = EvidenceClaim(
@@ -403,6 +418,11 @@ def extract_claims_from_evidence(db: Session, doc_id: str) -> bool:
                 evidence_id=doc.id,
                 statement=claim_data.statement,
                 claim_type=normalized_code,
+                subject_key=claim_slots.subject_key,
+                predicate_key=claim_slots.predicate_key,
+                scope=claim_slots.scope,
+                temporal_context=claim_slots.temporal_context,
+                structured_slots=claim_slots.model_dump(),
                 assertion_status=assertion_status,
                 confidence=claim_data.confidence,
                 review_status="PENDING",
@@ -433,6 +453,21 @@ def extract_claims_from_evidence(db: Session, doc_id: str) -> bool:
                             link_type="CONTRADICTS",
                         )
                     )
+
+            # POTENTIAL_CONFLICT는 CONTRADICTS와 분리하여 별도 POTENTIAL_CONFLICT 링크로 기록
+            if not verified_contradictions:
+                for p_dec in potential_conflicts:
+                    if p_dec.target_fact_id in facts_by_id and p_dec.target_fact_id not in seen_contra_targets:
+                        seen_contra_targets.add(p_dec.target_fact_id)
+                        contradiction_links_to_create.append(
+                            EvidenceLink(
+                                evidence_id=doc.id,
+                                claim_id=new_claim.id,
+                                target_type="FACT",
+                                target_id=p_dec.target_fact_id,
+                                link_type="POTENTIAL_CONFLICT",
+                            )
+                        )
 
             new_claims.append(new_claim)
 

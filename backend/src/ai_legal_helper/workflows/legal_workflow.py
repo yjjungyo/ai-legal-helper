@@ -515,7 +515,51 @@ def verification_node(state: LegalState) -> Dict:
     if graph_ev.get("evidence_gaps"):
         warnings.append(f"승인된 증거가 연결되지 않은 사실/쟁점이 {len(graph_ev['evidence_gaps'])}건 있습니다.")
     if graph_ev.get("contradictions"):
-        warnings.append(f"상충하는 증거가 존재하는 항목이 {len(graph_ev['contradictions'])}건 있습니다.")
+        from ai_legal_helper.rag.graph_rag import extract_keywords
+
+        contra_list = graph_ev["contradictions"]
+        warnings.append(f"상충하는 증거가 존재하는 항목이 {len(contra_list)}건 있습니다.")
+
+        # [P1-03] 질문과 직접 관련된 핵심 Fact에 CONTRADICTION이 존재하는지 판별
+        q_kws = [k for k in extract_keywords(q) if len(k) >= 2]
+        draft_kws = [k for k in extract_keywords(draft) if len(k) >= 2]
+        core_contradictions = []
+        for c in contra_list:
+            c_text = " ".join(
+                str(c.get(field) or "")
+                for field in ("target_content", "claim_statement", "contradicting_statement", "explanation")
+            ).lower()
+            if (q_kws and any(k in c_text for k in q_kws)) or (
+                not q_kws and draft_kws and any(k in c_text for k in draft_kws)
+            ):
+                core_contradictions.append(c)
+
+        if core_contradictions:
+            caveat_markers = (
+                "상충", "모순", "불일치", "다툼", "확인 필요", "확인이 필요",
+                "나뉘", "따라 달라", "전제로", "만약", "일치하지 않",
+            )
+            draft_acknowledges = any(m in draft for m in caveat_markers)
+            result["conflict_acknowledged"] = draft_acknowledges
+            if result.get("reason_code") in (None, "NONE", ""):
+                result["reason_code"] = "EVIDENCE_CONFLICT"
+
+            if not draft_acknowledges:
+                # 단정적 법률 결론을 차단하고 수정 또는 보류(WITHHELD) 유도
+                result["status"] = "REVISE"
+                result["reason_code"] = "EVIDENCE_CONFLICT"
+                contra_summaries = [
+                    f"사실 '{c.get('target_content') or ''}'에 대해 상충하는 증거 주장이 존재함"
+                    for c in core_contradictions[:3]
+                ]
+                result.setdefault("contradictions", []).extend(contra_summaries)
+                result.setdefault("revision_instructions", []).append(
+                    "질문과 관련된 핵심 사실관계에 대해 제출된 증거 간 상충(CONTRADICTION)이 존재합니다. "
+                    "어느 한쪽 사실만 확정된 것으로 단정하지 말고, 증거 간 상충 내용과 사실관계 확인에 따른 조건부 법률 효과를 명시하세요."
+                )
+            elif result.get("status") == "PASS":
+                # 상충 사실을 명시하고 조건부로 설명한 경우 CAUTIONARY 처분이 되도록 REVISE 상태 부여
+                result["status"] = "REVISE"
 
     result["warnings"] = warnings
     result["graph_checks"] = graph_checks
@@ -577,7 +621,11 @@ def verification_condition(state: LegalState) -> str:
         return "statute_search_approval"
 
     # 3. 최초 검증 실패 시(REVISE 또는 일반 작성오류) 1회에 한해 적응형 보강 검색(revise) 시도
-    #    HILT가 이미 실행되었거나 재검토가 이미 수행된 경우에는 무한 루프 방지
+    #    단, 핵심 증거 상충(EVIDENCE_CONFLICT)이 존재하더라도 초안이 이미 상충을 명시하고 조건부 답변을 작성한 경우에는
+    #    불필요한 재작성 없이 즉시 조건부 확정(finalize -> CAUTIONARY)으로 라우팅한다.
+    if reason_code == "EVIDENCE_CONFLICT" and ver_res.get("conflict_acknowledged") and status == "REVISE":
+        return "finalize"
+
     if revision_count < 1 and not hilt_executed:
         if status == "REVISE" or (status == "INSUFFICIENT" and reason_code in ("ANSWER_REVISION_REQUIRED", "NONE")):
             return "revise"

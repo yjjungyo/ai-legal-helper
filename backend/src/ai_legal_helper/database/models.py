@@ -259,6 +259,11 @@ class EvidenceClaim(Base):
     confidence = Column(Float, nullable=True)
     review_status = Column(String, default="PENDING")  # PENDING, APPROVED, EDITED, REJECTED
     extractor_model = Column(String, nullable=True)
+    subject_key = Column(String, nullable=True)  # 비교 대상 주체·계약·항목 키
+    predicate_key = Column(String, nullable=True)  # 비교 대상 속성·행위 의미 키
+    scope = Column(String, default="CASE_GLOBAL", nullable=True)  # DOCUMENT_LOCAL, CASE_GLOBAL
+    temporal_context = Column(String, nullable=True)  # 적용 시점·기간·이벤트 역할
+    structured_slots = Column(JSON, nullable=True)  # 정규화된 금액·날짜 역할 및 상충 판정 메타데이터
     created_at = Column(DateTime, default=get_kst_now)
 
     case = relationship("Case", back_populates="claims")
@@ -525,8 +530,8 @@ class ConsultationRecord(Base):
     case_id = Column(String, ForeignKey("cases.id", ondelete="CASCADE"), nullable=True)
     user_id = Column(String, ForeignKey("users.id"), nullable=True)
     request_id = Column(String, unique=True, index=True, nullable=False)
-    conversation_id = Column(String(100), index=True, nullable=True)
-    turn_index = Column(Integer, default=1, nullable=False)
+    conversation_id = Column(String(100), index=True, nullable=True)
+    turn_index = Column(Integer, default=1, nullable=False)
     trace_id = Column(String, nullable=True)
     question = Column(Text, nullable=False)
     answer = Column(Text, nullable=True)

@@ -146,6 +146,9 @@ def collect_case_snapshot(db: Session, case_id: str) -> Optional[Dict[str, Any]]
         label = _TARGET_LABELS.get(l.target_type)
         if label is None:
             continue
+        # 확정된 관계(SUPPORTS, CONTRADICTS)만 Neo4j 엣지로 투영한다 (POTENTIAL_CONFLICT는 PostgreSQL에서 관리).
+        if l.link_type not in _LINK_RELS:
+            continue
         # Claim 기반 링크인데 Claim이 승인되지 않았다면 근거 관계로 투영하지 않는다(원칙 6).
         if l.claim_id and claim_status.get(l.claim_id) not in APPROVED_REVIEW_STATUSES:
             continue
@@ -155,7 +158,7 @@ def collect_case_snapshot(db: Session, case_id: str) -> Optional[Dict[str, Any]]
             "source_id": l.claim_id or l.span_id,
             "target_label": label,
             "target_id": l.target_id,
-            "rel": _LINK_RELS.get(l.link_type, "CONTEXT"),
+            "rel": _LINK_RELS[l.link_type],
             "evidence_id": l.evidence_id,
             "span_id": l.span_id,
         })
@@ -187,7 +190,9 @@ def collect_case_snapshot(db: Session, case_id: str) -> Optional[Dict[str, Any]]
                    "page_number": s.page_number, "paragraph_index": s.paragraph_index,
                    "location_quality": s.location_quality} for s in spans],
         "claims": [{"id": c.id, "evidence_id": c.evidence_id, "statement": c.statement,
-                    "claim_type": c.claim_type, "assertion_status": c.assertion_status,
+                    "claim_type": c.claim_type, "subject_key": c.subject_key,
+                    "predicate_key": c.predicate_key, "scope": c.scope,
+                    "temporal_context": c.temporal_context, "assertion_status": c.assertion_status,
                     "review_status": c.review_status, "confidence": c.confidence} for c in claims],
         "span_claim_links": [{"span_id": l.span_id, "claim_id": l.claim_id} for l in scl],
         "evidence_links": evidence_links,

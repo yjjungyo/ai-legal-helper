@@ -2,26 +2,41 @@
 """
 증거 관리 API 라우터 (Evidence API Routes)
 
-증거 파일 업로드, 목록 조회, 추출 및 사용자 검토(리뷰)를 위한 REST 엔드포인트를 제공한다.
+증거 파일 업로드, 목록 조회, 추출, 상충 조회 및 사용자 검토(리뷰)를 위한 REST 엔드포인트를 제공한다.
 FastAPI BackgroundTasks를 사용하여 텍스트/AI 추출 작업이 메인 스레드를 블로킹하지 않도록 한다.
 """
 
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, BackgroundTasks, Request
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
 
 from ai_legal_helper.database.session import get_db
 from ai_legal_helper.database.models import (
-    EvidenceDocument, EvidenceClaim, EvidenceSpan, EvidenceLink,
-    Fact, Event, LegalIssue, Case, User, AuditLog
+    EvidenceDocument,
+    EvidenceClaim,
+    EvidenceSpan,
+    EvidenceLink,
+    Fact,
+    Event,
+    LegalIssue,
+    Case,
+    User,
+    AuditLog,
 )
 from ai_legal_helper.api.dependencies import get_current_user, get_case_for_user
 from ai_legal_helper.case_intelligence.evidence_ingestion import ingest_evidence, extract_text_from_evidence
 from ai_legal_helper.case_intelligence.evidence_extractor import (
-    extract_claims_from_evidence, normalize_claim_type, normalize_to_claim_code
+    extract_claims_from_evidence,
+    normalize_claim_type,
+    normalize_to_claim_code,
 )
-from ai_legal_helper.case_intelligence.evidence_manager import process_evidence_review
+from ai_legal_helper.case_intelligence.evidence_manager import (
+    process_evidence_review,
+    _prune_deleted_fact_references,
+    _recalculate_case_disputed_facts,
+    _rebuild_case_timeline,
+)
 from ai_legal_helper.case_intelligence.conflict_detector import (
     build_structured_slots,
     evaluate_claim_against_fact,
@@ -31,10 +46,31 @@ from ai_legal_helper.database.graph_sync import safe_sync_case
 
 router = APIRouter(prefix="/cases/{case_id}/evidence", tags=["evidence"])
 
+
 class ReviewRequest(BaseModel):
+    """증거 주장(Claim) 검토 요청 스키마."""
     action: str  # APPROVE, EDIT, REJECT
     new_statement: Optional[str] = None
     review_reason: Optional[str] = None
+
+
+def _extract_primary_span_info(claim: Optional[EvidenceClaim]) -> Dict[str, Any]:
+    """Claim에 연결된 첫 번째 원문 Span 위치 정보를 반환한다."""
+    if not claim or not claim.spans:
+        return {
+            "span_id": None,
+            "page_number": None,
+            "paragraph_index": None,
+            "text_excerpt": None,
+        }
+    first_span = claim.spans[0]
+    return {
+        "span_id": first_span.id,
+        "page_number": first_span.page_number,
+        "paragraph_index": first_span.paragraph_index,
+        "text_excerpt": first_span.text_excerpt,
+    }
+
 
 def run_extraction_pipeline(db_gen, doc_id: str):
     """백그라운드에서 텍스트 추출과 AI 추출 파이프라인을 실행한다."""
@@ -52,38 +88,45 @@ def run_extraction_pipeline(db_gen, doc_id: str):
     finally:
         db.close()
 
+
 @router.post("")
 async def upload_evidence(
     request: Request,
-    background_tasks: BackgroundTasks, 
-    file: UploadFile = File(...), 
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
     case: Case = Depends(get_case_for_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """새로운 증거 파일을 업로드하고 백그라운드 추출 작업을 시작한다."""
     doc = await ingest_evidence(db, case.id, file)
-    
+
     audit = AuditLog(
         actor_user_id=current_user.id,
         event_type="UPLOAD_EVIDENCE",
         resource_type="EvidenceDocument",
         resource_id=doc.id,
-        result="SUCCESS"
+        result="SUCCESS",
     )
     db.add(audit)
     db.commit()
-    
+
     background_tasks.add_task(run_extraction_pipeline, get_db, doc.id)
     return {"evidence_id": doc.id, "status": doc.status}
+
 
 @router.get("")
 def list_evidence(case: Case = Depends(get_case_for_user), db: Session = Depends(get_db)):
     """사건에 속한 모든 증거 문서 목록을 조회한다.
-    
+
     프론트엔드 호환성을 위해 original_filename과 filename을 함께 제공한다.
     """
-    docs = db.query(EvidenceDocument).filter_by(case_id=case.id).order_by(EvidenceDocument.uploaded_at.desc()).all()
+    docs = (
+        db.query(EvidenceDocument)
+        .filter_by(case_id=case.id)
+        .order_by(EvidenceDocument.uploaded_at.desc())
+        .all()
+    )
     return [
         {
             "id": d.id,
@@ -93,31 +136,32 @@ def list_evidence(case: Case = Depends(get_case_for_user), db: Session = Depends
             "size_bytes": d.size_bytes,
             "status": d.status,
             "uploaded_at": d.uploaded_at,
-            "created_at": d.uploaded_at
+            "created_at": d.uploaded_at,
         }
         for d in docs
     ]
 
+
 @router.get("/conflicts")
 def get_evidence_conflicts(
     case: Case = Depends(get_case_for_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """사건 내 증거들 간의 검증된 상충 및 모순 목록을 중복 없이 조회한다.
+    """사건 내 증거들 간의 검증된 확정 상충(CONTRADICTION) 및 잠재 상충(POTENTIAL_CONFLICT) 목록을 중복 없이 조회한다.
 
-    1. RDB EvidenceLink의 CONTRADICTS 관계를 3단계 상충 탐지 엔진으로 검증하여 조회
+    1. RDB EvidenceLink의 CONTRADICTS 및 POTENTIAL_CONFLICT 관계를 3단계 상충 탐지 엔진으로 검증하여 조회
     2. EvidenceClaim 중 미연결 상충 후보(CONTRADICTION_CANDIDATE)를 검증하여 조회
     3. Neo4j GraphRAG의 find_contradictions 결과를 PostgreSQL 원본과 대조 및 중복 제거하여 통합
-    4. 반려(REJECTED)된 주장은 제외하며, (claim_id, target_id) 기준으로 단일화한다.
+    4. 반려(REJECTED)된 주장은 제외하며, (claim_id, target_id) 기준으로 단일화하고 원문 Span 위치 정보를 함께 반환한다.
 
     Args:
         case (Case): 현재 로그인 사용자가 접근 권한을 가진 사건 엔티티.
         db (Session): 데이터베이스 세션.
 
     Returns:
-        dict: {"conflicts": List[Dict]} 형태의 검증된 상충 목록.
+        dict: conflicts(전체), contradictions(확정 상충), potential_conflicts(잠재 상충) 및 건수 요약.
     """
-    conflicts = []
+    conflicts: List[Dict[str, Any]] = []
     seen_pairs = set()
     seen_claim_ids = set()
 
@@ -131,11 +175,14 @@ def get_evidence_conflicts(
         if f.source_ref and f.source_ref in doc_map
     }
 
-    # 1. RDB EvidenceLink (link_type == 'CONTRADICTS')
+    # 1. RDB EvidenceLink (link_type in ('CONTRADICTS', 'POTENTIAL_CONFLICT'))
     links = (
         db.query(EvidenceLink)
         .join(EvidenceDocument, EvidenceLink.evidence_id == EvidenceDocument.id)
-        .filter(EvidenceDocument.case_id == case.id, EvidenceLink.link_type == "CONTRADICTS")
+        .filter(
+            EvidenceDocument.case_id == case.id,
+            EvidenceLink.link_type.in_(["CONTRADICTS", "POTENTIAL_CONFLICT"]),
+        )
         .all()
     )
     for link in links:
@@ -146,7 +193,8 @@ def get_evidence_conflicts(
 
         target_desc = f"{link.target_type}:{link.target_id}"
         target_doc_name = None
-        reason_code = "VERIFIED_LINK_CONFLICT"
+        conflict_status = "CONTRADICTION" if link.link_type == "CONTRADICTS" else "POTENTIAL_CONFLICT"
+        reason_code = "VERIFIED_LINK_CONFLICT" if conflict_status == "CONTRADICTION" else "POTENTIAL_LINK_CONFLICT"
         explanation = None
 
         if link.target_type == "FACT":
@@ -159,6 +207,10 @@ def get_evidence_conflicts(
                 claim_slots = build_structured_slots(
                     statement=claim.statement or "",
                     claim_type=claim.claim_type,
+                    subject=claim.subject_key,
+                    predicate=claim.predicate_key,
+                    scope=claim.scope,
+                    temporal_context=claim.temporal_context,
                     evidence_id=claim.evidence_id,
                     document_name=doc.original_filename if doc else None,
                 )
@@ -169,8 +221,9 @@ def get_evidence_conflicts(
                     claim_id=claim.id,
                     enable_llm_verification=False,
                 )
-                if decision.status != "CONTRADICTION":
+                if decision.status not in ("CONTRADICTION", "POTENTIAL_CONFLICT"):
                     continue
+                conflict_status = decision.status
                 reason_code = decision.reason_code
                 explanation = decision.explanation
         elif link.target_type == "EVENT":
@@ -189,16 +242,24 @@ def get_evidence_conflicts(
         if link.claim_id:
             seen_claim_ids.add(link.claim_id)
 
-        default_desc = f"증거 주장 '{claim.statement if claim else ''}'이(가) 기존 사실 '{target_desc}'와(과) 상충됩니다."
+        span_info = _extract_primary_span_info(claim)
+        default_desc = (
+            f"증거 주장 '{claim.statement if claim else ''}'이(가) 기존 사실 '{target_desc}'와(과) "
+            f"{'상충됩니다.' if conflict_status == 'CONTRADICTION' else '추가 사실 확인이 필요합니다.'}"
+        )
         conflicts.append({
             "conflict_id": link.id,
-            "type": "LINK_CONTRADICTION",
-            "status": "CONTRADICTION",
+            "type": "LINK_CONTRADICTION" if conflict_status == "CONTRADICTION" else "LINK_POTENTIAL_CONFLICT",
+            "status": conflict_status,
             "reason_code": reason_code,
             "evidence_id": link.evidence_id,
             "document_name": doc.original_filename if doc else None,
             "claim_id": link.claim_id,
             "claim_statement": claim.statement if claim else None,
+            "span_id": span_info["span_id"],
+            "page_number": span_info["page_number"],
+            "paragraph_index": span_info["paragraph_index"],
+            "text_excerpt": span_info["text_excerpt"],
             "target_type": link.target_type,
             "target_id": link.target_id,
             "target_description": target_desc,
@@ -213,7 +274,8 @@ def get_evidence_conflicts(
         .filter(
             EvidenceClaim.case_id == case.id,
             EvidenceClaim.review_status != "REJECTED",
-            (EvidenceClaim.assertion_status == "CONTRADICTION_CANDIDATE") | (EvidenceClaim.claim_type == "CONTRADICTION")
+            (EvidenceClaim.assertion_status == "CONTRADICTION_CANDIDATE")
+            | (EvidenceClaim.claim_type == "CONTRADICTION"),
         )
         .all()
     )
@@ -230,13 +292,18 @@ def get_evidence_conflicts(
             statement=c.statement or "",
             existing_facts=other_facts,
             claim_type=c.claim_type,
+            subject=c.subject_key,
+            predicate=c.predicate_key,
+            scope=c.scope,
+            temporal_context=c.temporal_context,
             evidence_id=c.evidence_id,
             document_name=doc.original_filename if doc else None,
             claim_id=c.id,
             fact_doc_names=fact_doc_names,
             enable_llm_verification=False,
         )
-        for decision in eval_res["contradictions"]:
+        span_info = _extract_primary_span_info(c)
+        for decision in eval_res["contradictions"] + eval_res.get("potential_conflicts", []):
             pair_key = (c.id, decision.target_fact_id)
             if pair_key in seen_pairs:
                 continue
@@ -247,13 +314,17 @@ def get_evidence_conflicts(
             target_doc_name = fact_doc_names.get(decision.target_fact_id)
             conflicts.append({
                 "conflict_id": c.id,
-                "type": "CLAIM_CONTRADICTION",
-                "status": "CONTRADICTION",
+                "type": "CLAIM_CONTRADICTION" if decision.status == "CONTRADICTION" else "CLAIM_POTENTIAL_CONFLICT",
+                "status": decision.status,
                 "reason_code": decision.reason_code,
                 "evidence_id": c.evidence_id,
                 "document_name": doc.original_filename if doc else None,
                 "claim_id": c.id,
                 "claim_statement": c.statement,
+                "span_id": span_info["span_id"],
+                "page_number": span_info["page_number"],
+                "paragraph_index": span_info["paragraph_index"],
+                "text_excerpt": span_info["text_excerpt"],
                 "target_type": "FACT",
                 "target_id": decision.target_fact_id,
                 "target_description": target_desc,
@@ -288,6 +359,10 @@ def get_evidence_conflicts(
                 claim_slots = build_structured_slots(
                     statement=claim.statement or "",
                     claim_type=claim.claim_type,
+                    subject=claim.subject_key,
+                    predicate=claim.predicate_key,
+                    scope=claim.scope,
+                    temporal_context=claim.temporal_context,
                     evidence_id=claim.evidence_id,
                     document_name=doc.original_filename if doc else None,
                 )
@@ -302,6 +377,7 @@ def get_evidence_conflicts(
                     continue
                 seen_pairs.add(pair_key)
                 seen_claim_ids.add(claim.id)
+                span_info = _extract_primary_span_info(claim)
                 conflicts.append({
                     "conflict_id": c_id,
                     "type": "GRAPH_CONTRADICTION",
@@ -311,6 +387,10 @@ def get_evidence_conflicts(
                     "document_name": doc.original_filename if doc else None,
                     "claim_id": claim.id,
                     "claim_statement": claim.statement,
+                    "span_id": span_info["span_id"],
+                    "page_number": span_info["page_number"],
+                    "paragraph_index": span_info["paragraph_index"],
+                    "text_excerpt": span_info["text_excerpt"],
                     "target_type": gc.get("target_type") or "FACT",
                     "target_id": t_id,
                     "target_description": fact.statement,
@@ -322,29 +402,26 @@ def get_evidence_conflicts(
     except Exception:
         pass
 
-    return {"conflicts": conflicts}
+    contradictions_only = [c for c in conflicts if c.get("status") == "CONTRADICTION"]
+    potential_only = [c for c in conflicts if c.get("status") == "POTENTIAL_CONFLICT"]
+
+    return {
+        "conflicts": conflicts,
+        "contradictions": contradictions_only,
+        "potential_conflicts": potential_only,
+        "contradiction_count": len(contradictions_only),
+        "potential_conflict_count": len(potential_only),
+    }
+
 
 @router.post("/{evidence_id}/extract")
 def trigger_evidence_extraction(
     evidence_id: str,
     background_tasks: BackgroundTasks,
     case: Case = Depends(get_case_for_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """지정된 증거 문서에 대해 텍스트 및 AI 사실 추출(또는 재추출) 작업을 백그라운드로 실행한다.
-
-    Args:
-        evidence_id (str): 추출 작업을 수행할 증거 문서의 UUID.
-        background_tasks (BackgroundTasks): FastAPI 비동기 백그라운드 태스크 러너.
-        case (Case): 현재 로그인 사용자가 접근 권한을 가진 사건 엔티티.
-        db (Session): 데이터베이스 세션.
-
-    Returns:
-        dict: 작업 성공 여부, 대상 증거 ID 및 안내 메시지.
-
-    Raises:
-        HTTPException: 해당 증거 문서를 찾을 수 없는 경우 404 상태 코드 반환.
-    """
+    """지정된 증거 문서에 대해 텍스트 및 AI 사실 추출(또는 재추출) 작업을 백그라운드로 실행한다."""
     doc = db.query(EvidenceDocument).filter_by(id=evidence_id, case_id=case.id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="증거 문서를 찾을 수 없습니다.")
@@ -357,22 +434,22 @@ def trigger_evidence_extraction(
     return {
         "status": "SUCCESS",
         "evidence_id": doc.id,
-        "message": "추출 작업이 시작되었습니다."
+        "message": "추출 작업이 시작되었습니다.",
     }
 
-@router.get("/{evidence_id}/claims")
-def get_evidence_claims(evidence_id: str, case: Case = Depends(get_case_for_user), db: Session = Depends(get_db)):
-    """특정 증거 문서에서 도출된 주장(Claim) 후보들과 원문(Span) 정보를 반환한다.
 
-    프론트엔드 인터페이스(EvidenceClaim, EvidenceSpan)와의 호환성을 위해 
-    표준 필드명(id, claim_type, review_status, text_excerpt, page_number 등)과 
-    기존 필드명(claim_id, status, text, page)을 함께 제공한다.
-    """
+@router.get("/{evidence_id}/claims")
+def get_evidence_claims(
+    evidence_id: str,
+    case: Case = Depends(get_case_for_user),
+    db: Session = Depends(get_db),
+):
+    """특정 증거 문서에서 도출된 주장(Claim) 후보들과 원문(Span) 정보를 반환한다."""
     doc = db.query(EvidenceDocument).filter_by(id=evidence_id, case_id=case.id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="증거 문서를 찾을 수 없습니다.")
-        
-    claims = db.query(EvidenceClaim).filter_by(evidence_id=evidence_id).all()
+
+    claims = db.query(EvidenceClaim).filter_by(evidence_id=evidence_id, case_id=case.id).all()
     result = []
     for c in claims:
         spans = c.spans
@@ -381,6 +458,11 @@ def get_evidence_claims(evidence_id: str, case: Case = Depends(get_case_for_user
             "claim_id": c.id,
             "statement": c.statement,
             "claim_type": normalize_to_claim_code(c.claim_type),
+            "subject_key": c.subject_key,
+            "predicate_key": c.predicate_key,
+            "scope": c.scope,
+            "temporal_context": c.temporal_context,
+            "structured_slots": c.structured_slots,
             "assertion_status": c.assertion_status,
             "review_status": c.review_status,
             "status": c.review_status,
@@ -396,63 +478,80 @@ def get_evidence_claims(evidence_id: str, case: Case = Depends(get_case_for_user
                     "paragraph_index": s.paragraph_index,
                 }
                 for s in spans
-            ]
+            ],
         })
     return result
 
+
 @router.post("/{evidence_id}/claims/{claim_id}/review")
 def review_evidence_claim(
-    evidence_id: str, 
-    claim_id: str, 
-    req: ReviewRequest, 
+    evidence_id: str,
+    claim_id: str,
+    req: ReviewRequest,
     request: Request,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     case: Case = Depends(get_case_for_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """
-    추출된 주장 후보를 검토(승인/수정/거절)하고 공식 Fact로 편입한다.
-    동시성 예외(Optimistic Locking)가 발생할 수 있다.
+    """추출된 주장 후보를 검토(승인/수정/거절)하고 공식 Fact 및 사건 그래프 상태를 원자적으로 갱신한다.
 
-    P2.4: 커밋 성공 후 백그라운드로 사건 그래프를 재동기화한다(승인/반려가 그래프 근거 관계에 반영됨).
+    [소유권 검증 (P0-03)]
+    - evidence_id가 현재 case_id에 속하는지 확인한다.
+    - claim_id가 요청된 case_id 및 evidence_id에 속하는지 엄격히 검증한다 (불일치 시 404/400 반환).
     """
+    doc = db.query(EvidenceDocument).filter_by(id=evidence_id, case_id=case.id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="증거 문서를 찾을 수 없습니다.")
+
+    claim = db.query(EvidenceClaim).filter_by(id=claim_id).first()
+    if not claim:
+        raise HTTPException(status_code=404, detail="검토할 주장(Claim)을 찾을 수 없습니다.")
+    if claim.case_id != case.id or claim.evidence_id != evidence_id:
+        raise HTTPException(
+            status_code=400,
+            detail="요청된 주장(claim_id)이 해당 사건 또는 증거 문서에 속하지 않습니다.",
+        )
+
     try:
-        # Check if evidence belongs to the case
-        doc = db.query(EvidenceDocument).filter_by(id=evidence_id, case_id=case.id).first()
-        if not doc:
-            raise HTTPException(status_code=404, detail="증거 문서를 찾을 수 없습니다.")
+        review = process_evidence_review(
+            db=db,
+            claim_id=claim_id,
+            action=req.action,
+            new_statement=req.new_statement,
+            review_reason=req.review_reason,
+            expected_case_id=case.id,
+            expected_evidence_id=evidence_id,
+        )
 
-        review = process_evidence_review(db, claim_id, req.action, req.new_statement, req.review_reason)
-        
         audit = AuditLog(
-        actor_user_id=current_user.id,
-        event_type=f"REVIEW_CLAIM_{req.action}",
-        resource_type="EvidenceClaim",
-        resource_id=claim_id,
-        result="SUCCESS"
-    )
+            actor_user_id=current_user.id,
+            event_type=f"REVIEW_CLAIM_{req.action}",
+            resource_type="EvidenceClaim",
+            resource_id=claim_id,
+            result="SUCCESS",
+        )
         db.add(audit)
         db.commit()
-        
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="동시 수정이 발생했거나 처리 중 오류가 발생했습니다.")
     return {"status": "SUCCESS", "review_id": review.id}
+
 
 @router.delete("/{evidence_id}")
 def delete_evidence(
     evidence_id: str,
     current_user: User = Depends(get_current_user),
     case: Case = Depends(get_case_for_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """사건에 등록된 증거 문서 및 관련 추출 데이터를 삭제한다.
+    """사건에 등록된 증거 문서 및 단독 지지 추출 데이터를 정합성 있게 삭제한다.
 
     1. 증거 문서 및 물리 파일 삭제
-    2. 해당 증거 문서에 근거하여 공식 승격된 사건 Fact 레코드 연쇄 삭제
-    3. 데이터베이스 레코드 삭제 (Cascade를 통해 Claim, Span, Link 자동 삭제)
+    2. 해당 증거 문서가 단독으로 지지하던 Fact만 선별 삭제하고 다른 승인 증거가 지지하는 Fact는 보존
+    3. 삭제된 Fact 참조(LegalIssue, Event) 정리, DISPUTED 상태 재계산 및 타임라인 재구축
     4. 사건 그래프 재동기화 작업 큐 등록
     """
     import os
@@ -463,7 +562,6 @@ def delete_evidence(
     if not doc:
         raise HTTPException(status_code=404, detail="삭제할 증거 문서를 찾을 수 없습니다.")
 
-    # 1. 물리 파일 삭제
     if doc.safe_storage_key:
         storage_dir = get_storage_dir()
         file_path = os.path.join(storage_dir, doc.safe_storage_key)
@@ -473,35 +571,77 @@ def delete_evidence(
             except Exception:
                 pass
 
-    # 2. 해당 증거 문서에 근거하여 공식 승격되었던 사건 Fact 조회 및 일괄 삭제
     fact_ids_from_links = [
         link.target_id
         for link in db.query(EvidenceLink).filter_by(evidence_id=evidence_id, target_type="FACT").all()
     ]
-    facts_to_delete = (
+    candidate_facts = (
         db.query(Fact)
         .filter(
-            (Fact.case_id == case.id) &
-            ((Fact.source_ref == evidence_id) | (Fact.id.in_(fact_ids_from_links)))
+            (Fact.case_id == case.id)
+            & ((Fact.source_ref == evidence_id) | (Fact.id.in_(fact_ids_from_links)))
         )
         .all()
     )
-    for fact in facts_to_delete:
-        db.delete(fact)
+
+    other_approved_claims = (
+        db.query(EvidenceClaim)
+        .filter(
+            EvidenceClaim.case_id == case.id,
+            EvidenceClaim.evidence_id != evidence_id,
+            EvidenceClaim.review_status.in_(["APPROVED", "EDITED"]),
+        )
+        .all()
+    )
+
+    deleted_fact_ids = set()
+    for fact in candidate_facts:
+        if fact.source_type == "USER_CLAIM":
+            continue
+        other_sup_links = (
+            db.query(EvidenceLink)
+            .join(EvidenceClaim, EvidenceLink.claim_id == EvidenceClaim.id)
+            .filter(
+                EvidenceLink.target_type == "FACT",
+                EvidenceLink.target_id == fact.id,
+                EvidenceLink.link_type == "SUPPORTS",
+                EvidenceLink.evidence_id != evidence_id,
+                EvidenceClaim.review_status.in_(["APPROVED", "EDITED"]),
+            )
+            .all()
+        )
+        norm_f = "".join((fact.statement or "").split())
+        same_stmt_others = [
+            oc for oc in other_approved_claims
+            if "".join((oc.statement or "").split()) == norm_f
+        ]
+        if not other_sup_links and not same_stmt_others:
+            deleted_fact_ids.add(fact.id)
+            db.delete(fact)
+        else:
+            if fact.source_ref == evidence_id:
+                if other_sup_links:
+                    fact.source_ref = other_sup_links[0].evidence_id
+                elif same_stmt_others:
+                    fact.source_ref = same_stmt_others[0].evidence_id
 
     doc_filename = doc.original_filename
     db.delete(doc)
+    db.flush()
+
+    _prune_deleted_fact_references(db, case.id, deleted_fact_ids)
+    _recalculate_case_disputed_facts(db, case.id)
+    _rebuild_case_timeline(db, case.id)
 
     audit = AuditLog(
         actor_user_id=current_user.id,
         event_type="DELETE_EVIDENCE",
         resource_type="EvidenceDocument",
         resource_id=evidence_id,
-        result="SUCCESS"
+        result="SUCCESS",
     )
     db.add(audit)
     queue_sync_task(db, case.id)
     db.commit()
 
     return {"status": "SUCCESS", "deleted_id": evidence_id, "filename": doc_filename}
-

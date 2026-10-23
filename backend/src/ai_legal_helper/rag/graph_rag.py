@@ -218,14 +218,16 @@ class GraphRAGRetriever:
         """, case_id=case_id, approved=_APPROVED)
 
     def find_contradictions(self, case_id: str) -> List[Dict[str, Any]]:
-        """CONTRADICTS 관계와, 같은 대상에 대한 SUPPORTS 근거를 함께 반환한다."""
+        """승인된 Claim의 CONTRADICTS 관계와, 같은 대상에 대한 SUPPORTS 근거를 함께 반환한다."""
         return self._run("""
             MATCH (src)-[:CONTRADICTS]->(t {case_id: $case_id})
+            WHERE NOT src:EvidenceClaim OR src.review_status IN $approved
             OPTIONAL MATCH (sup:EvidenceClaim)-[:SUPPORTS]->(t)
             WHERE sup.review_status IN $approved
             RETURN labels(t)[0] AS target_type, t.id AS target_id,
                    coalesce(t.statement, t.title) AS target_content,
                    src.id AS contradicting_id, labels(src)[0] AS contradicting_type,
+                   src.statement AS contradicting_statement,
                    collect(DISTINCT sup.id) AS supporting_claim_ids
             LIMIT 30
         """, case_id=case_id, approved=_APPROVED)
