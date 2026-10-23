@@ -523,3 +523,4 @@ class TestPartiesAndTimelineSync:
         events = db_session.query(Event).filter_by(case_id=case.id).all()
         assert len(events) == 2
         assert {e.event_date for e in events} == {"2025-01-01", "2025-12-31"}
+

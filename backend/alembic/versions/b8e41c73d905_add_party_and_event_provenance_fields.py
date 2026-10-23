@@ -65,3 +65,4 @@ def downgrade() -> None:
     op.drop_column("parties", "related_fact_ids")
     op.drop_column("parties", "verification_status")
     op.drop_column("parties", "source_type")
+

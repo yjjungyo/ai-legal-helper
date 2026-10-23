@@ -135,3 +135,4 @@
 - [`docs/development/CODING_COMMENT_STANDARD.md`](CODING_COMMENT_STANDARD.md)에 따라 신규·수정된 Python 모듈(`entity_sync.py`, `timeline.py`, `evidence_manager.py`, `manager.py`, `cases.py`, `models.py`, `schemas/case.py`)에 한국어 모듈 개요 및 Google 스타일 함수/클래스 Docstring을 작성하였다.
 - 프론트엔드 TypeScript/React(`CaseWorkspace.tsx`, `case.ts`) 주석 및 타입 정의를 최신 동작에 맞게 갱신하였다.
 - 로그 및 주석에 API Key, 개인정보 원문 등 민감정보를 기록하지 않았다.
+
