@@ -33,6 +33,7 @@ from ai_legal_helper.case_intelligence.evidence_extractor import (
 )
 from ai_legal_helper.case_intelligence.evidence_manager import (
     process_evidence_review,
+    sync_evidence_document_status,
     _prune_deleted_fact_references,
     _recalculate_case_disputed_facts,
     _rebuild_case_timeline,
@@ -119,7 +120,9 @@ async def upload_evidence(
 def list_evidence(case: Case = Depends(get_case_for_user), db: Session = Depends(get_db)):
     """사건에 속한 모든 증거 문서 목록을 조회한다.
 
-    프론트엔드 호환성을 위해 original_filename과 filename을 함께 제공한다.
+    각 문서에 속한 EvidenceClaim의 검토 상태(PENDING 잔여 여부)와 EvidenceDocument.status가
+    불일치하는 경우(예: 모든 Claim이 승인되었으나 문서 상태가 REVIEW_REQUIRED로 남아 있는 경우)
+    자동으로 APPROVED 상태로 동기화하여 반환한다.
     """
     docs = (
         db.query(EvidenceDocument)
@@ -127,6 +130,15 @@ def list_evidence(case: Case = Depends(get_case_for_user), db: Session = Depends
         .order_by(EvidenceDocument.uploaded_at.desc())
         .all()
     )
+    status_changed = False
+    for d in docs:
+        prev_st = d.status
+        new_st = sync_evidence_document_status(db, d.id)
+        if new_st != prev_st:
+            status_changed = True
+    if status_changed:
+        db.commit()
+
     return [
         {
             "id": d.id,

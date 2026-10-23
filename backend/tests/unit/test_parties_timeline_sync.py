@@ -524,3 +524,36 @@ class TestPartiesAndTimelineSync:
         assert len(events) == 2
         assert {e.event_date for e in events} == {"2025-01-01", "2025-12-31"}
 
+    @patch("ai_legal_helper.database.graph_sync_worker.queue_sync_task")
+    def test_t19_document_status_transitions_to_approved_when_all_claims_reviewed(
+        self, mock_queue, db_session
+    ):
+        """T19. 증거 문서 내 모든 Claim이 검토 완료(APPROVED/EDITED/REJECTED)되면 문서 상태가 APPROVED로 전이된다."""
+        case, doc = _create_case_with_doc(db_session)
+        c1 = EvidenceClaim(
+            case_id=case.id,
+            evidence_id=doc.id,
+            statement="임대인은 박정훈이다.",
+            claim_type="PARTY_INFO",
+            review_status="PENDING",
+        )
+        c2 = EvidenceClaim(
+            case_id=case.id,
+            evidence_id=doc.id,
+            statement="계약금 지급기일은 2022년 2월 20일이다.",
+            claim_type="DATE_INFO",
+            review_status="PENDING",
+        )
+        db_session.add_all([c1, c2])
+        db_session.commit()
+
+        # c1만 승인된 시점에는 c2가 PENDING이므로 doc.status는 REVIEW_REQUIRED 유지
+        process_evidence_review(db=db_session, claim_id=c1.id, action="APPROVE")
+        db_session.refresh(doc)
+        assert doc.status == "REVIEW_REQUIRED"
+
+        # 마지막 PENDING인 c2까지 승인되면 doc.status가 즉시 APPROVED로 변경됨
+        process_evidence_review(db=db_session, claim_id=c2.id, action="APPROVE")
+        db_session.refresh(doc)
+        assert doc.status == "APPROVED"
+

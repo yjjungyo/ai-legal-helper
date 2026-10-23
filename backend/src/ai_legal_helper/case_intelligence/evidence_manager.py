@@ -246,6 +246,38 @@ def _recalculate_case_disputed_facts(db: Session, case_id: str) -> None:
             fact.verification_status = _restore_non_disputed_status(fact)
 
 
+def sync_evidence_document_status(db: Session, evidence_id: str) -> Optional[str]:
+    """증거 문서에 속한 EvidenceClaim들의 검토 상태(review_status)를 집계하여 EvidenceDocument.status를 동기화한다.
+
+    [상태 전이 규칙]
+    - 해당 문서에 추출된 Claim이 1건 이상 존재하는 경우:
+      - `PENDING` 상태인 Claim이 1건이라도 남아 있으면 `REVIEW_REQUIRED`로 설정한다.
+      - `PENDING` 상태인 Claim이 0건이면(모든 Claim이 APPROVED, EDITED 또는 REJECTED로 검토 완료)
+        `APPROVED`로 전이한다.
+    - Claim이 아직 없는 경우 기존 문서 상태(`UPLOADED`, `EXTRACTING`, `FAILED` 등)를 유지한다.
+
+    Args:
+        db: 데이터베이스 세션.
+        evidence_id: 대상 증거 문서 ID.
+
+    Returns:
+        Optional[str]: 갱신된 EvidenceDocument.status 문자열 (문서 미존재 시 None).
+    """
+    doc = db.query(EvidenceDocument).filter_by(id=evidence_id).first()
+    if not doc:
+        return None
+
+    claims = db.query(EvidenceClaim).filter_by(evidence_id=evidence_id).all()
+    if not claims:
+        return doc.status
+
+    pending_count = sum(1 for c in claims if (c.review_status or "PENDING") == "PENDING")
+    target_status = "REVIEW_REQUIRED" if pending_count > 0 else "APPROVED"
+    if doc.status != target_status:
+        doc.status = target_status
+    return doc.status
+
+
 def _rebuild_case_timeline(db: Session, case_id: str) -> None:
     """사건의 현재 Fact 목록을 기준으로 당사자(Party)와 타임라인(Event)을 일괄 동기화한다.
 
@@ -502,8 +534,9 @@ def process_evidence_review(
                     )
                 )
 
-        # 5) 사건 전체 Fact의 DISPUTED 상태 재계산 및 타임라인(Event) 재구축
+        # 5) 사건 전체 Fact의 DISPUTED 상태 재계산, 증거 문서 상태(APPROVED/REVIEW_REQUIRED) 갱신 및 엔티티 동기화
         db.flush()
+        sync_evidence_document_status(db, claim.evidence_id)
         _recalculate_case_disputed_facts(db, case.id)
         _rebuild_case_timeline(db, case.id)
 

@@ -141,7 +141,16 @@ def get_workflow_summary(case: Case = Depends(get_case_for_user), db: Session = 
     )
 
     pending_claims = [c for c in claims if c.review_status == "PENDING"]
-    approved_claims = [c for c in claims if c.review_status == "APPROVED"]
+    approved_claims = [c for c in claims if c.review_status in ("APPROVED", "EDITED")]
+
+    from ai_legal_helper.case_intelligence.evidence_manager import sync_evidence_document_status
+    doc_status_updated = False
+    for ev_doc in evidences:
+        prev_st = ev_doc.status
+        if sync_evidence_document_status(db, ev_doc.id) != prev_st:
+            doc_status_updated = True
+    if doc_status_updated:
+        db.commit()
 
     derived_status = calculate_derived_status(db, case.id)
     

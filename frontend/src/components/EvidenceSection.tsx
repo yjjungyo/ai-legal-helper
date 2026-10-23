@@ -314,6 +314,25 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
   }, [selectedDocId]);
 
   /**
+   * 백그라운드 추출 중인 문서(EXTRACTING / UPLOADED)가 있을 때 자동 폴링하여
+   * 추출 완료 시 문서 배지와 주장 목록을 자동 갱신합니다.
+   */
+  useEffect(() => {
+    const hasExtracting = documents.some(
+      (d) => d.status === 'EXTRACTING' || d.status === 'UPLOADED'
+    );
+    if (!hasExtracting) return;
+    const timer = setInterval(async () => {
+      await loadEvidences();
+      if (selectedDocId) {
+        await loadClaims(selectedDocId);
+      }
+      await loadConflicts();
+    }, 2500);
+    return () => clearInterval(timer);
+  }, [documents, selectedDocId, caseId]);
+
+  /**
    * 증거 문서 목록 로드
    */
   const loadEvidences = async () => {
@@ -409,14 +428,17 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
   };
 
   /**
-   * 사실 주장(Claim) 승인 처리 및 재분석 안내 활성화 (EVT-023)
+   * 사실 주장(Claim) 승인 처리 및 문서 상태·재분석 안내 갱신 (EVT-023)
    */
   const handleApprove = async (claimId: string) => {
     if (!selectedDocId) return;
     try {
       await reviewEvidenceClaim(caseId, selectedDocId, claimId, { action: 'APPROVE' });
-      await loadClaims(selectedDocId);
-      await loadConflicts();
+      await Promise.all([
+        loadClaims(selectedDocId),
+        loadEvidences(),
+        loadConflicts(),
+      ]);
       setShowReanalyzePrompt(true);
       onRefreshCase();
     } catch (err) {
@@ -425,7 +447,7 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
   };
 
   /**
-   * 모달을 통한 수정 승인 / 반려 실행 및 재분석 안내 활성화 (EVT-023)
+   * 모달을 통한 수정 승인 / 반려 실행 및 문서 상태·재분석 안내 갱신 (EVT-023)
    */
   const handleModalSubmit = async ({ newStatement, reason }: { newStatement?: string; reason?: string }) => {
     if (!selectedDocId || !modalState.action) return;
@@ -437,8 +459,11 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
         review_reason: reason,
       });
       setModalState({ isOpen: false, action: null, claimId: '', statement: '' });
-      await loadClaims(selectedDocId);
-      await loadConflicts();
+      await Promise.all([
+        loadClaims(selectedDocId),
+        loadEvidences(),
+        loadConflicts(),
+      ]);
       if (currentAction === 'EDIT') {
         setShowReanalyzePrompt(true);
       }
@@ -562,13 +587,30 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
                     <strong style={{ fontSize: '0.92em', color: isSelected ? 'var(--primary)' : 'var(--text-main)', wordBreak: 'break-all' }}>
                       {displayName}
                     </strong>
-                    <span className="badge badge-gray" style={{ fontSize: '0.72em' }}>
-                      {doc.status}
+                    <span
+                      className={
+                        doc.status === 'APPROVED'
+                          ? 'badge badge-green'
+                          : doc.status === 'REVIEW_REQUIRED'
+                            ? 'badge badge-amber'
+                            : doc.status === 'EXTRACTING'
+                              ? 'badge badge-blue'
+                              : doc.status === 'FAILED' || doc.status === 'EXTRACTION_UNAVAILABLE'
+                                ? 'badge badge-red'
+                                : 'badge badge-gray'
+                      }
+                      style={{ fontSize: '0.72em', whiteSpace: 'nowrap' }}
+                    >
+                      {doc.status === 'APPROVED'
+                        ? 'APPROVED (검토완료)'
+                        : doc.status === 'REVIEW_REQUIRED'
+                          ? 'REVIEW_REQUIRED'
+                          : doc.status}
                     </span>
                   </div>
 
                   <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
-                    {(doc.status === 'UPLOADED' || doc.status === 'FAILED' || doc.status === 'REVIEW_REQUIRED') && (
+                    {(doc.status === 'UPLOADED' || doc.status === 'FAILED' || doc.status === 'REVIEW_REQUIRED' || doc.status === 'APPROVED') && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
