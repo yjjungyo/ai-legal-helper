@@ -924,6 +924,40 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
                   </div>
                 )}
               </div>
+              {(c.reason_code || c.subject_match_basis || c.predicate_match_basis || c.temporal_semantics) && (
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '6px',
+                    fontSize: '0.78em',
+                    color: 'var(--text-muted)',
+                    paddingTop: '6px',
+                    borderTop: '1px dashed var(--border)',
+                  }}
+                >
+                  {c.reason_code && (
+                    <span className="badge badge-gray" style={{ fontSize: '0.92em' }}>
+                      판정 사유: {c.reason_code}
+                    </span>
+                  )}
+                  {c.subject_match_basis && (
+                    <span style={{ backgroundColor: 'var(--surface-alt)', padding: '2px 6px', borderRadius: '4px' }}>
+                      대상 근거: {c.subject_match_basis}
+                    </span>
+                  )}
+                  {c.predicate_match_basis && (
+                    <span style={{ backgroundColor: 'var(--surface-alt)', padding: '2px 6px', borderRadius: '4px' }}>
+                      행위 근거: {c.predicate_match_basis}
+                    </span>
+                  )}
+                  {c.temporal_semantics && (
+                    <span style={{ backgroundColor: 'var(--surface-alt)', padding: '2px 6px', borderRadius: '4px' }}>
+                      시점 의미: {c.temporal_semantics}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           );
         };

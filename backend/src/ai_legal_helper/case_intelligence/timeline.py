@@ -32,6 +32,7 @@ import re
 from typing import Dict, List, Optional, Tuple
 
 from ai_legal_helper.case_intelligence.conflict_detector import extract_dates_with_validation
+from ai_legal_helper.case_intelligence.fact_semantics import extract_semantic_fact
 from ai_legal_helper.database.models import Event, Fact
 from ai_legal_helper.observability.decorators import trace
 from ai_legal_helper.observability.logging_config import get_logger
@@ -279,7 +280,19 @@ def _classify_clause_semantics(
     if any(kw in compact for kw in ("퇴거하였다", "이사하였다", "공실로", "명도하였다", "퇴거완료")):
         return [("실제 퇴거", _status("ACTUAL"), "MOVEOUT_ACTUAL", None)]
 
-    # 12. 법적 절차 (소 제기, 지급명령, 임차권등기 등)
+    # 12. 공통 Fact Semantics 기반 도메인 분류 (근로계약 입사/퇴사, 채권채무 대여/변제, 소송절차 등)
+    sem = extract_semantic_fact(full_statement)
+    if sem.event_type == "EMPLOYMENT" and sem.event_subtype in ("HIRE", "RESIGNATION"):
+        ev_title = "입사" if sem.event_subtype == "HIRE" else "퇴사"
+        return [(ev_title, _status(sem.occurrence_status), f"EMPLOYMENT:{sem.event_subtype}", None)]
+    if sem.event_type == "LOAN" and sem.event_subtype in ("LOAN_ORIGINATION", "PARTIAL_REPAYMENT"):
+        ev_title = "대여 발생" if sem.event_subtype == "LOAN_ORIGINATION" else "일부 변제"
+        return [(ev_title, _status(sem.occurrence_status), f"LOAN:{sem.event_subtype}", None)]
+    if sem.event_type == "LITIGATION" and sem.event_subtype in ("COMPLAINT_FILING", "COMPLAINT_SERVICE", "HEARING_DATE", "JUDGMENT_PRONOUNCEMENT"):
+        ev_title = "소장 제출" if sem.event_subtype == "COMPLAINT_FILING" else ("소장 송달" if sem.event_subtype == "COMPLAINT_SERVICE" else ("변론기일" if sem.event_subtype == "HEARING_DATE" else "판결 선고"))
+        return [(ev_title, _status(sem.occurrence_status), f"LITIGATION:{sem.event_subtype}", None)]
+
+    # 13. 법적 절차 (소 제기, 지급명령, 임차권등기 등)
     if any(
         kw in compact
         for kw in ("소를제기", "소송제기", "지급명령", "임차권등기", "가압류", "가처분", "경매", "판결선고")
@@ -287,7 +300,7 @@ def _classify_clause_semantics(
         occ = "SCHEDULED" if ("예정" in compact or "기일" in compact) else "ACTUAL"
         return [("법적 절차", _status(occ), f"LEGAL_PROCEEDING:{compact[:18]}", None)]
 
-    # 13. 일반 사실 (예정/기일/요청 키워드 유무에 따라 occurrence_status 결정, 문장별 고유 키 부여로 오병합 방지)
+    # 14. 일반 사실 (예정/기일/요청 키워드 유무에 따라 occurrence_status 결정, 문장별 고유 키 부여로 오병합 방지)
     if any(kw in compact for kw in ("예정", "기일", "하기로")):
         occ = "SCHEDULED"
     elif any(kw in compact for kw in ("요청", "촉구", "최고")):

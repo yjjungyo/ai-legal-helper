@@ -42,6 +42,13 @@ from ai_legal_helper.database.models import (
     EvidenceLink,
     Fact,
 )
+from ai_legal_helper.case_intelligence.fact_semantics import (
+    ComparabilityResult,
+    SemanticFact,
+    compare_fact_identity,
+    evaluate_temporal_relation,
+    extract_semantic_fact,
+)
 from ai_legal_helper.llm.gateway import get_llm
 from ai_legal_helper.observability.context import get_current_span_id
 from ai_legal_helper.observability.langfuse_client import update_span
@@ -61,6 +68,7 @@ PolarityType = Literal[
     "NEGATIVE",
     "DOUBLE_NEGATIVE",
     "REPORTED_NEGATIVE",
+    "UNCONFIRMED",
 ]
 
 # 한국어 수사 자릿수 연산을 위한 언어 체계 상수 (특정 금액 하드코딩이 아닌 한국어 기수법 정의)
@@ -118,6 +126,7 @@ _FUNCTION_WORDS: Set[str] = {
 # 금액의 의미적 역할(Semantic Role) 분류 패턴 (우선순위 순)
 _AMOUNT_ROLE_PATTERNS: Tuple[Tuple[str, re.Pattern[str]], ...] = (
     ("MODIFIED_CONTRACT_AMOUNT", re.compile(r"증액|감액|변경\s*보증금|갱신\s*보증금|인상|인하")),
+    ("TOTAL_AMOUNT", re.compile(r"합계|총액|전체\s*보증금|보증금\s*전액")),
     ("RETURN_REQUEST_AMOUNT", re.compile(r"반환\s*요청|반환을\s*요청|반환\s*청구")),
     ("RETURNED_AMOUNT", re.compile(r"일부\s*반환|반환한\s*금액|반환된\s*금액|반환받은|돌려받은|돌려준|회수한|공제\s*후\s*반환|원을\s*반환하|원을\s*반환했")),
     ("REMAINING_DEBT", re.compile(r"미반환|미지급|잔여\s*채무|잔존\s*채무|남은\s*금액|못\s*받은|연체액|체불액")),
@@ -135,15 +144,18 @@ _DATE_ROLE_PATTERNS: Tuple[Tuple[str, re.Pattern[str]], ...] = (
     ("RETURN_REQUEST_DATE", re.compile(r"반환\s*요청|퇴거\s*요청|퇴거\s*예정|퇴거일|명도\s*예정|반환\s*기일")),
     ("NOTICE_RECEIVED_DATE", re.compile(r"도달|수령|수신|받은\s*날")),
     ("NOTICE_SENT_DATE", re.compile(r"통지|통보|내용증명|발송|보낸\s*날|갱신\s*거절|해지\s*통고")),
-    ("EXPIRATION_DATE", re.compile(r"만기|만료|종료일|까지이다|기간\s*종료")),
-    ("START_OR_DELIVERY_DATE", re.compile(r"인도|입주|전입|개시일|부터\s*\d{4}")),
-    ("ACTUAL_PAYMENT_OR_RETURN_DATE", re.compile(r"지급기일|지급일|지급하|이체하|송금하|입금하|반환하")),
+    ("EXPIRATION_DATE", re.compile(r"계약\s*만기|임대차\s*만기|만료일|계약\s*종료일|임대차\s*종료|기간\s*만료")),
+    ("START_OR_DELIVERY_DATE", re.compile(r"인도|입주|전입\s*(?:신고)?일|개시일")),
+    ("DOWN_PAYMENT_DUE_DATE", re.compile(r"계약금\s*(?:지급|납부)?\s*기일|계약금\s*지급\s*예정")),
+    ("BALANCE_PAYMENT_DUE_DATE", re.compile(r"잔금\s*(?:지급|납부)?\s*기일|잔금\s*지급\s*예정")),
+    ("PAYMENT_DUE_DATE", re.compile(r"지급기일|지급예정일|납부기일|변제기")),
+    ("ACTUAL_PAYMENT_OR_RETURN_DATE", re.compile(r"지급하|이체하|송금하|입금하|반환하")),
     ("CONTRACT_DATE", re.compile(r"체결|계약일|작성일")),
 )
 
 # 인용·통보절 내부의 부정(Reported Negation) 패턴: "반환할 수 없다고 통보하였다" 등
 _REPORTED_NEGATION_RE = re.compile(
-    r"(?:수\s*없다|지\s*않겠다|지\s*못한다|어렵다|불가하다|거절한다|안\s*된다)고\s*"
+    r"(?:없다|수\s*없다|지\s*않겠다|지\s*못한다|어렵다|불가하다|거절한다|안\s*된다)고\s*"
     r"(?:통보|통지|연락|말|전달|회신|답변|문자|주장|고지)"
 )
 
@@ -200,7 +212,7 @@ class StructuredFactSlots(BaseModel):
     )
     polarity: PolarityType = Field(
         default="AFFIRMATIVE",
-        description="서술부의 극성 (AFFIRMATIVE, NEGATIVE, DOUBLE_NEGATIVE, REPORTED_NEGATIVE)",
+        description="서술부의 극성 (AFFIRMATIVE, NEGATIVE, DOUBLE_NEGATIVE, REPORTED_NEGATIVE, UNCONFIRMED)",
     )
     core_predicate: Optional[str] = Field(default=None, description="문장의 핵심 서술 행위/속성 어근")
     negated_predicate: Optional[str] = Field(default=None, description="부정 표현이 직접 수식하는 대상 행위 어근")
@@ -208,6 +220,11 @@ class StructuredFactSlots(BaseModel):
     evidence_id: Optional[str] = Field(default=None, description="출처 증거 문서 ID")
     document_name: Optional[str] = Field(default=None, description="출처 증거 문서 파일명")
     source_span_ids: List[str] = Field(default_factory=list, description="출처 원문 Span ID 목록")
+    semantic_fact: Optional[SemanticFact] = Field(default=None, description="정규화된 사실 의미 구조 모델")
+    semantic_category: Optional[str] = Field(default=None, description="의미 범주 (EVENT, STATE, OBLIGATION 등)")
+    event_type: Optional[str] = Field(default=None, description="이벤트 대분류")
+    event_subtype: Optional[str] = Field(default=None, description="이벤트 세부 항목")
+    temporal_type: Optional[str] = Field(default=None, description="시간 의미 유형")
 
 
 class ConflictDecision(BaseModel):
@@ -220,6 +237,9 @@ class ConflictDecision(BaseModel):
     confidence: float = Field(default=0.9, description="판정 신뢰도 (0.0 ~ 1.0)")
     source_span_ids: List[str] = Field(default_factory=list, description="근거 원문 Span ID 목록")
     llm_verified: bool = Field(default=False, description="Stage 3 LLM 검증 수행 여부")
+    subject_match_basis: Optional[str] = Field(default=None, description="동일 대상 판단 근거")
+    predicate_match_basis: Optional[str] = Field(default=None, description="동일 속성·행위 판단 근거")
+    temporal_semantics: Optional[str] = Field(default=None, description="시점 의미 판단 근거")
 
 
 class _LLMConflictVerificationSchema(BaseModel):
@@ -582,7 +602,21 @@ def build_structured_slots(
     tokens = extract_content_tokens(statement)
     pol, core_pred, neg_pred = analyze_polarity_and_predicate(statement, explicit_predicate=predicate)
 
-    inferred_subject = subject.strip() if subject and subject.strip() else None
+    # Fact Semantics 연계 추출
+    sem_fact = extract_semantic_fact(
+        statement,
+        context={
+            "document_name": document_name,
+            "claim_type": claim_type,
+            "subject_key": subject,
+            "predicate_key": predicate,
+            "evidence_id": evidence_id,
+        },
+    )
+    if sem_fact.polarity in ("UNCONFIRMED", "REPORTED_NEGATIVE", "DOUBLE_NEGATIVE"):
+        pol = sem_fact.polarity
+
+    inferred_subject = subject.strip() if subject and subject.strip() else (sem_fact.subject_key or None)
     if not inferred_subject and amount_roles:
         primary_amt_role = next(iter(amount_roles.keys()))
         if primary_amt_role != "GENERAL_AMOUNT":
@@ -590,7 +624,7 @@ def build_structured_slots(
     if not inferred_subject and tokens:
         inferred_subject = tokens[0]
 
-    inferred_temporal = temporal_context.strip() if temporal_context and temporal_context.strip() else None
+    inferred_temporal = temporal_context.strip() if temporal_context and temporal_context.strip() else (sem_fact.temporal_type if sem_fact.temporal_type != "NONE" else None)
     if not inferred_temporal and date_roles:
         inferred_temporal = next(iter(date_roles.keys()))
 
@@ -614,6 +648,11 @@ def build_structured_slots(
         evidence_id=evidence_id,
         document_name=document_name,
         source_span_ids=list(source_span_ids or []),
+        semantic_fact=sem_fact,
+        semantic_category=sem_fact.semantic_category,
+        event_type=sem_fact.event_type,
+        event_subtype=sem_fact.event_subtype,
+        temporal_type=sem_fact.temporal_type,
     )
 
 
@@ -824,6 +863,42 @@ def evaluate_claim_against_fact(
             source_span_ids=spans,
         )
 
+    # 1-2. Fact Semantic & Temporal Comparability Gate (v1.2 P0-01 ~ P0-04)
+    claim_sem = claim_slots.semantic_fact or extract_semantic_fact(
+        claim_slots.statement,
+        context={
+            "document_name": claim_slots.document_name,
+            "claim_type": claim_slots.claim_type,
+            "subject_key": claim_slots.subject_key,
+            "predicate_key": claim_slots.predicate_key,
+            "evidence_id": claim_slots.evidence_id,
+        },
+    )
+    fact_sem = fact_slots.semantic_fact or extract_semantic_fact(
+        fact_slots.statement,
+        context={
+            "document_name": fact_doc_name or fact_slots.document_name,
+            "claim_type": fact.fact_type,
+            "subject_key": fact_slots.subject_key,
+            "predicate_key": fact_slots.predicate_key,
+            "evidence_id": fact.source_ref or fact_slots.evidence_id,
+        },
+    )
+    comp_gate = compare_fact_identity(claim_sem, fact_sem)
+    if not comp_gate.is_comparable:
+        return ConflictDecision(
+            claim_id=claim_id,
+            target_fact_id=fact.id,
+            status=comp_gate.status,
+            reason_code=comp_gate.reason_code,
+            explanation=comp_gate.explanation,
+            confidence=0.95,
+            source_span_ids=spans,
+            subject_match_basis=comp_gate.subject_match_basis,
+            predicate_match_basis=comp_gate.predicate_match_basis,
+            temporal_semantics=comp_gate.temporal_semantics,
+        )
+
     # 1-2. 문서 고유 메타데이터(DOCUMENT_LOCAL / DOC_INFO)는 타 문서 사실과 비교 대상이 아님
     if claim_slots.scope == "DOCUMENT_LOCAL" or fact_slots.scope == "DOCUMENT_LOCAL":
         if (
@@ -1021,97 +1096,112 @@ def evaluate_claim_against_fact(
 
     # 2-2. 양쪽 모두 날짜를 포함하는 경우: 날짜 역할(Date Role) 기반 비교 (Section 3.4)
     if c_dates and f_dates:
-        if set(c_dates) == set(f_dates) and claim_slots.polarity == fact_slots.polarity:
-            return ConflictDecision(
-                claim_id=claim_id,
-                target_fact_id=fact.id,
-                status="CONSISTENT",
-                reason_code="NORMALIZED_DATE_MATCH",
-                explanation=f"정규화된 일자({', '.join(sorted(c_dates))})가 기존 사실과 일치합니다.",
-                confidence=0.95,
-                source_span_ids=spans,
+        if set(c_dates) == set(f_dates):
+            if claim_slots.polarity == fact_slots.polarity:
+                return ConflictDecision(
+                    claim_id=claim_id,
+                    target_fact_id=fact.id,
+                    status="CONSISTENT",
+                    reason_code="NORMALIZED_DATE_MATCH",
+                    explanation=f"정규화된 일자({', '.join(sorted(c_dates))})가 기존 사실과 일치합니다.",
+                    confidence=0.95,
+                    source_span_ids=spans,
+                )
+            # 날짜가 동일하나 서술 극성(polarity)이 다른 경우: 날짜 불일치가 아니므로 아래 2-3 서술 극성 비교로 위임
+        else:
+            c_d_roles = set(claim_slots.date_roles.keys()) - {"GENERAL_DATE"}
+            f_d_roles = set(fact_slots.date_roles.keys()) - {"GENERAL_DATE"}
+
+            # T06: 최초 만기일(EXPIRATION_DATE) vs 갱신일(RENEWAL_DATE) 또는 갱신 후 퇴거/반환 요청일
+            has_renewal_clue = (
+                "RENEWAL_DATE" in (c_d_roles | f_d_roles)
+                or bool(re.search(r"갱신|연장|재계약|만기\s*이후", claim_slots.statement + " " + fact_slots.statement))
             )
+            if has_renewal_clue and ("EXPIRATION_DATE" in (c_d_roles | f_d_roles) or "RETURN_REQUEST_DATE" in (c_d_roles | f_d_roles)):
+                return ConflictDecision(
+                    claim_id=claim_id,
+                    target_fact_id=fact.id,
+                    status="POTENTIAL_CONFLICT",
+                    reason_code="TEMPORAL_GAP_OR_RENEWAL_CHECK",
+                    explanation=(
+                        f"최초 약정 일자({', '.join(sorted(f_dates))})와 후속 일자({', '.join(sorted(c_dates))}) 사이에 "
+                        "묵시적 갱신 또는 계약 연장 경위에 대한 추가 확인이 필요합니다."
+                    ),
+                    confidence=0.85,
+                    source_span_ids=spans,
+                )
 
-        c_d_roles = set(claim_slots.date_roles.keys()) - {"GENERAL_DATE"}
-        f_d_roles = set(fact_slots.date_roles.keys()) - {"GENERAL_DATE"}
+            # T04: 날짜 역할이 명확히 서로 다른 경우 (예: 계약 체결일 CONTRACT_DATE vs 반환 요청일 RETURN_REQUEST_DATE)
+            if c_d_roles and f_d_roles and not (c_d_roles & f_d_roles):
+                return ConflictDecision(
+                    claim_id=claim_id,
+                    target_fact_id=fact.id,
+                    status="DIFFERENT_CONTEXT",
+                    reason_code="DIFFERENT_DATE_ROLE",
+                    explanation="서로 다른 성격의 일자(예: 계약 체결일·만기일·통지일·반환 요청일 등)에 관한 별개 사실입니다.",
+                    confidence=0.95,
+                    source_span_ids=spans,
+                )
 
-        # T06: 최초 만기일(EXPIRATION_DATE) vs 갱신일(RENEWAL_DATE) 또는 갱신 후 퇴거/반환 요청일
-        has_renewal_clue = (
-            "RENEWAL_DATE" in (c_d_roles | f_d_roles)
-            or bool(re.search(r"갱신|연장|재계약|만기\s*이후", claim_slots.statement + " " + fact_slots.statement))
-        )
-        if has_renewal_clue and ("EXPIRATION_DATE" in (c_d_roles | f_d_roles) or "RETURN_REQUEST_DATE" in (c_d_roles | f_d_roles)):
+            # T05: 동일한 날짜 역할(예: 동일 지급행위 ACTUAL_PAYMENT_OR_RETURN_DATE)이거나 핵심 토큰 유사도가 높은 경우
+            same_date_role = bool(c_d_roles and f_d_roles and (c_d_roles & f_d_roles))
+            union_tokens = set(claim_slots.content_tokens) | set(fact_slots.content_tokens)
+            jaccard = len(shared_tokens) / max(len(union_tokens), 1)
+
+            if not same_date_role and jaccard < 0.5:
+                return ConflictDecision(
+                    claim_id=claim_id,
+                    target_fact_id=fact.id,
+                    status="DIFFERENT_CONTEXT",
+                    reason_code="DIFFERENT_TIMELINE_EVENT",
+                    explanation="서로 다른 시점의 개별 이벤트 또는 후속 절차에 관한 일자입니다.",
+                    confidence=0.9,
+                    source_span_ids=spans,
+                )
+
+            if use_llm:
+                llm_ver = _verify_pair_with_llm(claim_slots, fact_slots)
+                if llm_ver is not None:
+                    return ConflictDecision(
+                        claim_id=claim_id,
+                        target_fact_id=fact.id,
+                        status=llm_ver.status,
+                        reason_code=llm_ver.reason_code,
+                        explanation=llm_ver.explanation,
+                        confidence=llm_ver.confidence,
+                        source_span_ids=spans,
+                        llm_verified=True,
+                    )
+
             return ConflictDecision(
                 claim_id=claim_id,
                 target_fact_id=fact.id,
                 status="POTENTIAL_CONFLICT",
-                reason_code="TEMPORAL_GAP_OR_RENEWAL_CHECK",
+                reason_code="SAME_EVENT_DATE_DISCREPANCY",
                 explanation=(
-                    f"최초 약정 일자({', '.join(sorted(f_dates))})와 후속 일자({', '.join(sorted(c_dates))}) 사이에 "
-                    "묵시적 갱신 또는 계약 연장 경위에 대한 추가 확인이 필요합니다."
+                    f"동일하거나 유사한 행위({', '.join(sorted(shared_tokens)[:3])})에 대해 "
+                    f"일자({', '.join(sorted(c_dates))} vs {', '.join(sorted(f_dates))})가 달라 경위 재검증이 필요합니다."
                 ),
-                confidence=0.85,
+                confidence=0.82,
                 source_span_ids=spans,
             )
 
-        # T04: 날짜 역할이 명확히 서로 다른 경우 (예: 계약 체결일 CONTRACT_DATE vs 반환 요청일 RETURN_REQUEST_DATE)
-        if c_d_roles and f_d_roles and not (c_d_roles & f_d_roles):
+    # 2-3. 서술 극성(긍정 vs 부정) 및 부정 적용 범위 비교 (Section 3.5 & T07 & v1.2)
+    if claim_slots.polarity != fact_slots.polarity:
+        # 1) 인식 불확실성(UNCONFIRMED: 미확인, 확인되지 않음)은 부정이 아니므로 상충 금지
+        if "UNCONFIRMED" in (claim_slots.polarity, fact_slots.polarity):
             return ConflictDecision(
                 claim_id=claim_id,
                 target_fact_id=fact.id,
                 status="DIFFERENT_CONTEXT",
-                reason_code="DIFFERENT_DATE_ROLE",
-                explanation="서로 다른 성격의 일자(예: 계약 체결일·만기일·통지일·반환 요청일 등)에 관한 별개 사실입니다.",
+                reason_code="EPISTEMIC_STATUS_NOT_CONTRADICTION",
+                explanation="사실의 확인 여부(미확인 또는 확인 불가)에 관한 진술은 긍정 사실과 상충하지 않는 별개 진술입니다.",
                 confidence=0.95,
                 source_span_ids=spans,
+                subject_match_basis="Epistemic status check",
             )
 
-        # T05: 동일한 날짜 역할(예: 동일 지급행위 ACTUAL_PAYMENT_OR_RETURN_DATE)이거나 핵심 토큰 유사도가 높은 경우
-        same_date_role = bool(c_d_roles and f_d_roles and (c_d_roles & f_d_roles))
-        union_tokens = set(claim_slots.content_tokens) | set(fact_slots.content_tokens)
-        jaccard = len(shared_tokens) / max(len(union_tokens), 1)
-
-        if not same_date_role and jaccard < 0.5:
-            return ConflictDecision(
-                claim_id=claim_id,
-                target_fact_id=fact.id,
-                status="DIFFERENT_CONTEXT",
-                reason_code="DIFFERENT_TIMELINE_EVENT",
-                explanation="서로 다른 시점의 개별 이벤트 또는 후속 절차에 관한 일자입니다.",
-                confidence=0.9,
-                source_span_ids=spans,
-            )
-
-        if use_llm:
-            llm_ver = _verify_pair_with_llm(claim_slots, fact_slots)
-            if llm_ver is not None:
-                return ConflictDecision(
-                    claim_id=claim_id,
-                    target_fact_id=fact.id,
-                    status=llm_ver.status,
-                    reason_code=llm_ver.reason_code,
-                    explanation=llm_ver.explanation,
-                    confidence=llm_ver.confidence,
-                    source_span_ids=spans,
-                    llm_verified=True,
-                )
-
-        return ConflictDecision(
-            claim_id=claim_id,
-            target_fact_id=fact.id,
-            status="POTENTIAL_CONFLICT",
-            reason_code="SAME_EVENT_DATE_DISCREPANCY",
-            explanation=(
-                f"동일하거나 유사한 행위({', '.join(sorted(shared_tokens)[:3])})에 대해 "
-                f"일자({', '.join(sorted(c_dates))} vs {', '.join(sorted(f_dates))})가 달라 경위 재검증이 필요합니다."
-            ),
-            confidence=0.82,
-            source_span_ids=spans,
-        )
-
-    # 2-3. 서술 극성(긍정 vs 부정) 및 부정 적용 범위 비교 (Section 3.5 & T07)
-    if claim_slots.polarity != fact_slots.polarity:
-        # 인용절 통지(REPORTED_NEGATIVE: '반환할 수 없다고 통보하였다')나 이중 부정(DOUBLE_NEGATIVE: '거절하지 않았다')은
+        # 2) 인용절 통지(REPORTED_NEGATIVE: '반환할 수 없다고 통보하였다')나 이중 부정(DOUBLE_NEGATIVE: '거절하지 않았다')은
         # 단순 이행/불이행(AFFIRMATIVE/NEGATIVE)과 서술 층위가 다르므로 즉시 모순으로 단정하지 않음
         if "REPORTED_NEGATIVE" in (claim_slots.polarity, fact_slots.polarity) or "DOUBLE_NEGATIVE" in (
             claim_slots.polarity,
@@ -1127,16 +1217,26 @@ def evaluate_claim_against_fact(
                 source_span_ids=spans,
             )
 
-        # 한쪽은 AFFIRMATIVE, 다른 한쪽은 NEGATIVE인 경우:
-        # 부정 대상 서술어(negated_predicate)와 긍정 핵심 서술어(core_predicate)가 일치하는지 확인
+        # 3) 한쪽은 AFFIRMATIVE, 다른 한쪽은 NEGATIVE인 경우:
+        # 부정 대상 서술어(negated_predicate)와 긍정 핵심 서술어(core_predicate)가 실제로 일치하고,
+        # 이벤트 유형이 호환될 때만 상충 검토 (토큰 수 2개 이상만으로 모순 판정 금지)
         c_pred = claim_slots.negated_predicate or claim_slots.core_predicate or claim_slots.predicate_key
         f_pred = fact_slots.negated_predicate or fact_slots.core_predicate or fact_slots.predicate_key
-        predicates_match = (
-            (c_pred and f_pred and (c_pred == f_pred or c_pred in f_pred or f_pred in c_pred))
-            or len(shared_tokens) >= 2
+        predicates_match = bool(c_pred and f_pred and (c_pred == f_pred or c_pred in f_pred or f_pred in c_pred))
+        event_types_compatible = (
+            claim_sem.event_type == fact_sem.event_type
+            and (claim_sem.event_subtype == fact_sem.event_subtype or not claim_sem.event_subtype or not fact_sem.event_subtype)
+        )
+        # 서술어 외에 행위 대상(목적어 또는 실질 체언)이 공유되는지 확인
+        shared_entity_tokens = set(shared_tokens) - {c_pred, f_pred, "하다", "되다", "이다", "않다", "없다"}
+        has_common_entity = bool(shared_entity_tokens) or (
+            claim_slots.subject_key
+            and fact_slots.subject_key
+            and claim_slots.subject_key == fact_slots.subject_key
+            and claim_slots.subject_key not in ("하다", "되다", "이다")
         )
 
-        if predicates_match:
+        if predicates_match and event_types_compatible and has_common_entity:
             # 만약 두 진술의 날짜가 명시적으로 서로 다르면 시점 변화에 따른 상태 변화(POTENTIAL_CONFLICT)
             if c_dates and f_dates and set(c_dates) != set(f_dates):
                 return ConflictDecision(
@@ -1355,23 +1455,23 @@ def reconcile_case_conflicts(
             if f.source_ref and f.source_ref in doc_map
         }
 
-        # 1. 기존 CONTRADICTS EvidenceLink 재검증
-        contradicts_links = (
+        # 1. 기존 CONTRADICTS 및 POTENTIAL_CONFLICT EvidenceLink 재검증
+        conflict_links = (
             db.query(EvidenceLink)
             .join(EvidenceDocument, EvidenceLink.evidence_id == EvidenceDocument.id)
             .filter(
                 EvidenceDocument.case_id == cid,
-                EvidenceLink.link_type == "CONTRADICTS",
+                EvidenceLink.link_type.in_(["CONTRADICTS", "POTENTIAL_CONFLICT"]),
             )
             .all()
         )
-        for link in contradicts_links:
+        for link in conflict_links:
             claim = db.query(EvidenceClaim).filter_by(id=link.claim_id).first() if link.claim_id else None
             if not claim or claim.review_status == "REJECTED":
                 changes.append({
                     "entity": "EvidenceLink",
                     "id": link.id,
-                    "before": "CONTRADICTS",
+                    "before": link.link_type,
                     "after": "DELETED (REJECTED_OR_MISSING_CLAIM)",
                 })
                 db.delete(link)
@@ -1385,7 +1485,7 @@ def reconcile_case_conflicts(
                     changes.append({
                         "entity": "EvidenceLink",
                         "id": link.id,
-                        "before": "CONTRADICTS",
+                        "before": link.link_type,
                         "after": "DELETED (MISSING_TARGET_FACT)",
                     })
                     db.delete(link)
@@ -1411,11 +1511,28 @@ def reconcile_case_conflicts(
                     claim_id=claim.id,
                     enable_llm_verification=False,
                 )
-                if decision.status != "CONTRADICTION":
-                    if (
-                        decision.status == "CONSISTENT"
-                        and claim.review_status in ("APPROVED", "EDITED")
-                    ):
+                if decision.status != link.link_type:
+                    if decision.status == "CONTRADICTION":
+                        changes.append({
+                            "entity": "EvidenceLink",
+                            "id": link.id,
+                            "before": link.link_type,
+                            "after": "CONTRADICTION",
+                            "reason_code": decision.reason_code,
+                        })
+                        link.link_type = "CONTRADICTION"
+                        case_changed = True
+                    elif decision.status == "POTENTIAL_CONFLICT":
+                        changes.append({
+                            "entity": "EvidenceLink",
+                            "id": link.id,
+                            "before": link.link_type,
+                            "after": "POTENTIAL_CONFLICT",
+                            "reason_code": decision.reason_code,
+                        })
+                        link.link_type = "POTENTIAL_CONFLICT"
+                        case_changed = True
+                    elif decision.status == "CONSISTENT" and claim.review_status in ("APPROVED", "EDITED"):
                         existing_sup = (
                             db.query(EvidenceLink)
                             .filter_by(
@@ -1431,7 +1548,7 @@ def reconcile_case_conflicts(
                             changes.append({
                                 "entity": "EvidenceLink",
                                 "id": link.id,
-                                "before": "CONTRADICTS",
+                                "before": link.link_type,
                                 "after": "SUPPORTS",
                                 "reason_code": decision.reason_code,
                             })
@@ -1441,32 +1558,24 @@ def reconcile_case_conflicts(
                             changes.append({
                                 "entity": "EvidenceLink",
                                 "id": link.id,
-                                "before": "CONTRADICTS",
+                                "before": link.link_type,
                                 "after": "DELETED (DUPLICATE_SUPPORTS)",
                                 "reason_code": decision.reason_code,
                             })
                             db.delete(link)
                             removed_links += 1
-                    elif decision.status == "POTENTIAL_CONFLICT":
-                        changes.append({
-                            "entity": "EvidenceLink",
-                            "id": link.id,
-                            "before": "CONTRADICTS",
-                            "after": "POTENTIAL_CONFLICT",
-                            "reason_code": decision.reason_code,
-                        })
-                        link.link_type = "POTENTIAL_CONFLICT"
-                        removed_links += 1
+                        case_changed = True
                     else:
                         changes.append({
                             "entity": "EvidenceLink",
                             "id": link.id,
-                            "before": "CONTRADICTS",
+                            "before": link.link_type,
                             "after": f"DELETED ({decision.status}:{decision.reason_code})",
+                            "reason_code": decision.reason_code,
                         })
                         db.delete(link)
                         removed_links += 1
-                    case_changed = True
+                        case_changed = True
 
         db.flush()
 
@@ -1492,8 +1601,7 @@ def reconcile_case_conflicts(
                 claim.scope = slots.scope
             if not claim.temporal_context and slots.temporal_context:
                 claim.temporal_context = slots.temporal_context
-            if not claim.structured_slots:
-                claim.structured_slots = slots.model_dump()
+            claim.structured_slots = slots.model_dump()
 
             if claim.assertion_status != "CONTRADICTION_CANDIDATE" and claim.claim_type != "CONTRADICTION":
                 continue
@@ -1530,7 +1638,7 @@ def reconcile_case_conflicts(
                 fact_doc_names=fact_doc_names,
                 enable_llm_verification=False,
             )
-            if not eval_res["contradictions"]:
+            if not eval_res["contradictions"] and not eval_res.get("potential_conflicts"):
                 if claim.assertion_status == "CONTRADICTION_CANDIDATE":
                     changes.append({
                         "entity": "EvidenceClaim",
