@@ -176,6 +176,9 @@ def synthesize(
     messages: List[AnyMessage],
     results: Dict[str, str],
     intent: Optional[str] = None,
+    case_evidence_briefing: Optional[Dict[str, Any]] = None,
+    issue_tasks: Optional[List[Dict[str, Any]]] = None,
+    source_registry: Optional[Dict[str, Any]] = None,
 ) -> List[AnyMessage]:
     from ai_legal_helper.utils.text_formatter import clean_markdown_formatting
 
@@ -187,6 +190,25 @@ def synthesize(
     chat_brief = _brief_history(messages)
     question = _extract_last_question(messages)
     findings = _format_findings(results, per_cat_limit=2400)
+
+    # 사건 증거 브리핑 텍스트 구성 (P0-01, P0-02, P0-07)
+    briefing_text = "(등록된 사건 증거 정보 없음)"
+    if case_evidence_briefing:
+        b_summary = case_evidence_briefing.get("formatted_summary", "")
+        if len(b_summary) > 4000:
+            briefing_text = b_summary[:4000] + "\n...(후략)"
+        else:
+            briefing_text = b_summary or "(등록된 사건 증거 정보 없음)"
+
+    # 계획된 법률 쟁점 목록 텍스트 구성 (P0-03)
+    issues_text = "(전체 종합 검토)"
+    if issue_tasks:
+        lines = []
+        for it in issue_tasks:
+            evs = ", ".join(it.get("relevant_evidence_labels", []))
+            lbl_part = f" [증거: {evs}]" if evs else ""
+            lines.append(f"- {it.get('issue_title', '')}{lbl_part}")
+        issues_text = "\n".join(lines)
 
     try:
         llm = get_llm(temperature=0.0)
@@ -202,6 +224,16 @@ def synthesize(
         elif intent == "DOCUMENT_REQUEST":
             cur_system = SYNTH_DOCUMENT_SYSTEM
             cur_fewshot = ""
+
+        # 등록 증거 및 쟁점 목록 프롬프트 주입
+        cur_system = (
+            f"{cur_system}\n\n"
+            f"[등록된 사건 증거 및 확정 사실 브리핑]\n{briefing_text}\n\n"
+            f"[검토 대상 핵심 법률 쟁점 목록]\n{issues_text}\n\n"
+            f"[중요 작성 원칙]\n"
+            f"- 입증된 사실을 기술할 때는 반드시 해당 증거 라벨 `[E01]` 또는 `[E01 파일명]`을 인용하세요.\n"
+            f"- 쟁점별 법률 분석에서는 위 [검토 대상 핵심 법률 쟁점 목록]의 각 항목을 독립적으로 분석하세요."
+        )
 
         prompt = SYNTH_PROMPT.format(
             system=cur_system,

@@ -40,6 +40,7 @@ export interface Source {
   evidence_id?: string | null;
   filename?: string | null;
   category?: string | null;
+  evidence_label?: string | null;
 }
 
 export interface UsageSummary {
@@ -109,6 +110,22 @@ export interface ConsultationResponse {
   case_id?: string;
   created_at?: string;
   approval_request?: StatuteSearchApprovalRequest | null;
+  // 쟁점별 검증 및 증거 근거 필드 (Issue-Level Verification v1.0)
+  issue_results?: Array<{
+    issue_id: string;
+    issue_type: string;
+    title: string;
+    status: string;
+    fact_grounding_status?: string;
+    legal_grounding_status?: string;
+    reason_code?: string;
+    reason?: string;
+    cited_evidence_labels?: string[];
+    missing_evidence_categories?: string[];
+  }>;
+  verified_facts?: string[];
+  missing_evidence?: string[];
+  evidence_citations?: Source[];
 }
 
 /**

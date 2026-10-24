@@ -246,6 +246,12 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
         resp.selected_agents = result.get("selected_agents", [])
         resp.warnings.extend(result.get("warnings", []))
 
+        # Issue-level Verification v1.0 Fields
+        resp.issue_results = result.get("issue_results", [])
+        resp.verified_facts = result.get("verified_facts", [])
+        resp.missing_evidence = result.get("missing_evidence", [])
+        resp.evidence_citations = result.get("evidence_citations", [])
+
         # 요구사항 5: Langfuse 루트 Span/Trace에 최종 출처·검증·실행시간·토큰 요약 기록 (P2-02)
         try:
             from ai_legal_helper.observability.context import get_current_span_id
@@ -389,6 +395,7 @@ async def get_consultation(
         record.status,
     )
 
+    ver_res = record.verification_result or {}
     return ConsultationResponse(
         request_id=record.request_id,
         conversation_id=record.conversation_id,
@@ -404,11 +411,15 @@ async def get_consultation(
         sources=sources,
         elapsed_ms=record.elapsed_ms,
         warnings=record.warnings or [],
-        verification_result=record.verification_result or {},
+        verification_result=ver_res,
         selected_agents=record.selected_agents or [],
         question=record.question,
         case_id=record.case_id,
-        created_at=get_kst_iso(record.created_at) if record.created_at else None
+        created_at=get_kst_iso(record.created_at) if record.created_at else None,
+        issue_results=ver_res.get("issue_results", []),
+        verified_facts=ver_res.get("verified_facts", []),
+        missing_evidence=ver_res.get("missing_evidence", []),
+        evidence_citations=ver_res.get("evidence_citations", []),
     )
 
 @router.get("/consultations/{request_id}/status")

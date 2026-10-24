@@ -165,38 +165,27 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
         "evidence_gaps": [],
         "contradictions": [],
     }
+    briefing_dict = None
+    case_evidence_sources = []
+    issue_tasks_dict = []
+
     if case_id:
         db = SessionLocal()
         try:
             case = db.query(Case).filter(Case.id == case_id).first()
             if case:
-                facts = db.query(Fact).filter(Fact.case_id == case_id).all()
-                events = db.query(Event).filter(Event.case_id == case_id).order_by(Event.event_date).all()
-                
-                # 승인(APPROVED) 및 수정승인(EDITED)된 증거 Claim을 사건 증거로 조회
-                approved_claims = db.query(EvidenceClaim).filter(
-                    EvidenceClaim.case_id == case_id,
-                    EvidenceClaim.review_status.in_(["APPROVED", "EDITED"])
-                ).all()
+                from ai_legal_helper.case_intelligence.case_briefing import build_case_evidence_briefing
+                from ai_legal_helper.workflows.issue_planner import plan_legal_issues
 
-                context_parts = [f"[사건 기본 정보]\n제목: {case.title}"]
-                if facts:
-                    fact_lines = "\n".join([
-                        f"- {f.statement} (유형: {f.fact_type}, 검증상태: {f.verification_status or 'UNVERIFIED'}, 출처유형: {f.source_type or 'UNKNOWN'}, 신뢰도: {f.confidence})"
-                        for f in facts
-                    ])
-                    context_parts.append(f"\n[기존 사실관계]\n{fact_lines}")
-                if events:
-                    event_lines = "\n".join([f"- {e.event_date or '날짜미상'}: {e.title}" for e in events])
-                    context_parts.append(f"\n[타임라인]\n{event_lines}")
-                if approved_claims:
-                    claim_lines = "\n".join([
-                        f"- {c.statement} (종류: {c.claim_type}, 단언상태: {c.assertion_status or 'DOCUMENT_STATES'}, 파일ID: {c.evidence_id})"
-                        for c in approved_claims
-                    ])
-                    context_parts.append(f"\n[사건 증거(승인된 추출 정보)]\n{claim_lines}")
+                briefing_obj = build_case_evidence_briefing(db, case_id, q or "")
+                issue_tasks_obj = plan_legal_issues(q or "", briefing_obj)
 
-                case_context = "\n".join(context_parts)
+                briefing_dict = briefing_obj.model_dump()
+                issue_tasks_dict = [t.model_dump() for t in issue_tasks_obj]
+                case_evidence_sources = list(briefing_obj.source_registry.values())
+
+                # 정규화된 사건 증거 브리핑 텍스트를 case_context 기본값으로 사용
+                case_context = briefing_obj.formatted_summary
                 
                 # [Structured Evidence GraphRAG v2.0 통합]
                 # PostgreSQL 구조화 증거 검색 + Neo4j 그래프 관계 탐색 → PostgreSQL 대조 검증 → 컨텍스트 추가.
@@ -206,6 +195,8 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
                 if graph_text:
                     case_context += "\n\n" + graph_text
                     
+        except Exception as e:
+            logger.warning(f"[INIT] 사건 증거 브리핑 구축 중 예외: {e}")
         finally:
             db.close()
             
@@ -232,6 +223,10 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
         "retrieved_sources": [],
         "case_context": case_context,
         "graph_evidence": graph_evidence,
+        "case_evidence_briefing": briefing_dict,
+        "case_evidence_sources": case_evidence_sources,
+        "issue_tasks": issue_tasks_dict,
+        "issue_results": [],
         "approval_request": None,
         "approval_status": "NONE",
         "statute_search_results": [],
@@ -437,7 +432,14 @@ async def run_agents_node(state: LegalState) -> Dict:
 def synthesize_node(state: LegalState) -> Dict:
     set_node_name("synthesize")
     intent_val = state.get("intent")
-    msgs = synthesize(state.get("messages", []), state.get("results", {}), intent=intent_val)
+    msgs = synthesize(
+        state.get("messages", []),
+        state.get("results", {}),
+        intent=intent_val,
+        case_evidence_briefing=state.get("case_evidence_briefing"),
+        issue_tasks=state.get("issue_tasks"),
+        source_registry={s.get("evidence_label", s.get("source_id")): s for s in (state.get("case_evidence_sources") or []) if s},
+    )
     draft = msgs[-1].content
     # don't append to messages yet, just save to draft_answer
     return {"draft_answer": draft}
@@ -582,9 +584,29 @@ def verification_node(state: LegalState) -> Dict:
     except Exception as ex:
         logger.debug(f"Langfuse log_score in verification_node failed: {ex}")
 
+    # 쟁점별 독립 검증 실행 (P0-04, P0-09)
+    issue_tasks_raw = state.get("issue_tasks") or []
+    briefing_raw = state.get("case_evidence_briefing") or {}
+
+    issue_results_list = []
+    if issue_tasks_raw and briefing_raw:
+        try:
+            from ai_legal_helper.workflows.issue_planner import LegalIssueTask
+            from ai_legal_helper.case_intelligence.case_briefing import CaseEvidenceBriefing
+            from ai_legal_helper.agents.issue_verifier import verify_all_issues
+
+            tasks_objs = [LegalIssueTask(**it) for it in issue_tasks_raw]
+            briefing_obj = CaseEvidenceBriefing(**briefing_raw)
+            issue_res_objs = verify_all_issues(tasks_objs, draft, briefing_obj, combined_sources)
+            issue_results_list = [r.model_dump() for r in issue_res_objs]
+            result["issue_results"] = issue_results_list
+        except Exception as e:
+            logger.warning(f"[VERIFICATION] 쟁점별 검증 중 예외 발생: {e}")
+
     return {
         "verification_result": result,
         "retrieved_sources": verified_sources,
+        "issue_results": issue_results_list,
     }
 
 def verification_condition(state: LegalState) -> str:
@@ -610,6 +632,27 @@ def verification_condition(state: LegalState) -> str:
     candidate_laws = ver_res.get("candidate_laws", [])
     hilt_executed = state.get("hilt_executed", False)
     revision_count = state.get("revision_count", 0)
+
+    # 쟁점별 검증 결과가 존재하는 경우 쟁점 기반 최종 처분 정책 우선 적용 (Section 8, P0-05)
+    issue_results_raw = ver_res.get("issue_results") or state.get("issue_results") or []
+    if issue_results_raw:
+        from ai_legal_helper.agents.issue_verifier import IssueVerificationResult
+        from ai_legal_helper.workflows.final_disposition import determine_final_disposition
+
+        issue_res_objs = [IssueVerificationResult(**ir) for ir in issue_results_raw]
+        disposition, disp_reason = determine_final_disposition(issue_res_objs)
+        logger.info(f"[DISPOSITION] 쟁점 기반 처분 결정: {disposition} ({disp_reason})")
+
+        if disposition in ("DELIVERED", "CAUTIONARY"):
+            return "finalize"
+        elif disposition == "WITHHELD":
+            # 법령 검색 기회가 남아있고 후보 법령이 있는 경우 HILT 승인 요청
+            if not hilt_executed and candidate_laws and reason_code in ("LEGAL_SOURCE_MISSING", "LEGAL_SOURCE_INSUFFICIENT"):
+                return "statute_search_approval"
+            # 1회 재검토 가능하면 revise 시도
+            if revision_count < 1 and not hilt_executed:
+                return "revise"
+            return "insufficient"
 
     # 1. 모든 필수 검증을 통과했다면 최종 확정 (HILT 여부와 무관하게 PASS일 때만 확정)
     if status == "PASS":
@@ -841,7 +884,22 @@ def insufficient_node(state: LegalState) -> Dict:
         "대한법률구조공단(국번없이 132) 또는 변호사 등 법률전문가의 정밀 대면 상담을 받으시기 바랍니다."
     )
 
-    final = clean_markdown_formatting("\n".join(parts))
+    briefing_raw = state.get("case_evidence_briefing")
+    issue_results_raw = ver_res.get("issue_results") or state.get("issue_results") or []
+
+    if briefing_raw:
+        from ai_legal_helper.case_intelligence.case_briefing import CaseEvidenceBriefing
+        from ai_legal_helper.agents.issue_verifier import IssueVerificationResult
+        from ai_legal_helper.workflows.final_disposition import build_dynamic_withheld_answer
+
+        briefing_obj = CaseEvidenceBriefing(**briefing_raw)
+        issue_res_objs = [IssueVerificationResult(**ir) for ir in issue_results_raw]
+        final = build_dynamic_withheld_answer(issue_res_objs, briefing_obj, reason_code)
+        preserved_sources = list(briefing_obj.source_registry.values())
+    else:
+        final = clean_markdown_formatting("\n".join(parts))
+        preserved_sources = []
+
     warnings = list(state.get("warnings", []) or []) + ["답변의 근거가 부족하여 INSUFFICIENT(WITHHELD) 처리되었습니다."]
 
     return {
@@ -852,9 +910,10 @@ def insufficient_node(state: LegalState) -> Dict:
         "missing_evidence": missing_issues,
         "unresolved_issues": ver_res.get("missing_legal_issues", []),
         "warnings": warnings,
-        "sources": [],
-        "cited_sources": [],
+        "sources": preserved_sources,
+        "cited_sources": preserved_sources,
         "messages": [AIMessage(content=final)],
+        "issue_results": issue_results_raw,
     }
 
 
@@ -865,12 +924,37 @@ def finalize_node(state: LegalState) -> Dict:
     from ai_legal_helper.agents.verification import sanitize_unverified_citations, audit_citations_and_claims
     from ai_legal_helper.utils.text_formatter import clean_markdown_formatting
 
-    sanitized = sanitize_unverified_citations(
-        state.get("draft_answer", ""),
-        state.get("retrieved_sources", []),
-        case_context=state.get("case_context", ""),
-    )
-    final = clean_markdown_formatting(sanitized)
+    ver_res = state.get("verification_result", {}) or {}
+    ver_status = ver_res.get("status", "PASS")
+    warnings = list(state.get("warnings", []) or [])
+    ver_warnings = ver_res.get("warnings", []) or []
+    for w in ver_warnings:
+        if w not in warnings:
+            warnings.append(w)
+
+    final_disp = "DELIVERED" if ver_status == "PASS" else "CAUTIONARY"
+
+    briefing_raw = state.get("case_evidence_briefing")
+    issue_results_raw = ver_res.get("issue_results") or state.get("issue_results") or []
+
+    if briefing_raw and issue_results_raw:
+        from ai_legal_helper.case_intelligence.case_briefing import CaseEvidenceBriefing
+        from ai_legal_helper.agents.issue_verifier import IssueVerificationResult
+        from ai_legal_helper.workflows.final_disposition import assemble_grounded_answer, determine_final_disposition
+
+        briefing_obj = CaseEvidenceBriefing(**briefing_raw)
+        issue_res_objs = [IssueVerificationResult(**ir) for ir in issue_results_raw]
+        calc_disp, _ = determine_final_disposition(issue_res_objs)
+        final_disp = calc_disp
+
+        final = assemble_grounded_answer(issue_res_objs, briefing_obj, state.get("draft_answer", ""), final_disp)
+    else:
+        sanitized = sanitize_unverified_citations(
+            state.get("draft_answer", ""),
+            state.get("retrieved_sources", []),
+            case_context=state.get("case_context", ""),
+        )
+        final = clean_markdown_formatting(sanitized)
 
     # [P0-03] 최종 확정된 답변(final)에 기반하여 실제 인용·검증된 출처(cited_sources)를 최종 산출
     final_audit = audit_citations_and_claims(
@@ -880,17 +964,18 @@ def finalize_node(state: LegalState) -> Dict:
     )
     cited_sources = final_audit.get("cited_sources") or final_audit.get("verified_sources", [])
 
-    # 법률검증 Agent의 실무 권고 및 유의사항(warnings)을 정제하여 전달
-    ver_res = state.get("verification_result", {}) or {}
-    ver_status = ver_res.get("status", "PASS")
-    warnings = list(state.get("warnings", []) or [])
-    ver_warnings = ver_res.get("warnings", []) or []
-    for w in ver_warnings:
-        if w not in warnings:
-            warnings.append(w)
-
-    # [P0-1] 최종 응답 처분 상태 결정: Verifier가 PASS이면 DELIVERED, REVISE이면 CAUTIONARY
-    final_disp = "DELIVERED" if ver_status == "PASS" else "CAUTIONARY"
+    # Case Evidence Sources(E01~E17)를 출처 목록에 통합하여 UI 배지 및 출처 뷰에 노출
+    if briefing_raw:
+        briefing_obj = CaseEvidenceBriefing(**briefing_raw)
+        case_ev_sources = list(briefing_obj.source_registry.values())
+        all_sources = list(cited_sources)
+        seen_keys = {s.get("source_id") or s.get("file") for s in all_sources if isinstance(s, dict)}
+        for ces in case_ev_sources:
+            k = ces.get("source_id") or ces.get("file")
+            if k not in seen_keys:
+                all_sources.append(ces)
+                seen_keys.add(k)
+        cited_sources = all_sources
 
     return {
         "final_answer": final,
@@ -898,7 +983,8 @@ def finalize_node(state: LegalState) -> Dict:
         "cited_sources": cited_sources,
         "warnings": warnings,
         "final_disposition": final_disp,
-        "messages": [AIMessage(content=final)]
+        "messages": [AIMessage(content=final)],
+        "issue_results": issue_results_raw,
     }
 
 

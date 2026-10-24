@@ -58,6 +58,7 @@ class Source(BaseModel):
 
     # 사건 증거(CASE_EVIDENCE) 및 일반 문서(DOCUMENT) 추가 필드
     evidence_id: Optional[str] = None
+    evidence_label: Optional[str] = None
     filename: Optional[str] = None
     category: Optional[str] = None
 
@@ -104,6 +105,12 @@ class ConsultationResponse(BaseModel):
 
     # P4.1 HILT Statute Search Approval fields
     approval_request: Optional[Dict[str, Any]] = None
+
+    # Issue-Level Verification & Evidence Grounding fields (Section 15.2)
+    issue_results: Optional[List[Dict[str, Any]]] = None
+    verified_facts: Optional[List[Dict[str, Any]]] = None
+    missing_evidence: Optional[List[Dict[str, Any]]] = None
+    evidence_citations: Optional[List[Dict[str, Any]]] = None
 
 
 class ApprovalDecisionRequest(BaseModel):

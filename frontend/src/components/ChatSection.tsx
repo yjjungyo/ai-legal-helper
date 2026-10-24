@@ -777,11 +777,54 @@ export function ChatSection({ caseId }: ChatSectionProps) {
                 </div>
               ) : null}
 
-              {/* 7. 고객용 참고 법령 및 사건 증거 목록 (심플 뱃지 안내) */}
-              {item.status !== 'IN_PROGRESS' && item.answer_status !== 'WITHHELD' && item.sources && item.sources.length > 0 && (
+              {/* 7. 쟁점별 검증 현황 뱃지 (Issue-Level Verification v1.0) */}
+              {item.status !== 'IN_PROGRESS' && item.issue_results && item.issue_results.length > 0 && (
                 <div
                   style={{
                     marginTop: '10px',
+                    marginBottom: '8px',
+                    padding: '8px 12px',
+                    backgroundColor: 'var(--surface-alt)',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    flexWrap: 'wrap',
+                    fontSize: '0.82em',
+                  }}
+                >
+                  <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>⚖️ 쟁점별 검증 현황:</span>
+                  {item.issue_results.map((iss, iIdx) => {
+                    let badgeClass = 'badge badge-blue';
+                    let statusLabel = '검증완료';
+                    if (iss.status === 'VERIFIED') {
+                      badgeClass = 'badge badge-green';
+                      statusLabel = '검증완료';
+                    } else if (iss.status === 'CONDITIONAL') {
+                      badgeClass = 'badge badge-purple';
+                      statusLabel = '조건부 검증';
+                    } else if (iss.status === 'NEEDS_EVIDENCE') {
+                      badgeClass = 'badge badge-yellow';
+                      statusLabel = '증거 보완필요';
+                    } else if (iss.status === 'BLOCKED') {
+                      badgeClass = 'badge badge-red';
+                      statusLabel = '답변 제한';
+                    }
+                    return (
+                      <span key={iIdx} className={badgeClass} style={{ fontSize: '0.82em', fontWeight: 500 }}>
+                        {iss.title}: {statusLabel}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* 8. 고객용 참고 법령 및 사건 증거 목록 (심플 뱃지 안내) */}
+              {item.status !== 'IN_PROGRESS' && item.sources && item.sources.length > 0 && (
+                <div
+                  style={{
+                    marginTop: '8px',
                     padding: '8px 12px',
                     backgroundColor: 'var(--surface-alt)',
                     borderRadius: 'var(--radius-md)',
@@ -798,19 +841,19 @@ export function ChatSection({ caseId }: ChatSectionProps) {
                     new Map(
                       item.sources.map((s) => [
                         s.source_type === 'CASE_EVIDENCE'
-                          ? `evidence_${s.file}`
+                          ? `evidence_${s.evidence_label || s.file}`
                           : `statute_${s.statute_name || s.title}_${s.article || ''}`,
                         s,
                       ])
                     ).values()
-                  ).slice(0, 6).map((s, sIdx) => (
+                  ).slice(0, 10).map((s, sIdx) => (
                     <span
                       key={sIdx}
                       className={s.source_type === 'CASE_EVIDENCE' ? 'badge badge-green' : 'badge badge-blue'}
                       style={{ fontSize: '0.85em', fontWeight: 500 }}
                     >
                       {s.source_type === 'CASE_EVIDENCE'
-                        ? `📁 ${s.file || s.title}`
+                        ? `📁 ${s.evidence_label ? `[${s.evidence_label}] ` : ''}${s.file || s.title}`
                         : `📜 ${s.statute_name || s.title}${s.article ? ` ${s.article}` : ''}`}
                     </span>
                   ))}
