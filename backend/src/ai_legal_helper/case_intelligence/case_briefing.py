@@ -360,13 +360,16 @@ def build_case_evidence_briefing(
     # 6. Source Registry 구성 (인용 검증 및 Verifier/Synthesizer 공통 참조)
     source_registry: Dict[str, Dict[str, Any]] = {}
     for ev_item in evidence_items:
-        source_registry[ev_item.evidence_label] = {
+        entry = {
             "evidence_id": ev_item.evidence_id,
             "evidence_label": ev_item.evidence_label,
             "document_name": ev_item.document_name,
             "source_type": "CASE_EVIDENCE",
-            "citation_tag": f"[{ev_item.evidence_label} {ev_item.document_name}]",
+            "citation_tag": f"[{ev_item.document_name or ev_item.evidence_label}]",
         }
+        source_registry[ev_item.evidence_label] = entry
+        if ev_item.document_name:
+            source_registry[ev_item.document_name] = entry
 
     # 7. LLM 주입용 정돈된 브리핑 텍스트(formatted_summary) 생성
     summary_lines = []
@@ -377,7 +380,7 @@ def build_case_evidence_briefing(
     if evidence_items:
         summary_lines.append("\n#### 1. 등록된 사건 증거 목록 (Source Registry)")
         for ev in evidence_items:
-            summary_lines.append(f"- [{ev.evidence_label}] {ev.document_name} ({ev.document_type}, 추출사실: {ev.claim_count}건)")
+            summary_lines.append(f"- [{ev.document_name}] ({ev.document_type}, 추출사실: {ev.claim_count}건)")
 
     # 당사자 정보
     if party_items:
@@ -395,7 +398,8 @@ def build_case_evidence_briefing(
         if supported_facts:
             summary_lines.append("  [증거로 입증된 사실 (EVIDENCE_SUPPORTED / CORROBORATED)]")
             for sf in supported_facts:
-                cite = f"[{sf.evidence_label}]" if sf.evidence_label else ""
+                doc_lbl = sf.document_name or sf.evidence_label
+                cite = f"[{doc_lbl}]" if doc_lbl else ""
                 summary_lines.append(f"  * {sf.statement} {cite} (상태: {sf.adjudication_status})")
 
         if alleged_facts:

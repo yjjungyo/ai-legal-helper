@@ -83,14 +83,14 @@ export function renderInlineMarkdown(text: string, onEvidenceClick?: (label: str
   if (!text) return [];
 
   // 토큰 분할 정규식: **볼드**, `인라인코드`, *이탤릭*
-  const tokenRegex = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g;
+  const tokenRegex = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*|\[(?:E\d{1,3}[^\]]*|[^\]]+\.(?:pdf|docx|txt|png|jpg|jpeg))\]|\[E\d{1,3}\])/gi;
   const parts = text.split(tokenRegex);
 
   return parts.map((part, index) => {
     if (!part) return null;
 
     // 증거 번호: [E01], [E02]
-    const evMatch = part.match(/^\[(E\d{1,3})\]$/);
+    const evMatch = (part.match(/^\[E\d{1,3}/i) || part.match(/\.(pdf|docx|txt|png|jpg|jpeg)\]$/i)) ? part.match(/^\[(.*)\]$/) : null;
     if (evMatch) {
       const label = evMatch[1];
       return (
@@ -105,7 +105,7 @@ export function renderInlineMarkdown(text: string, onEvidenceClick?: (label: str
           title={`증거 [${label}] 원문 및 발췌 확인`}
           aria-label={`증거 ${label} 확인`}
         >
-          [{label}]
+          📄 [{label}]
         </button>
       );
     }

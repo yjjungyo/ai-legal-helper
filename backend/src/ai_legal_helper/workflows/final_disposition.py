@@ -114,7 +114,7 @@ def assemble_grounded_answer(
             "일부 추가적인 공적 입증자료의 보완이 필요하여 조건부 가이드를 제공합니다."
         )
 
-    # 2. 등록 증거 기반 확인된 사실관계 (E번호 표시)
+    # 2. 등록 증거 기반 확인된 사실관계 (사용자 등록 파일명 그대로 표시)
     sections.append("\n[2. 등록 증거 기반 확인된 사실관계]")
     supported_facts = [f for f in briefing.facts if f.adjudication_status in ("EVIDENCE_SUPPORTED", "CORROBORATED")]
     
@@ -126,13 +126,16 @@ def assemble_grounded_answer(
         if norm_stmt in seen_stmts:
             continue
         seen_stmts.add(norm_stmt)
-        cite_label = f"[{f.evidence_label}]" if f.evidence_label else ""
+        # 사용자가 등록한 증거 파일명을 정확히 기재 ([E01] 대신 [E01_주택임대차계약서.txt])
+        doc_label = f.document_name or f.evidence_label
+        cite_label = f"[{doc_label}]" if doc_label else ""
         sections.append(f"- {norm_stmt} {cite_label}".strip())
         displayed_facts += 1
         if displayed_facts >= 12:  # 가독성을 위해 핵심 사실 12건 내외 선별
             break
 
     # 3. 쟁점별 법률 분석 및 판단
+    doc_name_map = {ev.evidence_label: ev.document_name for ev in (briefing.evidences or []) if ev.document_name}
     sections.append("\n[3. 쟁점별 법률 분석 및 판단]")
     for idx, r in enumerate(issue_results, 1):
         status_kr = {
@@ -149,9 +152,10 @@ def assemble_grounded_answer(
         for rec in r.safe_recommendations:
             sections.append(f"  * {rec}")
 
-        # 근거 증거 라벨
+        # 근거 증거 라벨 (등록된 파일명 우선 표시)
         if r.supported_source_ids:
-            cites = ", ".join(sorted(r.supported_source_ids))
+            doc_cites = [doc_name_map.get(s, s) for s in r.supported_source_ids]
+            cites = ", ".join(sorted(doc_cites))
             sections.append(f"  * 관련 증거: [{cites}]")
 
         # 인용 법령
@@ -226,7 +230,8 @@ def build_dynamic_withheld_answer(
     supported = [f for f in briefing.facts if f.adjudication_status in ("EVIDENCE_SUPPORTED", "CORROBORATED")]
     if supported:
         for f in supported[:8]:
-            cite = f"[{f.evidence_label}]" if f.evidence_label else ""
+            doc_label = f.document_name or f.evidence_label
+            cite = f"[{doc_label}]" if doc_label else ""
             sections.append(f"- {f.statement} {cite}".strip())
     else:
         sections.append("- 등록된 진술을 바탕으로 기초 정황을 확인하였습니다.")

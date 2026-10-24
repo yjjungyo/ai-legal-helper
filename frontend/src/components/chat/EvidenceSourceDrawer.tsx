@@ -35,17 +35,27 @@ export interface EvidenceSourceDrawerProps {
  */
 function findDocumentByLabel(label: string | null, documents: EvidenceDocument[]): EvidenceDocument | undefined {
   if (!label || !documents || documents.length === 0) return undefined;
-  const cleanLabel = label.trim().toUpperCase();
+  // 쉼표로 복수 기재된 경우 첫 번째 증거 항목 기준 매핑
+  const firstLabel = label.split(',')[0].trim();
+  const cleanLabel = firstLabel.trim();
+  const cleanUpper = cleanLabel.toUpperCase();
 
-  // 1차: 파일명 접두사 일치 확인
+  // 0차: 등록된 파일명 전체 일치 확인
+  const exactMatch = documents.find((doc) => {
+    const fn = (doc.original_filename || '').trim();
+    return fn === cleanLabel || fn.toUpperCase() === cleanUpper;
+  });
+  if (exactMatch) return exactMatch;
+
+  // 1차: 파일명 접두사 일치 확인 (예: E01 또는 파일명 시작부)
   const prefixMatch = documents.find((doc) => {
     const fn = (doc.original_filename || '').trim().toUpperCase();
-    return fn.startsWith(cleanLabel) || fn.includes(`[${cleanLabel}]`) || fn.includes(`(${cleanLabel})`);
+    return fn.startsWith(cleanUpper) || fn.includes(`[${cleanUpper}]`) || fn.includes(`(${cleanUpper})`);
   });
   if (prefixMatch) return prefixMatch;
 
   // 2차: 숫자 순서 기반 인덱스 확인 (E01 -> 1번째, E02 -> 2번째)
-  const numMatch = cleanLabel.match(/^E(\d+)$/);
+  const numMatch = cleanUpper.match(/^(?:\[)?E(\d+)/);
   if (numMatch) {
     const targetIdx = parseInt(numMatch[1], 10) - 1;
     // 생성일시 기준 오름차순 정렬 후 인덱스 참조
