@@ -272,3 +272,4 @@ def verify_all_issues(
         res = verify_issue(issue, draft_answer, briefing, retrieved_sources)
         results.append(res)
     return results
+
