@@ -219,7 +219,7 @@ class GraphRAGRetriever:
 
     def find_contradictions(self, case_id: str) -> List[Dict[str, Any]]:
         """승인된 Claim의 CONTRADICTS 관계와, 같은 대상에 대한 SUPPORTS 근거를 함께 반환한다."""
-        return self._run("""
+        raw = self._run("""
             MATCH (src)-[:CONTRADICTS]->(t {case_id: $case_id})
             WHERE NOT src:EvidenceClaim OR src.review_status IN $approved
             OPTIONAL MATCH (sup:EvidenceClaim)-[:SUPPORTS]->(t)
@@ -231,6 +231,63 @@ class GraphRAGRetriever:
                    collect(DISTINCT sup.id) AS supporting_claim_ids
             LIMIT 30
         """, case_id=case_id, approved=_APPROVED)
+        # 중복 (src.id, target.id) 쌍 제거
+        deduped = []
+        seen = set()
+        for item in raw:
+            key = (item.get("contradicting_id"), item.get("target_id"))
+            if key not in seen:
+                seen.add(key)
+                deduped.append(item)
+        return deduped
+
+    def _find_pg_gaps_and_contradictions(
+        self, db: Any, case_id: str
+    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """PostgreSQL 기반으로 증거 공백(EvidenceGap) 및 상충 증거(EvidenceLink)를 조회한다."""
+        from ai_legal_helper.database.models import EvidenceGap, EvidenceLink, EvidenceClaim, Fact
+
+        # 1. 증거 공백
+        gaps_query = db.query(EvidenceGap).filter_by(case_id=case_id).all()
+        gaps = [
+            {
+                "node_type": "Fact" if g.fact_id else "LegalIssue",
+                "node_id": g.fact_id or g.claim_id or g.id,
+                "content": g.target_proposition or g.description,
+                "gap_type": g.gap_type,
+            }
+            for g in gaps_query
+        ]
+
+        # 2. 상충 증거
+        links = (
+            db.query(EvidenceLink)
+            .join(EvidenceClaim, EvidenceLink.claim_id == EvidenceClaim.id)
+            .filter(
+                EvidenceClaim.case_id == case_id,
+                EvidenceLink.link_type == "CONTRADICTS",
+            )
+            .all()
+        )
+        seen_pairs = set()
+        contras = []
+        for l in links:
+            claim = db.query(EvidenceClaim).filter_by(id=l.claim_id).first()
+            fact = db.query(Fact).filter_by(id=l.target_id).first() if l.target_type == "FACT" else None
+            pair_key = (l.claim_id, l.target_id)
+            if pair_key in seen_pairs:
+                continue
+            seen_pairs.add(pair_key)
+            contras.append({
+                "target_type": l.target_type,
+                "target_id": l.target_id,
+                "target_content": fact.statement if fact else "",
+                "contradicting_id": l.claim_id,
+                "contradicting_type": "EvidenceClaim",
+                "contradicting_statement": claim.statement if claim else "",
+                "supporting_claim_ids": [],
+            })
+        return gaps, contras
 
     # ------------------------------------------------------------------ 전략 3: Structured Hybrid (PostgreSQL + Neo4j)
     @trace

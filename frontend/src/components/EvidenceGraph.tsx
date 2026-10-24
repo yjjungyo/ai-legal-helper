@@ -248,16 +248,37 @@ export const EvidenceGraph: React.FC<Props> = ({ caseId }) => {
                 <div>
                   <strong style={{ color: '#d9480f' }}>⚡ 상충 증거 (Contradictions)</strong>
                   <p style={{ margin: '4px 0', fontSize: '12px', color: '#666' }}>서로 모순되거나 충돌하는 진술/증거:</p>
-                  <ul style={{ margin: '6px 0 0 16px', padding: 0 }}>
-                    {analysis.contradictions?.map((c: any, i: number) => (
-                      <li key={i} style={{ marginBottom: '4px' }}>
-                        <span style={{ fontWeight: 'bold' }}>[{c.target_type}]</span> {c.target_content}
-                      </li>
-                    ))}
-                    {(!analysis.contradictions || analysis.contradictions.length === 0) && (
-                      <li style={{ color: '#2b8a3e' }}>상충되는 증거가 없습니다.</li>
+                  <div style={{ marginTop: '6px' }}>
+                    {analysis.contradictions && analysis.contradictions.length > 0 ? (
+                      analysis.contradictions.map((c: any, i: number) => (
+                        <div
+                          key={i}
+                          style={{
+                            marginBottom: '8px',
+                            padding: '8px 10px',
+                            background: '#fff9db',
+                            border: '1px solid #ffe066',
+                            borderRadius: '4px',
+                            fontSize: '12px',
+                          }}
+                        >
+                          <div style={{ color: '#d9480f', fontWeight: 'bold', marginBottom: '3px' }}>
+                            상충 #{i + 1} [{c.target_type || 'Fact'}]
+                          </div>
+                          <div style={{ color: '#333', marginBottom: '2px' }}>
+                            <span style={{ fontWeight: 'bold', color: '#495057' }}>확정 사실:</span> {c.target_content}
+                          </div>
+                          {c.contradicting_statement && (
+                            <div style={{ color: '#c92a2a' }}>
+                              <span style={{ fontWeight: 'bold' }}>상충 진술:</span> {c.contradicting_statement}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <p style={{ color: '#2b8a3e', fontSize: '12px', margin: '4px 0' }}>상충되는 증거가 없습니다.</p>
                     )}
-                  </ul>
+                  </div>
                 </div>
               </div>
             )}

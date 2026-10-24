@@ -89,6 +89,16 @@ _SUBSTANTIVE_ROLE_MAP: Dict[str, str] = {
     "사업주": "사용자",
     "근로자": "근로자",
     "피용자": "근로자",
+    # 의료 / 헬스케어
+    "의사": "의사",
+    "병원": "의료기관",
+    "의료기관": "의료기관",
+    "환자": "환자",
+    # 지식재산권 / 특허
+    "발명자": "발명자",
+    "출원인": "출원인",
+    "특허권자": "특허권자",
+    "저작권자": "저작권자",
     # 형사 / 가사 / 행정 / 대리
     "고소인": "고소인",
     "피고소인": "피고소인",
@@ -142,13 +152,20 @@ _COUNTERPARTY_RELATIONS: Dict[str, Tuple[str, str]] = {
     "근로자": ("사용자", "근로계약 당사자"),
     "도급인": ("수급인", "도급계약 당사자"),
     "수급인": ("도급인", "도급계약 당사자"),
+    "의사": ("환자", "의료계약 당사자"),
+    "환자": ("의사", "의료계약 당사자"),
+    "의료기관": ("환자", "의료계약 당사자"),
+    "발명자": ("출원인", "특허출원 당사자"),
+    "출원인": ("발명자", "특허출원 당사자"),
     "고소인": ("피고소인", "형사고소 당사자"),
     "피고소인": ("고소인", "형사고소 당사자"),
     "신청인": ("피신청인", "신청사건 당사자"),
     "피신청인": ("신청인", "신청사건 당사자"),
 }
 
-# 인명/기관명으로 오인해서는 안 되는 일반 법률·계약·행위·상태 명사 사전 (T04 보호)
+# 인명/기관명으로 오인해서는 안 되는 일반 법률·계약·추상 대명사 사전 (T04 보호)
+# 주의: 사건별 행위·상태 명사(예: '입주', '현거주', '준공', '처방', '해고')를 끝없이 블랙리스트에 추가하는
+# 하드코딩(Whack-A-Mole)을 지양하고, 본 사전에는 순수 언어학적·법률적 공통 기능어만 유지한다.
 _NON_NAME_STOPWORDS: Set[str] = {
     *_ALL_ROLE_MAP.keys(),
     "계약", "계약서", "문서", "문자", "메시지", "대화", "내용증명", "통지서", "합의서", "확인서",
@@ -157,20 +174,36 @@ _NON_NAME_STOPWORDS: Set[str] = {
     "중도금", "잔금", "월세", "차임", "관리비", "이자", "지연손해금", "손해배상", "위약금", "금원",
     "금액", "계좌", "은행계좌", "주택", "아파트", "건물", "부동산", "목적물", "임차목적물", "호실",
     "주소", "소재지", "연락처", "전화번호", "휴대전화", "이메일", "성명", "이름", "성명미상", "불상",
-    "미상", "미정", "없음", "있음", "동일", "본인", "상대방", "당사자", "제3자", "반환", "지급",
-    "입금", "송금", "퇴거", "이사", "인도", "명도", "갱신", "해지", "종료", "만기", "만료", "연장",
-    "지연", "거절", "거부", "동의", "합의", "승낙", "요청", "통보", "통지", "연락", "약속", "의무",
-    "권리", "책임", "사정", "사유", "기한", "기간", "일정", "예정", "새로운", "신규", "기존",
-    "다음", "해당", "위", "아래", "각", "양", "쌍방", "일방", "사이", "명의", "소유", "표시",
-    "녹취", "녹취록", "통화", "형식", "원본", "사본", "문서에", "여부", "진술", "진술상", "유지", "거주",
+    "미상", "미정", "없음", "있음", "동일", "본인", "상대방", "당사자", "제3자",
+    "녹취", "녹취록", "통화", "형식", "원본", "사본", "여부", "현황",
 }
 
 _NON_NAME_SUBSTRINGS: Tuple[str, ...] = (
     "보증금", "전세금", "계약금", "중도금", "잔금", "차임", "월세", "연락처", "전화번호",
-    "서명란", "계좌", "반환", "지급", "퇴거", "인도", "명도", "해지", "갱신", "지연",
+    "서명란", "계좌", "반환", "지급", "퇴거", "해지", "갱신", "지연",
     "거절", "요청", "통보", "통지", "기재", "명시", "하였다", "했다", "한다", "이다",
     "입니다", "있고", "있다", "없다", "않다", "미상", "불상", "예정", "기일", "문서", "진술", "여부",
 )
+
+# 대한민국 통계청 표준 성씨(Family Name) 화이트리스트
+# 한국인 성명의 99.8%를 포괄하는 표준 성씨 집합이다.
+# 특정 사건 어휘에 의존하지 않고, 건설(준공), 의료(처방/진료), 노동(해고), 지재권(출원), 형사(자백) 등
+# 모든 법률 도메인에서 비인명 행위·상태 명사가 당사자 이름으로 오추출되는 것을 원천 차단한다.
+_KOREAN_FAMILY_NAMES: Set[str] = {
+    # 단성 (1자) - 빈도순 및 공인 성씨
+    "김", "이", "박", "최", "정", "강", "조", "윤", "장", "임",
+    "한", "오", "서", "신", "권", "황", "안", "송", "유", "홍",
+    "고", "문", "양", "손", "배", "백", "허", "남", "심", "노",
+    "하", "곽", "성", "차", "주", "우", "구", "나", "전", "민",
+    "진", "지", "엄", "채", "원", "천", "방", "공", "현", "함",
+    "변", "염", "여", "추", "도", "소", "석", "선", "설", "마",
+    "길", "연", "위", "표", "명", "기", "반", "왕", "금", "옥",
+    "육", "인", "맹", "제", "탁", "국", "어", "은", "편", "용",
+    "예", "경", "봉", "사", "부", "복", "태", "목", "형", "계",
+    "피", "두", "감", "음", "빈", "동", "온",
+    # 복성 (2자)
+    "남궁", "선우", "황보", "제갈", "사공", "서문", "독고",
+}
 
 _ORG_KEYWORDS: Tuple[str, ...] = (
     "주식회사", "(주)", "㈜", "유한회사", "합자회사", "법무법인", "재단법인", "사단법인",
@@ -203,10 +236,12 @@ _PATTERN_NAME_PAREN_ROLE = re.compile(
 )
 
 # 패턴 4: "<역할> <이름어절>" (예: "임대인 박정훈", "임대인 박정훈은", "임대인 박정훈의")
+# 주의: 뒤에 은/는/이/가/의/에게/씨/님/콜론/괄호/문장부호가 결합하거나 문장 끝인 경우에만 인명으로 인식하고,
+# '임차인 입주 전', '임차인 현거주 및'과 같이 일반 명사·접속사·후속어절이 이어지는 경우는 엄격히 배제한다.
 _PATTERN_ROLE_SPACE_NAME = re.compile(
     rf"(?<![가-힣])(?P<role>{_ROLE_ALTERNATION})\s+"
-    rf"(?P<name>[가-힣]{{2,6}})"
-    rf"(?=\s|[.,;)]|$)"
+    rf"(?P<name>[가-힣]{{2,4}})"
+    rf"(?=(?:\s*(?:씨|님))?(?:[은는이가의에게께과와]\s*|\s*[:=]\s*|\s*\([가-힣\s]+\)|[.,;)]|$))"
 )
 
 # 역할 귀속 연락처 추출 패턴: "임대인의 연락처는 010-4826-1357이다" 또는 "임대인은 박정훈이며 연락처는 010-4826-1357이다"
@@ -278,26 +313,53 @@ def _clean_and_validate_party_name(raw_name: str) -> Optional[str]:
         return None
 
     if re.fullmatch(r"[가-힣]{2,4}", compact):
+        # 대한민국 표준 성씨(Family Name) 화이트리스트 검사:
+        # 2자 복성(남궁, 선우 등) 또는 1자 단성(김, 이, 박 등)으로 시작해야 한다.
+        has_valid_surname = False
+        if len(compact) >= 3 and compact[:2] in _KOREAN_FAMILY_NAMES:
+            has_valid_surname = True
+        elif compact[0] in _KOREAN_FAMILY_NAMES:
+            has_valid_surname = True
+
+        if not has_valid_surname:
+            return None
+
         return compact
 
     return None
 
 
-def _extract_role_name_pairs_from_statement(statement: str) -> List[Tuple[str, str, bool]]:
-    """단일 Fact 진술문에서 `(정규화된_이름, 표준_역할, 실체적_역할_여부)` 목록을 추출한다."""
+def _extract_role_name_pairs_from_statement(
+    statement: str,
+    allow_loose_space_pattern: bool = False,
+) -> List[Tuple[str, str, bool]]:
+    """단일 Fact 진술문에서 `(정규화된_이름, 표준_역할, 실체적_역할_여부)` 목록을 추출한다.
+
+    Args:
+        statement: Fact 진술문 텍스트.
+        allow_loose_space_pattern: 전용 당사자 정의 문맥(PARTY_INFO)에서만 True로 설정하여
+            `<역할> <이름>` 띄어쓰기 패턴을 허용한다. 일반 서술문(DOC_INFO, ACTION 등)에서는 False로 제한하여
+            '수급인 준공', '의사 진료', '근로자 해고' 등 행위·상태 명사구가 당사자로 오인되는 것을 원천 방지한다.
+
+    Returns:
+        List[Tuple[str, str, bool]]: (정규화된 이름, 표준화된 역할, 실체적 법률역할 여부) 목록.
+    """
     if not statement:
         return []
 
     found: List[Tuple[str, str, bool]] = []
     seen: Set[Tuple[str, str]] = set()
 
-    for pattern in (
+    patterns = [
         _PATTERN_ROLE_IS_NAME,
         _PATTERN_NAME_IS_ROLE,
         _PATTERN_ROLE_PAREN_NAME,
         _PATTERN_NAME_PAREN_ROLE,
-        _PATTERN_ROLE_SPACE_NAME,
-    ):
+    ]
+    if allow_loose_space_pattern:
+        patterns.append(_PATTERN_ROLE_SPACE_NAME)
+
+    for pattern in patterns:
         for match in pattern.finditer(statement):
             raw_role = (match.group("role") or "").strip()
             raw_name = (match.group("name") or "").strip()
@@ -372,6 +434,9 @@ def extract_parties_from_facts(
         stmt = (fact.statement or "").strip()
         if not stmt:
             continue
+        # 단순 문서 제목 기술이나 문서 메타데이터 서술 문장은 당사자 인명 추출 대상이 아님
+        if any(stmt.startswith(prefix) for prefix in ("문서 제목은", "문서의 제목은", "이 문서는")):
+            continue
 
         # 연락처 속성 추출 (예: "임대인의 연락처는 010-4826-1357이다.")
         for cm in _PATTERN_ROLE_CONTACT.finditer(stmt):
@@ -379,7 +444,10 @@ def extract_parties_from_facts(
             phone = re.sub(r"[\s.]+", "-", cm.group("phone").strip())
             role_contacts.setdefault(c_role, []).append((phone, fact))
 
-        pairs = _extract_role_name_pairs_from_statement(stmt)
+        f_type = (fact.fact_type or "").upper()
+        # PARTY_INFO 문맥에서만 느슨한 띄어쓰기 패턴(_PATTERN_ROLE_SPACE_NAME)을 허용한다.
+        is_party_context = f_type in ("PARTY_INFO", "당사자정보")
+        pairs = _extract_role_name_pairs_from_statement(stmt, allow_loose_space_pattern=is_party_context)
         for name, role, is_sub in pairs:
             if is_sub:
                 key = (name, role)
@@ -450,8 +518,54 @@ def extract_parties_from_facts(
                     if cid not in target_cand.related_claim_ids:
                         target_cand.related_claim_ids.append(cid)
 
+    # 동일 역할(role) 및 동일 연락처(contacts)를 공유하는 중복 후보 통합
+    # 예: 동일 연락처를 갖는 복수의 임차인 후보가 존재할 경우 실제 인명(PARTY_INFO 또는 3자 성명)으로 단일화
+    party_info_fact_ids = {
+        f.id for f in facts if (f.fact_type or "").upper() in ("PARTY_INFO", "당사자정보")
+    }
+    cands_by_role_and_phone: Dict[Tuple[str, str], List[_ExtractedPartyCandidate]] = {}
+    for cand in substantive_by_key.values():
+        for p in cand.contacts:
+            cands_by_role_and_phone.setdefault((cand.role, p), []).append(cand)
+
+    merged_away_keys: Set[Tuple[str, str]] = set()
+    for (r, phone), dup_cands in cands_by_role_and_phone.items():
+        if len(dup_cands) > 1:
+            def _party_score(c: _ExtractedPartyCandidate) -> int:
+                score = 0
+                if any(fid for fid in c.related_fact_ids if fid in party_info_fact_ids):
+                    score += 100
+                if c.verification_status == "DOCUMENT_VERIFIED":
+                    score += 50
+                elif c.verification_status == "VERIFIED":
+                    score += 30
+                if len(c.name) == 3:
+                    score += 20
+                elif len(c.name) == 2:
+                    score += 10
+                return score
+
+            best_cand = max(dup_cands, key=_party_score)
+            for other in dup_cands:
+                if other is not best_cand:
+                    for fid in other.related_fact_ids:
+                        if fid not in best_cand.related_fact_ids:
+                            best_cand.related_fact_ids.append(fid)
+                    for cid in other.related_claim_ids:
+                        if cid not in best_cand.related_claim_ids:
+                            best_cand.related_claim_ids.append(cid)
+                    for aux in other.aux_roles:
+                        if aux not in best_cand.aux_roles:
+                            best_cand.aux_roles.append(aux)
+                    merged_away_keys.add((other.name, other.role))
+
+    consolidated_by_key: Dict[Tuple[str, str], _ExtractedPartyCandidate] = {}
+    for k, v in substantive_by_key.items():
+        if k not in merged_away_keys:
+            consolidated_by_key[k] = v
+
     # 쌍방 당사자 관계(party_relationship) 자동 추론
-    candidates = list(substantive_by_key.values())
+    candidates = list(consolidated_by_key.values())
     by_role: Dict[str, List[str]] = {}
     for c in candidates:
         by_role.setdefault(c.role, []).append(c.name)

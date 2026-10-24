@@ -178,8 +178,34 @@ def adjudicate_fact(
                 break
 
             # 3) 동일 사건 일자 직접 불일치
+            # 문서 메타데이터(문서 작성일, 발급일, 열람일 등)는 각 문서의 고유 작성 시점이므로 시점 모순에서 배제
+            is_doc_metadata_date = (
+                proposition.event_type == "DOCUMENT_METADATA"
+                or target_prop.event_type == "DOCUMENT_METADATA"
+                or any(kw in stmt for kw in ("문서 작성일", "작성일자", "작성일", "발급일자", "발급일", "열람일"))
+                or any(kw in target_stmt for kw in ("문서 작성일", "작성일자", "작성일", "발급일자", "발급일", "열람일"))
+            )
+            # 출처 문서가 서로 다른 경우 각 문서의 개별 시점이므로 시점 모순에서 배제
+            is_different_doc = (
+                getattr(proposition, "source_evidence_id", None)
+                and target_evidence_id
+                and getattr(proposition, "source_evidence_id", None) != target_evidence_id
+            )
+            # 단일 유일 사건(계약체결일, 동일 전입신고일 등 단 1회만 성립해야 하는 행위)에 한정하여 일자 불일치 판정
+            is_same_single_event = (
+                proposition.event_type == target_prop.event_type
+                and proposition.event_type not in ("GENERAL_FACT", "DOCUMENT_METADATA", "COMMUNICATION")
+                and (
+                    (proposition.event_subtype and proposition.event_subtype == target_prop.event_subtype)
+                    or any(act in stmt and act in target_stmt for act in ("계약체결", "체결일", "전입신고", "확정일자"))
+                )
+            )
+
             if (
-                proposition.temporal_value
+                not is_doc_metadata_date
+                and not is_different_doc
+                and is_same_single_event
+                and proposition.temporal_value
                 and target_prop.temporal_value
                 and proposition.temporal_value != target_prop.temporal_value
             ):

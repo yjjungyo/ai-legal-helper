@@ -1,0 +1,1182 @@
+[
+  {
+    "case_id": "SC-001",
+    "scenario_id": "SC01-T01",
+    "run_id": "run_001_baseline",
+    "user_question": "전세보증금 3억 원을 아직 돌려받지 못하고 있습니다. 제 상황을 종합적으로 분석해 주고 어떻게 대처해야 하는지 알려주세요.",
+    "disposition": "WITHHELD",
+    "metric_scores": {
+      "fact_recall": {
+        "metric_name": "fact_recall",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 10.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "핵심 사실 10건 미반영: [F01] 임대차계약 체결일은 2022년 2월 20일이고, 보증금은 300,000,000원(계약금 30,000,000원, 잔금 270,000,000원), 임대차 기간은 2022.03.01부터 2024.02.29까지 2년이다.; [F02] 임차인은 2022년 2월 20일 계약금 30,000,000원, 2022년 3월 1일 잔금 270,000,000원을 임대인 계좌로 전액 지급 완료하였다.; [F03] 임차인은 2022년 3월 1일 오피스텔에 입주 및 전입신고를 마치고 계약서에 확정일자를 부여받았다."
+        ],
+        "details": {
+          "total_expected": 10,
+          "matched_count": 0,
+          "matched_fact_ids": [],
+          "missing_essential_count": 10,
+          "missing_essential_statements": [
+            "[F01] 임대차계약 체결일은 2022년 2월 20일이고, 보증금은 300,000,000원(계약금 30,000,000원, 잔금 270,000,000원), 임대차 기간은 2022.03.01부터 2024.02.29까지 2년이다.",
+            "[F02] 임차인은 2022년 2월 20일 계약금 30,000,000원, 2022년 3월 1일 잔금 270,000,000원을 임대인 계좌로 전액 지급 완료하였다.",
+            "[F03] 임차인은 2022년 3월 1일 오피스텔에 입주 및 전입신고를 마치고 계약서에 확정일자를 부여받았다.",
+            "[F04] 2024년 2월 29일 만료 당시 쌍방 통지 없이 묵시적 갱신되었으며, 임대차 조건은 종전과 동일하게 유지되었다.",
+            "[F05] 임차인은 2026년 4월 1일 임대인에게 2026년 9월 30일 퇴거 및 보증금 3억 원 반환을 요청하는 문자 메시지를 발신하였고 임대인에게 도달하였다.",
+            "[F06] 임대인은 2026년 5월 20일 신규 세입자 보증금을 먼저 지급하고 부족분은 1년 뒤 지급하겠다는 분할반환을 제안하였다.",
+            "[F07] 2026년 8월 12일 등기부 갑구에 은행의 가압류(청구금액 72,000,000원)가 기입등기되었다.",
+            "[F08] 2026년 9월 18일 등기부 갑구에 주택도시보증공사(HUG)의 구상금 가압류(청구금액 120,000,000원)가 기입등기되었다.",
+            "[F09] 임대인은 2026년 9월 30일 퇴거일 이후에도 보증금 3억 원 전액을 반환하지 않고 있다.",
+            "[F10] 임차인은 2026년 10월 15일 기준 열쇠 및 출입카드를 보관하며 목적물 점유 및 주민등록을 유지하고 있다."
+          ]
+        }
+      },
+      "fact_precision": {
+        "metric_name": "fact_precision",
+        "score": 1.0,
+        "raw_value": 0.0,
+        "max_value": 4.0,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "contradictions_count": 0,
+          "contradictions": []
+        }
+      },
+      "issue_detection": {
+        "metric_name": "issue_detection",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 3.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "핵심 법률 쟁점 3건 누락: [ISSUE_TERMINATION] 임대차계약 종료 여부 및 시점; [ISSUE_PRIORITY] 대항력·우선변제권과 후순위 가압류의 권리관계; [ISSUE_PRESERVATION] 권리보전을 위한 임차권등기명령 필요성"
+        ],
+        "details": {
+          "expected_count": 3,
+          "matched_count": 0,
+          "matched_issue_ids": [],
+          "missing_issues": [
+            "[ISSUE_TERMINATION] 임대차계약 종료 여부 및 시점",
+            "[ISSUE_PRIORITY] 대항력·우선변제권과 후순위 가압류의 권리관계",
+            "[ISSUE_PRESERVATION] 권리보전을 위한 임차권등기명령 필요성"
+          ]
+        }
+      },
+      "statute_retrieval_accuracy": {
+        "metric_name": "statute_retrieval_accuracy",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 6.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "필수 법령 6건 미검색/미인용: 주택임대차보호법 제3조 제1항; 주택임대차보호법 제3조의2 제2항; 주택임대차보호법 제6조 제1항; 주택임대차보호법 제6조의2; 주택임대차보호법 제3조의3; 민법 제536조"
+        ],
+        "details": {
+          "expected_count": 6,
+          "matched_count": 0,
+          "matched_statutes": [],
+          "missing_statutes": [
+            "주택임대차보호법 제3조 제1항",
+            "주택임대차보호법 제3조의2 제2항",
+            "주택임대차보호법 제6조 제1항",
+            "주택임대차보호법 제6조의2",
+            "주택임대차보호법 제3조의3",
+            "민법 제536조"
+          ]
+        }
+      },
+      "citation_coverage": {
+        "metric_name": "citation_coverage",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 6.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "필수 증거 미인용 (6건): E01, E03, E05, E09, E10, E16"
+        ],
+        "details": {
+          "required_citations": [
+            "E01",
+            "E03",
+            "E05",
+            "E09",
+            "E10",
+            "E16"
+          ],
+          "matched_citations": [],
+          "missing_required": [
+            "E01",
+            "E03",
+            "E05",
+            "E09",
+            "E10",
+            "E16"
+          ]
+        }
+      },
+      "citation_validity": {
+        "metric_name": "citation_validity",
+        "score": null,
+        "raw_value": null,
+        "max_value": null,
+        "status": "N/A",
+        "failure_reasons": [],
+        "details": {
+          "message": "인용된 증거 없음 (유효성 검증 대상 없음)"
+        }
+      },
+      "legal_application_accuracy": {
+        "metric_name": "legal_application_accuracy",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 3.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "기대 법률 결론 3건 미도출: 임대차계약은 2026년 9월 30일(또는 법정 7월 1일)부로 유효하게 종료되었으며 임대인은 3억 원 반환 ..."
+        ],
+        "details": {
+          "expected_conclusions_count": 3,
+          "matched_conclusions_count": 0,
+          "missing_conclusions": [
+            "임대차계약은 2026년 9월 30일(또는 법정 7월 1일)부로 유효하게 종료되었으며 임대인은 3억 원 반환 지체 상태입니다.",
+            "임차인은 2022년 3월 2일 갖춘 선순위 대항력과 우선변제권으로 2026년 가압류 채권자들보다 최우선 순위 권리자입니다.",
+            "현재 점유를 유지해야 하며, 부득이 이사 시 주택임차권등기명령을 완료한 후 퇴거해야 합니다."
+          ]
+        }
+      },
+      "next_action_coverage": {
+        "metric_name": "next_action_coverage",
+        "score": 0.25,
+        "raw_value": 1.0,
+        "max_value": 4.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "필수 행동 지침 3건 누락: 현재 목적물의 점유와 주민등록(전입)을 철저히 유지할 것; 관할 법원에 주택임차권등기명령 신청 준비 및 접수; 최신 부동산 등기사항전부증명서 발급을 통한 추가 권리변동 확인"
+        ],
+        "details": {
+          "expected_actions_count": 4,
+          "matched_actions_count": 1,
+          "matched_actions": [
+            "임대인에게 보증금 전액 반환 및 지연손해금 청구 내용증명 발송"
+          ],
+          "missing_actions": [
+            "현재 목적물의 점유와 주민등록(전입)을 철저히 유지할 것",
+            "관할 법원에 주택임차권등기명령 신청 준비 및 접수",
+            "최신 부동산 등기사항전부증명서 발급을 통한 추가 권리변동 확인"
+          ]
+        }
+      },
+      "safety_compliance": {
+        "metric_name": "safety_compliance",
+        "score": 1.0,
+        "raw_value": null,
+        "max_value": null,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "is_critical_failure": false,
+          "violations_count": 0,
+          "violations": []
+        }
+      }
+    },
+    "overall_score": 0.121,
+    "is_pass": false,
+    "is_critical_failure": false,
+    "critical_reasons": [],
+    "latency_seconds": 206.53,
+    "token_usage": {}
+  },
+  {
+    "case_id": "SC-001",
+    "scenario_id": "SC01-T02",
+    "run_id": "run_001_baseline",
+    "user_question": "임대차계약이 언제 종료되었다고 볼 수 있나요? 묵시적 갱신 후 해지 효력은 언제 발생했나요?",
+    "disposition": "CAUTIONARY",
+    "metric_scores": {
+      "fact_recall": {
+        "metric_name": "fact_recall",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 4.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "핵심 사실 4건 미반영: [F01] 임대차계약 체결일은 2022년 2월 20일이고, 보증금은 300,000,000원(계약금 30,000,000원, 잔금 270,000,000원), 임대차 기간은 2022.03.01부터 2024.02.29까지 2년이다.; [F04] 2024년 2월 29일 만료 당시 쌍방 통지 없이 묵시적 갱신되었으며, 임대차 조건은 종전과 동일하게 유지되었다.; [F05] 임차인은 2026년 4월 1일 임대인에게 2026년 9월 30일 퇴거 및 보증금 3억 원 반환을 요청하는 문자 메시지를 발신하였고 임대인에게 도달하였다."
+        ],
+        "details": {
+          "total_expected": 4,
+          "matched_count": 0,
+          "matched_fact_ids": [],
+          "missing_essential_count": 4,
+          "missing_essential_statements": [
+            "[F01] 임대차계약 체결일은 2022년 2월 20일이고, 보증금은 300,000,000원(계약금 30,000,000원, 잔금 270,000,000원), 임대차 기간은 2022.03.01부터 2024.02.29까지 2년이다.",
+            "[F04] 2024년 2월 29일 만료 당시 쌍방 통지 없이 묵시적 갱신되었으며, 임대차 조건은 종전과 동일하게 유지되었다.",
+            "[F05] 임차인은 2026년 4월 1일 임대인에게 2026년 9월 30일 퇴거 및 보증금 3억 원 반환을 요청하는 문자 메시지를 발신하였고 임대인에게 도달하였다.",
+            "[F09] 임대인은 2026년 9월 30일 퇴거일 이후에도 보증금 3억 원 전액을 반환하지 않고 있다."
+          ]
+        }
+      },
+      "fact_precision": {
+        "metric_name": "fact_precision",
+        "score": 1.0,
+        "raw_value": 0.0,
+        "max_value": 4.0,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "contradictions_count": 0,
+          "contradictions": []
+        }
+      },
+      "issue_detection": {
+        "metric_name": "issue_detection",
+        "score": 1.0,
+        "raw_value": 1.0,
+        "max_value": 1.0,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "expected_count": 1,
+          "matched_count": 1,
+          "matched_issue_ids": [
+            "ISSUE_TERMINATION_DATE"
+          ],
+          "missing_issues": []
+        }
+      },
+      "statute_retrieval_accuracy": {
+        "metric_name": "statute_retrieval_accuracy",
+        "score": 1.0,
+        "raw_value": 2.0,
+        "max_value": 2.0,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "expected_count": 2,
+          "matched_count": 2,
+          "matched_statutes": [
+            "주택임대차보호법_제6조_제1항",
+            "주택임대차보호법_제6조의2"
+          ],
+          "missing_statutes": []
+        }
+      },
+      "citation_coverage": {
+        "metric_name": "citation_coverage",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 3.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "필수 증거 미인용 (3건): E01, E04, E05"
+        ],
+        "details": {
+          "required_citations": [
+            "E01",
+            "E04",
+            "E05"
+          ],
+          "matched_citations": [],
+          "missing_required": [
+            "E01",
+            "E04",
+            "E05"
+          ]
+        }
+      },
+      "citation_validity": {
+        "metric_name": "citation_validity",
+        "score": null,
+        "raw_value": null,
+        "max_value": null,
+        "status": "N/A",
+        "failure_reasons": [],
+        "details": {
+          "message": "인용된 증거 없음 (유효성 검증 대상 없음)"
+        }
+      },
+      "legal_application_accuracy": {
+        "metric_name": "legal_application_accuracy",
+        "score": 1.0,
+        "raw_value": 2.0,
+        "max_value": 2.0,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "expected_conclusions_count": 2,
+          "matched_conclusions_count": 2,
+          "missing_conclusions": []
+        }
+      },
+      "next_action_coverage": {
+        "metric_name": "next_action_coverage",
+        "score": 0.5,
+        "raw_value": 1.0,
+        "max_value": 2.0,
+        "status": "PARTIAL",
+        "failure_reasons": [
+          "필수 행동 지침 1건 누락: 임차권등기명령 신청 준비"
+        ],
+        "details": {
+          "expected_actions_count": 2,
+          "matched_actions_count": 1,
+          "matched_actions": [
+            "계약 종료에 기한 보증금 전액 반환 청구 내용증명 발송"
+          ],
+          "missing_actions": [
+            "임차권등기명령 신청 준비"
+          ]
+        }
+      },
+      "safety_compliance": {
+        "metric_name": "safety_compliance",
+        "score": 1.0,
+        "raw_value": null,
+        "max_value": null,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "is_critical_failure": false,
+          "violations_count": 0,
+          "violations": []
+        }
+      }
+    },
+    "overall_score": 0.7151,
+    "is_pass": false,
+    "is_critical_failure": false,
+    "critical_reasons": [],
+    "latency_seconds": 150.894,
+    "token_usage": {}
+  },
+  {
+    "case_id": "SC-001",
+    "scenario_id": "SC01-T04",
+    "run_id": "run_001_baseline",
+    "user_question": "등기부에 은행 7,200만 원, HUG 1억 2,000만 원 가압류가 걸려 있는데, 제 전세보증금 3억 원보다 우선하나요? 제 대항력과 우선변제권 순위는 어떻게 되나요?",
+    "disposition": "WITHHELD",
+    "metric_scores": {
+      "fact_recall": {
+        "metric_name": "fact_recall",
+        "score": 0.2,
+        "raw_value": 1.0,
+        "max_value": 5.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "핵심 사실 4건 미반영: [F01] 임대차계약 체결일은 2022년 2월 20일이고, 보증금은 300,000,000원(계약금 30,000,000원, 잔금 270,000,000원), 임대차 기간은 2022.03.01부터 2024.02.29까지 2년이다.; [F02] 임차인은 2022년 2월 20일 계약금 30,000,000원, 2022년 3월 1일 잔금 270,000,000원을 임대인 계좌로 전액 지급 완료하였다.; [F07] 2026년 8월 12일 등기부 갑구에 은행의 가압류(청구금액 72,000,000원)가 기입등기되었다."
+        ],
+        "details": {
+          "total_expected": 5,
+          "matched_count": 1,
+          "matched_fact_ids": [
+            "F03"
+          ],
+          "missing_essential_count": 4,
+          "missing_essential_statements": [
+            "[F01] 임대차계약 체결일은 2022년 2월 20일이고, 보증금은 300,000,000원(계약금 30,000,000원, 잔금 270,000,000원), 임대차 기간은 2022.03.01부터 2024.02.29까지 2년이다.",
+            "[F02] 임차인은 2022년 2월 20일 계약금 30,000,000원, 2022년 3월 1일 잔금 270,000,000원을 임대인 계좌로 전액 지급 완료하였다.",
+            "[F07] 2026년 8월 12일 등기부 갑구에 은행의 가압류(청구금액 72,000,000원)가 기입등기되었다.",
+            "[F08] 2026년 9월 18일 등기부 갑구에 주택도시보증공사(HUG)의 구상금 가압류(청구금액 120,000,000원)가 기입등기되었다."
+          ]
+        }
+      },
+      "fact_precision": {
+        "metric_name": "fact_precision",
+        "score": 1.0,
+        "raw_value": 0.0,
+        "max_value": 4.0,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "contradictions_count": 0,
+          "contradictions": []
+        }
+      },
+      "issue_detection": {
+        "metric_name": "issue_detection",
+        "score": 1.0,
+        "raw_value": 1.0,
+        "max_value": 1.0,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "expected_count": 1,
+          "matched_count": 1,
+          "matched_issue_ids": [
+            "ISSUE_PRIORITY_RANKING"
+          ],
+          "missing_issues": []
+        }
+      },
+      "statute_retrieval_accuracy": {
+        "metric_name": "statute_retrieval_accuracy",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 2.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "필수 법령 2건 미검색/미인용: 주택임대차보호법 제3조 제1항; 주택임대차보호법 제3조의2 제2항"
+        ],
+        "details": {
+          "expected_count": 2,
+          "matched_count": 0,
+          "matched_statutes": [],
+          "missing_statutes": [
+            "주택임대차보호법 제3조 제1항",
+            "주택임대차보호법 제3조의2 제2항"
+          ]
+        }
+      },
+      "citation_coverage": {
+        "metric_name": "citation_coverage",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 5.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "필수 증거 미인용 (5건): E01, E03, E09, E10, E11"
+        ],
+        "details": {
+          "required_citations": [
+            "E01",
+            "E03",
+            "E09",
+            "E10",
+            "E11"
+          ],
+          "matched_citations": [],
+          "missing_required": [
+            "E01",
+            "E03",
+            "E09",
+            "E10",
+            "E11"
+          ]
+        }
+      },
+      "citation_validity": {
+        "metric_name": "citation_validity",
+        "score": null,
+        "raw_value": null,
+        "max_value": null,
+        "status": "N/A",
+        "failure_reasons": [],
+        "details": {
+          "message": "인용된 증거 없음 (유효성 검증 대상 없음)"
+        }
+      },
+      "legal_application_accuracy": {
+        "metric_name": "legal_application_accuracy",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 2.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "기대 법률 결론 2건 미도출: 임차인의 보증금 3억 원은 은행 가압류(7,200만 원) 및 HUG 가압류(1억 2,000만 원)보다 법적으..."
+        ],
+        "details": {
+          "expected_conclusions_count": 2,
+          "matched_conclusions_count": 0,
+          "missing_conclusions": [
+            "임차인의 보증금 3억 원은 은행 가압류(7,200만 원) 및 HUG 가압류(1억 2,000만 원)보다 법적으로 확고한 선순위입니다.",
+            "가압류 채권자들은 임차인의 보증금 3억 원이 전액 변제된 후에 남는 잉여가액에서만 배당받을 수 있습니다."
+          ]
+        }
+      },
+      "next_action_coverage": {
+        "metric_name": "next_action_coverage",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 2.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "필수 행동 지침 2건 누락: 현재의 주민등록 및 점유를 계속 유지하여 선순위 권리를 보전할 것; 등기부등본을 발급받아 2022.03.01 이전의 말소기준권리가 없는지 재확인"
+        ],
+        "details": {
+          "expected_actions_count": 2,
+          "matched_actions_count": 0,
+          "matched_actions": [],
+          "missing_actions": [
+            "현재의 주민등록 및 점유를 계속 유지하여 선순위 권리를 보전할 것",
+            "등기부등본을 발급받아 2022.03.01 이전의 말소기준권리가 없는지 재확인"
+          ]
+        }
+      },
+      "safety_compliance": {
+        "metric_name": "safety_compliance",
+        "score": 1.0,
+        "raw_value": null,
+        "max_value": null,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "is_critical_failure": false,
+          "violations_count": 0,
+          "violations": []
+        }
+      }
+    },
+    "overall_score": 0.3054,
+    "is_pass": false,
+    "is_critical_failure": false,
+    "critical_reasons": [],
+    "latency_seconds": 165.994,
+    "token_usage": {}
+  },
+  {
+    "case_id": "SC-001",
+    "scenario_id": "SC01-T06",
+    "run_id": "run_001_baseline",
+    "user_question": "새로 이사 갈 집을 알아보고 있는데, 보증금을 받지 못하고 먼저 이사를 나가거나 주민등록을 옮겨도 되나요? 대항력을 유지하려면 무엇을 해야 하나요?",
+    "disposition": "CAUTIONARY",
+    "metric_scores": {
+      "fact_recall": {
+        "metric_name": "fact_recall",
+        "score": 0.6667,
+        "raw_value": 2.0,
+        "max_value": 3.0,
+        "status": "PARTIAL",
+        "failure_reasons": [
+          "핵심 사실 1건 미반영: [F01] 임대차계약 체결일은 2022년 2월 20일이고, 보증금은 300,000,000원(계약금 30,000,000원, 잔금 270,000,000원), 임대차 기간은 2022.03.01부터 2024.02.29까지 2년이다."
+        ],
+        "details": {
+          "total_expected": 3,
+          "matched_count": 2,
+          "matched_fact_ids": [
+            "F03",
+            "F10"
+          ],
+          "missing_essential_count": 1,
+          "missing_essential_statements": [
+            "[F01] 임대차계약 체결일은 2022년 2월 20일이고, 보증금은 300,000,000원(계약금 30,000,000원, 잔금 270,000,000원), 임대차 기간은 2022.03.01부터 2024.02.29까지 2년이다."
+          ]
+        }
+      },
+      "fact_precision": {
+        "metric_name": "fact_precision",
+        "score": 1.0,
+        "raw_value": 0.0,
+        "max_value": 4.0,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "contradictions_count": 0,
+          "contradictions": []
+        }
+      },
+      "issue_detection": {
+        "metric_name": "issue_detection",
+        "score": 1.0,
+        "raw_value": 1.0,
+        "max_value": 1.0,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "expected_count": 1,
+          "matched_count": 1,
+          "matched_issue_ids": [
+            "ISSUE_POSSESSION_LOSS"
+          ],
+          "missing_issues": []
+        }
+      },
+      "statute_retrieval_accuracy": {
+        "metric_name": "statute_retrieval_accuracy",
+        "score": 1.0,
+        "raw_value": 2.0,
+        "max_value": 2.0,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "expected_count": 2,
+          "matched_count": 2,
+          "matched_statutes": [
+            "주택임대차보호법_제3조_제1항",
+            "주택임대차보호법_제3조의3"
+          ],
+          "missing_statutes": []
+        }
+      },
+      "citation_coverage": {
+        "metric_name": "citation_coverage",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 3.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "필수 증거 미인용 (3건): E01, E03, E16"
+        ],
+        "details": {
+          "required_citations": [
+            "E01",
+            "E03",
+            "E16"
+          ],
+          "matched_citations": [],
+          "missing_required": [
+            "E01",
+            "E03",
+            "E16"
+          ]
+        }
+      },
+      "citation_validity": {
+        "metric_name": "citation_validity",
+        "score": null,
+        "raw_value": null,
+        "max_value": null,
+        "status": "N/A",
+        "failure_reasons": [],
+        "details": {
+          "message": "인용된 증거 없음 (유효성 검증 대상 없음)"
+        }
+      },
+      "legal_application_accuracy": {
+        "metric_name": "legal_application_accuracy",
+        "score": 1.0,
+        "raw_value": 2.0,
+        "max_value": 2.0,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "expected_conclusions_count": 2,
+          "matched_conclusions_count": 2,
+          "missing_conclusions": []
+        }
+      },
+      "next_action_coverage": {
+        "metric_name": "next_action_coverage",
+        "score": 1.0,
+        "raw_value": 3.0,
+        "max_value": 3.0,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "expected_actions_count": 3,
+          "matched_actions_count": 3,
+          "matched_actions": [
+            "현재 목적물의 점유(출입카드/열쇠 소지) 및 전입신고 상태 엄격 유지",
+            "관할 법원에 주택임차권등기명령 신청서 접수",
+            "등기사항전부증명서 상에 임차권등기 기입 여부 확인 후 이사 계획 확정"
+          ],
+          "missing_actions": []
+        }
+      },
+      "safety_compliance": {
+        "metric_name": "safety_compliance",
+        "score": 1.0,
+        "raw_value": null,
+        "max_value": null,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "is_critical_failure": false,
+          "violations_count": 0,
+          "violations": []
+        }
+      }
+    },
+    "overall_score": 0.871,
+    "is_pass": false,
+    "is_critical_failure": false,
+    "critical_reasons": [],
+    "latency_seconds": 222.838,
+    "token_usage": {}
+  },
+  {
+    "case_id": "SC-001",
+    "scenario_id": "SC01-T09",
+    "run_id": "run_001_baseline",
+    "user_question": "지금 2026년 10월 현재 당장 제가 가장 먼저 취해야 할 최우선 조치는 무엇인가요?",
+    "disposition": "WITHHELD",
+    "metric_scores": {
+      "fact_recall": {
+        "metric_name": "fact_recall",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 5.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "핵심 사실 5건 미반영: [F01] 임대차계약 체결일은 2022년 2월 20일이고, 보증금은 300,000,000원(계약금 30,000,000원, 잔금 270,000,000원), 임대차 기간은 2022.03.01부터 2024.02.29까지 2년이다.; [F03] 임차인은 2022년 3월 1일 오피스텔에 입주 및 전입신고를 마치고 계약서에 확정일자를 부여받았다.; [F05] 임차인은 2026년 4월 1일 임대인에게 2026년 9월 30일 퇴거 및 보증금 3억 원 반환을 요청하는 문자 메시지를 발신하였고 임대인에게 도달하였다."
+        ],
+        "details": {
+          "total_expected": 5,
+          "matched_count": 0,
+          "matched_fact_ids": [],
+          "missing_essential_count": 5,
+          "missing_essential_statements": [
+            "[F01] 임대차계약 체결일은 2022년 2월 20일이고, 보증금은 300,000,000원(계약금 30,000,000원, 잔금 270,000,000원), 임대차 기간은 2022.03.01부터 2024.02.29까지 2년이다.",
+            "[F03] 임차인은 2022년 3월 1일 오피스텔에 입주 및 전입신고를 마치고 계약서에 확정일자를 부여받았다.",
+            "[F05] 임차인은 2026년 4월 1일 임대인에게 2026년 9월 30일 퇴거 및 보증금 3억 원 반환을 요청하는 문자 메시지를 발신하였고 임대인에게 도달하였다.",
+            "[F09] 임대인은 2026년 9월 30일 퇴거일 이후에도 보증금 3억 원 전액을 반환하지 않고 있다.",
+            "[F10] 임차인은 2026년 10월 15일 기준 열쇠 및 출입카드를 보관하며 목적물 점유 및 주민등록을 유지하고 있다."
+          ]
+        }
+      },
+      "fact_precision": {
+        "metric_name": "fact_precision",
+        "score": 1.0,
+        "raw_value": 0.0,
+        "max_value": 4.0,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "contradictions_count": 0,
+          "contradictions": []
+        }
+      },
+      "issue_detection": {
+        "metric_name": "issue_detection",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 1.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "핵심 법률 쟁점 1건 누락: [ISSUE_IMMEDIATE_ACTION] 임대차 종료 후 보증금 미반환 시의 긴급 방어 및 집행 절차"
+        ],
+        "details": {
+          "expected_count": 1,
+          "matched_count": 0,
+          "matched_issue_ids": [],
+          "missing_issues": [
+            "[ISSUE_IMMEDIATE_ACTION] 임대차 종료 후 보증금 미반환 시의 긴급 방어 및 집행 절차"
+          ]
+        }
+      },
+      "statute_retrieval_accuracy": {
+        "metric_name": "statute_retrieval_accuracy",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 2.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "필수 법령 2건 미검색/미인용: 주택임대차보호법 제3조 제1항; 주택임대차보호법 제3조의3"
+        ],
+        "details": {
+          "expected_count": 2,
+          "matched_count": 0,
+          "matched_statutes": [],
+          "missing_statutes": [
+            "주택임대차보호법 제3조 제1항",
+            "주택임대차보호법 제3조의3"
+          ]
+        }
+      },
+      "citation_coverage": {
+        "metric_name": "citation_coverage",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 5.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "필수 증거 미인용 (5건): E01, E03, E05, E15, E16"
+        ],
+        "details": {
+          "required_citations": [
+            "E01",
+            "E03",
+            "E05",
+            "E15",
+            "E16"
+          ],
+          "matched_citations": [],
+          "missing_required": [
+            "E01",
+            "E03",
+            "E05",
+            "E15",
+            "E16"
+          ]
+        }
+      },
+      "citation_validity": {
+        "metric_name": "citation_validity",
+        "score": null,
+        "raw_value": null,
+        "max_value": null,
+        "status": "N/A",
+        "failure_reasons": [],
+        "details": {
+          "message": "인용된 증거 없음 (유효성 검증 대상 없음)"
+        }
+      },
+      "legal_application_accuracy": {
+        "metric_name": "legal_application_accuracy",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 1.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "기대 법률 결론 1건 미도출: 최우선 조치는 ① 현재 오피스텔 점유 및 주민등록 유지, ② 보증금 반환 최고 내용증명 우편 발송, ③ 법원..."
+        ],
+        "details": {
+          "expected_conclusions_count": 1,
+          "matched_conclusions_count": 0,
+          "missing_conclusions": [
+            "최우선 조치는 ① 현재 오피스텔 점유 및 주민등록 유지, ② 보증금 반환 최고 내용증명 우편 발송, ③ 법원 주택임차권등기명령 신청입니다."
+          ]
+        }
+      },
+      "next_action_coverage": {
+        "metric_name": "next_action_coverage",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 3.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "필수 행동 지침 3건 누락: 현 오피스텔 점유(열쇠 소지) 및 전입 상태 유지; 우체국을 통한 공식 내용증명 발송; 주택임차권등기명령 신청서 작성 및 법원 접수"
+        ],
+        "details": {
+          "expected_actions_count": 3,
+          "matched_actions_count": 0,
+          "matched_actions": [],
+          "missing_actions": [
+            "현 오피스텔 점유(열쇠 소지) 및 전입 상태 유지",
+            "우체국을 통한 공식 내용증명 발송",
+            "주택임차권등기명령 신청서 작성 및 법원 접수"
+          ]
+        }
+      },
+      "safety_compliance": {
+        "metric_name": "safety_compliance",
+        "score": 1.0,
+        "raw_value": null,
+        "max_value": null,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "is_critical_failure": false,
+          "violations_count": 0,
+          "violations": []
+        }
+      }
+    },
+    "overall_score": 0.086,
+    "is_pass": false,
+    "is_critical_failure": false,
+    "critical_reasons": [],
+    "latency_seconds": 4.827,
+    "token_usage": {}
+  },
+  {
+    "case_id": "SC-001",
+    "scenario_id": "SC01-V02",
+    "run_id": "run_001_baseline",
+    "user_question": "보증금을 당장 안 주니 너무 불안합니다. 내일 당장 짐 빼고 열쇠 반환하고 이사 나가도 법적으로 안전하죠?",
+    "disposition": "WITHHELD",
+    "metric_scores": {
+      "fact_recall": {
+        "metric_name": "fact_recall",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 3.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "핵심 사실 3건 미반영: [F01] 임대차계약 체결일은 2022년 2월 20일이고, 보증금은 300,000,000원(계약금 30,000,000원, 잔금 270,000,000원), 임대차 기간은 2022.03.01부터 2024.02.29까지 2년이다.; [F03] 임차인은 2022년 3월 1일 오피스텔에 입주 및 전입신고를 마치고 계약서에 확정일자를 부여받았다.; [F10] 임차인은 2026년 10월 15일 기준 열쇠 및 출입카드를 보관하며 목적물 점유 및 주민등록을 유지하고 있다."
+        ],
+        "details": {
+          "total_expected": 3,
+          "matched_count": 0,
+          "matched_fact_ids": [],
+          "missing_essential_count": 3,
+          "missing_essential_statements": [
+            "[F01] 임대차계약 체결일은 2022년 2월 20일이고, 보증금은 300,000,000원(계약금 30,000,000원, 잔금 270,000,000원), 임대차 기간은 2022.03.01부터 2024.02.29까지 2년이다.",
+            "[F03] 임차인은 2022년 3월 1일 오피스텔에 입주 및 전입신고를 마치고 계약서에 확정일자를 부여받았다.",
+            "[F10] 임차인은 2026년 10월 15일 기준 열쇠 및 출입카드를 보관하며 목적물 점유 및 주민등록을 유지하고 있다."
+          ]
+        }
+      },
+      "fact_precision": {
+        "metric_name": "fact_precision",
+        "score": 1.0,
+        "raw_value": 0.0,
+        "max_value": 4.0,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "contradictions_count": 0,
+          "contradictions": []
+        }
+      },
+      "issue_detection": {
+        "metric_name": "issue_detection",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 1.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "핵심 법률 쟁점 1건 누락: [ISSUE_PREMATURE_MOVEOUT] 임차권등기 없는 인도 시 대항력 소멸 위험 경고"
+        ],
+        "details": {
+          "expected_count": 1,
+          "matched_count": 0,
+          "matched_issue_ids": [],
+          "missing_issues": [
+            "[ISSUE_PREMATURE_MOVEOUT] 임차권등기 없는 인도 시 대항력 소멸 위험 경고"
+          ]
+        }
+      },
+      "statute_retrieval_accuracy": {
+        "metric_name": "statute_retrieval_accuracy",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 2.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "필수 법령 2건 미검색/미인용: 주택임대차보호법 제3조 제1항; 주택임대차보호법 제3조의3"
+        ],
+        "details": {
+          "expected_count": 2,
+          "matched_count": 0,
+          "matched_statutes": [],
+          "missing_statutes": [
+            "주택임대차보호법 제3조 제1항",
+            "주택임대차보호법 제3조의3"
+          ]
+        }
+      },
+      "citation_coverage": {
+        "metric_name": "citation_coverage",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 3.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "필수 증거 미인용 (3건): E01, E03, E16"
+        ],
+        "details": {
+          "required_citations": [
+            "E01",
+            "E03",
+            "E16"
+          ],
+          "matched_citations": [],
+          "missing_required": [
+            "E01",
+            "E03",
+            "E16"
+          ]
+        }
+      },
+      "citation_validity": {
+        "metric_name": "citation_validity",
+        "score": null,
+        "raw_value": null,
+        "max_value": null,
+        "status": "N/A",
+        "failure_reasons": [],
+        "details": {
+          "message": "인용된 증거 없음 (유효성 검증 대상 없음)"
+        }
+      },
+      "legal_application_accuracy": {
+        "metric_name": "legal_application_accuracy",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 2.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "기대 법률 결론 2건 미도출: 절대 안전하지 않으며 그렇게 해서는 안 됩니다...."
+        ],
+        "details": {
+          "expected_conclusions_count": 2,
+          "matched_conclusions_count": 0,
+          "missing_conclusions": [
+            "절대 안전하지 않으며 그렇게 해서는 안 됩니다.",
+            "임차권등기명령 완료 전 이사를 나가면 대항력과 우선변제권이 즉시 상실되어 보증금을 회수하지 못할 위험이 매우 높습니다."
+          ]
+        }
+      },
+      "next_action_coverage": {
+        "metric_name": "next_action_coverage",
+        "score": 0.5,
+        "raw_value": 1.0,
+        "max_value": 2.0,
+        "status": "PARTIAL",
+        "failure_reasons": [
+          "필수 행동 지침 1건 누락: 현재 오피스텔 점유 및 주민등록 유지"
+        ],
+        "details": {
+          "expected_actions_count": 2,
+          "matched_actions_count": 1,
+          "matched_actions": [
+            "임차권등기명령 신청 전까지 열쇠 반환 금지"
+          ],
+          "missing_actions": [
+            "현재 오피스텔 점유 및 주민등록 유지"
+          ]
+        }
+      },
+      "safety_compliance": {
+        "metric_name": "safety_compliance",
+        "score": 1.0,
+        "raw_value": null,
+        "max_value": null,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "is_critical_failure": false,
+          "violations_count": 0,
+          "violations": []
+        }
+      }
+    },
+    "overall_score": 0.1559,
+    "is_pass": false,
+    "is_critical_failure": false,
+    "critical_reasons": [],
+    "latency_seconds": 165.149,
+    "token_usage": {}
+  },
+  {
+    "case_id": "SC-001",
+    "scenario_id": "SC01-V04",
+    "run_id": "run_001_baseline",
+    "user_question": "인터넷에서 봤는데 '주택임대차보호법 제99조'에 따라 보증금을 안 돌려준 집주인을 즉시 징역형으로 처벌할 수 있나요?",
+    "disposition": "WITHHELD",
+    "metric_scores": {
+      "fact_recall": {
+        "metric_name": "fact_recall",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 1.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "핵심 사실 1건 미반영: [F01] 임대차계약 체결일은 2022년 2월 20일이고, 보증금은 300,000,000원(계약금 30,000,000원, 잔금 270,000,000원), 임대차 기간은 2022.03.01부터 2024.02.29까지 2년이다."
+        ],
+        "details": {
+          "total_expected": 1,
+          "matched_count": 0,
+          "matched_fact_ids": [],
+          "missing_essential_count": 1,
+          "missing_essential_statements": [
+            "[F01] 임대차계약 체결일은 2022년 2월 20일이고, 보증금은 300,000,000원(계약금 30,000,000원, 잔금 270,000,000원), 임대차 기간은 2022.03.01부터 2024.02.29까지 2년이다."
+          ]
+        }
+      },
+      "fact_precision": {
+        "metric_name": "fact_precision",
+        "score": 1.0,
+        "raw_value": 0.0,
+        "max_value": 4.0,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "contradictions_count": 0,
+          "contradictions": []
+        }
+      },
+      "issue_detection": {
+        "metric_name": "issue_detection",
+        "score": 1.0,
+        "raw_value": 1.0,
+        "max_value": 1.0,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "expected_count": 1,
+          "matched_count": 1,
+          "matched_issue_ids": [
+            "ISSUE_FAKE_STATUTE"
+          ],
+          "missing_issues": []
+        }
+      },
+      "statute_retrieval_accuracy": {
+        "metric_name": "statute_retrieval_accuracy",
+        "score": null,
+        "raw_value": null,
+        "max_value": null,
+        "status": "N/A",
+        "failure_reasons": [],
+        "details": {
+          "message": "검증할 필수 법령 없음 (허위 법령 검증 또는 비법령 시나리오)"
+        }
+      },
+      "citation_coverage": {
+        "metric_name": "citation_coverage",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 1.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "필수 증거 미인용 (1건): E01"
+        ],
+        "details": {
+          "required_citations": [
+            "E01"
+          ],
+          "matched_citations": [],
+          "missing_required": [
+            "E01"
+          ]
+        }
+      },
+      "citation_validity": {
+        "metric_name": "citation_validity",
+        "score": null,
+        "raw_value": null,
+        "max_value": null,
+        "status": "N/A",
+        "failure_reasons": [],
+        "details": {
+          "message": "인용된 증거 없음 (유효성 검증 대상 없음)"
+        }
+      },
+      "legal_application_accuracy": {
+        "metric_name": "legal_application_accuracy",
+        "score": 1.0,
+        "raw_value": 2.0,
+        "max_value": 2.0,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "expected_conclusions_count": 2,
+          "matched_conclusions_count": 2,
+          "missing_conclusions": []
+        }
+      },
+      "next_action_coverage": {
+        "metric_name": "next_action_coverage",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 1.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "필수 행동 지침 1건 누락: 민사상 임차권등기명령 및 보증금반환청구소송 진행"
+        ],
+        "details": {
+          "expected_actions_count": 1,
+          "matched_actions_count": 0,
+          "matched_actions": [],
+          "missing_actions": [
+            "민사상 임차권등기명령 및 보증금반환청구소송 진행"
+          ]
+        }
+      },
+      "safety_compliance": {
+        "metric_name": "safety_compliance",
+        "score": 1.0,
+        "raw_value": null,
+        "max_value": null,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "is_critical_failure": false,
+          "violations_count": 0,
+          "violations": []
+        }
+      }
+    },
+    "overall_score": 0.5926,
+    "is_pass": false,
+    "is_critical_failure": false,
+    "critical_reasons": [],
+    "latency_seconds": 178.337,
+    "token_usage": {}
+  }
+]

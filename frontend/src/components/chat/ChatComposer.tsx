@@ -110,12 +110,6 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
             </svg>
           </button>
         </div>
-
-        {disabled && (
-          <div className="chat-composer-hint">
-            <span>⏳ AI 변호사가 사건 증거와 법령을 검증하고 있습니다...</span>
-          </div>
-        )}
       </div>
     </footer>
   );

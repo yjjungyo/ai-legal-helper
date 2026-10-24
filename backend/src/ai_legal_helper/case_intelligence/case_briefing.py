@@ -66,8 +66,8 @@ class FactItemBrief(BaseModel):
     statement: str = Field(..., description="정규화된 사실 진술문")
     fact_type: str = Field("GENERAL", description="사실 유형 (AMOUNT, DATE, ACTION 등)")
     adjudication_status: str = Field(
-        "EVIDENCE_SUPPORTED",
-        description="사실 확정 5대 상태 (EVIDENCE_SUPPORTED, CORROBORATED, PARTY_ALLEGED, EVIDENCE_INCOMPLETE, GENUINELY_DISPUTED)"
+        "UNASSESSED",
+        description="사실 확정 상태 (UNASSESSED, EVIDENCE_SUPPORTED, CORROBORATED, PARTY_ALLEGED, EVIDENCE_INCOMPLETE, GENUINELY_DISPUTED)"
     )
     source_evidence_id: Optional[str] = Field(None, description="근거 증거 문서 ID")
     evidence_label: Optional[str] = Field(None, description="근거 증거 번호 (예: E01)")
@@ -272,7 +272,8 @@ def build_case_evidence_briefing(
 
     for f in facts_records:
         adj = adj_by_fact_id.get(f.id)
-        adj_status = adj.adjudication_status if adj else "EVIDENCE_SUPPORTED"
+        # FactAdjudication이 없는 경우 검증되지 않은 사실(UNASSESSED)로 명시하여 허위 입증 승격 방지 (P0-07)
+        adj_status = adj.adjudication_status if adj else "UNASSESSED"
         source_doc_id = f.source_ref if f.source_ref in doc_dict else None
         source_doc = doc_dict.get(source_doc_id) if source_doc_id else None
         lbl = label_map.get(source_doc_id) if source_doc_id else None

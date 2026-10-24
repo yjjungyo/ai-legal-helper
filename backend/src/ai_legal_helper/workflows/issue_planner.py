@@ -15,7 +15,7 @@
 
 from typing import List, Dict, Any, Optional
 import re
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from ai_legal_helper.case_intelligence.case_briefing import CaseEvidenceBriefing
 from ai_legal_helper.observability.logging_config import get_logger
@@ -33,8 +33,20 @@ class LegalIssueTask(BaseModel):
     relevant_evidence_ids: List[str] = Field(default_factory=list, description="관련 증거 문서 ID 목록")
     relevant_evidence_labels: List[str] = Field(default_factory=list, description="관련 표시용 증거 번호 목록 (예: ['E01', 'E03'])")
     required_statutes: List[str] = Field(default_factory=list, description="검토에 필요한 관련 법령/조문 (예: ['주택임대차보호법 제6조'])")
+    candidate_statutes: List[str] = Field(default_factory=list, description="후보 법령 목록 (P0-09)")
+    retrieved_statutes: List[str] = Field(default_factory=list, description="검색 확보된 법령 목록 (P0-09)")
+    verified_statutes: List[str] = Field(default_factory=list, description="조문 본문 검증 완료된 법령 목록 (P0-09)")
+    applicable_statutes: List[str] = Field(default_factory=list, description="요건사실 포섭 적용 법령 목록 (P0-09)")
+    cited_statutes: List[str] = Field(default_factory=list, description="최종 인용 법령 목록 (P0-09)")
     missing_evidence: List[str] = Field(default_factory=list, description="해당 쟁점에 결여된 증빙 자료 요건")
     priority: str = Field("HIGH", description="상담 우선순위 (HIGH, MEDIUM, LOW)")
+
+    @model_validator(mode="after")
+    def sync_candidate_statutes(self) -> "LegalIssueTask":
+        """후보 법령과 필수 법령 목록을 동기화하여 라이프사이클을 초기화한다 (P0-09)."""
+        if not self.candidate_statutes and self.required_statutes:
+            self.candidate_statutes = list(self.required_statutes)
+        return self
 
 
 def _match_facts_and_evidences(

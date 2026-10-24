@@ -524,3 +524,71 @@ class TestQuantitativeEvaluationV11VsV12:
         assert precision == 1.0
         assert recall == 1.0
         assert fpr == 0.0
+
+
+class TestRealisticDisputeConflictScenarios:
+    """
+    [클래스 설명]
+    실제 임대차 분쟁 사건에서 나타나는 복합 사실관계(가압류 복수 건, 이행 청구와 미반환 상태,
+    목적물 인도/열쇠 반환과 보증금 반환 의무의 분리)에 대한 상충 오탐 방지 테스트 슈트.
+    """
+
+    def test_multiple_provisional_attachments_are_different_instances(self):
+        """[가압류 복수 건] 부동산 등기부상 서로 다른 가압류 청구금액은 별개 건이므로 DIFFERENT_CONTEXT 판정."""
+        claim_stmt = "가압류 청구금액은 72,000,000원이다."
+        fact_stmt = "가압류 청구금액은 120,000,000원이다."
+
+        c_slots = build_structured_slots(statement=claim_stmt, claim_type="AMOUNT")
+        fact = Fact(id="f-enc1", statement=fact_stmt, fact_type="AMOUNT", verification_status="DOCUMENT_VERIFIED")
+        decision = evaluate_claim_against_fact(claim_slots=c_slots, fact=fact)
+
+        assert decision.status == "DIFFERENT_CONTEXT"
+        assert decision.reason_code in ("DIFFERENT_EVENT_INSTANCE", "DIFFERENT_OBJECT_QUALIFIER")
+
+    def test_deposit_return_request_vs_non_performance_is_consistent(self):
+        """[이행 청구 vs 미반환] 보증금 반환 요청과 현재 보증금 미반환 상태는 양립 가능한 사실(CONSISTENT)."""
+        claim_stmt = "이수현은 보증금이 반환되지 않았다고 밝혔다."
+        fact_stmt = "이수현은 2026년 9월 30일 보증금 3억 원 전액의 반환을 요청하였다."
+
+        c_slots = build_structured_slots(statement=claim_stmt, claim_type="CONDITION")
+        fact = Fact(id="f-req1", statement=fact_stmt, fact_type="CONDITION", verification_status="DOCUMENT_VERIFIED")
+        decision = evaluate_claim_against_fact(claim_slots=c_slots, fact=fact)
+
+        assert decision.status == "CONSISTENT"
+        assert decision.reason_code == "REQUEST_ACCOMPANIES_NON_PERFORMANCE"
+
+    def test_deposit_non_performance_vs_requested_amount_is_consistent(self):
+        """[미반환 vs 요청 액수] 보증금 미반환 사실과 반환 요청된 보증금 액수 진술은 양립 가능(CONSISTENT)."""
+        claim_stmt = "이수현은 보증금이 반환되지 않았다고 밝혔다."
+        fact_stmt = "반환 요청된 보증금 액수는 300,000,000원이다."
+
+        c_slots = build_structured_slots(statement=claim_stmt, claim_type="AMOUNT")
+        fact = Fact(id="f-req2", statement=fact_stmt, fact_type="AMOUNT", verification_status="DOCUMENT_VERIFIED")
+        decision = evaluate_claim_against_fact(claim_slots=c_slots, fact=fact)
+
+        assert decision.status == "CONSISTENT"
+        assert decision.reason_code == "REQUEST_ACCOMPANIES_NON_PERFORMANCE"
+
+    def test_key_non_return_vs_deposit_return_request_is_different_context(self):
+        """[열쇠 미반환 vs 보증금 반환 요청] 목적물 인도(열쇠) 의무와 보증금 반환 청구는 급부 대상이 다른 별개 사실."""
+        claim_stmt = "이수현은 2026년 9월 30일 보증금 3억 원 전액의 반환을 요청하였다."
+        fact_stmt = "이수현은 출입카드와 현관 열쇠를 임대인에게 반환하지 않았다."
+
+        c_slots = build_structured_slots(statement=claim_stmt, claim_type="CONDITION")
+        fact = Fact(id="f-key1", statement=fact_stmt, fact_type="CONDITION", verification_status="DOCUMENT_VERIFIED")
+        decision = evaluate_claim_against_fact(claim_slots=c_slots, fact=fact)
+
+        assert decision.status == "DIFFERENT_CONTEXT"
+        assert decision.reason_code == "DIFFERENT_PERFORMANCE_OBJECT"
+
+    def test_key_non_return_vs_schedule_inquiry_is_different_context(self):
+        """[열쇠 미반환 vs 반환 일정 문의] 보증금 반환 일정 요청과 열쇠 미반환은 급부 대상이 다른 별개 사실."""
+        claim_stmt = "이수현은 박정훈에게 보증금 반환 일정을 서면으로 알려달라고 요청하였다."
+        fact_stmt = "이수현은 출입카드와 현관 열쇠를 임대인에게 반환하지 않았다."
+
+        c_slots = build_structured_slots(statement=claim_stmt, claim_type="CONDITION")
+        fact = Fact(id="f-key2", statement=fact_stmt, fact_type="CONDITION", verification_status="DOCUMENT_VERIFIED")
+        decision = evaluate_claim_against_fact(claim_slots=c_slots, fact=fact)
+
+        assert decision.status == "DIFFERENT_CONTEXT"
+        assert decision.reason_code == "DIFFERENT_PERFORMANCE_OBJECT"

@@ -1010,6 +1010,22 @@ def evaluate_claim_against_fact(
                 source_span_ids=spans,
             )
 
+        # 가압류 / 근저당권 등 부동산 등기부상 권리 설정 금액인 경우 복수 건 공존 가능
+        if (
+            claim_sem.event_type == "ENCUMBRANCE"
+            or fact_sem.event_type == "ENCUMBRANCE"
+            or any(kw in (claim_slots.statement + " " + fact_slots.statement) for kw in ("가압류", "근저당권", "압류"))
+        ):
+            return ConflictDecision(
+                claim_id=claim_id,
+                target_fact_id=fact.id,
+                status="DIFFERENT_CONTEXT",
+                reason_code="DIFFERENT_EVENT_INSTANCE",
+                explanation="부동산 등기부상 채권자 또는 청구금액이 서로 다른 별개의 가압류·권리설정 건입니다.",
+                confidence=0.95,
+                source_span_ids=spans,
+            )
+
         # 동일 역할 금액이 다른 경우 (예: T02 동일 계약 보증금 3억 vs 2억)
         if matched_same_role_diff is not None and not matched_same_role_equal:
             _, diff_c_vals, diff_f_vals = matched_same_role_diff
@@ -1218,6 +1234,42 @@ def evaluate_claim_against_fact(
             )
 
         # 3) 한쪽은 AFFIRMATIVE, 다른 한쪽은 NEGATIVE인 경우:
+        # 가. 급부 대상(Object) 차이 검증: 열쇠·출입카드(목적물 인도) vs 보증금·차임(금전 지급)
+        c_is_key = any(kw in claim_slots.statement for kw in ("출입카드", "열쇠", "비밀번호", "목적물 인도", "명도"))
+        f_is_key = any(kw in fact_slots.statement for kw in ("출입카드", "열쇠", "비밀번호", "목적물 인도", "명도"))
+        c_is_deposit = any(kw in claim_slots.statement for kw in ("보증금", "전세금", "차임", "월세", "청구금액"))
+        f_is_deposit = any(kw in fact_slots.statement for kw in ("보증금", "전세금", "차임", "월세", "청구금액"))
+        if (c_is_key and f_is_deposit) or (f_is_key and c_is_deposit):
+            return ConflictDecision(
+                claim_id=claim_id,
+                target_fact_id=fact.id,
+                status="DIFFERENT_CONTEXT",
+                reason_code="DIFFERENT_PERFORMANCE_OBJECT",
+                explanation="목적물 인도(열쇠·출입카드 반환) 의무와 보증금 반환 의무는 서로 다른 별개의 법률상 급부 대상입니다.",
+                confidence=0.98,
+                source_span_ids=spans,
+            )
+
+        # 나. 화행 차이 검증: 이행 청구·반환 요청 vs 미이행·미반환 상태 (요청과 불이행은 양립)
+        c_is_req = any(kw in claim_slots.statement for kw in ("요청", "청구", "독촉", "통지", "알려달라", "알려달라고"))
+        f_is_req = any(kw in fact_slots.statement for kw in ("요청", "청구", "독촉", "통지", "알려달라", "알려달라고"))
+        c_is_non_perf = claim_slots.polarity in ("NEGATIVE", "REPORTED_NEGATIVE") or any(
+            kw in claim_slots.statement for kw in ("반환되지 않", "미반환", "지급되지 않", "돌려받지 못", "반환하지 않")
+        )
+        f_is_non_perf = fact_slots.polarity in ("NEGATIVE", "REPORTED_NEGATIVE") or any(
+            kw in fact_slots.statement for kw in ("반환되지 않", "미반환", "지급되지 않", "돌려받지 못", "반환하지 않")
+        )
+        if (c_is_req and f_is_non_perf) or (f_is_req and c_is_non_perf):
+            return ConflictDecision(
+                claim_id=claim_id,
+                target_fact_id=fact.id,
+                status="CONSISTENT",
+                reason_code="REQUEST_ACCOMPANIES_NON_PERFORMANCE",
+                explanation="이행 청구·반환 요청 사실과 미반환·불이행 상태는 법률적으로 양립 가능하며 모순이 아닙니다.",
+                confidence=0.95,
+                source_span_ids=spans,
+            )
+
         # 부정 대상 서술어(negated_predicate)와 긍정 핵심 서술어(core_predicate)가 실제로 일치하고,
         # 이벤트 유형이 호환될 때만 상충 검토 (토큰 수 2개 이상만으로 모순 판정 금지)
         c_pred = claim_slots.negated_predicate or claim_slots.core_predicate or claim_slots.predicate_key

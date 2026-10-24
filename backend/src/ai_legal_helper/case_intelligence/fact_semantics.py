@@ -511,12 +511,19 @@ def extract_semantic_fact(
     is_repeatable = False
     object_qualifier: Optional[str] = None
 
-    # (A) METADATA: 문서 정보, 제목
+    # (A) METADATA: 문서 정보, 제목, 작성일, 발급일
     if claim_type in ("DOC_INFO", "DOCUMENT_INFO") or any(
-        kw in compact for kw in ("문서의제목", "문서제목", "본문서는", "이문서는", "작성된전사본", "원음파일")
+        kw in compact for kw in (
+            "문서의제목", "문서제목", "본문서는", "이문서는", "작성된전사본", "원음파일",
+            "문서작성일", "작성일은", "작성일자", "작성일이", "발급일은", "발급일자", "발급일이", "작성되었다", "문서의작성"
+        )
     ):
         sem_category = "METADATA"
         event_type = "DOCUMENT_METADATA"
+        if any(kw in compact for kw in ("작성일", "발급일", "작성일자", "발급일자")):
+            event_subtype = "DOCUMENT_CREATION_DATE"
+        else:
+            event_subtype = "DOCUMENT_TITLE"
         temporal_type = "REPORTED_AT" if primary_date else "NONE"
         occurrence_status = "ACTUAL"
 
@@ -564,10 +571,11 @@ def extract_semantic_fact(
             event_type = "LEGAL_OBLIGATION"
             temporal_type = "NONE"
 
-    # (E) PAYMENT: 금원 지급 관련 (계약금, 중도금, 잔금, 보증금 총액, 차임, 급여, 가압류 청구금액 등)
+    # (E) PAYMENT: 금원 지급 관련 (계약금, 중도금, 잔금, 보증금 총액, 차임, 급여 등)
+    # 단, 출입카드/열쇠(KEY_DELIVERY) 및 가압류/근저당(ENCUMBRANCE)은 별도 유형으로 분리
     elif any(kw in compact for kw in (
         "지급", "반환", "이체", "납부", "입금", "청구금액", "보증금", "전세금", "계약금", "잔금", "중도금", "차임", "월세", "급여", "임금", "합계는"
-    )) and not any(kw in compact for kw in ("임대차기간", "계약기간", "존속기간", "가입여부")):
+    )) and not any(kw in compact for kw in ("임대차기간", "계약기간", "존속기간", "가입여부", "출입카드", "열쇠", "가압류", "근저당", "소유권")):
         event_type = "PAYMENT"
         
         # 합계 / 총액 / 보증금 전체
@@ -581,8 +589,6 @@ def extract_semantic_fact(
             event_subtype = "INTERIM_PAYMENT"
         elif "잔금" in compact and not ("보증금" in compact and "중" in compact):
             event_subtype = "BALANCE_PAYMENT"
-        elif "가압류" in compact or "청구금액" in compact:
-            event_subtype = "CLAIM_AMOUNT"
         elif "차임" in compact or "월세" in compact:
             event_subtype = "RENT"
         elif "급여" in compact or "임금" in compact:
@@ -605,7 +611,7 @@ def extract_semantic_fact(
             sem_category = "EVENT"
             temporal_type = "OCCURRED_AT" if primary_date else "NONE"
             occurrence_status = "ACTUAL"
-        elif any(kw in compact for kw in ("기준", "현재", "미반환상태", "미반환", "못했다")):
+        elif any(kw in compact for kw in ("기준", "현재", "미반환상태", "미반환", "못했다", "반환되지", "지급되지", "돌려받지")):
             sem_category = "STATE"
             temporal_type = "VALID_AT" if primary_date else "NONE"
             occurrence_status = "ACTUAL"
@@ -975,18 +981,30 @@ def check_proposition_comparability(
 
     pa, pb = proposition_a, proposition_b
 
-    # 1. 문서 고유 메타데이터 (DOC_INFO / DOCUMENT_METADATA)
-    if pa.semantic_category == "DOCUMENT_METADATA" and pb.semantic_category == "DOCUMENT_METADATA":
-        doc_a = (pa.provenance or {}).get("document_name")
-        doc_b = (pb.provenance or {}).get("document_name")
-        if doc_a and doc_b and doc_a != doc_b:
+    # 1. 문서 고유 메타데이터 (DOC_INFO / DOCUMENT_METADATA / 작성일자 / 발급일자)
+    is_meta_a = (
+        pa.semantic_category in ("METADATA", "DOCUMENT_METADATA")
+        or pa.event_type == "DOCUMENT_METADATA"
+        or any(kw in (pa.statement or "") for kw in ("문서 작성일", "작성일자", "작성일", "발급일자", "발급일"))
+    )
+    is_meta_b = (
+        pb.semantic_category in ("METADATA", "DOCUMENT_METADATA")
+        or pb.event_type == "DOCUMENT_METADATA"
+        or any(kw in (pb.statement or "") for kw in ("문서 작성일", "작성일자", "작성일", "발급일자", "발급일"))
+    )
+
+    if is_meta_a and is_meta_b:
+        doc_a = (pa.provenance or {}).get("document_name") or (pa.provenance or {}).get("evidence_id")
+        doc_b = (pb.provenance or {}).get("document_name") or (pb.provenance or {}).get("evidence_id")
+        # 개별 문서마다 고유한 작성일·제목이 존재하므로 두 문서가 다르거나 진술문이 다른 경우 비상충(DIFFERENT_CONTEXT)
+        if (doc_a and doc_b and doc_a != doc_b) or pa.statement != pb.statement:
             mismatched.append("DOCUMENT_LOCAL_METADATA")
             return ComparabilityResult(
                 is_comparable=False,
                 status="DIFFERENT_CONTEXT",
                 identity_status="DIFFERENT",
                 reason_code="DOCUMENT_LOCAL_METADATA",
-                explanation="서로 다른 증거 문서의 고유 메타데이터(문서 제목·형식)는 개별 문서에 국한된 별개 진술입니다.",
+                explanation="서로 다른 증거 문서의 고유 메타데이터(문서 제목·작성일·발급일)는 각 문서에 국한된 개별 사실입니다.",
                 matched_dimensions=matched,
                 mismatched_dimensions=mismatched,
                 subject_match_basis=f"DocA: {doc_a} vs DocB: {doc_b}",
@@ -1044,6 +1062,91 @@ def check_proposition_comparability(
             mismatched_dimensions=mismatched,
             temporal_semantics="Notice Date vs Scheduled Target Date",
         )
+
+    # 3-2. 급부 대상(Object) 분리: 열쇠·출입카드(목적물 인도) vs 보증금·차임(금전 지급)
+    # 설명: 임차인의 열쇠·출입카드 반환 의무와 임대인의 보증금 반환 의무는 동시이행 관계에 있는
+    # 서로 다른 독립된 급부 대상이므로 상충 대상이 아니다.
+    c_is_key = any(kw in (pa.statement or "") for kw in ("출입카드", "열쇠", "비밀번호", "목적물 인도", "명도"))
+    f_is_key = any(kw in (pb.statement or "") for kw in ("출입카드", "열쇠", "비밀번호", "목적물 인도", "명도"))
+    c_is_deposit = any(kw in (pa.statement or "") for kw in ("보증금", "전세금", "차임", "월세", "청구금액"))
+    f_is_deposit = any(kw in (pb.statement or "") for kw in ("보증금", "전세금", "차임", "월세", "청구금액"))
+    if (c_is_key and f_is_deposit) or (f_is_key and c_is_deposit):
+        mismatched.append("PERFORMANCE_OBJECT")
+        return ComparabilityResult(
+            is_comparable=False,
+            status="DIFFERENT_CONTEXT",
+            identity_status="DIFFERENT",
+            reason_code="DIFFERENT_PERFORMANCE_OBJECT",
+            explanation="목적물 인도(열쇠·출입카드 반환) 의무와 보증금 반환 의무는 서로 다른 별개의 법률상 급부 대상입니다.",
+            mismatched_dimensions=mismatched,
+            predicate_match_basis="Key delivery vs Deposit refund",
+        )
+
+    # 3-3. 화행 및 이행 상태 분리: 이행 청구·반환 요청(REQUEST) vs 미이행·미반환 상태(NEGATIVE/STATE)
+    # 설명: 보증금 반환을 청구·요청한 사실(REQUEST)과 현재까지 보증금이 반환되지 않은 상태(NEGATIVE)는
+    # 서로 모순되는 것이 아니라, 반환되지 않았기 때문에 반환을 요청하거나 소송을 제기하는 정상적·보완적 사실관계이다.
+    is_request_a = (
+        pa.speech_act == "REQUEST"
+        or pa.temporal_type == "REQUESTED_AT"
+        or any(kw in (pa.statement or "") for kw in ("반환을 요청", "반환 요청", "청구하였", "요구하였", "촉구하였", "반환 일정을", "알려달라고"))
+    )
+    is_request_b = (
+        pb.speech_act == "REQUEST"
+        or pb.temporal_type == "REQUESTED_AT"
+        or any(kw in (pb.statement or "") for kw in ("반환을 요청", "반환 요청", "청구하였", "요구하였", "촉구하였", "반환 일정을", "알려달라고"))
+    )
+    is_negative_perf_a = (
+        pa.polarity in ("NEGATIVE", "REPORTED_NEGATIVE")
+        or any(kw in (pa.statement or "") for kw in ("반환되지 않", "미반환", "지급되지 않", "돌려받지 못", "받지 못"))
+    )
+    is_negative_perf_b = (
+        pb.polarity in ("NEGATIVE", "REPORTED_NEGATIVE")
+        or any(kw in (pb.statement or "") for kw in ("반환되지 않", "미반환", "지급되지 않", "돌려받지 못", "받지 못"))
+    )
+
+    if (is_request_a and is_negative_perf_b) or (is_request_b and is_negative_perf_a):
+        matched.append("DEPOSIT_CLAIM_HARMONY")
+        return ComparabilityResult(
+            is_comparable=False,
+            status="CONSISTENT",
+            identity_status="COMPATIBLE",
+            reason_code="REQUEST_ACCOMPANIES_NON_PERFORMANCE",
+            explanation="보증금 반환을 요청한 사실과 보증금이 반환되지 않은 상태는 서로 모순되지 않고 양립하는 정상적 사실관계입니다.",
+            matched_dimensions=matched,
+            predicate_match_basis="Demand for payment accompanies default/unpaid state",
+        )
+
+    # 3-4. 등기부상 권리 설정(ENCUMBRANCE: 가압류, 근저당권) 건별 분리
+    # 설명: 부동산 등기부에는 채권자 또는 청구금액이 다른 여러 건의 가압류·근저당권이 공존할 수 있으며,
+    # 이는 상충이 아니라 복수의 권리설정 인스턴스이다.
+    if pa.event_type == "ENCUMBRANCE" and pb.event_type == "ENCUMBRANCE":
+        val_a = (pa.value or {}).get("amount") if isinstance(pa.value, dict) else pa.value
+        val_b = (pb.value or {}).get("amount") if isinstance(pb.value, dict) else pb.value
+        if pa.object_key and pb.object_key and pa.object_key != pb.object_key:
+            mismatched.append("OBJECT_QUALIFIER")
+            return ComparabilityResult(
+                is_comparable=False,
+                status="DIFFERENT_CONTEXT",
+                identity_status="DIFFERENT",
+                reason_code="DIFFERENT_OBJECT_QUALIFIER",
+                explanation=f"등기부상 서로 다른 권리 또는 채권자 건입니다 ({pa.object_key} vs {pb.object_key}).",
+                mismatched_dimensions=mismatched,
+                subject_match_basis=f"Encumbrance: {pa.object_key} vs {pb.object_key}",
+            )
+        if (
+            (val_a is not None and val_b is not None and val_a != val_b)
+            or (pa.event_instance_key and pb.event_instance_key and pa.event_instance_key != pb.event_instance_key)
+        ):
+            mismatched.append("ENCUMBRANCE_INSTANCE")
+            return ComparabilityResult(
+                is_comparable=False,
+                status="DIFFERENT_CONTEXT",
+                identity_status="DIFFERENT",
+                reason_code="DIFFERENT_EVENT_INSTANCE",
+                explanation="부동산 등기부상 채권자 또는 청구금액이 서로 다른 별개의 가압류·권리설정 건입니다.",
+                mismatched_dimensions=mismatched,
+                subject_match_basis=f"Encumbrance: {pa.event_instance_key} vs {pb.event_instance_key}",
+            )
 
     # 4. 거래 단계 및 구성항목 분리: 계약금/잔금 vs 보증금 총액 (CASE-03, S01, S06, S07)
     subtypes = {pa.event_subtype, pb.event_subtype} - {None}

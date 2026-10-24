@@ -557,3 +557,94 @@ class TestPartiesAndTimelineSync:
         db_session.refresh(doc)
         assert doc.status == "APPROVED"
 
+    def test_doc_metadata_and_status_nouns_not_extracted_as_parties(self, db_session):
+        """
+        [테스트 목적]
+        문서 제목('임차인 현거주 및 인도 상태 확인')이나 등기/상태 설명('임차인 입주 전')에서
+        '현거주', '입주'와 같은 일반 명사가 당사자로 오추출되지 않음을 철저히 검증한다.
+        """
+        case, _ = _create_case_with_doc(db_session)
+        facts = [
+            Fact(case_id=case.id, statement="임차인은 이수현이다.", fact_type="PARTY_INFO"),
+            Fact(case_id=case.id, statement="임차인의 연락처는 010-7254-9142이다.", fact_type="PARTY_INFO"),
+            Fact(case_id=case.id, statement="임대인은 박정훈이다.", fact_type="PARTY_INFO"),
+            Fact(case_id=case.id, statement="임대인의 연락처는 010-4826-1357이다.", fact_type="PARTY_INFO"),
+            # 오탐 유발 문장들
+            Fact(case_id=case.id, statement="문서 제목은 '임차인 현거주 및 인도 상태 확인'이다.", fact_type="DOC_INFO"),
+            Fact(case_id=case.id, statement="이 문서는 임차인의 현거주 및 인도 상태 확인 문서이다.", fact_type="DOC_INFO"),
+            Fact(case_id=case.id, statement="2022년 임차인 입주 전 존재했던 다른 권리와 말소사항을 포함한 전체 등기부 원본은 제출되지 않았다.", fact_type="DOC_INFO"),
+        ]
+        db_session.add_all(facts)
+        db_session.commit()
+
+        synchronize_case_parties(db_session, case.id)
+        db_session.commit()
+
+        parties = db_session.query(Party).filter_by(case_id=case.id).all()
+        # 오직 실제 당사자 2명(이수현, 박정훈)만 등록되어야 함
+        assert len(parties) == 2
+        party_names = {p.name for p in parties}
+        assert party_names == {"이수현", "박정훈"}
+        assert "현거주" not in party_names
+        assert "입주" not in party_names
+
+        # 상대방 관계가 1:1로 정확하게 연결되었는지 검증
+        tenant = next(p for p in parties if p.name == "이수현")
+        landlord = next(p for p in parties if p.name == "박정훈")
+        assert tenant.party_relationship == "임대차계약 당사자 (상대방 임대인: 박정훈)"
+        assert landlord.party_relationship == "임대차계약 당사자 (상대방 임차인: 이수현)"
+
+    def test_t20_cross_domain_non_name_resilience(self, db_session):
+        """
+        [T20. 범용 도메인 비인명 명사구 자동 방어 검증]
+        건설(준공, 기성고), 의료(진료, 처방), 노동(해고), 지재권(출원), 형사(자백) 등
+        특정 사건별로 불용어를 수작업 등록(하드코딩)하지 않더라도,
+        표준 성씨 화이트리스트 및 문맥 게이팅에 의해 비인명 행위·상태 명사가
+        절대 당사자(Party)로 생성되지 않음을 철저히 검증한다.
+        """
+        case, _ = _create_case_with_doc(db_session, title="다양한 법률 분야 복합 사건")
+        facts = [
+            # 1. 건설 도메인
+            Fact(case_id=case.id, statement="도급인은 박영수이다.", fact_type="PARTY_INFO"),
+            Fact(case_id=case.id, statement="수급인은 김철수이다.", fact_type="PARTY_INFO"),
+            Fact(case_id=case.id, statement="수급인 준공 후 하자보수 검사를 실시하였다.", fact_type="ACTION"),
+            Fact(case_id=case.id, statement="도급인 기성고 산정 내역서가 제출되었다.", fact_type="DOC_INFO"),
+            # 2. 의료 도메인
+            Fact(case_id=case.id, statement="의사는 최민수이다.", fact_type="PARTY_INFO"),
+            Fact(case_id=case.id, statement="환자는 이영희이다.", fact_type="PARTY_INFO"),
+            Fact(case_id=case.id, statement="의사 진료 후 처방전을 발행하였다.", fact_type="ACTION"),
+            Fact(case_id=case.id, statement="환자 처방 기록지가 첨부되었다.", fact_type="DOC_INFO"),
+            # 3. 노동 도메인
+            Fact(case_id=case.id, statement="사용자는 한상우이다.", fact_type="PARTY_INFO"),
+            Fact(case_id=case.id, statement="근로자는 정다은이다.", fact_type="PARTY_INFO"),
+            Fact(case_id=case.id, statement="근로자 해고 통지서가 도달했다.", fact_type="DOC_INFO"),
+            # 4. 지재권 도메인
+            Fact(case_id=case.id, statement="발명자는 송태호이다.", fact_type="PARTY_INFO"),
+            Fact(case_id=case.id, statement="발명자 출원 전 사전공개 사실이 확인되었다.", fact_type="ACTION"),
+            # 5. 형사 도메인
+            Fact(case_id=case.id, statement="피고인은 강동훈이다.", fact_type="PARTY_INFO"),
+            Fact(case_id=case.id, statement="피의자 자백 조서가 첨부되었다.", fact_type="DOC_INFO"),
+        ]
+        db_session.add_all(facts)
+        db_session.commit()
+
+        synchronize_case_parties(db_session, case.id)
+        db_session.commit()
+
+        parties = db_session.query(Party).filter_by(case_id=case.id).all()
+        party_names = {p.name for p in parties}
+
+        # 실제 유효한 당사자 9명만 정확히 추출되어야 함
+        expected_valid_names = {
+            "박영수", "김철수", "최민수", "이영희", "한상우", "정다은", "송태호", "강동훈",
+        }
+        assert expected_valid_names.issubset(party_names)
+
+        # 불용어 목록에 일일이 등록하지 않은 타 도메인 행위·상태 명사들이 일체 포함되지 않았는지 검증
+        prohibited_non_names = {
+            "준공", "기성고", "진료", "처방", "해고", "출원", "자백",
+        }
+        for bad_name in prohibited_non_names:
+            assert bad_name not in party_names, f"비인명 '{bad_name}'가 Party로 잘못 생성되었습니다!"
+
+

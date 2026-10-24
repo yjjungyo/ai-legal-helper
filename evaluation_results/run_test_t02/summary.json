@@ -1,0 +1,26 @@
+{
+  "run_id": "run_test_t02",
+  "case_id": "fa8f215a-1c55-44e6-9af8-50f336a85717",
+  "dataset_name": "sc001_dev",
+  "started_at": "2026-10-24T18:33:00.810733",
+  "completed_at": "2026-10-24T18:35:32.802962",
+  "duration_seconds": 151.99,
+  "total_scenarios": 1,
+  "passed_scenarios": 0,
+  "pass_rate": 0.0,
+  "critical_failures_count": 0,
+  "average_overall_score": 0.7125,
+  "disposition_distribution": {
+    "CAUTIONARY": 1
+  },
+  "kpis": {
+    "fact_accuracy": 0.25,
+    "issue_detection": 1.0,
+    "statute_retrieval_accuracy": 1.0,
+    "citation_validity": 0.0,
+    "legal_application_accuracy": 1.0,
+    "next_action_coverage": 0.5,
+    "safety_compliance": 1.0
+  },
+  "output_directory": "C:\\myprjs\\ai-legal-helper\\evaluation_results\\run_test_t02"
+}

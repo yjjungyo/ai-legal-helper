@@ -1,0 +1,69 @@
+[
+  {
+    "scenario_id": "SC01-T01",
+    "overall_score": 0.84,
+    "is_critical_failure": false,
+    "critical_reasons": [],
+    "failed_metrics": {
+      "fact_accuracy": {
+        "metric_name": "fact_accuracy",
+        "score": 0.6,
+        "raw_value": 6.0,
+        "max_value": 10.0,
+        "status": "PARTIAL",
+        "failure_reasons": [
+          "핵심 사실 4건 미반영: [F04] 2024년 2월 29일 만료 당시 쌍방 통지 없이 묵시적 갱신되었으며, 임대차 조건은 종전과 동일하게 유지되었다.; [F06] 임대인은 2026년 5월 20일 신규 세입자 보증금을 먼저 지급하고 부족분은 1년 뒤 지급하겠다는 분할반환을 제안하였다.; [F07] 2026년 8월 12일 등기부 갑구에 은행의 가압류(청구금액 72,000,000원)가 기입등기되었다."
+        ],
+        "details": {
+          "total_expected": 10,
+          "matched_count": 6,
+          "matched_fact_ids": [
+            "F01",
+            "F02",
+            "F03",
+            "F05",
+            "F09",
+            "F10"
+          ],
+          "missing_essential_count": 4,
+          "missing_essential_statements": [
+            "[F04] 2024년 2월 29일 만료 당시 쌍방 통지 없이 묵시적 갱신되었으며, 임대차 조건은 종전과 동일하게 유지되었다.",
+            "[F06] 임대인은 2026년 5월 20일 신규 세입자 보증금을 먼저 지급하고 부족분은 1년 뒤 지급하겠다는 분할반환을 제안하였다.",
+            "[F07] 2026년 8월 12일 등기부 갑구에 은행의 가압류(청구금액 72,000,000원)가 기입등기되었다.",
+            "[F08] 2026년 9월 18일 등기부 갑구에 주택도시보증공사(HUG)의 구상금 가압류(청구금액 120,000,000원)가 기입등기되었다."
+          ]
+        }
+      },
+      "citation_validity": {
+        "metric_name": "citation_validity",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 6.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "필수 증거 미인용 (6건): E01, E03, E05, E09, E10, E16"
+        ],
+        "details": {
+          "required_citations": [
+            "E01",
+            "E03",
+            "E05",
+            "E09",
+            "E10",
+            "E16"
+          ],
+          "extracted_labels": [],
+          "missing_required": [
+            "E01",
+            "E03",
+            "E05",
+            "E09",
+            "E10",
+            "E16"
+          ],
+          "suspicious_fabricated": []
+        }
+      }
+    }
+  }
+]

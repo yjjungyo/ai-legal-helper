@@ -1,0 +1,77 @@
+[
+  {
+    "scenario_id": "SC01-T02",
+    "overall_score": 0.7125,
+    "is_critical_failure": false,
+    "critical_reasons": [],
+    "failed_metrics": {
+      "fact_accuracy": {
+        "metric_name": "fact_accuracy",
+        "score": 0.25,
+        "raw_value": 1.0,
+        "max_value": 4.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "핵심 사실 3건 미반영: [F01] 임대차계약 체결일은 2022년 2월 20일이고, 보증금은 300,000,000원(계약금 30,000,000원, 잔금 270,000,000원), 임대차 기간은 2022.03.01부터 2024.02.29까지 2년이다.; [F05] 임차인은 2026년 4월 1일 임대인에게 2026년 9월 30일 퇴거 및 보증금 3억 원 반환을 요청하는 문자 메시지를 발신하였고 임대인에게 도달하였다.; [F09] 임대인은 2026년 9월 30일 퇴거일 이후에도 보증금 3억 원 전액을 반환하지 않고 있다."
+        ],
+        "details": {
+          "total_expected": 4,
+          "matched_count": 1,
+          "matched_fact_ids": [
+            "F04"
+          ],
+          "missing_essential_count": 3,
+          "missing_essential_statements": [
+            "[F01] 임대차계약 체결일은 2022년 2월 20일이고, 보증금은 300,000,000원(계약금 30,000,000원, 잔금 270,000,000원), 임대차 기간은 2022.03.01부터 2024.02.29까지 2년이다.",
+            "[F05] 임차인은 2026년 4월 1일 임대인에게 2026년 9월 30일 퇴거 및 보증금 3억 원 반환을 요청하는 문자 메시지를 발신하였고 임대인에게 도달하였다.",
+            "[F09] 임대인은 2026년 9월 30일 퇴거일 이후에도 보증금 3억 원 전액을 반환하지 않고 있다."
+          ]
+        }
+      },
+      "citation_validity": {
+        "metric_name": "citation_validity",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 3.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "필수 증거 미인용 (3건): E01, E04, E05"
+        ],
+        "details": {
+          "required_citations": [
+            "E01",
+            "E04",
+            "E05"
+          ],
+          "extracted_labels": [],
+          "missing_required": [
+            "E01",
+            "E04",
+            "E05"
+          ],
+          "suspicious_fabricated": []
+        }
+      },
+      "next_action_coverage": {
+        "metric_name": "next_action_coverage",
+        "score": 0.5,
+        "raw_value": 1.0,
+        "max_value": 2.0,
+        "status": "PARTIAL",
+        "failure_reasons": [
+          "필수 행동 지침 1건 누락: 임차권등기명령 신청 준비"
+        ],
+        "details": {
+          "expected_actions_count": 2,
+          "matched_actions_count": 1,
+          "matched_actions": [
+            "계약 종료에 기한 보증금 전액 반환 청구 내용증명 발송"
+          ],
+          "missing_actions": [
+            "임차권등기명령 신청 준비"
+          ]
+        }
+      }
+    }
+  }
+]

@@ -600,6 +600,26 @@ def verification_node(state: LegalState) -> Dict:
             issue_res_objs = verify_all_issues(tasks_objs, draft, briefing_obj, combined_sources)
             issue_results_list = [r.model_dump() for r in issue_res_objs]
             result["issue_results"] = issue_results_list
+
+            # Langfuse v2 관측성 지표 기록 (Section 16, P1-03)
+            try:
+                from ai_legal_helper.observability.context import get_current_span_id
+                from ai_legal_helper.observability.langfuse_client import update_span
+
+                cur_span = get_current_span_id()
+                if cur_span:
+                    candidate_cnt = sum(len(it.get("candidate_statutes", [])) for it in issue_tasks_raw)
+                    verified_cnt = sum(len(r.get("supported_statute_ids", [])) for r in issue_results_list)
+                    unsupported_cnt = sum(len(r.get("unsupported_claims", [])) for r in issue_results_list)
+                    update_span(cur_span, {
+                        "candidate_statute_count": candidate_cnt,
+                        "retrieved_statute_count": len(combined_sources),
+                        "verified_statute_count": verified_cnt,
+                        "unsupported_legal_claim_count": unsupported_cnt,
+                        "issue_count": len(issue_results_list),
+                    })
+            except Exception as span_e:
+                logger.debug(f"[VERIFY] span update 무시: {span_e}")
         except Exception as e:
             logger.warning(f"[VERIFICATION] 쟁점별 검증 중 예외 발생: {e}")
 
@@ -902,7 +922,13 @@ def insufficient_node(state: LegalState) -> Dict:
         briefing_obj = CaseEvidenceBriefing(**briefing_raw)
         issue_res_objs = [IssueVerificationResult(**ir) for ir in issue_results_raw]
         final = build_dynamic_withheld_answer(issue_res_objs, briefing_obj, reason_code)
-        preserved_sources = list(briefing_obj.source_registry.values())
+        # 본문에 실제로 인용되거나 제시된 증거만 선별
+        preserved_sources = [
+            ces for lbl, ces in briefing_obj.source_registry.items()
+            if f"[{lbl}]" in final or f"[{lbl}_" in final or (ces.get("file_name") and ces.get("file_name") in final)
+        ]
+        if not preserved_sources:
+            preserved_sources = list(briefing_obj.source_registry.values())[:3]
     else:
         final = clean_markdown_formatting("\n".join(parts))
         preserved_sources = []
@@ -971,17 +997,23 @@ def finalize_node(state: LegalState) -> Dict:
     )
     cited_sources = final_audit.get("cited_sources") or final_audit.get("verified_sources", [])
 
-    # Case Evidence Sources(E01~E17)를 출처 목록에 통합하여 UI 배지 및 출처 뷰에 노출
+    # Case Evidence Sources 중 최종 확정된 답변 본문(final)에 실제로 인용된 증거만 선별 (P0-10)
     if briefing_raw:
         briefing_obj = CaseEvidenceBriefing(**briefing_raw)
-        case_ev_sources = list(briefing_obj.source_registry.values())
         all_sources = list(cited_sources)
         seen_keys = {s.get("source_id") or s.get("file") for s in all_sources if isinstance(s, dict)}
-        for ces in case_ev_sources:
-            k = ces.get("source_id") or ces.get("file")
-            if k not in seen_keys:
-                all_sources.append(ces)
-                seen_keys.add(k)
+        for ev_label, ces in briefing_obj.source_registry.items():
+            doc_name = ces.get("file_name") or ces.get("file") or ""
+            is_cited_in_final = (
+                f"[{ev_label}]" in final
+                or f"[{ev_label}_" in final
+                or (doc_name and doc_name in final)
+            )
+            if is_cited_in_final:
+                k = ces.get("source_id") or ces.get("file")
+                if k not in seen_keys:
+                    all_sources.append(ces)
+                    seen_keys.add(k)
         cited_sources = all_sources
 
     return {

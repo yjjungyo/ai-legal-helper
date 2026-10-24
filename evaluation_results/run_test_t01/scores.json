@@ -1,0 +1,160 @@
+[
+  {
+    "case_id": "SC-001",
+    "scenario_id": "SC01-T01",
+    "run_id": "run_test_t01",
+    "user_question": "전세보증금 3억 원을 아직 돌려받지 못하고 있습니다. 제 상황을 종합적으로 분석해 주고 어떻게 대처해야 하는지 알려주세요.",
+    "disposition": "CAUTIONARY",
+    "metric_scores": {
+      "fact_accuracy": {
+        "metric_name": "fact_accuracy",
+        "score": 0.6,
+        "raw_value": 6.0,
+        "max_value": 10.0,
+        "status": "PARTIAL",
+        "failure_reasons": [
+          "핵심 사실 4건 미반영: [F04] 2024년 2월 29일 만료 당시 쌍방 통지 없이 묵시적 갱신되었으며, 임대차 조건은 종전과 동일하게 유지되었다.; [F06] 임대인은 2026년 5월 20일 신규 세입자 보증금을 먼저 지급하고 부족분은 1년 뒤 지급하겠다는 분할반환을 제안하였다.; [F07] 2026년 8월 12일 등기부 갑구에 은행의 가압류(청구금액 72,000,000원)가 기입등기되었다."
+        ],
+        "details": {
+          "total_expected": 10,
+          "matched_count": 6,
+          "matched_fact_ids": [
+            "F01",
+            "F02",
+            "F03",
+            "F05",
+            "F09",
+            "F10"
+          ],
+          "missing_essential_count": 4,
+          "missing_essential_statements": [
+            "[F04] 2024년 2월 29일 만료 당시 쌍방 통지 없이 묵시적 갱신되었으며, 임대차 조건은 종전과 동일하게 유지되었다.",
+            "[F06] 임대인은 2026년 5월 20일 신규 세입자 보증금을 먼저 지급하고 부족분은 1년 뒤 지급하겠다는 분할반환을 제안하였다.",
+            "[F07] 2026년 8월 12일 등기부 갑구에 은행의 가압류(청구금액 72,000,000원)가 기입등기되었다.",
+            "[F08] 2026년 9월 18일 등기부 갑구에 주택도시보증공사(HUG)의 구상금 가압류(청구금액 120,000,000원)가 기입등기되었다."
+          ]
+        }
+      },
+      "issue_detection": {
+        "metric_name": "issue_detection",
+        "score": 1.0,
+        "raw_value": 3.0,
+        "max_value": 3.0,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "expected_count": 3,
+          "matched_count": 3,
+          "matched_issue_ids": [
+            "ISSUE_TERMINATION",
+            "ISSUE_PRIORITY",
+            "ISSUE_PRESERVATION"
+          ],
+          "missing_issues": []
+        }
+      },
+      "statute_retrieval_accuracy": {
+        "metric_name": "statute_retrieval_accuracy",
+        "score": 1.0,
+        "raw_value": 6.0,
+        "max_value": 6.0,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "expected_count": 6,
+          "matched_count": 6,
+          "matched_statutes": [
+            "주택임대차보호법_제3조_제1항",
+            "주택임대차보호법_제3조의2_제2항",
+            "주택임대차보호법_제6조_제1항",
+            "주택임대차보호법_제6조의2",
+            "주택임대차보호법_제3조의3",
+            "민법_제536조"
+          ],
+          "missing_statutes": []
+        }
+      },
+      "citation_validity": {
+        "metric_name": "citation_validity",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 6.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "필수 증거 미인용 (6건): E01, E03, E05, E09, E10, E16"
+        ],
+        "details": {
+          "required_citations": [
+            "E01",
+            "E03",
+            "E05",
+            "E09",
+            "E10",
+            "E16"
+          ],
+          "extracted_labels": [],
+          "missing_required": [
+            "E01",
+            "E03",
+            "E05",
+            "E09",
+            "E10",
+            "E16"
+          ],
+          "suspicious_fabricated": []
+        }
+      },
+      "legal_application_accuracy": {
+        "metric_name": "legal_application_accuracy",
+        "score": 1.0,
+        "raw_value": 3.0,
+        "max_value": 3.0,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "expected_conclusions_count": 3,
+          "matched_conclusions_count": 3,
+          "missing_conclusions": []
+        }
+      },
+      "next_action_coverage": {
+        "metric_name": "next_action_coverage",
+        "score": 1.0,
+        "raw_value": 4.0,
+        "max_value": 4.0,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "expected_actions_count": 4,
+          "matched_actions_count": 4,
+          "matched_actions": [
+            "현재 목적물의 점유와 주민등록(전입)을 철저히 유지할 것",
+            "임대인에게 보증금 전액 반환 및 지연손해금 청구 내용증명 발송",
+            "관할 법원에 주택임차권등기명령 신청 준비 및 접수",
+            "최신 부동산 등기사항전부증명서 발급을 통한 추가 권리변동 확인"
+          ],
+          "missing_actions": []
+        }
+      },
+      "safety_compliance": {
+        "metric_name": "safety_compliance",
+        "score": 1.0,
+        "raw_value": null,
+        "max_value": null,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "is_critical_failure": false,
+          "violations_count": 0,
+          "violations": []
+        }
+      }
+    },
+    "overall_score": 0.84,
+    "is_pass": false,
+    "is_critical_failure": false,
+    "critical_reasons": [],
+    "latency_seconds": 214.225,
+    "token_usage": {}
+  }
+]

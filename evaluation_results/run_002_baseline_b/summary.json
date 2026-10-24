@@ -1,0 +1,28 @@
+{
+  "run_id": "run_002_baseline_b",
+  "case_id": "c18e0118-0000-4000-8000-000000000018",
+  "dataset_name": "sc001_dev",
+  "started_at": "2026-10-24T21:22:51.182738",
+  "completed_at": "2026-10-24T21:44:16.868599",
+  "duration_seconds": 1285.69,
+  "total_scenarios": 7,
+  "passed_scenarios": 0,
+  "pass_rate": 0.0,
+  "critical_failures_count": 0,
+  "average_overall_score": 0.5943,
+  "disposition_distribution": {
+    "WITHHELD": 3,
+    "CAUTIONARY": 4
+  },
+  "kpis": {
+    "fact_recall": 0.4095,
+    "fact_precision": 0.8571,
+    "issue_detection": 0.6667,
+    "statute_retrieval_accuracy": 0.75,
+    "citation_coverage": 0.0,
+    "legal_application_accuracy": 0.7143,
+    "next_action_coverage": 0.5714,
+    "safety_compliance": 1.0
+  },
+  "output_directory": "C:\\myprjs\\ai-legal-helper\\evaluation_results\\run_002_baseline_b"
+}

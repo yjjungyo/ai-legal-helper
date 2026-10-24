@@ -11,15 +11,19 @@
 1. 쟁점 기반 최종 처분 상태 결정 (determine_final_disposition, Section 8, P0-05):
    - 검증된 쟁점이 존재하면 전체 답변 폐기를 방지하고 DELIVERED 또는 CAUTIONARY 부여
    - 안전하게 제공 가능한 쟁점이 전혀 없는 극단적 경우에만 WITHHELD 부여
-2. 부분 답변 조립 정책 (assemble_grounded_answer, Section 8.4):
-   - 차단된(BLOCKED) 주장, 허위 인용, 미검증 결론은 엄격히 배제
-   - 확인된 사건 사실(FactAdjudication), 증거 번호(E01, E02...) 및 쟁점별 법률 분석 결합
-   - 이미 등록된 증거를 다시 요구하지 않고, 실제 미비된 증거 공백(EvidenceGap)만 안내
-3. 개선된 판단 유보 생성 (build_dynamic_withheld_answer, Section 9, P0-06):
-   - WITHHELD 상태에서도 등록된 증거 목록과 입증된 사실을 요약하여 투명성 제공
+2. 사건 사실 정렬 및 선별 로직 (select_grounded_facts_for_display, Section 12, P0-08):
+   - 문서 제목, 단순 서명란 서식, 단순 전화번호 등 부차적 메타데이터 배제
+   - 보증금, 계약기간, 대항력(전입/확정일자), 통지, 가압류 등 핵심 요건사실 우선 가중치 정렬
+   - 출처 다양성(Diversity) 보장: 특정 증거 독점을 방지하고 복수 증거(E01, E02, E03, E05, E09, E10 등) 사실을 고루 안배
+3. 동적 부분 답변 조립 (assemble_grounded_answer, Section 8, P0-05):
+   - 사전에 작성된 고정 템플릿(결론 및 3단계 행동 가이드) 전면 배제
+   - 실제 검증 완료된 쟁점 및 확인 사실만을 바탕으로 사건 맞춤형 종합 판단과 행동 가이드 동적 구성
+4. 개선된 판단 유보 생성 (build_dynamic_withheld_answer, Section 9, P0-06):
+   - WITHHELD 상태에서도 등록된 증거 목록과 입증된 핵심 사실을 요약하여 투명성 제공
 """
 
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
+import re
 from pydantic import BaseModel, Field
 
 from ai_legal_helper.case_intelligence.case_briefing import CaseEvidenceBriefing
@@ -28,6 +32,139 @@ from ai_legal_helper.utils.text_formatter import clean_markdown_formatting
 from ai_legal_helper.observability.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+# 부차적 메타데이터 배제용 패턴 (문서명, 연락처, 단순 서명란 서식)
+_METADATA_EXCLUDE_PATTERNS = [
+    re.compile(r"^(문서\s*제목은|이\s*문서는|제목은|문서의\s*명칭은|표제는)", re.IGNORECASE),
+    re.compile(r"(연락처는|전화번호는|휴대폰|010-\d{4}-\d{4})", re.IGNORECASE),
+    re.compile(r"(서명란이\s*존재한다|기재되어\s*있고\s*서명란|서명·날인란|날인란)", re.IGNORECASE),
+    re.compile(r"^임대차\s*목적물의\s*전용면적은", re.IGNORECASE),
+]
+
+
+def is_trivial_metadata_fact(stmt: str) -> bool:
+    """사건 본질과 무관한 서식·메타데이터·단순 연락처 사실인지 검사한다 (P0-08)."""
+    stmt_clean = stmt.strip()
+    for pat in _METADATA_EXCLUDE_PATTERNS:
+        if pat.search(stmt_clean):
+            return True
+    return False
+
+
+def score_fact_legal_importance(fact: Any, query: Optional[str] = None) -> float:
+    """법률 요건사실 및 질문 맥락과의 연관성에 따라 사실의 중요도 점수를 계산한다 (P0-08).
+
+    Args:
+        fact: FactItemBrief 객체.
+        query: 사용자 질문 문자열.
+
+    Returns:
+        float: 중요도 가중치 점수.
+    """
+    stmt = fact.statement.lower()
+    score = 0.0
+
+    # 1. 보증금 / 지급 / 채권·채무 관련 (+50)
+    if any(k in stmt for k in ["보증금", "잔금", "계약금", "이체", "영수", "지급", "반환", "원이다", "원약정"]):
+        score += 50.0
+
+    # 2. 임대차 계약 기간 / 인도 / 거주 관련 (+40)
+    if any(k in stmt for k in ["계약 체결", "임대차 기간", "만료", "종료", "월 차임", "인도"]):
+        score += 40.0
+
+    # 3. 대항력 / 전입신고 / 확정일자 / 점유 (+45)
+    if any(k in stmt for k in ["전입", "주민등록", "확정일자", "점유", "거주", "대항력"]):
+        score += 45.0
+
+    # 4. 계약 종료 통고 / 내용증명 / 해지 의사표시 (+35)
+    if any(k in stmt for k in ["통고", "통지", "퇴거", "해지", "갱신 거절", "내용증명", "카카오톡", "문자"]):
+        score += 35.0
+
+    # 5. 제한물권 / 가압류 / 경매 / 채권자 (+40)
+    if any(k in stmt for k in ["가압류", "압류", "근저당", "경매", "배당", "hug", "주택도시보증공사", "은행", "결정문"]):
+        score += 40.0
+
+    # 6. 임대인의 분할반환 제안 등 교섭 (+30)
+    if any(k in stmt for k in ["분할", "분할반환", "1년 뒤", "합의", "제안"]):
+        score += 30.0
+
+    # 7. 질문(query) 키워드 연관 가중치 (+20)
+    if query:
+        q_tokens = [tok for tok in re.findall(r"[가-힣0-9A-Za-z]{2,}", query.lower()) if tok not in ["주세요", "대해", "관련", "어떻게"]]
+        matched_tokens = sum(1 for tok in q_tokens if tok in stmt)
+        score += matched_tokens * 10.0
+
+    return score
+
+
+def select_grounded_facts_for_display(
+    briefing: CaseEvidenceBriefing,
+    query: Optional[str] = None,
+    max_facts: int = 12,
+) -> List[Any]:
+    """등록된 사실관계 중 핵심 요건사실과 질문 연관 사실을 우선 선별하고 출처 다양성을 보장한다 (P0-08).
+
+    선별 원칙:
+    1. 신뢰 상태가 직접 입증(EVIDENCE_SUPPORTED, CORROBORATED)된 사실만 대상.
+    2. 문서 제목, 단순 서명란, 연락처 등 부차적 메타데이터 배제.
+    3. 요건사실 가중치(보증금, 임대차 기간, 대항력, 통고, 가압류 등) 정렬.
+    4. 출처 다양성 보장: 동일 증거 라벨(예: E01)에서 최대 3건까지만 1차 선택하여
+       다른 증거(E02, E03, E05, E09, E10 등)가 고루 포섭되도록 함.
+
+    Args:
+        briefing: 사건 증거 브리핑 모델.
+        query: 사용자 질문 문자열.
+        max_facts: 반환할 최대 사실 건수 (기본 12건).
+
+    Returns:
+        List[Any]: 선별된 FactItemBrief 객체 리스트.
+    """
+    supported_facts = [
+        f for f in briefing.facts
+        if f.adjudication_status in ("EVIDENCE_SUPPORTED", "CORROBORATED")
+        and not is_trivial_metadata_fact(f.statement)
+    ]
+
+    # 가중치 점수 내림차순 정렬
+    scored_facts = sorted(
+        supported_facts,
+        key=lambda f: score_fact_legal_importance(f, query),
+        reverse=True,
+    )
+
+    selected: List[Any] = []
+    seen_stmts = set()
+    label_counts: Dict[str, int] = {}
+    remaining_pool: List[Any] = []
+
+    # 1차 라운드: 증거 라벨별 최대 3건으로 다양성 확보
+    for f in scored_facts:
+        norm_stmt = f.statement.strip()
+        if norm_stmt in seen_stmts:
+            continue
+
+        lbl = f.evidence_label or "UNKNOWN"
+        curr_cnt = label_counts.get(lbl, 0)
+        if curr_cnt < 3:
+            selected.append(f)
+            seen_stmts.add(norm_stmt)
+            label_counts[lbl] = curr_cnt + 1
+            if len(selected) >= max_facts:
+                break
+        else:
+            remaining_pool.append(f)
+
+    # 슬롯이 남은 경우 나머지 상위 가중치 사실로 보충
+    if len(selected) < max_facts and remaining_pool:
+        for f in remaining_pool:
+            norm_stmt = f.statement.strip()
+            if norm_stmt not in seen_stmts:
+                selected.append(f)
+                seen_stmts.add(norm_stmt)
+                if len(selected) >= max_facts:
+                    break
+
+    return selected
 
 
 def determine_final_disposition(
@@ -95,44 +232,44 @@ def assemble_grounded_answer(
     """
     sections = []
 
-    # 1. 사건 종합 판단 및 핵심 결론
+    # 1. 사건 종합 판단 및 핵심 결론 (하드코딩 제거: 쟁점 검증 상태 기반 동적 생성)
     sections.append("[1. 사건 종합 판단 및 핵심 결론]")
+    verified_issues = [r for r in issue_results if r.status == "VERIFIED"]
+    conditional_issues = [r for r in issue_results if r.status == "CONDITIONAL"]
+    needs_evidence_issues = [r for r in issue_results if r.status in ("NEEDS_EVIDENCE", "NEEDS_LEGAL_SOURCE")]
+
     if disposition == "DELIVERED":
         sections.append(
-            "- 등록된 증거자료와 관련 법령(주택임대차보호법 등)을 검토한 결과, "
-            "임대차계약 종료 및 임차인의 대항력·우선변제권 관련 주요 법률관계가 명확히 확인되었습니다."
+            f"- 등록된 증거와 관련 법령 조문을 대조 검증한 결과, "
+            f"핵심 법률 쟁점 {len(verified_issues)}건에 관한 권리관계 및 사실관계가 명확히 입증되었습니다."
         )
     elif disposition == "CAUTIONARY":
-        sections.append(
-            "- 등록된 사건 증거를 바탕으로 임대차계약 체결, 보증금 약정, 전입·확정일자 및 가압류 등재 사실 등 "
-            "핵심 사실관계는 명확히 입증되었습니다. 다만 경매 시 정확한 배당 수령액 및 최신 권리변동은 "
-            "추가적인 공적 서류 확인이 수반되는 조건부 법률 판단을 제공합니다."
-        )
+        parts_summary = []
+        if verified_issues:
+            v_titles = ", ".join(f"'{v.issue_title}'" for v in verified_issues)
+            parts_summary.append(f"핵심 사실과 법령이 입증된 {v_titles} 쟁점은 확정적 권리를 행사할 수 있습니다.")
+        if conditional_issues:
+            c_titles = ", ".join(f"'{c.issue_title}'" for c in conditional_issues)
+            parts_summary.append(f"{c_titles} 쟁점은 최신 등기부 전수 확인 또는 실제 경매 배당 절차에 따른 조건부 법률 판단을 제공합니다.")
+        if not parts_summary:
+            parts_summary.append("등록된 증거를 바탕으로 기본 사실관계는 확인되었으나, 일부 쟁점에 관해 조건부 법률 판단을 제공합니다.")
+        sections.append("- " + " ".join(parts_summary))
     else:
         sections.append(
             "- 현재 등록된 증거를 바탕으로 기본 사실관계는 확인되나, 법률상 권리구제를 확정하기 위해 "
             "일부 추가적인 공적 입증자료의 보완이 필요하여 조건부 가이드를 제공합니다."
         )
 
-    # 2. 등록 증거 기반 확인된 사실관계 (사용자 등록 파일명 그대로 표시)
+    # 2. 등록 증거 기반 확인된 사실관계 (질문 연관 핵심 요건사실 우선 선별 및 파일명 표시)
     sections.append("\n[2. 등록 증거 기반 확인된 사실관계]")
-    supported_facts = [f for f in briefing.facts if f.adjudication_status in ("EVIDENCE_SUPPORTED", "CORROBORATED")]
-    
-    # 중복 및 핵심 사실 위주 선별
-    seen_stmts = set()
-    displayed_facts = 0
-    for f in supported_facts:
-        norm_stmt = f.statement.strip()
-        if norm_stmt in seen_stmts:
-            continue
-        seen_stmts.add(norm_stmt)
-        # 사용자가 등록한 증거 파일명을 정확히 기재 ([E01] 대신 [E01_주택임대차계약서.txt])
-        doc_label = f.document_name or f.evidence_label
-        cite_label = f"[{doc_label}]" if doc_label else ""
-        sections.append(f"- {norm_stmt} {cite_label}".strip())
-        displayed_facts += 1
-        if displayed_facts >= 12:  # 가독성을 위해 핵심 사실 12건 내외 선별
-            break
+    selected_facts = select_grounded_facts_for_display(briefing, query=draft_answer, max_facts=12)
+    if selected_facts:
+        for f in selected_facts:
+            doc_label = f.document_name or f.evidence_label
+            cite_label = f"[{doc_label}]" if doc_label else ""
+            sections.append(f"- {f.statement} {cite_label}".strip())
+    else:
+        sections.append("- 등록된 증거로부터 확인된 기초 사실관계를 정리 중입니다.")
 
     # 3. 쟁점별 법률 분석 및 판단
     doc_name_map = {ev.evidence_label: ev.document_name for ev in (briefing.evidences or []) if ev.document_name}
@@ -177,13 +314,27 @@ def assemble_grounded_answer(
     else:
         sections.append("- 현재 핵심 사실관계를 입증하기 위한 필수 증빙 서류는 충실히 등록되어 있습니다.")
 
-    # 5. 안전한 실무적 다음 행동 가이드
+    # 5. 안전한 실무적 다음 행동 가이드 (하드코딩 제거: 쟁점별 권고 조치 기반 동적 조립)
     sections.append("\n[5. 안전한 실무적 다음 행동 가이드]")
-    sections.append(
-        "1. 전입 및 점유 유지: 보증금 전액을 반환받거나 임차권등기가 등기부에 기재될 때까지 절대 주택 점유를 상실(퇴거/열쇠 반환)하거나 전입을 옮기지 마십시오.\n"
-        "2. 최신 등기사항전부증명서 열람: 인터넷등기소를 통해 목적물의 최신 말소사항 포함 등기부를 발급받아 가압류 외 다른 선순위 권리 변동을 최종 대조하십시오.\n"
-        "3. 임차권등기명령 및 지급명령 준비: 임대인의 분할 지급 제안을 거절하고, 계약 종료 즉시 관할 법원에 임차권등기명령 신청 및 보증금 반환 청구 소송(또는 지급명령)을 진행하십시오."
-    )
+    action_items: List[str] = []
+    seen_actions = set()
+
+    for r in issue_results:
+        for rec in r.safe_recommendations:
+            rec_clean = rec.strip()
+            if rec_clean and rec_clean not in seen_actions:
+                seen_actions.add(rec_clean)
+                action_items.append(rec_clean)
+
+    if not action_items:
+        action_items = [
+            "보증금 전액을 반환받거나 임차권등기가 등기부에 기재될 때까지 절대 주택 점유를 상실(퇴거/열쇠 반환)하거나 전입을 옮기지 마십시오.",
+            "인터넷등기소를 통해 목적물의 최신 말소사항 포함 등기부를 발급받아 가압류 외 다른 선순위 권리 변동을 최종 대조하십시오.",
+            "계약 종료 즉시 관할 법원에 임차권등기명령 신청 및 보증금 반환 청구 소송(또는 지급명령)을 진행하십시오.",
+        ]
+
+    for idx, act in enumerate(action_items[:5], 1):
+        sections.append(f"{idx}. {act}")
 
     final_text = "\n".join(sections)
     return clean_markdown_formatting(final_text)
@@ -225,11 +376,11 @@ def build_dynamic_withheld_answer(
         "일부 법률 효과를 확정하기 위해 추가적인 공적 확인이 필요하여 답변을 조건부로 안내합니다.\n"
     )
 
-    # 1. 현재 확인된 사실관계
+    # 1. 현재 확인된 사실관계 (핵심 요건사실 선별 적용)
     sections.append("[1. 등록 증거로 입증된 사실관계]")
-    supported = [f for f in briefing.facts if f.adjudication_status in ("EVIDENCE_SUPPORTED", "CORROBORATED")]
-    if supported:
-        for f in supported[:8]:
+    selected_withheld_facts = select_grounded_facts_for_display(briefing, max_facts=8)
+    if selected_withheld_facts:
+        for f in selected_withheld_facts:
             doc_label = f.document_name or f.evidence_label
             cite = f"[{doc_label}]" if doc_label else ""
             sections.append(f"- {f.statement} {cite}".strip())
