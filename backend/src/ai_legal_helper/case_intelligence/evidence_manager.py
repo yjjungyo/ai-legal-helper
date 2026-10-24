@@ -32,10 +32,28 @@ from ai_legal_helper.database.models import (
     Fact,
     Event,
     LegalIssue,
+    EvidenceAssessment,
+    FactAdjudication,
+    EvidenceGap,
+    FactComparisonAudit,
 )
 from ai_legal_helper.case_intelligence.conflict_detector import (
     build_structured_slots,
     evaluate_claim_conflicts,
+    evaluate_claim_against_fact,
+)
+from ai_legal_helper.case_intelligence.fact_semantics import (
+    extract_semantic_proposition,
+    check_proposition_comparability,
+)
+from ai_legal_helper.case_intelligence.evidence_reliability import (
+    evaluate_evidence_reliability,
+)
+from ai_legal_helper.case_intelligence.evidence_gap import (
+    detect_evidence_gap,
+)
+from ai_legal_helper.case_intelligence.fact_adjudicator import (
+    adjudicate_fact,
 )
 from ai_legal_helper.case_intelligence.entity_sync import (
     rebuild_case_entities,
@@ -138,6 +156,10 @@ def _cleanup_previous_claim_effects(
 
     # 현재 Claim의 기존 EvidenceLink 일괄 삭제 (APPROVE/EDIT 시에는 이후 최신 상태로 재생성됨)
     db.query(EvidenceLink).filter_by(claim_id=claim.id).delete(synchronize_session=False)
+    db.query(EvidenceAssessment).filter_by(claim_id=claim.id).delete(synchronize_session=False)
+    db.query(FactAdjudication).filter_by(claim_id=claim.id).delete(synchronize_session=False)
+    db.query(EvidenceGap).filter_by(claim_id=claim.id).delete(synchronize_session=False)
+    db.query(FactComparisonAudit).filter_by(claim_id=claim.id).delete(synchronize_session=False)
     db.flush()
 
     norm_new = "".join((new_statement or "").split())
@@ -533,6 +555,116 @@ def process_evidence_review(
                         link_type="SUPPORTS",
                     )
                 )
+
+            # (A) 사실 명제 추출 (SemanticProposition)
+            prop = extract_semantic_proposition(
+                claim.statement,
+                context={
+                    "evidence_id": claim.evidence_id,
+                    "claim_id": claim.id,
+                    "source_span_ids": span_ids,
+                    "document_name": doc.original_filename if doc else None,
+                },
+            )
+
+            # (B) 증거 신뢰성 7대 차원 평가 (EvidenceAssessment)
+            assessment_res = evaluate_evidence_reliability(
+                document_name=doc.original_filename if doc else "",
+                proposition=prop,
+                document_metadata=doc.metadata_json or {},
+            )
+            assessment_record = EvidenceAssessment(
+                case_id=case.id,
+                evidence_id=claim.evidence_id,
+                claim_id=claim.id,
+                proposition_hash=str(hash(claim.statement)),
+                source_authenticity=assessment_res.source_authenticity,
+                directness=assessment_res.directness,
+                relevance=assessment_res.relevance,
+                completeness=assessment_res.completeness,
+                temporal_applicability=assessment_res.temporal_applicability,
+                corroboration=assessment_res.corroboration,
+                provenance_quality=assessment_res.provenance_quality,
+                assessment_status=assessment_res.assessment_status,
+                reliability_score=assessment_res.reliability_score,
+                proof_scope=assessment_res.proof_scope,
+                summary=assessment_res.summary,
+            )
+            db.add(assessment_record)
+
+            # (C) 사실 확정 및 심리 (FactAdjudication)
+            case_docs_map = {d.id: d.original_filename for d in db.query(EvidenceDocument).filter_by(case_id=case.id).all()}
+            fact_doc_map = {f.id: case_docs_map.get(f.source_ref) for f in existing_facts if f.source_ref}
+            adjudication_res = adjudicate_fact(
+                proposition=prop,
+                candidate_facts=comparison_facts,
+                assessment=assessment_res,
+                claim_id=claim.id,
+                fact_id=target_fact.id,
+                fact_doc_names=fact_doc_map,
+            )
+
+            # 직접 처분문서 또는 공문서로 뒷받침된 사실은 DOCUMENT_VERIFIED 확정
+            if (
+                adjudication_res.adjudication_status in ("EVIDENCE_SUPPORTED", "CORROBORATED")
+                and target_fact.verification_status != "DISPUTED"
+            ):
+                target_fact.verification_status = "DOCUMENT_VERIFIED"
+                target_fact.source_type = "DOCUMENT_SUPPORTED"
+
+            # 만약 증거 공백(EvidenceGap)이 탐지된 경우 등록
+            if adjudication_res.gap_item:
+                gap_item = adjudication_res.gap_item
+                existing_gap = db.query(EvidenceGap).filter_by(
+                    case_id=case.id,
+                    gap_type=gap_item.gap_type,
+                ).first()
+                if not existing_gap:
+                    db.add(EvidenceGap(
+                        case_id=case.id,
+                        claim_id=claim.id,
+                        fact_id=target_fact.id,
+                        gap_type=gap_item.gap_type,
+                        target_proposition=gap_item.target_proposition,
+                        description=gap_item.description,
+                        recommended_document_types=gap_item.recommended_document_types,
+                        recommended_action=gap_item.recommended_action,
+                        priority=gap_item.priority,
+                        is_resolved=False,
+                    ))
+
+            # FactAdjudication 영구 기록
+            db.add(FactAdjudication(
+                case_id=case.id,
+                fact_id=target_fact.id,
+                claim_id=claim.id,
+                adjudication_status=adjudication_res.adjudication_status,
+                primary_relation=adjudication_res.primary_relation,
+                confidence=adjudication_res.confidence,
+                adjudication_basis=adjudication_res.adjudication_basis,
+                supporting_evidence_ids=adjudication_res.supporting_evidence_ids,
+                contradicting_evidence_ids=adjudication_res.contradicting_evidence_ids,
+            ))
+
+            # (D) 비교 감사 로그 기록 (FactComparisonAudit)
+            for c_fact in comparison_facts:
+                c_prop = extract_semantic_proposition(c_fact.statement or "")
+                c_res = check_proposition_comparability(prop, c_prop)
+                db.add(FactComparisonAudit(
+                    case_id=case.id,
+                    claim_id=claim.id,
+                    fact_id=c_fact.id,
+                    is_comparable=c_res.is_comparable,
+                    comparability_reason=c_res.reason_code,
+                    relation=adjudication_res.primary_relation if c_res.is_comparable else "DIFFERENT_CONTEXT",
+                    audit_details={
+                        "claim_statement": claim.statement,
+                        "fact_statement": c_fact.statement,
+                        "matched_dimensions": c_res.matched_dimensions,
+                        "mismatched_dimensions": c_res.mismatched_dimensions,
+                        "explanation": c_res.explanation,
+                    },
+                ))
 
         # 5) 사건 전체 Fact의 DISPUTED 상태 재계산, 증거 문서 상태(APPROVED/REVIEW_REQUIRED) 갱신 및 엔티티 동기화
         db.flush()

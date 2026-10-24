@@ -207,3 +207,4 @@ backend/tests/unit/test_parties_timeline_sync.py: 18 passed
 Evidence Conflict Detection Engine v1.2 개발을 통해 서로 다른 사실을 모순으로 오인하던 근본적 문제를 해결하였으며, 진짜 모순은 놓치지 않으면서 사건 그래프와 RAG 검색의 데이터 일관성을 확보하였습니다.
 
 모든 단위·통합·회귀 테스트(50건)와 프론트엔드 빌드가 성공하였으며, 라이브 사건의 445건 오탐 링크가 정상 복구되었습니다.
+

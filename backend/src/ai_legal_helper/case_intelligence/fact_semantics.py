@@ -42,6 +42,151 @@ logger = get_logger(__name__)
 # 1. 사실 의미 데이터 모델 (SemanticFact, ComparabilityResult, TemporalRelationResult)
 # ==============================================================================
 
+class SemanticProposition(BaseModel):
+    """
+    구조화된 법적 사실 명제 모델 (Semantic Proposition Model).
+
+    Section 5 (P0-01) 요구사항 반영:
+    단순 문자열 텍스트가 아니라 법적 명제의 주체, 객체, 속성, 범주, 세부 단계,
+    고유 인스턴스 식별자(event_instance_key), 화행(speech_act), 인식 상태(epistemic_status),
+    시간 의미 유형 및 시계열 구간, 조건/양상을 다차원 정규화하여 보관한다.
+    """
+
+    statement: str = Field(default="", description="원본 진술문 문자열")
+    subject_key: Optional[str] = Field(None, description="명제의 주체 (예: 임대인, 임차인, 채무자 등)")
+    object_key: Optional[str] = Field(None, description="명제의 객체/대상 (예: 특정 가압류, 특정 계약 등)")
+    predicate_key: Optional[str] = Field(None, description="핵심 서술어 또는 행위 속성 (예: 반환, 지급, 체결 등)")
+
+    semantic_category: Literal[
+        "EVENT",
+        "STATE",
+        "OBLIGATION",
+        "RIGHT",
+        "CONDITION",
+        "DOCUMENT_METADATA",
+        "SOURCE_AVAILABILITY",
+        "EPISTEMIC_STATUS",
+        "ASSERTION",
+        "UNKNOWN",
+    ] = Field("UNKNOWN", description="명제의 법적 의미 범주")
+
+    event_type: Optional[str] = Field(None, description="사건 대분류 (PAYMENT, RESIDENCE, LOAN 등)")
+    event_subtype: Optional[str] = Field(None, description="사건 소분류 (DOWN_PAYMENT, BALANCE_PAYMENT 등)")
+    event_instance_key: Optional[str] = Field(
+        None,
+        description="동일 사건·거래 인스턴스 구분을 위한 고유 키 (예: ENCUMBRANCE:HUG:72M vs ENCUMBRANCE:BANK:50M)",
+    )
+
+    value: Optional[Dict[str, Any]] = Field(None, description="정규화된 값 딕셔너리 (amount, unit 등)")
+    value_role: Optional[str] = Field(None, description="값의 의미적 역할 (TOTAL_AMOUNT, DOWN_PAYMENT 등)")
+
+    temporal_type: Optional[Literal[
+        "OCCURRED_AT",
+        "DUE_AT",
+        "SCHEDULED_AT",
+        "REQUESTED_AT",
+        "REPORTED_AT",
+        "VALID_AT",
+        "VALID_INTERVAL",
+        "EFFECTIVE_FROM",
+        "EFFECTIVE_TO",
+        "NONE",
+    ]] = Field("NONE", description="시간 정보의 법적 의미 역할")
+    temporal_value: Optional[str] = Field(None, description="정규화된 일자 (YYYY-MM-DD)")
+    temporal_interval: Optional[Dict[str, Any]] = Field(None, description="시작일과 종료일로 구성된 유효 구간")
+
+    condition: Optional[str] = Field(None, description="조건부 명제의 조건 표현")
+    modality: Optional[str] = Field(None, description="양상 표현 (의무, 가능, 금지 등)")
+
+    polarity: Literal[
+        "AFFIRMATIVE",
+        "NEGATIVE",
+        "DOUBLE_NEGATIVE",
+        "REPORTED_NEGATIVE",
+        "UNKNOWN",
+    ] = Field("UNKNOWN", description="서술 극성")
+
+    epistemic_status: Literal[
+        "ASSERTED",
+        "REPORTED",
+        "DOCUMENT_STATES",
+        "UNKNOWN",
+        "NOT_VERIFIED",
+        "INFERRED",
+    ] = Field("UNKNOWN", description="인식 상태 (직접 단언, 인용 보고, 문서 기재, 미확인/정보부족 등)")
+
+    speech_act: Optional[Literal[
+        "STATEMENT",
+        "REQUEST",
+        "PROPOSAL",
+        "ACCEPTANCE",
+        "REJECTION",
+        "NOTICE",
+        "QUESTION",
+        "PROMISE",
+    ]] = Field("STATEMENT", description="화행 유형 (단순 진술, 이행 청구, 분할 제안, 거절 등)")
+    speaker_key: Optional[str] = Field(None, description="발화자 또는 의사표시 주체")
+
+    source_evidence_id: Optional[str] = Field(None, description="출처 증거 문서 ID")
+    source_claim_id: Optional[str] = Field(None, description="출처 Claim ID")
+    source_span_ids: List[str] = Field(default_factory=list, description="근거 원문 Span ID 목록")
+    confidence: float = Field(1.0, description="추출 신뢰도")
+    provenance: Optional[Dict[str, Any]] = Field(default_factory=dict, description="추가 출처 메타데이터")
+
+    def to_semantic_fact(self) -> "SemanticFact":
+        """SemanticFact 레거시 호환 모델로 변환한다."""
+        raw_amount = None
+        if isinstance(self.value, dict) and "amount" in self.value:
+            raw_amount = self.value["amount"]
+        elif isinstance(self.value, (int, float)):
+            raw_amount = int(self.value)
+
+        # semantic_category 매핑
+        sem_cat = self.semantic_category
+        if sem_cat in ("RIGHT", "ASSERTION"):
+            sem_cat = "STATE"
+        elif sem_cat == "SOURCE_AVAILABILITY":
+            sem_cat = "EPISTEMIC_STATUS"
+
+        # occurrence_status 매핑
+        occ = "ACTUAL"
+        if self.speech_act == "PROPOSAL":
+            occ = "PROPOSED"
+        elif self.speech_act == "REQUEST":
+            occ = "REQUESTED"
+        elif self.temporal_type in ("DUE_AT", "SCHEDULED_AT"):
+            occ = "SCHEDULED"
+        elif self.epistemic_status == "NOT_VERIFIED":
+            occ = "UNCONFIRMED"
+
+        # polarity 매핑
+        pol = self.polarity
+        if self.epistemic_status == "NOT_VERIFIED":
+            pol = "UNCONFIRMED"
+        elif pol == "UNKNOWN":
+            pol = "AFFIRMATIVE"
+
+        return SemanticFact(
+            statement=self.statement,
+            subject_key=self.subject_key,
+            object_key=self.object_key,
+            predicate=self.predicate_key,
+            semantic_category=sem_cat if sem_cat in ("EVENT", "STATE", "OBLIGATION", "CONDITION", "EPISTEMIC_STATUS", "IDENTITY", "METADATA", "UNKNOWN") else "UNKNOWN",
+            event_type=self.event_type,
+            event_subtype=self.event_subtype,
+            temporal_type=self.temporal_type,
+            temporal_value=self.temporal_value,
+            temporal_qualifier=None,
+            occurrence_status=occ,
+            polarity=pol if pol in ("AFFIRMATIVE", "NEGATIVE", "DOUBLE_NEGATIVE", "REPORTED_NEGATIVE", "UNCONFIRMED") else "AFFIRMATIVE",
+            is_repeatable_event=(self.event_type == "COMMUNICATION"),
+            value=raw_amount,
+            condition=self.condition,
+            confidence=self.confidence,
+            provenance=self.provenance,
+        )
+
+
 class SemanticFact(BaseModel):
     """
     단일 Fact 또는 Claim의 법적 의미 구조 모델.
@@ -129,10 +274,97 @@ class SemanticFact(BaseModel):
     confidence: float = Field(1.0, description="추출 신뢰도")
     provenance: Optional[Dict[str, Any]] = Field(default_factory=dict, description="출처 문서 및 Span 정보")
 
+    def to_proposition(self) -> SemanticProposition:
+        """새로운 SemanticProposition 모델로 변환한다."""
+        speech_act: Literal[
+            "STATEMENT", "REQUEST", "PROPOSAL", "ACCEPTANCE", "REJECTION", "NOTICE", "QUESTION", "PROMISE"
+        ] = "STATEMENT"
+        if self.occurrence_status == "PROPOSED":
+            speech_act = "PROPOSAL"
+        elif self.occurrence_status == "REQUESTED":
+            speech_act = "REQUEST"
+        elif self.event_type == "NOTICE":
+            speech_act = "NOTICE"
+
+        epistemic: Literal[
+            "ASSERTED", "REPORTED", "DOCUMENT_STATES", "UNKNOWN", "NOT_VERIFIED", "INFERRED"
+        ] = "ASSERTED"
+        if self.polarity == "UNCONFIRMED" or self.semantic_category == "EPISTEMIC_STATUS":
+            epistemic = "NOT_VERIFIED"
+        elif self.occurrence_status == "ALLEGED":
+            epistemic = "REPORTED"
+
+        val_dict = None
+        if self.value is not None:
+            if isinstance(self.value, (int, float)):
+                val_dict = {"amount": int(self.value), "currency": "KRW"}
+            elif isinstance(self.value, dict):
+                val_dict = self.value
+
+        inst_key = None
+        if self.event_type == "ENCUMBRANCE":
+            inst_key = f"ENCUMBRANCE:{self.object_key or 'GENERIC'}:{self.value or 'ANY'}"
+        elif self.event_type == "COMMUNICATION":
+            inst_key = f"COMMUNICATION:{self.temporal_value or 'ANY'}:{self.event_subtype or 'MSG'}"
+
+        pol: Literal["AFFIRMATIVE", "NEGATIVE", "DOUBLE_NEGATIVE", "REPORTED_NEGATIVE", "UNKNOWN"] = "UNKNOWN"
+        if self.polarity == "AFFIRMATIVE":
+            pol = "AFFIRMATIVE"
+        elif self.polarity == "NEGATIVE":
+            pol = "NEGATIVE"
+        elif self.polarity == "DOUBLE_NEGATIVE":
+            pol = "DOUBLE_NEGATIVE"
+        elif self.polarity == "REPORTED_NEGATIVE":
+            pol = "REPORTED_NEGATIVE"
+        elif self.polarity == "UNCONFIRMED":
+            pol = "UNKNOWN"
+
+        sem_cat: Literal[
+            "EVENT", "STATE", "OBLIGATION", "RIGHT", "CONDITION", "DOCUMENT_METADATA", "SOURCE_AVAILABILITY", "EPISTEMIC_STATUS", "ASSERTION", "UNKNOWN"
+        ] = "UNKNOWN"
+        if self.semantic_category in ("EVENT", "STATE", "OBLIGATION", "CONDITION", "UNKNOWN"):
+            sem_cat = self.semantic_category  # type: ignore
+        elif self.semantic_category == "IDENTITY":
+            sem_cat = "STATE"
+        elif self.semantic_category == "METADATA":
+            sem_cat = "DOCUMENT_METADATA"
+        elif self.semantic_category == "EPISTEMIC_STATUS":
+            sem_cat = "EPISTEMIC_STATUS"
+
+        prov = self.provenance or {}
+
+        return SemanticProposition(
+            statement=self.statement,
+            subject_key=self.subject_key,
+            object_key=self.object_key,
+            predicate_key=self.predicate,
+            semantic_category=sem_cat,
+            event_type=self.event_type,
+            event_subtype=self.event_subtype,
+            event_instance_key=inst_key,
+            value=val_dict,
+            value_role=self.event_subtype,
+            temporal_type=self.temporal_type,
+            temporal_value=self.temporal_value,
+            condition=self.condition,
+            polarity=pol,
+            epistemic_status=epistemic,
+            speech_act=speech_act,
+            speaker_key=self.subject_key,
+            source_evidence_id=prov.get("evidence_id"),
+            source_claim_id=prov.get("claim_id"),
+            source_span_ids=prov.get("span_ids", []),
+            confidence=self.confidence,
+            provenance=prov,
+        )
+
 
 class ComparabilityResult(BaseModel):
     """
-    두 SemanticFact 간의 비교 가능성(Comparability Gate) 판정 결과.
+    두 명제 간의 비교 가능성(Comparability Gate) 판정 결과 모델.
+
+    Section 8.3 (P0-04) 요구사항 반영:
+    비교 가능 여부뿐만 아니라 동일성 평가 상태(identity_status), 일치/불일치/누락 차원 목록을 제공한다.
     """
 
     is_comparable: bool = Field(..., description="두 명제가 상충 여부를 비교할 수 있는 동일 명제인지 여부")
@@ -142,8 +374,17 @@ class ComparabilityResult(BaseModel):
         "INSUFFICIENT_INFORMATION",
         "CONSISTENT",
     ] = Field(..., description="비교 관문 통과 상태")
+    identity_status: Literal[
+        "IDENTICAL",
+        "COMPATIBLE",
+        "DIFFERENT",
+        "UNCERTAIN",
+    ] = Field("DIFFERENT", description="동일성 상태 분류")
     reason_code: str = Field(..., description="구체적 사유 코드")
     explanation: str = Field(..., description="사용자 친화적 설명")
+    matched_dimensions: List[str] = Field(default_factory=list, description="일치한 평가 차원 목록")
+    mismatched_dimensions: List[str] = Field(default_factory=list, description="불일치한 평가 차원 목록")
+    missing_dimensions: List[str] = Field(default_factory=list, description="비교에 누락된 차원 목록")
     subject_match_basis: Optional[str] = Field(None, description="주체 비교 근거")
     predicate_match_basis: Optional[str] = Field(None, description="행위/속성 비교 근거")
     temporal_semantics: Optional[str] = Field(None, description="시간 의미 차이 요약")
@@ -304,7 +545,7 @@ def extract_semantic_fact(
         temporal_type = "NONE"
 
     # (D) OBLIGATION: 법률상/계약상 의무, 약정 의무
-    elif any(kw in compact for kw in ("의무가있다", "의무를부담", "이행할의무", "해야한다", "책임이자신에게")):
+    elif any(kw in compact for kw in ("의무가있다", "의무를부담", "이행할의무", "해야한다", "책임이자신에게", "의무를이행")):
         sem_category = "OBLIGATION"
         occurrence_status = "SCHEDULED"
         if "지급" in compact or "반환" in compact:
@@ -325,19 +566,20 @@ def extract_semantic_fact(
 
     # (E) PAYMENT: 금원 지급 관련 (계약금, 중도금, 잔금, 보증금 총액, 차임, 급여, 가압류 청구금액 등)
     elif any(kw in compact for kw in (
-        "지급기일", "지급일", "지급예정일", "지급하였다", "지급함", "이체되었다", "이체했", "반환기일",
-        "반환일", "반환을요청", "반환요청", "반환채무", "청구금액", "보증금은", "전세금은", "계약금은", "잔금은", "차임은", "합계는"
-    )):
+        "지급", "반환", "이체", "납부", "입금", "청구금액", "보증금", "전세금", "계약금", "잔금", "중도금", "차임", "월세", "급여", "임금", "합계는"
+    )) and not any(kw in compact for kw in ("임대차기간", "계약기간", "존속기간", "가입여부")):
         event_type = "PAYMENT"
         
         # 합계 / 총액 / 보증금 전체
         if "합계" in compact or "총액" in compact or "전체" in compact:
             event_subtype = "TOTAL_AMOUNT"
-        elif "계약금" in compact:
+        elif "보증금" in compact and ("계약금" in compact or "잔금" in compact) and ("중" in compact or "포함" in compact):
+            event_subtype = "PRINCIPAL_DEPOSIT"
+        elif "계약금" in compact and not ("보증금" in compact and "중" in compact):
             event_subtype = "DOWN_PAYMENT"
         elif "중도금" in compact:
             event_subtype = "INTERIM_PAYMENT"
-        elif "잔금" in compact:
+        elif "잔금" in compact and not ("보증금" in compact and "중" in compact):
             event_subtype = "BALANCE_PAYMENT"
         elif "가압류" in compact or "청구금액" in compact:
             event_subtype = "CLAIM_AMOUNT"
@@ -345,25 +587,25 @@ def extract_semantic_fact(
             event_subtype = "RENT"
         elif "급여" in compact or "임금" in compact:
             event_subtype = "WAGE"
-        elif "반환" in compact:
+        elif "반환" in compact and not ("보증금" in compact and ("계약" in compact or "원금" in compact)):
             event_subtype = "RETURN_AMOUNT"
         else:
             event_subtype = "PRINCIPAL_DEPOSIT"
 
         # 시점 및 발생 성격 구분
-        if any(kw in compact for kw in ("기일은", "지급기일", "예정일", "하기로약정", "하기로함")):
+        if any(kw in compact for kw in ("기일", "예정일", "약정", "하기로함", "지급한다", "반환한다", "지급하기로", "반환하기로")):
             sem_category = "OBLIGATION"
-            temporal_type = "DUE_AT"
+            temporal_type = "DUE_AT" if primary_date else "SCHEDULED_AT"
             occurrence_status = "SCHEDULED"
-        elif any(kw in compact for kw in ("요청하였다", "요구하였다", "요청한")):
+        elif any(kw in compact for kw in ("요청", "요구", "청구")):
             sem_category = "EVENT"
             temporal_type = "REQUESTED_AT" if primary_date else "NONE"
             occurrence_status = "REQUESTED"
-        elif any(kw in compact for kw in ("지급하였다", "지급함", "이체되었다", "이체하였다", "납부하였다", "입금되었다")):
+        elif any(kw in compact for kw in ("지급하였", "지급함", "지급되었", "지급됐", "지급된", "이체", "납부", "입금", "반환하였", "반환함", "반환되었")):
             sem_category = "EVENT"
             temporal_type = "OCCURRED_AT" if primary_date else "NONE"
             occurrence_status = "ACTUAL"
-        elif any(kw in compact for kw in ("기준", "현재", "미반환상태", "못했다")):
+        elif any(kw in compact for kw in ("기준", "현재", "미반환상태", "미반환", "못했다")):
             sem_category = "STATE"
             temporal_type = "VALID_AT" if primary_date else "NONE"
             occurrence_status = "ACTUAL"
@@ -625,247 +867,478 @@ def extract_semantic_fact(
 
 
 # ==============================================================================
-# 4. 사실 동일성 비교 함수 (compare_fact_identity)
+# 3-1. 사실 명제 추출 함수 (extract_semantic_proposition)
 # ==============================================================================
+
+def extract_semantic_proposition(
+    statement: str,
+    context: Optional[Dict[str, Any]] = None,
+) -> SemanticProposition:
+    """단일 진술문(statement)과 문맥으로부터 다차원 정규화된 SemanticProposition을 추출한다.
+
+    Section 5 (P0-01) 요구사항 반영:
+    1. 화행(Speech Act: STATEMENT, REQUEST, PROPOSAL, ACCEPTANCE, REJECTION, NOTICE 등) 분석
+    2. 인식 상태(Epistemic Status: ASSERTED, REPORTED, DOCUMENT_STATES, NOT_VERIFIED, INFERRED) 분석
+    3. 고유 인스턴스 키(event_instance_key) 생성으로 동일 채권/사건/메시지 인스턴스 식별
+    4. 정보 부족(NOT_VERIFIED/SOURCE_AVAILABILITY)과 실체적 부정(NEGATIVE)의 엄격한 분리
+
+    Args:
+        statement: 분석 대상 진술문.
+        context: 선택적 문맥 딕셔너리.
+
+    Returns:
+        SemanticProposition: 정규화된 법적 사실 명제 인스턴스.
+    """
+    stmt = (statement or "").strip()
+    ctx = context or {}
+    compact = re.sub(r"\s+", "", stmt)
+
+    sem_fact = extract_semantic_fact(stmt, context=ctx)
+    prop = sem_fact.to_proposition()
+
+    # 1. 화행(Speech Act) 정밀 추출 (CASE-04: 제안 vs 거절 분리)
+    if any(kw in compact for kw in ("방안을제안", "제안하였", "조건을제안", "제안함", "제시하였", "제안했다")):
+        prop.speech_act = "PROPOSAL"
+    elif any(kw in compact for kw in ("동의하지않", "거절하였", "거부하였", "받아들이지않", "응하지않", "거절함", "거부함")):
+        prop.speech_act = "REJECTION"
+    elif any(kw in compact for kw in ("요청하였", "요구하였", "촉구하였", "청구하였", "달라고요구", "해달라고요구")):
+        prop.speech_act = "REQUEST"
+    elif any(kw in compact for kw in ("동의하였", "수락하였", "합의하였", "승낙하였")):
+        prop.speech_act = "ACCEPTANCE"
+    elif any(kw in compact for kw in ("통보하였", "통지하였", "고지하였", "알렸")):
+        prop.speech_act = "NOTICE"
+
+    # 2. 인식 상태(Epistemic Status) 및 정보 부족 분리 (CASE-01, CASE-05, CASE-06)
+    if any(kw in compact for kw in (
+        "확인되지않았", "확인되지않음", "미확인이다", "미확인.", "확인하지못",
+        "자료가제출되지", "자료가없", "원본이제출되지", "제출되지않았", "판단할수없",
+        "가입여부는확인되지", "별도확인이필요", "알수없"
+    )):
+        prop.epistemic_status = "NOT_VERIFIED"
+        prop.polarity = "UNKNOWN"  # 증거 부족은 부정 사실(NEGATIVE)이 아님! (원칙 2.1)
+        if any(kw in compact for kw in ("제출되지않았", "자료가없", "원본이제출되지")):
+            prop.semantic_category = "SOURCE_AVAILABILITY"
+        else:
+            prop.semantic_category = "EPISTEMIC_STATUS"
+    elif any(kw in compact for kw in ("기억한다", "들었다", "진술상", "주장한다", "말했다")):
+        prop.epistemic_status = "REPORTED"
+    elif any(kw in compact for kw in ("기재되어있", "명시되어있", "기재됨", "명시됨")):
+        prop.epistemic_status = "DOCUMENT_STATES"
+
+    # 3. 인스턴스 키(event_instance_key) 생성 (CASE-02, CASE-07 등 별개 인스턴스 분리)
+    if prop.event_type == "ENCUMBRANCE":
+        amt_str = str(sem_fact.value) if sem_fact.value else "UNKNOWN"
+        prop.event_instance_key = f"ENCUMBRANCE:{prop.object_key or 'GENERIC'}:{amt_str}"
+    elif prop.event_type == "COMMUNICATION":
+        prop.event_instance_key = f"COMMUNICATION:{prop.temporal_value or 'ANY'}:{prop.speech_act or 'MSG'}"
+    elif prop.speech_act in ("PROPOSAL", "REJECTION"):
+        prop.event_instance_key = f"SPEECH_ACT:{prop.speech_act}:{prop.speaker_key or 'PARTY'}"
+
+    # 출처 및 Span 정보
+    prop.source_evidence_id = ctx.get("evidence_id")
+    prop.source_claim_id = ctx.get("claim_id")
+    prop.source_span_ids = ctx.get("source_span_ids", [])
+
+    return prop
+
+
+# ==============================================================================
+# 4. 사실 명제 비교 함수 (check_proposition_comparability & compare_fact_identity)
+# ==============================================================================
+
+def check_proposition_comparability(
+    proposition_a: SemanticProposition,
+    proposition_b: SemanticProposition,
+) -> ComparabilityResult:
+    """두 SemanticProposition이 상충 여부를 검증할 수 있는 동일 명제인지 8대 차원으로 판정한다.
+
+    Section 8 (P0-04) 요구사항 반영:
+    1. 동일 주체(Subject) 비교
+    2. 동일 객체/거래(Object) 비교
+    3. 동일 속성/행위(Predicate) 비교
+    4. 행위 인스턴스(Event Instance) 비교
+    5. 거래 단계(Transaction Stage) 비교
+    6. 시간적 의미(Temporal Semantics) 비교
+    7. 상태 기준(State Criteria) 비교
+    8. 화행/의사표시(Speech Act) 비교
+
+    Args:
+        proposition_a: 첫 번째 SemanticProposition.
+        proposition_b: 두 번째 SemanticProposition.
+
+    Returns:
+        ComparabilityResult: 비교 관문 판정 결과.
+    """
+    matched: List[str] = []
+    mismatched: List[str] = []
+    missing: List[str] = []
+
+    pa, pb = proposition_a, proposition_b
+
+    # 1. 문서 고유 메타데이터 (DOC_INFO / DOCUMENT_METADATA)
+    if pa.semantic_category == "DOCUMENT_METADATA" and pb.semantic_category == "DOCUMENT_METADATA":
+        doc_a = (pa.provenance or {}).get("document_name")
+        doc_b = (pb.provenance or {}).get("document_name")
+        if doc_a and doc_b and doc_a != doc_b:
+            mismatched.append("DOCUMENT_LOCAL_METADATA")
+            return ComparabilityResult(
+                is_comparable=False,
+                status="DIFFERENT_CONTEXT",
+                identity_status="DIFFERENT",
+                reason_code="DOCUMENT_LOCAL_METADATA",
+                explanation="서로 다른 증거 문서의 고유 메타데이터(문서 제목·형식)는 개별 문서에 국한된 별개 진술입니다.",
+                matched_dimensions=matched,
+                mismatched_dimensions=mismatched,
+                subject_match_basis=f"DocA: {doc_a} vs DocB: {doc_b}",
+            )
+
+    # 2. 증거 부족 및 인식 상태 (원칙 2.1: 증거 부족은 상충이 아님, CASE-01, CASE-05, CASE-06)
+    if (
+        pa.epistemic_status == "NOT_VERIFIED"
+        or pb.epistemic_status == "NOT_VERIFIED"
+        or pa.semantic_category in ("EPISTEMIC_STATUS", "SOURCE_AVAILABILITY")
+        or pb.semantic_category in ("EPISTEMIC_STATUS", "SOURCE_AVAILABILITY")
+    ):
+        mismatched.append("EPISTEMIC_STATUS")
+        reason_code = "EPISTEMIC_STATUS_NOT_CONTRADICTION"
+        if pa.semantic_category == "SOURCE_AVAILABILITY" or pb.semantic_category == "SOURCE_AVAILABILITY":
+            reason_code = "SOURCE_AVAILABILITY_NOT_FACT_NEGATION"
+        return ComparabilityResult(
+            is_comparable=False,
+            status="DIFFERENT_CONTEXT",
+            identity_status="DIFFERENT",
+            reason_code=reason_code,
+            explanation="진술이 사실의 확인 여부(미확인, 자료 미제출)에 관한 메타 진술이므로 실체적 사실과 상충하지 않으며 증거 공백(EVIDENCE_GAP)에 해당합니다.",
+            matched_dimensions=matched,
+            mismatched_dimensions=mismatched,
+            predicate_match_basis="Epistemic status vs Factual assertion",
+        )
+
+    # 3. 화행(Speech Act) 분리: 제안(PROPOSAL) vs 거절(REJECTION) (CASE-04)
+    if {pa.speech_act, pb.speech_act} == {"PROPOSAL", "REJECTION"}:
+        mismatched.append("SPEECH_ACT")
+        return ComparabilityResult(
+            is_comparable=False,
+            status="CONSISTENT",
+            identity_status="COMPATIBLE",
+            reason_code="PROPOSAL_VS_REJECTION",
+            explanation="임대인의 분할 반환 제안(PROPOSAL)과 임차인의 거절(REJECTION)은 서로 다른 별개 의사표시로서 양립 가능하며 모순이 아닙니다.",
+            matched_dimensions=matched,
+            mismatched_dimensions=mismatched,
+            predicate_match_basis="Proposal responds to Rejection",
+        )
+
+    # 4. 거래 단계 및 구성항목 분리: 계약금/잔금 vs 보증금 총액 (CASE-03, S01, S06, S07)
+    subtypes = {pa.event_subtype, pb.event_subtype} - {None}
+    if pa.event_type == "PAYMENT" and pb.event_type == "PAYMENT":
+        # (A) 계약금 또는 잔금과 보증금 총액의 관계: COMPONENT_OF / SUM_OF
+        # 총액/합계가 명시되었거나 value_role이 TOTAL_AMOUNT/SUM_OF인 경우 COMPONENT_OF_SUM 판정
+        is_component_relation = False
+        if ("DOWN_PAYMENT" in subtypes or "BALANCE_PAYMENT" in subtypes) and (
+            "TOTAL_AMOUNT" in subtypes or "SUM_OF" in subtypes
+        ):
+            is_component_relation = True
+        elif ("DOWN_PAYMENT" in subtypes or "BALANCE_PAYMENT" in subtypes) and "PRINCIPAL_DEPOSIT" in subtypes:
+            if any("합계" in (p.statement or "") or "총" in (p.statement or "") for p in (pa, pb)):
+                is_component_relation = True
+
+        if is_component_relation:
+            return ComparabilityResult(
+                is_comparable=False,
+                status="CONSISTENT",
+                identity_status="COMPATIBLE",
+                reason_code="COMPONENT_OF_SUM",
+                explanation="계약금이나 잔금은 보증금 총액의 구성항목(PART_OF)이므로 총액과 모순되지 않고 양립합니다.",
+                matched_dimensions=["PAYMENT_DOMAIN"],
+                mismatched_dimensions=["PAYMENT_COMPONENT_STAGE"],
+                predicate_match_basis=f"Component: {pa.event_subtype} vs {pb.event_subtype}",
+            )
+
+        # (B) 보증금 원금과 반환 요청 금액의 동일 금액인 경우
+        if subtypes in (
+            {"PRINCIPAL_DEPOSIT", "RETURN_AMOUNT"},
+            {"PRINCIPAL_DEPOSIT", "TOTAL_AMOUNT"},
+            {"RETURN_AMOUNT", "TOTAL_AMOUNT"},
+        ):
+            val_a = (pa.value or {}).get("amount") if isinstance(pa.value, dict) else pa.value
+            val_b = (pb.value or {}).get("amount") if isinstance(pb.value, dict) else pb.value
+            if val_a is not None and val_b is not None and val_a == val_b:
+                matched.extend(["PAYMENT_AMOUNT", "PAYMENT_DOMAIN"])
+                return ComparabilityResult(
+                    is_comparable=False,
+                    status="CONSISTENT",
+                    identity_status="COMPATIBLE",
+                    reason_code="PAYMENT_AMOUNT_MATCH",
+                    explanation="계약상 보증금 원금과 반환 요청 금액의 정규화 수치가 일치하여 상호 지지(CONSISTENT)합니다.",
+                    matched_dimensions=matched,
+                    predicate_match_basis="PrincipalDeposit matches ReturnAmount",
+                )
+            else:
+                return ComparabilityResult(
+                    is_comparable=False,
+                    status="DIFFERENT_CONTEXT",
+                    identity_status="DIFFERENT",
+                    reason_code="DIFFERENT_AMOUNT_ATTRIBUTE",
+                    explanation=f"지급 구성 항목이 서로 다른 별개 거래 단계입니다 ({pa.event_subtype} vs {pb.event_subtype}).",
+                    mismatched_dimensions=["PAYMENT_SUBTYPE"],
+                )
+        elif len(subtypes) >= 2 and pa.event_subtype != pb.event_subtype:
+            mismatched.append("PAYMENT_SUBTYPE")
+            return ComparabilityResult(
+                is_comparable=False,
+                status="DIFFERENT_CONTEXT",
+                identity_status="DIFFERENT",
+                reason_code="DIFFERENT_PAYMENT_COMPONENT",
+                explanation=f"지급 구성 항목이 서로 다른 별개 거래 단계입니다 ({pa.event_subtype} vs {pb.event_subtype}).",
+                mismatched_dimensions=mismatched,
+                predicate_match_basis=f"Subtypes: {pa.event_subtype} != {pb.event_subtype}",
+            )
+
+    # 5. 근로계약 단계 분리: 입사(HIRE) vs 퇴사(RESIGNATION)
+    if pa.event_type == "EMPLOYMENT" and pb.event_type == "EMPLOYMENT":
+        if len(subtypes) >= 2 and pa.event_subtype != pb.event_subtype:
+            mismatched.append("EMPLOYMENT_STAGE")
+            return ComparabilityResult(
+                is_comparable=False,
+                status="DIFFERENT_CONTEXT",
+                identity_status="DIFFERENT",
+                reason_code="DIFFERENT_EMPLOYMENT_STAGE",
+                explanation=f"근로관계 단계가 서로 다른 별개 사건입니다 ({pa.event_subtype} vs {pb.event_subtype}).",
+                mismatched_dimensions=mismatched,
+                predicate_match_basis=f"EmploymentSubtypes: {pa.event_subtype} != {pb.event_subtype}",
+            )
+
+    # 6. 채권채무 단계 분리: 대여(LOAN_ORIGINATION) vs 일부 변제(PARTIAL_REPAYMENT)
+    if pa.event_type == "LOAN" and pb.event_type == "LOAN":
+        if len(subtypes) >= 2 and pa.event_subtype != pb.event_subtype:
+            mismatched.append("LOAN_STAGE")
+            return ComparabilityResult(
+                is_comparable=False,
+                status="DIFFERENT_CONTEXT",
+                identity_status="DIFFERENT",
+                reason_code="DIFFERENT_TRANSACTION_STAGE",
+                explanation=f"채권채무 거래 단계가 서로 다른 별개 사실입니다 ({pa.event_subtype} vs {pb.event_subtype}).",
+                mismatched_dimensions=mismatched,
+                predicate_match_basis=f"LoanSubtypes: {pa.event_subtype} != {pb.event_subtype}",
+            )
+
+    # 7. 통지/의사소통 단계 분리: 발송(NOTICE_SENT) vs 도달(NOTICE_REACHED)
+    if pa.event_type == "COMMUNICATION" and pb.event_type == "COMMUNICATION":
+        if "NOTICE_SENT" in subtypes and "NOTICE_REACHED" in subtypes:
+            mismatched.append("COMMUNICATION_STAGE")
+            return ComparabilityResult(
+                is_comparable=False,
+                status="DIFFERENT_CONTEXT",
+                identity_status="DIFFERENT",
+                reason_code="DIFFERENT_COMMUNICATION_STAGE",
+                explanation="의사표시 발송 시점과 도달·수령 시점은 구별되는 별개의 절차입니다.",
+                mismatched_dimensions=mismatched,
+                predicate_match_basis="NoticeSent vs NoticeReached",
+            )
+
+    # 8. 고유 사건 인스턴스(event_instance_key) 및 객체 한정자 불일치 (CASE-02, CASE-07)
+    if pa.object_key and pb.object_key and pa.object_key != pb.object_key:
+        mismatched.append("OBJECT_QUALIFIER")
+        return ComparabilityResult(
+            is_comparable=False,
+            status="DIFFERENT_CONTEXT",
+            identity_status="DIFFERENT",
+            reason_code="DIFFERENT_OBJECT_QUALIFIER",
+            explanation=f"등기부상 서로 다른 권리 또는 채권자 건입니다 ({pa.object_key} vs {pb.object_key}).",
+            mismatched_dimensions=mismatched,
+            subject_match_basis=f"ObjectQualifier: {pa.object_key} != {pb.object_key}",
+        )
+
+    if pa.event_instance_key and pb.event_instance_key and pa.event_instance_key != pb.event_instance_key:
+        mismatched.append("EVENT_INSTANCE")
+        return ComparabilityResult(
+            is_comparable=False,
+            status="DIFFERENT_CONTEXT",
+            identity_status="DIFFERENT",
+            reason_code="DIFFERENT_EVENT_INSTANCE",
+            explanation=f"서로 다른 별개의 사건·거래 인스턴스입니다 ({pa.event_instance_key} vs {pb.event_instance_key}).",
+            mismatched_dimensions=mismatched,
+        )
+
+    # 9. 서로 다른 사건 대분류
+    if pa.event_type and pb.event_type and pa.event_type != pb.event_type:
+        mismatched.append("EVENT_TYPE")
+        return ComparabilityResult(
+            is_comparable=False,
+            status="DIFFERENT_CONTEXT",
+            identity_status="DIFFERENT",
+            reason_code="DIFFERENT_EVENT_TYPE",
+            explanation=f"서로 다른 법률 행위 및 사건 유형입니다 ({pa.event_type} vs {pb.event_type}).",
+            mismatched_dimensions=mismatched,
+            predicate_match_basis=f"EventType: {pa.event_type} != {pb.event_type}",
+        )
+
+    # 10. 행위(EVENT) vs 지속 상태(STATE) 분리 (CASE-01, CASE-05, S04, S05)
+    categories = {pa.semantic_category, pb.semantic_category}
+    if "EVENT" in categories and "STATE" in categories:
+        mismatched.append("SEMANTIC_CATEGORY")
+        return ComparabilityResult(
+            is_comparable=False,
+            status="DIFFERENT_CONTEXT",
+            identity_status="DIFFERENT",
+            reason_code="EVENT_VS_STATE",
+            explanation="과거 특정 시점에 발생한 행위(EVENT)와 이후 특정 시점의 유지 상태(STATE)는 서로 다른 범주의 진술입니다.",
+            mismatched_dimensions=mismatched,
+            temporal_semantics=f"Category A: {pa.semantic_category} vs Category B: {pb.semantic_category}",
+        )
+
+    # 11. 시점 의미 중 약정기일(DUE_AT)과 실제 이행(OCCURRED_AT)이 동일 일자인 경우 (S03)
+    tt_pair = {pa.temporal_type, pb.temporal_type}
+    if "DUE_AT" in tt_pair and "OCCURRED_AT" in tt_pair:
+        if pa.temporal_value and pb.temporal_value and pa.temporal_value == pb.temporal_value:
+            matched.extend(["TEMPORAL_VALUE", "PAYMENT_PERFORMANCE"])
+            return ComparabilityResult(
+                is_comparable=False,
+                status="CONSISTENT",
+                identity_status="COMPATIBLE",
+                reason_code="TEMPORALLY_COMPATIBLE",
+                explanation="약정된 지급기일과 실제 지급일이 동일하여 정상적으로 이행된 양립 가능한 사실입니다.",
+                matched_dimensions=matched,
+                temporal_semantics=f"Both on {pa.temporal_value} (DUE_AT == OCCURRED_AT)",
+            )
+
+    # 12. 의무(OBLIGATION) vs 실제 이행/미이행(EVENT/STATE) 분리
+    if "OBLIGATION" in categories and ("EVENT" in categories or "STATE" in categories):
+        # 단, 금액 사실 간에 동일 금액인 경우는 서술어 형태 차이이므로 제외
+        is_same_payment_amount = False
+        if pa.event_type == "PAYMENT" and pb.event_type == "PAYMENT":
+            val_a = (pa.value or {}).get("amount") if isinstance(pa.value, dict) else pa.value
+            val_b = (pb.value or {}).get("amount") if isinstance(pb.value, dict) else pb.value
+            if val_a is not None and val_b is not None and val_a == val_b:
+                is_same_payment_amount = True
+
+        if not is_same_payment_amount:
+            mismatched.append("OBLIGATION_VS_PERFORMANCE")
+            return ComparabilityResult(
+                is_comparable=False,
+                status="DIFFERENT_CONTEXT",
+                identity_status="DIFFERENT",
+                reason_code="DIFFERENT_OBLIGATION_VS_PERFORMANCE",
+                explanation="계약상 의무 부담 사실과 실제 이행/미이행 상태는 서술 층위가 다른 별개 사실입니다.",
+                mismatched_dimensions=mismatched,
+                predicate_match_basis="Obligation vs Performance status",
+            )
+
+    # 13. 기타 시점 의미 차이
+    if (
+        pa.temporal_type != pb.temporal_type
+        and "NONE" not in (pa.temporal_type, pb.temporal_type)
+    ):
+        if "DUE_AT" in tt_pair and "OCCURRED_AT" in tt_pair:
+            mismatched.append("TEMPORAL_SEMANTICS")
+            return ComparabilityResult(
+                is_comparable=False,
+                status="DIFFERENT_CONTEXT",
+                identity_status="DIFFERENT",
+                reason_code="DIFFERENT_TRANSACTION_STAGE",
+                explanation="약정된 지급기일(DUE_AT)과 실제 지급 발생일(OCCURRED_AT)은 서로 다른 시간적 의미를 가집니다.",
+                mismatched_dimensions=mismatched,
+                temporal_semantics=f"TemporalTypes: {pa.temporal_type} vs {pb.temporal_type}",
+            )
+        if "REQUESTED_AT" in tt_pair and ("OCCURRED_AT" in tt_pair or "REPORTED_AT" in tt_pair):
+            mismatched.append("TEMPORAL_SEMANTICS")
+            return ComparabilityResult(
+                is_comparable=False,
+                status="DIFFERENT_CONTEXT",
+                identity_status="DIFFERENT",
+                reason_code="DIFFERENT_TEMPORAL_SEMANTICS",
+                explanation="반환/퇴거를 요청한 목표일자와 통지 의사표시를 발송한 일자는 서로 다른 시점 의미입니다.",
+                mismatched_dimensions=mismatched,
+                temporal_semantics=f"TemporalTypes: {pa.temporal_type} vs {pb.temporal_type}",
+            )
+        if "VALID_AT" in tt_pair and "OCCURRED_AT" in tt_pair:
+            mismatched.append("TEMPORAL_SEMANTICS")
+            return ComparabilityResult(
+                is_comparable=False,
+                status="DIFFERENT_CONTEXT",
+                identity_status="DIFFERENT",
+                reason_code="EVENT_VS_STATE",
+                explanation="상태 확인 기준일(VALID_AT)과 최초 행위 발생일(OCCURRED_AT)은 양립 가능한 별개 시점입니다.",
+                mismatched_dimensions=mismatched,
+                temporal_semantics=f"TemporalTypes: {pa.temporal_type} vs {pb.temporal_type}",
+            )
+
+    # 14. 반복 발생 의사소통 사건 (COMMUNICATION: 문자, 통화 등) (CASE-07)
+    if (pa.event_type == "COMMUNICATION" or (pa.provenance or {}).get("is_repeatable")) and (
+        pb.event_type == "COMMUNICATION" or (pb.provenance or {}).get("is_repeatable")
+    ):
+        if pa.temporal_value != pb.temporal_value:
+            mismatched.append("COMMUNICATION_DATE")
+            return ComparabilityResult(
+                is_comparable=False,
+                status="DIFFERENT_CONTEXT",
+                identity_status="DIFFERENT",
+                reason_code="REPEATABLE_COMMUNICATION_EVENT",
+                explanation="사건 진행 경과 중 각기 다른 일시에 발송·수신된 별개의 의사소통(문자·통화·문의) 기록입니다.",
+                mismatched_dimensions=mismatched,
+                temporal_semantics=f"Dates: {pa.temporal_value} != {pb.temporal_value}",
+            )
+
+    # 15. 신원 정보(IDENTITY)와 일반 사건(EVENT)의 극성 오탐 차단 (CASE-01)
+    if pa.semantic_category == "STATE" and pa.predicate_key in ("임차인", "임대인", "당사자") and pb.polarity == "NEGATIVE":
+        mismatched.append("IDENTITY_VS_EVENT")
+        return ComparabilityResult(
+            is_comparable=False,
+            status="DIFFERENT_CONTEXT",
+            identity_status="DIFFERENT",
+            reason_code="IDENTITY_VS_EVENT_POLARITY",
+            explanation="당사자 신원 사실과 사건 이행 여부에 관한 부정 진술은 대상 범주가 다릅니다.",
+            mismatched_dimensions=mismatched,
+        )
+
+    # 16. 공통 핵심 개념어(토큰) 존재 여부 검증 (전혀 다른 주제 간의 거짓 비교 승인 차단)
+    from ai_legal_helper.case_intelligence.conflict_detector import extract_content_tokens, _find_shared_concepts
+    tokens_a = extract_content_tokens(pa.statement or "")
+    tokens_b = extract_content_tokens(pb.statement or "")
+    shared_tokens = _find_shared_concepts(tokens_a, tokens_b)
+
+    has_explicit_same_event = (
+        pa.event_type
+        and pb.event_type
+        and pa.event_type != "GENERAL_FACT"
+        and pa.event_type == pb.event_type
+        and pa.event_subtype == pb.event_subtype
+        and pa.event_subtype is not None
+    )
+
+    if not shared_tokens and not has_explicit_same_event:
+        mismatched.append("CONTENT_TOPIC")
+        return ComparabilityResult(
+            is_comparable=False,
+            status="DIFFERENT_CONTEXT",
+            identity_status="DIFFERENT",
+            reason_code="NO_SHARED_CONCEPT",
+            explanation="두 사실 간에 공유되는 핵심 주제어 및 대상 개념이 존재하지 않는 별개의 진술입니다.",
+            mismatched_dimensions=mismatched,
+        )
+
+    # 모든 관문 통과 시 상충 여부 검증 대상(COMPARABLE)으로 승인
+    matched.extend(["SUBJECT_OR_CATEGORY", "EVENT_TYPE", "TEMPORAL_FRAME"])
+    return ComparabilityResult(
+        is_comparable=True,
+        status="COMPARABLE",
+        identity_status="IDENTICAL",
+        reason_code="IDENTICAL_PROPOSITION_CANDIDATE",
+        explanation="동일 대상·동일 행위·동일 시점 의미를 공유하므로 상충 여부 검증 대상입니다.",
+        matched_dimensions=matched,
+        subject_match_basis=f"Category: {pa.semantic_category}, EventType: {pa.event_type}",
+        predicate_match_basis=f"Subtype: {pa.event_subtype}",
+    )
+
 
 def compare_fact_identity(
     fact_a: SemanticFact,
     fact_b: SemanticFact,
 ) -> ComparabilityResult:
-    """두 SemanticFact가 상충 가능 여부를 검증할 수 있는 동일 명제인지 판정한다.
-
-    비교 관문(Comparability Gate)의 핵심 함수로서, 다음 조건을 단계별로 검증한다:
-    1. 문서 로컬 메타데이터(METADATA)는 문서 간 다름이 정상이므로 DIFFERENT_CONTEXT.
-    2. 인식 불확실성(EPISTEMIC_STATUS: '미확인', '확인되지 않음')은 일반 긍정 사실과 상충 금지 (DIFFERENT_CONTEXT).
-    3. 거래 단계(event_subtype) 차이 (예: 계약금 vs 중도금 vs 잔금 vs 합계): DIFFERENT_CONTEXT.
-    4. 의미 범주 차이 (행위 EVENT vs 상태 STATE vs 의무 OBLIGATION): DIFFERENT_CONTEXT.
-    5. 시점 의미 차이 (약정기일 DUE_AT vs 실제발생 OCCURRED_AT vs 상태기준 VALID_AT): DIFFERENT_CONTEXT 또는 TEMPORALLY_COMPATIBLE.
-    6. 반복 발생 의사소통 사건 (COMMUNICATION: 문자, 통화 등)은 시점이 달라도 별개 사건 (DIFFERENT_CONTEXT).
-    7. 별개의 가압류 건 (은행 가압류 vs HUG 가압류): DIFFERENT_CONTEXT.
-
-    Args:
-        fact_a: 첫 번째 SemanticFact.
-        fact_b: 두 번째 SemanticFact.
-
-    Returns:
-        ComparabilityResult: 비교 관문 판정 결과.
-    """
-    # 1. 문서 고유 메타데이터 (DOC_INFO / METADATA)
-    if fact_a.semantic_category == "METADATA" and fact_b.semantic_category == "METADATA":
-        # 서로 다른 파일명이거나 문서 제목이면 DIFFERENT_CONTEXT
-        doc_a = fact_a.provenance.get("document_name")
-        doc_b = fact_b.provenance.get("document_name")
-        if doc_a and doc_b and doc_a != doc_b:
-            return ComparabilityResult(
-                is_comparable=False,
-                status="DIFFERENT_CONTEXT",
-                reason_code="DOCUMENT_LOCAL_METADATA",
-                explanation="서로 다른 증거 문서의 고유 메타데이터(문서 제목·형식)는 개별 문서에 국한된 별개 진술입니다.",
-                subject_match_basis=f"DocA: {doc_a} vs DocB: {doc_b}",
-            )
-
-    # 2. 인식 상태(EPISTEMIC_STATUS)는 사실의 존재 여부를 다투는 긍정 사실과 모순되지 않음
-    if fact_a.polarity == "UNCONFIRMED" or fact_b.polarity == "UNCONFIRMED" or \
-       fact_a.semantic_category == "EPISTEMIC_STATUS" or fact_b.semantic_category == "EPISTEMIC_STATUS":
-        return ComparabilityResult(
-            is_comparable=False,
-            status="DIFFERENT_CONTEXT",
-            reason_code="EPISTEMIC_STATUS_NOT_CONTRADICTION",
-            explanation="진술이 사실의 확인 여부(미확인, 부존재)에 관한 메타 진술이므로 다른 확정 사실과 상충하지 않습니다.",
-            predicate_match_basis="Epistemic status vs Factual assertion",
-        )
-
-    # 3. 거래 단계 및 세부 항목 분리
-    # (A) 금원 지급 구성 항목 (Payment Component) 분리 (예: 계약금 vs 잔금 vs 보증금 총액)
-    subtypes = {fact_a.event_subtype, fact_b.event_subtype} - {None}
-    if fact_a.event_type == "PAYMENT" and fact_b.event_type == "PAYMENT":
-        if len(subtypes) >= 2 and fact_a.event_subtype != fact_b.event_subtype:
-            # 보증금 총액(PRINCIPAL_DEPOSIT / TOTAL_AMOUNT)과 반환 요청 금액(RETURN_AMOUNT)이
-            # 동일한 금액을 가리키는 경우(전액 반환 청구), 동일 명목 금액 비교로 승인
-            is_compatible_deposit = False
-            if subtypes in (
-                {"PRINCIPAL_DEPOSIT", "RETURN_AMOUNT"},
-                {"PRINCIPAL_DEPOSIT", "TOTAL_AMOUNT"},
-                {"RETURN_AMOUNT", "TOTAL_AMOUNT"},
-            ):
-                if fact_a.value is not None and fact_b.value is not None and fact_a.value == fact_b.value:
-                    is_compatible_deposit = True
-
-            if not is_compatible_deposit:
-                return ComparabilityResult(
-                    is_comparable=False,
-                    status="DIFFERENT_CONTEXT",
-                    reason_code="DIFFERENT_PAYMENT_COMPONENT",
-                    explanation=f"지급 구성 항목이 서로 다른 별개 거래 단계입니다 ({fact_a.event_subtype} vs {fact_b.event_subtype}).",
-                    predicate_match_basis=f"Subtypes: {fact_a.event_subtype} != {fact_b.event_subtype}",
-                )
-
-    # (B) 근로계약 단계 분리: 입사(HIRE) vs 퇴사(RESIGNATION)
-    if fact_a.event_type == "EMPLOYMENT" and fact_b.event_type == "EMPLOYMENT":
-        if len(subtypes) >= 2 and fact_a.event_subtype != fact_b.event_subtype:
-            return ComparabilityResult(
-                is_comparable=False,
-                status="DIFFERENT_CONTEXT",
-                reason_code="DIFFERENT_EMPLOYMENT_STAGE",
-                explanation=f"근로관계 단계가 서로 다른 별개 사건입니다 ({fact_a.event_subtype} vs {fact_b.event_subtype}).",
-                predicate_match_basis=f"EmploymentSubtypes: {fact_a.event_subtype} != {fact_b.event_subtype}",
-            )
-
-    # (C) 채권채무 단계 분리: 대여(LOAN_ORIGINATION) vs 일부 변제(PARTIAL_REPAYMENT)
-    if fact_a.event_type == "LOAN" and fact_b.event_type == "LOAN":
-        if len(subtypes) >= 2 and fact_a.event_subtype != fact_b.event_subtype:
-            return ComparabilityResult(
-                is_comparable=False,
-                status="DIFFERENT_CONTEXT",
-                reason_code="DIFFERENT_TRANSACTION_STAGE",
-                explanation=f"채권채무 거래 단계가 서로 다른 별개 사실입니다 ({fact_a.event_subtype} vs {fact_b.event_subtype}).",
-                predicate_match_basis=f"LoanSubtypes: {fact_a.event_subtype} != {fact_b.event_subtype}",
-            )
-
-    # (D) 통지/의사소통 단계 분리: 발송(NOTICE_SENT) vs 도달(NOTICE_REACHED)
-    if fact_a.event_type == "COMMUNICATION" and fact_b.event_type == "COMMUNICATION":
-        if "NOTICE_SENT" in subtypes and "NOTICE_REACHED" in subtypes:
-            return ComparabilityResult(
-                is_comparable=False,
-                status="DIFFERENT_CONTEXT",
-                reason_code="DIFFERENT_COMMUNICATION_STAGE",
-                explanation="의사표시 발송 시점과 도달·수령 시점은 구별되는 별개의 절차입니다.",
-                predicate_match_basis="NoticeSent vs NoticeReached",
-            )
-
-    # (E) 서로 다른 사건 대분류 (예: 계약 체결 CONTRACT_EXECUTION vs 등기 접수 ENCUMBRANCE/REGISTRATION)
-    if (
-        fact_a.event_type
-        and fact_b.event_type
-        and fact_a.event_type != "GENERAL_FACT"
-        and fact_b.event_type != "GENERAL_FACT"
-        and fact_a.event_type != fact_b.event_type
-    ):
-        return ComparabilityResult(
-            is_comparable=False,
-            status="DIFFERENT_CONTEXT",
-            reason_code="DIFFERENT_EVENT_TYPE",
-            explanation=f"서로 다른 법률 행위 및 사건 유형입니다 ({fact_a.event_type} vs {fact_b.event_type}).",
-            predicate_match_basis=f"EventType: {fact_a.event_type} != {fact_b.event_type}",
-        )
-
-    # 4. 행위(EVENT) vs 지속 상태(STATE) 분리
-    # 예: 전입신고일(EVENT) vs 전입유지 여부(STATE), 임대차 시작일(EVENT) vs 갱신 후 유지 상태(STATE)
-    categories = {fact_a.semantic_category, fact_b.semantic_category}
-    if "EVENT" in categories and "STATE" in categories:
-        return ComparabilityResult(
-            is_comparable=False,
-            status="DIFFERENT_CONTEXT",
-            reason_code="EVENT_VS_STATE",
-            explanation=f"과거 특정 시점에 발생한 행위(EVENT)와 이후 특정 시점의 유지 상태(STATE)는 서로 다른 범주의 진술입니다.",
-            temporal_semantics=f"Category A: {fact_a.semantic_category} vs Category B: {fact_b.semantic_category}",
-        )
-
-    # 5. 시점 의미 중 약정기일(DUE_AT)과 실제 이행(OCCURRED_AT)이 동일 일자인 경우 (S03)
-    # 이는 계약 약정에 따른 적시 이행으로 양립 가능한 일치(CONSISTENT) 사실임
-    tt_pair = {fact_a.temporal_type, fact_b.temporal_type}
-    if "DUE_AT" in tt_pair and "OCCURRED_AT" in tt_pair:
-        if fact_a.temporal_value and fact_b.temporal_value and fact_a.temporal_value == fact_b.temporal_value:
-            return ComparabilityResult(
-                is_comparable=False,
-                status="CONSISTENT",
-                reason_code="TEMPORALLY_COMPATIBLE",
-                explanation="약정된 지급기일과 실제 지급일이 동일하여 정상적으로 이행된 양립 가능한 사실입니다.",
-                temporal_semantics=f"Both on {fact_a.temporal_value} (DUE_AT == OCCURRED_AT)",
-            )
-
-    # 6. 의무(OBLIGATION) vs 실제 이행/미이행(EVENT/STATE) 분리
-    # 예: '임대인은 보증금을 반환할 의무가 있다' vs '임차인은 보증금을 돌려받지 못했다'
-    if "OBLIGATION" in categories and ("EVENT" in categories or "STATE" in categories):
-        return ComparabilityResult(
-            is_comparable=False,
-            status="DIFFERENT_CONTEXT",
-            reason_code="DIFFERENT_OBLIGATION_VS_PERFORMANCE",
-            explanation="계약상 의무 부담 사실과 실제 이행/미이행 상태는 서술 층위가 다른 별개 사실입니다.",
-            predicate_match_basis="Obligation vs Performance status",
-        )
-
-    # 7. 시점 의미 차이 (약정기일 DUE_AT vs 실제발생 OCCURRED_AT vs 상태기준일 VALID_AT vs 요청기한 REQUESTED_AT)
-    if (
-        fact_a.temporal_type != fact_b.temporal_type
-        and "NONE" not in (fact_a.temporal_type, fact_b.temporal_type)
-    ):
-        # 기일(DUE_AT) vs 실제지급(OCCURRED_AT) - 날짜가 다른 경우
-        if "DUE_AT" in tt_pair and "OCCURRED_AT" in tt_pair:
-            return ComparabilityResult(
-                is_comparable=False,
-                status="DIFFERENT_CONTEXT",
-                reason_code="DIFFERENT_TRANSACTION_STAGE",
-                explanation="약정된 지급기일(DUE_AT)과 실제 지급 발생일(OCCURRED_AT)은 서로 다른 시간적 의미를 가집니다.",
-                temporal_semantics=f"TemporalTypes: {fact_a.temporal_type} vs {fact_b.temporal_type}",
-            )
-        # 요청기한(REQUESTED_AT) vs 실제통지발송일(REPORTED_AT/OCCURRED_AT)
-        if "REQUESTED_AT" in tt_pair and ("OCCURRED_AT" in tt_pair or "REPORTED_AT" in tt_pair):
-            return ComparabilityResult(
-                is_comparable=False,
-                status="DIFFERENT_CONTEXT",
-                reason_code="DIFFERENT_TEMPORAL_SEMANTICS",
-                explanation="반환/퇴거를 요청한 목표일자와 통지 의사표시를 발송한 일자는 서로 다른 시점 의미입니다.",
-                temporal_semantics=f"TemporalTypes: {fact_a.temporal_type} vs {fact_b.temporal_type}",
-            )
-        # 상태 기준일(VALID_AT) vs 실제 행위일(OCCURRED_AT)
-        if "VALID_AT" in tt_pair and "OCCURRED_AT" in tt_pair:
-            return ComparabilityResult(
-                is_comparable=False,
-                status="DIFFERENT_CONTEXT",
-                reason_code="EVENT_VS_STATE",
-                explanation="상태 확인 기준일(VALID_AT)과 최초 행위 발생일(OCCURRED_AT)은 양립 가능한 별개 시점입니다.",
-                temporal_semantics=f"TemporalTypes: {fact_a.temporal_type} vs {fact_b.temporal_type}",
-            )
-
-    # 7. 반복 발생 의사소통 사건 (COMMUNICATION: 문자, 통화, 문의)
-    if fact_a.is_repeatable_event and fact_b.is_repeatable_event:
-        if fact_a.temporal_value != fact_b.temporal_value:
-            return ComparabilityResult(
-                is_comparable=False,
-                status="DIFFERENT_CONTEXT",
-                reason_code="REPEATABLE_COMMUNICATION_EVENT",
-                explanation="사건 진행 경과 중 각기 다른 일시에 발송·수신된 별개의 의사소통(문자·통화·문의) 기록입니다.",
-                temporal_semantics=f"Dates: {fact_a.temporal_value} != {fact_b.temporal_value}",
-            )
-
-    # 8. 객체 한정자(object_key) 불일치 (예: 은행 가압류 vs HUG 가압류)
-    if fact_a.object_key and fact_b.object_key and fact_a.object_key != fact_b.object_key:
-        return ComparabilityResult(
-            is_comparable=False,
-            status="DIFFERENT_CONTEXT",
-            reason_code="DIFFERENT_OBJECT_QUALIFIER",
-            explanation=f"등기부상 서로 다른 권리 또는 채권자 건입니다 ({fact_a.object_key} vs {fact_b.object_key}).",
-            subject_match_basis=f"ObjectQualifier: {fact_a.object_key} != {fact_b.object_key}",
-        )
-
-    # 9. 신원 정보(IDENTITY)와 일반 사건(EVENT)의 극성 오탐 차단
-    if fact_a.semantic_category == "IDENTITY" and fact_b.semantic_category != "IDENTITY":
-        if fact_b.polarity == "NEGATIVE":
-            return ComparabilityResult(
-                is_comparable=False,
-                status="DIFFERENT_CONTEXT",
-                reason_code="IDENTITY_VS_EVENT_POLARITY",
-                explanation="당사자 신원 사실과 사건 이행 여부에 관한 부정 진술은 대상 범주가 다릅니다.",
-            )
-    if fact_b.semantic_category == "IDENTITY" and fact_a.semantic_category != "IDENTITY":
-        if fact_a.polarity == "NEGATIVE":
-            return ComparabilityResult(
-                is_comparable=False,
-                status="DIFFERENT_CONTEXT",
-                reason_code="IDENTITY_VS_EVENT_POLARITY",
-                explanation="당사자 신원 사실과 사건 이행 여부에 관한 부정 진술은 대상 범주가 다릅니다.",
-            )
-
-    # 위 관문을 모두 통과하면 본격적인 상충/일치 검증 대상(COMPARABLE)으로 승인
-    return ComparabilityResult(
-        is_comparable=True,
-        status="COMPARABLE",
-        reason_code="IDENTICAL_FACT_CANDIDATE",
-        explanation="동일 대상·동일 행위·동일 시점 의미를 공유하므로 상충 여부 검증 대상입니다.",
-        subject_match_basis=f"Category: {fact_a.semantic_category}, EventType: {fact_a.event_type}",
-        predicate_match_basis=f"Subtype: {fact_a.event_subtype}",
-    )
+    """두 SemanticFact가 상충 가능 여부를 검증할 수 있는 동일 명제인지 판정한다 (SemanticProposition 위임)."""
+    prop_a = fact_a.to_proposition()
+    prop_b = fact_b.to_proposition()
+    return check_proposition_comparability(prop_a, prop_b)
 
 
 # ==============================================================================

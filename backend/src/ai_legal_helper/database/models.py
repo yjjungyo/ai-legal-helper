@@ -9,7 +9,7 @@ Case Intelligence 데이터베이스 모델 (Database Models)
 
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, Float, Text, DateTime, ForeignKey, JSON, desc
+from sqlalchemy import Column, String, Integer, Float, Text, DateTime, ForeignKey, JSON, Boolean, desc
 from sqlalchemy.orm import relationship
 
 from ai_legal_helper.database.session import Base
@@ -95,6 +95,10 @@ class Case(Base):
     action_revisions = relationship("ActionRevision", back_populates="case", cascade="all, delete-orphan")
     legal_documents = relationship("LegalDocument", back_populates="case", cascade="all, delete-orphan")
     consultations = relationship("ConsultationRecord", back_populates="case", cascade="all, delete-orphan", order_by="desc(ConsultationRecord.created_at)")
+    evidence_assessments = relationship("EvidenceAssessment", back_populates="case", cascade="all, delete-orphan")
+    fact_adjudications = relationship("FactAdjudication", back_populates="case", cascade="all, delete-orphan")
+    evidence_gaps = relationship("EvidenceGap", back_populates="case", cascade="all, delete-orphan")
+    comparison_audits = relationship("FactComparisonAudit", back_populates="case", cascade="all, delete-orphan")
 
 class Party(Base):
     """
@@ -139,6 +143,8 @@ class Fact(Base):
     created_at = Column(DateTime, default=get_kst_now)
 
     case = relationship("Case", back_populates="facts")
+    adjudications = relationship("FactAdjudication", back_populates="fact", cascade="all, delete-orphan")
+    gaps = relationship("EvidenceGap", back_populates="fact")
 
 class Event(Base):
     """
@@ -227,6 +233,7 @@ class EvidenceDocument(Base):
     case = relationship("Case", back_populates="evidences")
     spans = relationship("EvidenceSpan", back_populates="document", cascade="all, delete-orphan")
     claims = relationship("EvidenceClaim", back_populates="document", cascade="all, delete-orphan")
+    assessments = relationship("EvidenceAssessment", back_populates="document", cascade="all, delete-orphan")
 
 class EvidenceSpan(Base):
     """
@@ -278,6 +285,9 @@ class EvidenceClaim(Base):
     case = relationship("Case", back_populates="claims")
     document = relationship("EvidenceDocument", back_populates="claims")
     spans = relationship("EvidenceSpan", secondary="evidence_span_claim_links", back_populates="claim_links")
+    assessments = relationship("EvidenceAssessment", back_populates="claim", cascade="all, delete-orphan")
+    adjudications = relationship("FactAdjudication", back_populates="claim")
+    gaps = relationship("EvidenceGap", back_populates="claim")
 
 class EvidenceSpanClaimLink(Base):
     """
@@ -560,4 +570,115 @@ class ConsultationRecord(Base):
 
     case = relationship("Case", back_populates="consultations")
     user = relationship("User")
+
+
+class EvidenceAssessment(Base):
+    """
+    증거 신뢰성 평가(EvidenceAssessment) 모델
+    
+    개별 증거 문서와 추출된 사실 명제 간의 7대 차원(출처진정성, 직접성, 관련성,
+    완전성, 시점적합성, 상호보강성, 출처품질) 신뢰도를 평가하여 기록한다.
+    """
+    __tablename__ = "evidence_assessments"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    case_id = Column(String, ForeignKey("cases.id", ondelete="CASCADE"), nullable=False, index=True)
+    evidence_id = Column(String, ForeignKey("evidence_documents.id", ondelete="CASCADE"), nullable=False, index=True)
+    claim_id = Column(String, ForeignKey("evidence_claims.id", ondelete="CASCADE"), nullable=True, index=True)
+    proposition_hash = Column(String, nullable=True, index=True)
+    source_authenticity = Column(String, nullable=False, default="UNVERIFIED")
+    directness = Column(String, nullable=False, default="INDIRECT_CIRCUMSTANTIAL")
+    relevance = Column(String, nullable=False, default="DIRECTLY_RELEVANT")
+    completeness = Column(String, nullable=False, default="COMPLETE")
+    temporal_applicability = Column(String, nullable=False, default="CONTEMPORANEOUS")
+    corroboration = Column(String, nullable=False, default="UNCORROBORATED")
+    provenance_quality = Column(String, nullable=False, default="MEDIUM")
+    assessment_status = Column(String, nullable=False, default="PROVISIONAL")
+    reliability_score = Column(Float, nullable=False, default=0.5)
+    proof_scope = Column(JSON, nullable=True)
+    summary = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=get_kst_now)
+    updated_at = Column(DateTime, default=get_kst_now, onupdate=get_kst_now)
+
+    case = relationship("Case", back_populates="evidence_assessments")
+    document = relationship("EvidenceDocument", back_populates="assessments")
+    claim = relationship("EvidenceClaim", back_populates="assessments")
+
+
+class FactAdjudication(Base):
+    """
+    사실 확정 및 심리 결과(FactAdjudication) 모델
+    
+    개별 사실 명제에 대한 증거 지원 여부, 타 증거와의 보강/대립 관계,
+    최종 확정 상태(EVIDENCE_SUPPORTED, CORROBORATED, PARTY_ALLEGED,
+    EVIDENCE_INCOMPLETE, GENUINELY_DISPUTED)를 기록한다.
+    """
+    __tablename__ = "fact_adjudications"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    case_id = Column(String, ForeignKey("cases.id", ondelete="CASCADE"), nullable=False, index=True)
+    fact_id = Column(String, ForeignKey("facts.id", ondelete="CASCADE"), nullable=True, index=True)
+    claim_id = Column(String, ForeignKey("evidence_claims.id", ondelete="SET NULL"), nullable=True, index=True)
+    adjudication_status = Column(String, nullable=False, default="EVIDENCE_SUPPORTED")
+    primary_relation = Column(String, nullable=False, default="SUPPORTS")
+    confidence = Column(Float, nullable=False, default=1.0)
+    adjudication_basis = Column(Text, nullable=True)
+    supporting_evidence_ids = Column(JSON, nullable=True)
+    contradicting_evidence_ids = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=get_kst_now)
+    updated_at = Column(DateTime, default=get_kst_now, onupdate=get_kst_now)
+
+    case = relationship("Case", back_populates="fact_adjudications")
+    fact = relationship("Fact", back_populates="adjudications")
+    claim = relationship("EvidenceClaim", back_populates="adjudications")
+
+
+class EvidenceGap(Base):
+    """
+    증거 공백 및 보완 추천(EvidenceGap) 모델
+    
+    사실관계의 미확인, 자료 미제출 등 필수 증거의 결함을 추적하고,
+    권장되는 보완 서류와 행동 지침을 사용자에게 제공한다.
+    """
+    __tablename__ = "evidence_gaps"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    case_id = Column(String, ForeignKey("cases.id", ondelete="CASCADE"), nullable=False, index=True)
+    claim_id = Column(String, ForeignKey("evidence_claims.id", ondelete="SET NULL"), nullable=True, index=True)
+    fact_id = Column(String, ForeignKey("facts.id", ondelete="SET NULL"), nullable=True, index=True)
+    gap_type = Column(String, nullable=False, index=True)
+    target_proposition = Column(Text, nullable=False)
+    description = Column(Text, nullable=True)
+    recommended_document_types = Column(JSON, nullable=True)
+    recommended_action = Column(Text, nullable=True)
+    priority = Column(String, nullable=False, default="MEDIUM")
+    is_resolved = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=get_kst_now)
+    updated_at = Column(DateTime, default=get_kst_now, onupdate=get_kst_now)
+
+    case = relationship("Case", back_populates="evidence_gaps")
+    claim = relationship("EvidenceClaim", back_populates="gaps")
+    fact = relationship("Fact", back_populates="gaps")
+
+
+class FactComparisonAudit(Base):
+    """
+    사실 비교 및 상충 검증 감사 이력(FactComparisonAudit) 모델
+    
+    Claim과 Fact 간의 Comparability Gate 검증 결과 및
+    판정 근거(차원별 일치/불일치)를 영구 감사 로그로 보관한다.
+    """
+    __tablename__ = "fact_comparison_audits"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    case_id = Column(String, ForeignKey("cases.id", ondelete="CASCADE"), nullable=False, index=True)
+    claim_id = Column(String, ForeignKey("evidence_claims.id", ondelete="SET NULL"), nullable=True, index=True)
+    fact_id = Column(String, ForeignKey("facts.id", ondelete="SET NULL"), nullable=True, index=True)
+    is_comparable = Column(Boolean, nullable=False, default=False)
+    comparability_reason = Column(String, nullable=True)
+    relation = Column(String, nullable=True)
+    audit_details = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=get_kst_now)
+
+    case = relationship("Case", back_populates="comparison_audits")
 

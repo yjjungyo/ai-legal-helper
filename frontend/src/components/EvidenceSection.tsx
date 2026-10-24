@@ -13,7 +13,9 @@ import {
   extractEvidence, 
   getEvidenceClaims, 
   reviewEvidenceClaim, 
-  getEvidenceConflicts 
+  getEvidenceConflicts,
+  getEvidenceAdjudications,
+  getEvidenceGaps,
 } from '../api/evidenceClient';
 import type { EvidenceDocument, EvidenceClaim } from '../types/evidence';
 
@@ -283,6 +285,9 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
   const [claims, setClaims] = useState<EvidenceClaim[]>([]);
   const [conflicts, setConflicts] = useState<any[]>([]);
   const [conflictError, setConflictError] = useState<string | null>(null);
+  const [adjudications, setAdjudications] = useState<any[]>([]);
+  const [evidenceGaps, setEvidenceGaps] = useState<any[]>([]);
+  const [activeInsightTab, setActiveInsightTab] = useState<'verified' | 'gaps' | 'conflicts'>('verified');
   const [uploading, setUploading] = useState(false);
   const [showReanalyzePrompt, setShowReanalyzePrompt] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -303,6 +308,7 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
   useEffect(() => {
     loadEvidences();
     loadConflicts();
+    loadAdjudicationsAndGaps();
   }, [caseId]);
 
   useEffect(() => {
@@ -328,6 +334,7 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
         await loadClaims(selectedDocId);
       }
       await loadConflicts();
+      await loadAdjudicationsAndGaps();
     }, 2500);
     return () => clearInterval(timer);
   }, [documents, selectedDocId, caseId]);
@@ -361,6 +368,22 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
     } catch (e: any) {
       console.error('증거 모순 분석 로딩 실패:', e);
       setConflictError(e?.message || '증거 상충 분석 결과를 불러오지 못했습니다. 네트워크 또는 서버 상태를 확인해 주세요.');
+    }
+  };
+
+  /**
+   * 확정 사실 심리 결과(FactAdjudication) 및 증거 공백(EvidenceGap) 로드
+   */
+  const loadAdjudicationsAndGaps = async () => {
+    try {
+      const [adjRes, gapRes] = await Promise.all([
+        getEvidenceAdjudications(caseId).catch(() => ({ adjudications: [] })),
+        getEvidenceGaps(caseId).catch(() => ({ gaps: [] })),
+      ]);
+      setAdjudications(adjRes.adjudications || []);
+      setEvidenceGaps(gapRes.gaps || []);
+    } catch (e) {
+      console.error('심리 및 공백 데이터 로딩 실패:', e);
     }
   };
 
@@ -438,6 +461,7 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
         loadClaims(selectedDocId),
         loadEvidences(),
         loadConflicts(),
+        loadAdjudicationsAndGaps(),
       ]);
       setShowReanalyzePrompt(true);
       onRefreshCase();
@@ -463,6 +487,7 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
         loadClaims(selectedDocId),
         loadEvidences(),
         loadConflicts(),
+        loadAdjudicationsAndGaps(),
       ]);
       if (currentAction === 'EDIT') {
         setShowReanalyzePrompt(true);
@@ -781,231 +806,257 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
         </div>
       </div>
 
-      {/* 3. 증거 상충(Conflicts) 조회 오류 배너 및 확정 상충 / 추가 확인 필요 분리 카드 */}
-      {conflictError && (
-        <div
-          className="card"
-          style={{
-            borderColor: 'var(--danger-border)',
-            backgroundColor: 'var(--danger-bg)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: '12px',
-          }}
-        >
+      {/* 3. 증거 분석 인사이트: 1) 확인된 사실, 2) 증거 보완 필요, 3) 실제 상충 */}
+      <div className="card" style={{ marginTop: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
           <div>
-            <strong style={{ color: 'var(--danger)', fontSize: '0.95em', display: 'block', marginBottom: '2px' }}>
-              ⚠️ 증거 상충 분석 결과를 불러오지 못했습니다
-            </strong>
-            <span style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>
-              {conflictError}
+            <h3 style={{ margin: 0, fontSize: '1.05em', fontWeight: 700 }}>
+              ⚖️ 사실관계 분석 및 증거 검증 결과
+            </h3>
+            <span style={{ fontSize: '0.84em', color: 'var(--text-secondary)' }}>
+              처분문서 신뢰도 평가, 요건사실 입증 완성도 및 상충 검증 현황입니다.
             </span>
           </div>
-          <button onClick={loadConflicts} className="btn btn-secondary btn-sm">
-            다시 시도
-          </button>
-        </div>
-      )}
-
-      {!conflictError && conflicts.length > 0 && (() => {
-        const confirmedConflicts = conflicts.filter(
-          (c) => typeof c === 'string' || c?.status !== 'POTENTIAL_CONFLICT'
-        );
-        const potentialConflicts = conflicts.filter(
-          (c) => typeof c === 'object' && c?.status === 'POTENTIAL_CONFLICT'
-        );
-
-        const formatSpanLocation = (item: any): string | null => {
-          const parts: string[] = [];
-          if (item?.page_number !== undefined && item?.page_number !== null) {
-            parts.push(`p.${item.page_number}`);
-          }
-          if (item?.paragraph_index !== undefined && item?.paragraph_index !== null) {
-            parts.push(`문단 ${Number(item.paragraph_index) + 1}`);
-          }
-          return parts.length > 0 ? parts.join(', ') : null;
-        };
-
-        const renderConflictCard = (c: any, idx: number, isPotential: boolean) => {
-          if (typeof c === 'string') {
-            return (
-              <div
-                key={idx}
-                style={{
-                  padding: '10px 12px',
-                  borderRadius: 'var(--radius-sm)',
-                  backgroundColor: 'var(--surface)',
-                  border: '1px solid var(--danger-border)',
-                  fontSize: '0.86em',
-                  color: 'var(--danger)',
-                }}
-              >
-                {c}
-              </div>
-            );
-          }
-          const explanation =
-            c.explanation ||
-            c.description ||
-            (isPotential
-              ? '추가 사실관계 또는 시점 확인이 필요한 잠재 상충 항목입니다.'
-              : '증거 진술과 기존 사건 사실 간 상충이 감지되었습니다.');
-          const spanLoc = formatSpanLocation(c);
-
-          return (
-            <div
-              key={c.conflict_id || idx}
-              style={{
-                padding: '12px 14px',
-                borderRadius: 'var(--radius-sm)',
-                backgroundColor: 'var(--surface)',
-                border: isPotential ? '1px solid var(--border)' : '1px solid var(--danger-border)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px',
-              }}
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className={`btn btn-sm ${activeInsightTab === 'verified' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setActiveInsightTab('verified')}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <span className={isPotential ? 'badge badge-amber' : 'badge badge-red'}>
-                  {isPotential ? '추가 확인 필요' : '확정 상충'}
-                </span>
-                <span
-                  style={{
-                    fontSize: '0.88em',
-                    fontWeight: 600,
-                    color: isPotential ? 'var(--text-main)' : 'var(--danger)',
-                  }}
-                >
-                  {explanation}
-                </span>
+              ✓ 확인된 사실 ({adjudications.filter((a) => a.adjudication_status === 'EVIDENCE_SUPPORTED' || a.adjudication_status === 'CORROBORATED').length})
+            </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${activeInsightTab === 'gaps' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setActiveInsightTab('gaps')}
+            >
+              📋 증거 보완 필요 ({evidenceGaps.length})
+            </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${activeInsightTab === 'conflicts' ? 'btn-danger' : 'btn-secondary'}`}
+              onClick={() => setActiveInsightTab('conflicts')}
+            >
+              ⚠️ 실제 상충 ({conflicts.filter((c) => c.status === 'CONTRADICTION').length})
+            </button>
+          </div>
+        </div>
+
+        {/* 탭 1: 확인된 사실 */}
+        {activeInsightTab === 'verified' && (
+          <div>
+            {adjudications.filter((a) => a.adjudication_status === 'EVIDENCE_SUPPORTED' || a.adjudication_status === 'CORROBORATED').length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '0.9em' }}>
+                승인된 직접 처분문서 또는 공문서로 뒷받침된 사실이 아직 없습니다.
               </div>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-                  gap: '8px',
-                  fontSize: '0.84em',
-                }}
-              >
-                {c.claim_statement && (
-                  <div
-                    style={{
-                      padding: '8px 10px',
-                      borderRadius: 'var(--radius-sm)',
-                      backgroundColor: 'var(--bg-secondary)',
-                      border: '1px solid var(--border-color)',
-                    }}
-                  >
-                    <div style={{ fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                      📄 증거 문서 진술 {c.document_name ? `(${c.document_name})` : ''}
-                      {spanLoc && (
-                        <span style={{ marginLeft: '6px', color: 'var(--primary)' }}>
-                          [{spanLoc}]
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {adjudications
+                  .filter((a) => a.adjudication_status === 'EVIDENCE_SUPPORTED' || a.adjudication_status === 'CORROBORATED')
+                  .map((adj) => (
+                    <div
+                      key={adj.id}
+                      style={{
+                        padding: '10px 14px',
+                        borderRadius: 'var(--radius-sm)',
+                        backgroundColor: 'var(--surface-alt)',
+                        border: '1px solid var(--border)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <span className="badge badge-green" style={{ fontSize: '0.8em' }}>
+                          {adj.adjudication_status === 'CORROBORATED' ? '다중 보강 사실' : '직접 입증 사실'}
                         </span>
+                        {adj.primary_relation && adj.primary_relation !== 'SUPPORTS' && (
+                          <span className="badge badge-blue" style={{ fontSize: '0.8em' }}>
+                            관계: {adj.primary_relation}
+                          </span>
+                        )}
+                        {adj.document_name && (
+                          <span style={{ fontSize: '0.82em', color: 'var(--text-secondary)' }}>
+                            📄 {adj.document_name}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '0.9em', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        {adj.statement}
+                      </div>
+                      {adj.adjudication_basis && (
+                        <div style={{ fontSize: '0.8em', color: 'var(--text-muted)' }}>
+                          💡 {adj.adjudication_basis}
+                        </div>
                       )}
                     </div>
-                    <div style={{ color: 'var(--text-primary)' }}>{c.claim_statement}</div>
-                  </div>
-                )}
-                {c.target_description && (
-                  <div
-                    style={{
-                      padding: '8px 10px',
-                      borderRadius: 'var(--radius-sm)',
-                      backgroundColor: 'var(--bg-secondary)',
-                      border: '1px solid var(--border-color)',
-                    }}
-                  >
-                    <div style={{ fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                      📌 비교 대상 기존 사실 {c.target_document_name ? `(${c.target_document_name})` : ''}
-                    </div>
-                    <div style={{ color: 'var(--text-primary)' }}>{c.target_description}</div>
-                  </div>
-                )}
-              </div>
-              {(c.reason_code || c.subject_match_basis || c.predicate_match_basis || c.temporal_semantics) && (
-                <div
-                  style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: '6px',
-                    fontSize: '0.78em',
-                    color: 'var(--text-muted)',
-                    paddingTop: '6px',
-                    borderTop: '1px dashed var(--border)',
-                  }}
-                >
-                  {c.reason_code && (
-                    <span className="badge badge-gray" style={{ fontSize: '0.92em' }}>
-                      판정 사유: {c.reason_code}
-                    </span>
-                  )}
-                  {c.subject_match_basis && (
-                    <span style={{ backgroundColor: 'var(--surface-alt)', padding: '2px 6px', borderRadius: '4px' }}>
-                      대상 근거: {c.subject_match_basis}
-                    </span>
-                  )}
-                  {c.predicate_match_basis && (
-                    <span style={{ backgroundColor: 'var(--surface-alt)', padding: '2px 6px', borderRadius: '4px' }}>
-                      행위 근거: {c.predicate_match_basis}
-                    </span>
-                  )}
-                  {c.temporal_semantics && (
-                    <span style={{ backgroundColor: 'var(--surface-alt)', padding: '2px 6px', borderRadius: '4px' }}>
-                      시점 의미: {c.temporal_semantics}
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        };
-
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {confirmedConflicts.length > 0 && (
-              <div
-                className="card"
-                style={{
-                  borderColor: 'var(--danger-border)',
-                  backgroundColor: 'var(--danger-bg)',
-                }}
-              >
-                <h4 style={{ margin: '0 0 6px 0', color: 'var(--danger)', fontSize: '1em', fontWeight: 700 }}>
-                  ⚠️ 확정 상충 ({confirmedConflicts.length}건)
-                </h4>
-                <p style={{ fontSize: '0.86em', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                  동일한 사실 대상·속성에 대해 서로 양립할 수 없는 진술이 확인되었습니다. 원문 출처와 경위를 확인해 주세요.
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {confirmedConflicts.map((c, i) => renderConflictCard(c, i, false))}
-                </div>
-              </div>
-            )}
-
-            {potentialConflicts.length > 0 && (
-              <div
-                className="card"
-                style={{
-                  borderColor: 'var(--border)',
-                  backgroundColor: 'var(--surface-alt)',
-                }}
-              >
-                <h4 style={{ margin: '0 0 6px 0', color: 'var(--text-main)', fontSize: '1em', fontWeight: 700 }}>
-                  🔎 추가 확인 필요 ({potentialConflicts.length}건)
-                </h4>
-                <p style={{ fontSize: '0.86em', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                  시점·조건 또는 문맥에 따라 양립 가능 여부가 달라질 수 있는 진술입니다. 계약 변경이나 후속 합의 여부를 확인해 주세요.
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {potentialConflicts.map((c, i) => renderConflictCard(c, i, true))}
-                </div>
+                  ))}
               </div>
             )}
           </div>
-        );
-      })()}
+        )}
+
+        {/* 탭 2: 증거 보완 필요 */}
+        {activeInsightTab === 'gaps' && (
+          <div>
+            {evidenceGaps.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '0.9em' }}>
+                현재 발견된 필수 증거 공백이 없습니다. 모든 요건사실이 증빙되었거나 추가 자료가 불필요합니다.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {evidenceGaps.map((gap) => (
+                  <div
+                    key={gap.id}
+                    style={{
+                      padding: '12px 14px',
+                      borderRadius: 'var(--radius-sm)',
+                      backgroundColor: 'var(--surface)',
+                      border: '1px solid var(--border-color)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span className={gap.priority === 'HIGH' ? 'badge badge-red' : 'badge badge-amber'}>
+                        {gap.priority === 'HIGH' ? '보완 필수' : '보완 권장'}
+                      </span>
+                      <strong style={{ fontSize: '0.92em', color: 'var(--text-primary)' }}>
+                        {gap.target_proposition}
+                      </strong>
+                    </div>
+                    <div style={{ fontSize: '0.86em', color: 'var(--text-secondary)' }}>
+                      {gap.description}
+                    </div>
+                    {gap.recommended_document_types && gap.recommended_document_types.length > 0 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', paddingTop: '4px' }}>
+                        <span style={{ fontSize: '0.8em', color: 'var(--text-muted)' }}>추천 제출 서류:</span>
+                        {gap.recommended_document_types.map((docType: string, i: number) => (
+                          <span
+                            key={i}
+                            className="badge badge-indigo"
+                            style={{ fontSize: '0.8em', padding: '3px 8px' }}
+                          >
+                            📎 {docType}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {gap.recommended_action && (
+                      <div
+                        style={{
+                          fontSize: '0.82em',
+                          color: 'var(--primary)',
+                          backgroundColor: 'var(--surface-alt)',
+                          padding: '6px 10px',
+                          borderRadius: '4px',
+                        }}
+                      >
+                        👉 권장 조치: {gap.recommended_action}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 탭 3: 실제 상충 */}
+        {activeInsightTab === 'conflicts' && (
+          <div>
+            {conflictError && (
+              <div
+                style={{
+                  padding: '12px',
+                  borderRadius: 'var(--radius-sm)',
+                  backgroundColor: 'var(--danger-bg)',
+                  border: '1px solid var(--danger-border)',
+                  color: 'var(--danger)',
+                  fontSize: '0.88em',
+                  marginBottom: '12px',
+                }}
+              >
+                ⚠️ {conflictError}
+              </div>
+            )}
+            {!conflictError && conflicts.filter((c) => c?.status === 'CONTRADICTION').length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '0.9em' }}>
+                🎉 확인된 실제 상충(모순) 내역이 없습니다. 증거 간 내용이 일치하거나 양립 가능합니다.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {conflicts
+                  .filter((c) => typeof c === 'string' || c?.status === 'CONTRADICTION')
+                  .map((c, idx) => {
+                    if (typeof c === 'string') {
+                      return (
+                        <div
+                          key={idx}
+                          style={{
+                            padding: '10px 12px',
+                            borderRadius: 'var(--radius-sm)',
+                            backgroundColor: 'var(--surface)',
+                            border: '1px solid var(--danger-border)',
+                            fontSize: '0.86em',
+                            color: 'var(--danger)',
+                          }}
+                        >
+                          {c}
+                        </div>
+                      );
+                    }
+                    return (
+                      <div
+                        key={c.conflict_id || idx}
+                        style={{
+                          padding: '12px 14px',
+                          borderRadius: 'var(--radius-sm)',
+                          backgroundColor: 'var(--surface)',
+                          border: '1px solid var(--danger-border)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <span className="badge badge-red">확정 상충</span>
+                          <span style={{ fontSize: '0.88em', fontWeight: 600, color: 'var(--danger)' }}>
+                            {c.explanation || c.description || '서로 양립할 수 없는 대립 사실이 감지되었습니다.'}
+                          </span>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '8px', fontSize: '0.84em' }}>
+                          {c.claim_statement && (
+                            <div style={{ padding: '8px 10px', borderRadius: 'var(--radius-sm)', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
+                              <div style={{ fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                                📄 증거 문서 진술 {c.document_name ? `(${c.document_name})` : ''}
+                              </div>
+                              <div style={{ color: 'var(--text-primary)' }}>{c.claim_statement}</div>
+                            </div>
+                          )}
+                          {c.target_description && (
+                            <div style={{ padding: '8px 10px', borderRadius: 'var(--radius-sm)', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
+                              <div style={{ fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                                📌 비교 대상 기존 사실 {c.target_document_name ? `(${c.target_document_name})` : ''}
+                              </div>
+                              <div style={{ color: 'var(--text-primary)' }}>{c.target_description}</div>
+                            </div>
+                          )}
+                        </div>
+                        {c.reason_code && (
+                          <div style={{ fontSize: '0.78em', color: 'var(--text-muted)', paddingTop: '4px' }}>
+                            판정 사유: <span className="badge badge-gray">{c.reason_code}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* 사실 검토(수정 승인 / 반려) 인라인 모달 */}
       <ReviewModal

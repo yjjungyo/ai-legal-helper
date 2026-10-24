@@ -23,6 +23,10 @@ from ai_legal_helper.database.models import (
     Case,
     User,
     AuditLog,
+    EvidenceAssessment,
+    FactAdjudication,
+    EvidenceGap,
+    FactComparisonAudit,
 )
 from ai_legal_helper.api.dependencies import get_current_user, get_case_for_user
 from ai_legal_helper.case_intelligence.evidence_ingestion import ingest_evidence, extract_text_from_evidence
@@ -430,6 +434,62 @@ def get_evidence_conflicts(
         "contradiction_count": len(contradictions_only),
         "potential_conflict_count": len(potential_only),
     }
+
+
+@router.get("/adjudications")
+def get_case_fact_adjudications(
+    case: Case = Depends(get_case_for_user),
+    db: Session = Depends(get_db),
+):
+    """사건의 모든 확정 사실 심리 결과(FactAdjudication) 및 증거 신뢰성 목록을 반환한다."""
+    adjudications = db.query(FactAdjudication).filter_by(case_id=case.id).all()
+    facts = {f.id: f for f in db.query(Fact).filter_by(case_id=case.id).all()}
+    claims = {c.id: c for c in db.query(EvidenceClaim).filter_by(case_id=case.id).all()}
+    docs = {d.id: d for d in db.query(EvidenceDocument).filter_by(case_id=case.id).all()}
+
+    results = []
+    for adj in adjudications:
+        fact = facts.get(adj.fact_id) if adj.fact_id else None
+        claim = claims.get(adj.claim_id) if adj.claim_id else None
+        doc = docs.get(claim.evidence_id) if (claim and claim.evidence_id) else None
+        results.append({
+            "id": adj.id,
+            "fact_id": adj.fact_id,
+            "claim_id": adj.claim_id,
+            "statement": fact.statement if fact else (claim.statement if claim else ""),
+            "adjudication_status": adj.adjudication_status,
+            "primary_relation": adj.primary_relation,
+            "confidence": adj.confidence,
+            "adjudication_basis": adj.adjudication_basis,
+            "document_name": doc.original_filename if doc else None,
+            "supporting_evidence_ids": adj.supporting_evidence_ids or [],
+            "contradicting_evidence_ids": adj.contradicting_evidence_ids or [],
+            "created_at": adj.created_at.isoformat() if adj.created_at else None,
+        })
+    return {"adjudications": results, "total_count": len(results)}
+
+
+@router.get("/gaps")
+def get_case_evidence_gaps(
+    case: Case = Depends(get_case_for_user),
+    db: Session = Depends(get_db),
+):
+    """사건의 증거 공백(EvidenceGap) 및 권장 보완 조치 목록을 반환한다."""
+    gaps = db.query(EvidenceGap).filter_by(case_id=case.id).all()
+    results = []
+    for g in gaps:
+        results.append({
+            "id": g.id,
+            "gap_type": g.gap_type,
+            "target_proposition": g.target_proposition,
+            "description": g.description,
+            "recommended_document_types": g.recommended_document_types or [],
+            "recommended_action": g.recommended_action,
+            "priority": g.priority,
+            "is_resolved": g.is_resolved,
+            "created_at": g.created_at.isoformat() if g.created_at else None,
+        })
+    return {"gaps": results, "total_count": len(results)}
 
 
 @router.post("/{evidence_id}/extract")

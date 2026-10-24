@@ -61,3 +61,15 @@ export const getEvidenceConflicts = async (caseId: string): Promise<any> => {
   return response.json();
 };
 
+export const getEvidenceAdjudications = async (caseId: string): Promise<any> => {
+  const response = await apiFetch(`/cases/${caseId}/evidence/adjudications`);
+  if (!response.ok) throw new Error('Failed to get adjudications');
+  return response.json();
+};
+
+export const getEvidenceGaps = async (caseId: string): Promise<any> => {
+  const response = await apiFetch(`/cases/${caseId}/evidence/gaps`);
+  if (!response.ok) throw new Error('Failed to get evidence gaps');
+  return response.json();
+};
+

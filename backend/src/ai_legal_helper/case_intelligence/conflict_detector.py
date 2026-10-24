@@ -814,9 +814,9 @@ def evaluate_claim_against_fact(
     use_llm = _should_use_llm_verification(enable_llm_verification)
 
     fact_slots = build_structured_slots(
-        statement=fact.statement or "",
-        claim_type=fact.fact_type,
-        evidence_id=fact.source_ref,
+        statement=getattr(fact, "statement", "") or "",
+        claim_type=getattr(fact, "fact_type", "GENERAL"),
+        evidence_id=getattr(fact, "source_ref", None),
         document_name=fact_doc_name,
     )
 
