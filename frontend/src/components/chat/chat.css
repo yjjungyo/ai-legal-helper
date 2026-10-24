@@ -273,6 +273,27 @@
   box-shadow: 0 2px 8px rgba(37, 99, 235, 0.06);
 }
 
+/* 최종 답변 완료 후 보존되는 진행 상태 카드 */
+.chat-progress-card.completed {
+  background-color: #f8fafc;
+  border-color: #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  padding: 12px 18px;
+  transition: all 0.2s ease;
+}
+
+.chat-progress-card.completed.collapsed .chat-progress-header {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.chat-progress-card.completed.expanded .chat-progress-header {
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
 .chat-progress-header {
   display: flex;
   align-items: center;

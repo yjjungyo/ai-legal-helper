@@ -4,7 +4,7 @@
  * 실시간 상태(RUNNING, COMPLETED, WAITING_APPROVAL, SKIPPED, FAILED)를 시각화합니다.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import type { ConsultationProgress as IConsultationProgress, ConsultationStep, ApprovalRequest } from '../../types/consultation';
 
 export interface ConsultationProgressProps {
@@ -22,6 +22,8 @@ export interface ConsultationProgressProps {
   requestId: string;
   /** 승인/거절 액션 처리 중 여부 */
   isActionLoading?: boolean;
+  /** 최종 분석 및 답변 완료 여부 (완료 시 보존 모드로 전환) */
+  isCompleted?: boolean;
 }
 
 /**
@@ -78,12 +80,24 @@ export const ConsultationProgress: React.FC<ConsultationProgressProps> = ({
   onReject,
   requestId,
   isActionLoading = false,
+  isCompleted = false,
 }) => {
+  // 최종 답변 완료 후에도 진행과정을 확인할 수 있도록 기본 펼침 상태 유지
+  const [isExpanded, setIsExpanded] = useState(true);
+
   // 서버로부터 전달받은 단계 목록이 있으면 사용하고, 없으면 기본 목록에 상태 보정
   let steps = progress?.steps && progress.steps.length > 0 ? progress.steps : DEFAULT_STEPS;
 
-  // HILT 승인 대기 상태인 경우 5번째 단계를 WAITING_APPROVAL로 보정
-  if (status === 'APPROVAL_REQUIRED') {
+  const completedMode = isCompleted || status === 'SUCCESS';
+
+  if (completedMode) {
+    // 최종 완료 상태에서는 모든 단계가 완료된 상태로 단정하게 보이도록 보정
+    steps = steps.map((s) => ({
+      ...s,
+      status: s.status === 'PENDING' || s.status === 'RUNNING' ? 'COMPLETED' : s.status,
+    }));
+  } else if (status === 'APPROVAL_REQUIRED') {
+    // HILT 승인 대기 상태인 경우 5번째 단계를 WAITING_APPROVAL로 보정
     steps = steps.map((s) => {
       if (s.step_id === 'STATUTE_APPROVAL') {
         return { ...s, status: 'WAITING_APPROVAL' };
@@ -98,50 +112,85 @@ export const ConsultationProgress: React.FC<ConsultationProgressProps> = ({
   const isApprovalWaiting = status === 'APPROVAL_REQUIRED';
 
   return (
-    <div className="chat-progress-card" role="status" aria-live="polite">
+    <div
+      className={`chat-progress-card ${completedMode ? 'completed' : ''} ${isExpanded ? 'expanded' : 'collapsed'}`}
+      role="status"
+      aria-live="polite"
+    >
       {/* 카드 상단 헤더 */}
       <div className="chat-progress-header">
         <div className="chat-progress-title">
-          <span
-            className="spinner"
-            style={{
-              width: '14px',
-              height: '14px',
-              borderTopColor: isApprovalWaiting ? '#d97706' : '#2563eb',
-            }}
-          />
-          <span>
-            {isApprovalWaiting
+          {completedMode ? (
+            <span style={{ color: '#16a34a', fontWeight: 'bold', fontSize: '1.05em' }}>✓</span>
+          ) : (
+            <span
+              className="spinner"
+              style={{
+                width: '14px',
+                height: '14px',
+                borderTopColor: isApprovalWaiting ? '#d97706' : '#2563eb',
+              }}
+            />
+          )}
+          <span style={{ color: completedMode ? '#166534' : '#1e40af' }}>
+            {completedMode
+              ? '사건 증거 기반 AI 법률 상담 분석 및 6단계 검증 완료'
+              : isApprovalWaiting
               ? '법률 조문 추가 검색 승인 대기 중'
               : '사건 증거 기반 AI 법률 상담 분석 진행 중...'}
           </span>
         </div>
-        <span style={{ fontSize: '0.78em', color: '#64748b' }}>
-          {progress?.current_step_name || progress?.current_step || (isApprovalWaiting ? 'HILT 법령 검색 승인' : '증거 교차 검증')}
-        </span>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span
+            style={{
+              fontSize: '0.78em',
+              color: completedMode ? '#15803d' : '#64748b',
+              fontWeight: completedMode ? 600 : 400,
+            }}
+          >
+            {completedMode
+              ? '6단계 완료'
+              : progress?.current_step_name || progress?.current_step || (isApprovalWaiting ? 'HILT 법령 검색 승인' : '증거 교차 검증')}
+          </span>
+
+          {completedMode && (
+            <button
+              type="button"
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="btn btn-secondary btn-sm"
+              style={{ padding: '2px 8px', fontSize: '0.74em', color: '#475569' }}
+              title={isExpanded ? '진행과정 접기' : '진행과정 펼치기'}
+            >
+              {isExpanded ? '▲ 진행과정 접기' : '▼ 진행과정 보기'}
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* 6단계 진행 리스트 */}
-      <div className="chat-progress-steps-list">
-        {steps.map((step) => {
-          const statusClass = step.status.toLowerCase();
-          return (
-            <div key={step.step_id} className={`chat-progress-step-item ${statusClass}`}>
-              <div className="chat-step-left">
-                <div className="chat-step-icon">{renderStepIcon(step.status)}</div>
-                <span>{step.step_name || step.title}</span>
+      {/* 6단계 진행 리스트 (펼침 상태이거나 분석 중일 때 렌더링) */}
+      {(!completedMode || isExpanded) && (
+        <div className="chat-progress-steps-list">
+          {steps.map((step) => {
+            const statusClass = step.status.toLowerCase();
+            return (
+              <div key={step.step_id} className={`chat-progress-step-item ${statusClass}`}>
+                <div className="chat-step-left">
+                  <div className="chat-step-icon">{renderStepIcon(step.status)}</div>
+                  <span>{step.step_name || step.title}</span>
+                </div>
+                <div style={{ fontSize: '0.78em' }}>
+                  {step.status === 'RUNNING' && <span style={{ color: '#2563eb' }}>분석 중...</span>}
+                  {step.status === 'COMPLETED' && <span style={{ color: '#16a34a' }}>완료</span>}
+                  {step.status === 'WAITING_APPROVAL' && <span style={{ color: '#d97706', fontWeight: 600 }}>승인 필요</span>}
+                  {step.status === 'SKIPPED' && <span style={{ color: '#94a3b8' }}>건너뜀</span>}
+                  {step.status === 'PENDING' && <span style={{ color: '#94a3b8' }}>대기</span>}
+                </div>
               </div>
-              <div style={{ fontSize: '0.78em' }}>
-                {step.status === 'RUNNING' && <span style={{ color: '#2563eb' }}>분석 중...</span>}
-                {step.status === 'COMPLETED' && <span style={{ color: '#16a34a' }}>완료</span>}
-                {step.status === 'WAITING_APPROVAL' && <span style={{ color: '#d97706', fontWeight: 600 }}>승인 필요</span>}
-                {step.status === 'SKIPPED' && <span style={{ color: '#94a3b8' }}>건너뜀</span>}
-                {step.status === 'PENDING' && <span style={{ color: '#94a3b8' }}>대기</span>}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* 상황 A: HILT 승인 대기 인라인 액션 박스 */}
       {isApprovalWaiting && (
@@ -195,3 +244,4 @@ export const ConsultationProgress: React.FC<ConsultationProgressProps> = ({
     </div>
   );
 };
+

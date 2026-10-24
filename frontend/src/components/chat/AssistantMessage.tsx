@@ -154,9 +154,9 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
             </div>
           </div>
 
-          {/* 콘텐츠 분기 */}
-          {isRunningOrApproval ? (
-            // 상황 1: 진행 중 또는 HILT 승인 대기 단계 (ConsultationProgress)
+          {/* 콘텐츠 영역: 6단계 진행과정 보존 및 답변 렌더링 */}
+          {/* 1. 진행 상태 추적 카드 (진행 중이거나 완료된 경우 항상 보존하여 상단에 렌더링) */}
+          {(isRunningOrApproval || message.progress || message.status === 'SUCCESS' || message.answer) && !isFailed && (
             <ConsultationProgress
               progress={message.progress}
               status={message.status}
@@ -165,9 +165,12 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
               onReject={onReject}
               requestId={message.request_id}
               isActionLoading={isActionLoading}
+              isCompleted={!isRunningOrApproval && !isFailed}
             />
-          ) : isFailed ? (
-            // 상황 2: 오류 발생 (Error Box)
+          )}
+
+          {/* 2. 상태별 세부 결과 (오류 알림 또는 최종 완성된 법률의견서 카드) */}
+          {isFailed ? (
             <div
               style={{
                 padding: '16px 18px',
@@ -185,8 +188,7 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
                 {message.detail || message.answer || '서버와의 통신이 원활하지 않습니다. 잠시 후 다시 질문해주세요.'}
               </p>
             </div>
-          ) : (
-            // 상황 3: 완료된 정상 법률 조언 답변 (LegalAnswerView)
+          ) : message.answer ? (
             <div className="chat-assistant-card">
               <LegalAnswerView
                 content={message.answer || ''}
@@ -235,7 +237,7 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
                 </div>
               )}
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>
