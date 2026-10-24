@@ -68,8 +68,8 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
 
   return (
     <footer className="case-chat-composer" role="region" aria-label="메시지 입력 영역">
-      <div className="case-chat-composer-inner">
-        <div className="chat-textarea-wrapper">
+      <div className="case-chat-composer-inner" style={{ width: '100%', maxWidth: '860px', margin: '0 auto' }}>
+        <div className="chat-textarea-wrapper" style={{ width: '100%', display: 'flex', alignItems: 'flex-end', boxSizing: 'border-box' }}>
           <textarea
             ref={textareaRef}
             rows={1}
@@ -83,6 +83,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                 : placeholder
             }
             className="chat-textarea"
+            style={{ width: '100%', flex: 1, minWidth: 0, boxSizing: 'border-box' }}
             aria-label="법률 상담 질문 입력"
           />
 

@@ -73,7 +73,7 @@ export const CaseChatHeader: React.FC<CaseChatHeaderProps> = ({
   totalTurnsCount,
 }) => {
   return (
-    <header className="case-chat-header" role="banner">
+    <header className="case-chat-header" role="banner" style={{ width: '100%', boxSizing: 'border-box' }}>
       {/* 좌측: 사건 타이틀 및 상태 */}
       <div className="case-chat-header-left">
         <div className="case-chat-icon-badge" aria-hidden="true">

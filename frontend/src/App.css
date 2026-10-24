@@ -206,6 +206,17 @@
   max-width: 1400px;
 }
 
+/* Chat 탭 전용 풀블리드 레이아웃 (스크롤 이중화 방지 및 하단 고정 입력기 보장) */
+.workspace-canvas.workspace-canvas-chat {
+  padding: 0 !important;
+  max-width: none !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  height: calc(100vh - 56px) !important;
+  max-height: calc(100vh - 56px) !important;
+}
+
 /* Cards */
 .card {
   background-color: var(--surface);

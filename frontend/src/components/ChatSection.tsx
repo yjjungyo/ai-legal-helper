@@ -106,7 +106,7 @@ export const ChatSection: React.FC<ChatSectionProps> = ({ caseId }) => {
   }, [handleApproval]);
 
   return (
-    <div className="case-chat-layout">
+    <div className="case-chat-layout" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
       {/* 1. 상단 사건 헤더 (CaseChatHeader) - 동적 카운트 배지 */}
       <CaseChatHeader
         caseTitle={caseDetail?.title || '사건 법률 상담'}

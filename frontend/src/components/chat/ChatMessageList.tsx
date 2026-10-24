@@ -38,11 +38,28 @@ function isDifferentDay(d1Str?: string, d2Str?: string): boolean {
   );
 }
 
-const SAMPLE_QUESTIONS = [
-  '보증금 전액 반환 가능성 및 대항력 유지 요건은 어떻게 되나요?',
-  '임대차 계약 해지 통보의 유효성과 필요 절차를 검토해주세요.',
-  '임대인의 분할반환 제안 수용 시 권리 보전 방안은 무엇인가요?',
-  '현재 가압류 상황에서 경매 진행 시 배당 순위는 어떻게 되나요?',
+interface SampleQuestion {
+  category: string;
+  question: string;
+}
+
+const SAMPLE_QUESTIONS: SampleQuestion[] = [
+  {
+    category: '💰 보증금 반환',
+    question: '보증금 전액 반환 가능성 및 대항력 유지 요건은 어떻게 되나요?',
+  },
+  {
+    category: '📜 계약 해지',
+    question: '임대차 계약 해지 통보의 유효성과 필요 절차를 검토해주세요.',
+  },
+  {
+    category: '🛡️ 권리 보전',
+    question: '임대인의 분할반환 제안 수용 시 안전한 권리 보전 방안은 무엇인가요?',
+  },
+  {
+    category: '⚖️ 배당 및 경매',
+    question: '현재 가압류 상황에서 경매 진행 시 임차인의 배당 순위는 어떻게 되나요?',
+  },
 ];
 
 /**
@@ -71,25 +88,26 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
       <main className="case-chat-stream" ref={containerRef}>
         <div className="chat-empty-state">
           <div className="chat-empty-icon" aria-hidden="true">
-            💬
+            ⚖️
           </div>
-          <h3 style={{ fontSize: '1.2em', fontWeight: 700, color: '#0f172a', margin: '0 0 8px 0' }}>
-            사건 중심 법률 상담을 시작해보세요
+          <h3 className="chat-empty-title">
+            사건 중심 AI 법률 상담을 시작해보세요
           </h3>
-          <p style={{ fontSize: '0.9em', color: '#64748b', lineHeight: 1.6, margin: 0 }}>
+          <p className="chat-empty-subtitle">
             등록된 사건 증거(계약서, 등기부등본, 진술 등)와 확정 사실관계를 바탕으로<br />
-            실제 사실에 입각한 전문적인 법률 검토와 행동 가이드를 제공합니다.
+            실제 사실에 입각한 전문적인 법률 검토와 안전한 행동 가이드를 제공합니다.
           </p>
 
-          <div className="chat-sample-chips">
-            {SAMPLE_QUESTIONS.map((q, idx) => (
+          <div className="chat-sample-grid">
+            {SAMPLE_QUESTIONS.map((item, idx) => (
               <button
                 key={idx}
                 type="button"
-                onClick={() => onSelectSampleQuestion?.(q)}
-                className="chat-sample-chip"
+                onClick={() => onSelectSampleQuestion?.(item.question)}
+                className="chat-sample-card"
               >
-                {q}
+                <span className="chat-sample-category">{item.category}</span>
+                <span className="chat-sample-text">{item.question}</span>
               </button>
             ))}
           </div>

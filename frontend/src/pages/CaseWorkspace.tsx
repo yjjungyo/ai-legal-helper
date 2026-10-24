@@ -393,8 +393,8 @@ export function CaseWorkspace() {
         </div>
       </aside>
 
-      {/* 2. 우측 메인 캔버스 영역 */}
-      <main className="workspace-canvas">
+      {/* 2. 우측 메인 캔버스 영역 (Chat 탭일 경우 풀블리드 전용 스타일 적용) */}
+      <main className={`workspace-canvas ${currentTab === 'chat' ? 'workspace-canvas-chat' : ''}`}>
         <Routes>
           <Route
             path="overview"
