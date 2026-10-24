@@ -29,7 +29,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
   onChange,
   onSend,
   disabled = false,
-  placeholder = '사건에 대해 추가로 궁금한 점을 질문하세요... (Enter: 전송, Shift+Enter: 줄바꿈)',
+  placeholder = '사건에 대해 추가로 궁금한 점을 질문하세요...',
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -111,14 +111,11 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
           </button>
         </div>
 
-        <div className="chat-composer-hint">
-          <span>
-            {disabled
-              ? '⏳ AI 변호사가 사건 증거와 법령을 검증하고 있습니다.'
-              : 'Enter를 누르면 전송되며, Shift+Enter로 줄바꿈할 수 있습니다.'}
-          </span>
-          <span>{value.length > 0 && `${value.length}자`}</span>
-        </div>
+        {disabled && (
+          <div className="chat-composer-hint">
+            <span>⏳ AI 변호사가 사건 증거와 법령을 검증하고 있습니다...</span>
+          </div>
+        )}
       </div>
     </footer>
   );

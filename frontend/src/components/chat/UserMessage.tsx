@@ -40,7 +40,7 @@ function formatTime(dateStr?: string): string {
  * @param props 질문 내용 및 메타데이터
  * @returns 우측 정렬 사용자 메시지 JSX
  */
-export const UserMessage: React.FC<UserMessageProps> = ({ question, createdAt, turnIndex }) => {
+export const UserMessage: React.FC<UserMessageProps> = ({ question, createdAt }) => {
   const timeLabel = formatTime(createdAt);
 
   return (
@@ -49,12 +49,11 @@ export const UserMessage: React.FC<UserMessageProps> = ({ question, createdAt, t
         <div className="chat-user-bubble">
           {question}
         </div>
-        <div className="chat-user-meta">
-          {turnIndex !== undefined && (
-            <span style={{ fontWeight: 600 }}>턴 #{turnIndex}</span>
-          )}
-          {timeLabel && <span>{timeLabel}</span>}
-        </div>
+        {timeLabel && (
+          <div className="chat-user-meta">
+            <span>{timeLabel}</span>
+          </div>
+        )}
       </div>
     </div>
   );

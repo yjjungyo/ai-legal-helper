@@ -644,8 +644,11 @@ def verification_condition(state: LegalState) -> str:
         logger.info(f"[DISPOSITION] 쟁점 기반 처분 결정: {disposition} ({disp_reason})")
 
         # 후보 법령이 존재하고 아직 HILT를 실행하지 않은 경우:
-        # 쟁점 중 법령 누락(missing_statutes)이 있거나 법령 근거 부족 시 사용자 승인을 구하는 HILT 노드로 우선 라우팅
-        any_statute_missing = any(ir.missing_statutes for ir in issue_res_objs)
+        # 쟁점 중 법령 누락이 있거나 법령 근거 부족 시 사용자 승인을 구하는 HILT 노드로 우선 라우팅
+        any_statute_missing = any(
+            (getattr(ir, "missing_statutes", None) or getattr(ir, "missing_legal_sources", None))
+            for ir in issue_res_objs
+        )
         if not hilt_executed and candidate_laws and (any_statute_missing or reason_code in ("LEGAL_SOURCE_MISSING", "LEGAL_SOURCE_INSUFFICIENT")):
             logger.info(f"[DISPOSITION] 후보 법령({candidate_laws}) 검증을 위해 HILT 법령 검색 승인 요청 노드로 분기합니다.")
             return "statute_search_approval"

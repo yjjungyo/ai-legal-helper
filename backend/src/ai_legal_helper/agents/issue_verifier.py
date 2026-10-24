@@ -49,6 +49,7 @@ class IssueVerificationResult(BaseModel):
     unsupported_claims: List[Dict[str, Any]] = Field(default_factory=list, description="근거 부족으로 제외/유보된 주장들")
     unresolved_facts: List[str] = Field(default_factory=list, description="미확인으로 남아있는 사실 목록")
     missing_legal_sources: List[str] = Field(default_factory=list, description="부족한 법령/판례 근거 목록")
+    missing_statutes: List[str] = Field(default_factory=list, description="부족한 법령 목록 (호환 필드)")
     legal_analysis: Optional[str] = Field(None, description="해당 쟁점에 대한 검증된 권장 분석 문안")
     safe_recommendations: List[str] = Field(default_factory=list, description="해당 쟁점에 한정된 안전한 실무 조치 안내")
     revision_instructions: List[str] = Field(default_factory=list, description="수정/보완 지침")
@@ -259,6 +260,7 @@ def verify_issue(
         unsupported_claims=unsupported_claims,
         unresolved_facts=unresolved_facts,
         missing_legal_sources=missing_statutes,
+        missing_statutes=missing_statutes,
         safe_recommendations=safe_recommendations,
         revision_instructions=[],
     )
