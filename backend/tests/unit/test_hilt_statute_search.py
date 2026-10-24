@@ -178,6 +178,7 @@ def test_t06_unverified_statute_citations_blocked():
 async def test_t07_checkpointer_state_persistence_and_resume():
     """T-07: LangGraph Checkpointer가 인터럽트 상태를 보존하고 Command(resume=...)로 정상 재개되는지 검증한다."""
     thread_id = f"test-t07-{uuid.uuid4()}"
+    mem_checkpointer = MemorySaver()
 
     # Verifier가 법령 검색 승인 요청을 발생시키도록 모킹
     mock_ver_output = {
@@ -193,7 +194,10 @@ async def test_t07_checkpointer_state_persistence_and_resume():
         "revision_instructions": [],
     }
 
-    with patch("ai_legal_helper.workflows.legal_workflow.verification_node") as mock_ver_node:
+    with patch("ai_legal_helper.workflows.legal_workflow.intent_analysis_node", return_value={"intent": "NEW_LEGAL_ANALYSIS"}), \
+         patch("ai_legal_helper.workflows.legal_workflow.run_agents_node", return_value={"retrieved_sources": []}), \
+         patch("ai_legal_helper.workflows.legal_workflow.synthesize_node", return_value={"draft_answer": "초안"}), \
+         patch("ai_legal_helper.workflows.legal_workflow.verification_node") as mock_ver_node:
         mock_ver_node.return_value = {
             "verification_result": mock_ver_output,
             "retrieved_sources": [],
@@ -203,6 +207,7 @@ async def test_t07_checkpointer_state_persistence_and_resume():
         res1 = await run_legal_consultation(
             question="묵시적 갱신 해지 통보 효력 시점은?",
             thread_id=thread_id,
+            checkpointer=mem_checkpointer,
         )
 
         assert res1["status"] == "APPROVAL_REQUIRED"
@@ -225,7 +230,7 @@ async def test_t07_checkpointer_state_persistence_and_resume():
 
         fake_re_answer2 = "주택임대차보호법 제6조의2에 따라 3개월 후 해지됩니다. (주택임대차보호법_제6조의2.txt, p.1)"
         with patch("ai_legal_helper.tools.official_statute_search.search_official_statutes", return_value=[sample_statute_source]), \
-             patch("ai_legal_helper.llm.gateway.get_llm", return_value=FakeListChatModel(responses=[fake_re_answer2])):
+             patch("ai_legal_helper.llm.gateway.get_llm", return_value=FakeListChatModel(responses=[fake_re_answer2] * 10)):
 
             # 2차 검증에서는 PASS 반환하도록 변경
             mock_ver_node.return_value = {
@@ -245,6 +250,7 @@ async def test_t07_checkpointer_state_persistence_and_resume():
                 question="",
                 thread_id=thread_id,
                 resume_data={"approved": True, "reason": "사용자 승인"},
+                checkpointer=mem_checkpointer,
             )
 
             assert res2["status"] == "SUCCESS"

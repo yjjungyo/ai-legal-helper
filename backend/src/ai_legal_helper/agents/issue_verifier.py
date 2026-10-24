@@ -147,23 +147,27 @@ def verify_issue(
         )
 
     # 3. 법령 근거 검증 (Legal Verification)
-    source_texts = " ".join([str(s.get("content", "")) + " " + str(s.get("title", "")) for s in retrieved_sources])
-    full_context_text = draft_answer + " " + source_texts
+    # 실제 검색된 법령/판례 출처(source_texts)에 해당 법령 명칭 및 조문이 존재하는지 엄격히 검증
+    # (draft_answer 자체에 적힌 텍스트로 자가 통과(Self-pass)하는 오류 원천 차단)
+    source_texts = " ".join([
+        str(s.get("content", "")) + " " + str(s.get("title", "")) + " " + str(s.get("article", ""))
+        for s in retrieved_sources
+    ])
 
     for stat in issue.required_statutes:
         m = _STATUTE_REGEX.search(stat)
         if m:
             law_name = m.group(1)
             art_no = m.group(2)
-            if law_name in full_context_text:
-                if not art_no or f"제{art_no}조" in full_context_text or f"제 {art_no} 조" in full_context_text:
+            if law_name in source_texts:
+                if not art_no or f"제{art_no}조" in source_texts or f"제 {art_no} 조" in source_texts:
                     supported_statute_ids.append(stat)
                 else:
                     missing_statutes.append(stat)
             else:
                 missing_statutes.append(stat)
         else:
-            if stat in full_context_text:
+            if stat in source_texts:
                 supported_statute_ids.append(stat)
             else:
                 missing_statutes.append(stat)

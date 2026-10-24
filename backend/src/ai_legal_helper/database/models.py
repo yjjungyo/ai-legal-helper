@@ -74,6 +74,7 @@ class Case(Base):
     case_type = Column(String, nullable=True)  # 예: "주택임대차"
     description = Column(Text, nullable=True)
     status = Column(String, default="OPEN")  # OPEN, IN_PROGRESS, CLOSED
+    primary_conversation_id = Column(String(100), nullable=True, index=True)  # 사건 대표 대화 식별자 (Case = One Persistent Conversation)
     version = Column(Integer, default=1)  # 업데이트 발생 시 증가
     created_at = Column(DateTime, default=get_kst_now)
     updated_at = Column(DateTime, default=get_kst_now, onupdate=get_kst_now)
@@ -564,6 +565,7 @@ class ConsultationRecord(Base):
     verification_result = Column(JSON, nullable=True)
     warnings = Column(JSON, nullable=True)
     selected_agents = Column(JSON, nullable=True)
+    progress = Column(JSON, nullable=True)  # LangGraph 6단계 실시간 진행 상태 (ConsultationProgress)
     elapsed_ms = Column(Float, nullable=True)
     created_at = Column(DateTime, default=get_kst_now)
     updated_at = Column(DateTime, default=get_kst_now, onupdate=get_kst_now)

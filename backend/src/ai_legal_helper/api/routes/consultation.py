@@ -25,7 +25,8 @@ from typing import Dict, Any, List, Optional
 
 from ai_legal_helper.api.schemas.consultation import (
     ConsultationRequest, ConsultationResponse, Source, UsageSummary, ApprovalDecisionRequest,
-    ConversationSummary, ConversationDetail
+    ConversationSummary, ConversationDetail, ConsultationStepStatus, ConsultationStep,
+    ConsultationProgress, create_initial_progress
 )
 from ai_legal_helper.observability.context import (
     set_trace_id, reset_trace_id, set_case_id, reset_case_id
@@ -46,6 +47,98 @@ router = APIRouter()
 # In-memory store for consultation tasks (ephemeral for P1)
 _consultations: Dict[str, ConsultationResponse] = {}
 
+NODE_TO_PROGRESS_STEP: Dict[str, tuple[str, str]] = {
+    "supervisor_initialize": ("step_1", "사건 기본정보 및 대화 맥락 확인 완료"),
+    "intent_analysis": ("step_1", "의뢰인 질의 의도 분석 완료"),
+    "general_conversation": ("step_6", "일반 안내 답변 생성 완료"),
+    "followup_action": ("step_4", "후속 실행 조치 분석 완료"),
+    "route": ("step_2", "사실관계 및 타임라인 조회 중"),
+    "plan": ("step_2", "증거 및 사실관계 조회 완료"),
+    "run_agents": ("step_3", "법령 및 판례 검색 중"),
+    "synthesize": ("step_4", "법률 쟁점별 분석 중"),
+    "verification": ("step_5", "증거 및 법률 근거 검증 중"),
+    "revise": ("step_5", "검증 피드백 기반 보강 중"),
+    "statute_search_approval": ("step_3", "공식 법령 원문 검색 승인 대기 중"),
+    "execute_statute_search": ("step_3", "공식 법령 정보 조회 중"),
+    "re_analyze": ("step_4", "법령 검색 결과 기반 재분석 중"),
+    "finalize": ("step_6", "최종 상담 답변 작성 중"),
+    "insufficient": ("step_6", "판단 유보 및 보완 안내 작성 완료"),
+}
+
+
+def update_progress_step(
+    request_id: str,
+    active_step_id: str,
+    status: ConsultationStepStatus = ConsultationStepStatus.RUNNING,
+    message: Optional[str] = None
+) -> None:
+    """지정된 상담의 6단계 진행 상태를 갱신하고 메모리와 DB에 즉시 반영한다 (P0-05)."""
+    now_str = get_kst_iso()
+    step_order = ["step_1", "step_2", "step_3", "step_4", "step_5", "step_6"]
+    curr_idx = step_order.index(active_step_id) if active_step_id in step_order else -1
+
+    resp = _consultations.get(request_id)
+    if resp and resp.progress:
+        resp.progress.current_step = active_step_id
+        resp.progress.updated_at = now_str
+        for s in resp.progress.steps:
+            s_idx = step_order.index(s.step_id) if s.step_id in step_order else -1
+            if s_idx < curr_idx:
+                s.status = ConsultationStepStatus.COMPLETED
+                if not s.completed_at:
+                    s.completed_at = now_str
+            elif s_idx == curr_idx:
+                s.status = status
+                if status == ConsultationStepStatus.RUNNING and not s.started_at:
+                    s.started_at = now_str
+                elif status in (ConsultationStepStatus.COMPLETED, ConsultationStepStatus.WAITING_APPROVAL, ConsultationStepStatus.FAILED):
+                    s.completed_at = now_str
+                if message:
+                    s.message = message
+            else:
+                s.status = ConsultationStepStatus.PENDING
+
+    # DB에도 실시간 반영
+    try:
+        with SessionLocal() as db_session:
+            rec = db_session.query(ConsultationRecord).filter(ConsultationRecord.request_id == request_id).first()
+            if rec and resp and resp.progress:
+                rec.progress = resp.progress.model_dump()
+                db_session.commit()
+    except Exception as e:
+        logger.warning(f"[UPDATE_PROGRESS] Failed to persist progress to DB: {e}")
+
+
+def _parse_or_build_progress(
+    raw_progress: Any,
+    status: str,
+    request_id: str,
+    timestamp: Optional[str] = None
+) -> Optional[ConsultationProgress]:
+    """저장된 raw_progress를 파싱하거나 완료 상태에 부합하는 ConsultationProgress를 생성한다."""
+    if raw_progress and isinstance(raw_progress, dict):
+        try:
+            return ConsultationProgress(**raw_progress)
+        except Exception:
+            pass
+    if status == "SUCCESS":
+        ts = timestamp or get_kst_iso()
+        return ConsultationProgress(
+            request_id=request_id,
+            current_step=None,
+            steps=[
+                ConsultationStep(step_id="step_1", title="사건 정보와 이전 상담 맥락 확인", status=ConsultationStepStatus.COMPLETED, completed_at=ts),
+                ConsultationStep(step_id="step_2", title="사실관계·타임라인·증거 조회", status=ConsultationStepStatus.COMPLETED, completed_at=ts),
+                ConsultationStep(step_id="step_3", title="관련 법령 및 판례 검색", status=ConsultationStepStatus.COMPLETED, completed_at=ts),
+                ConsultationStep(step_id="step_4", title="법률 쟁점별 분석", status=ConsultationStepStatus.COMPLETED, completed_at=ts),
+                ConsultationStep(step_id="step_5", title="증거·법률 근거 검증", status=ConsultationStepStatus.COMPLETED, completed_at=ts),
+                ConsultationStep(step_id="step_6", title="최종 상담 답변 작성", status=ConsultationStepStatus.COMPLETED, completed_at=ts),
+            ],
+            updated_at=ts,
+        )
+    return None
+
+
 @router.post("/consultations", response_model=ConsultationResponse)
 async def start_consultation(
     req: ConsultationRequest, 
@@ -54,9 +147,16 @@ async def start_consultation(
     db: Session = Depends(get_db)
 ):
     """법률 상담 프로세스를 비동기적으로 시작한다."""
+    conversation_id: str
     if req.case_id:
-        # Verify case ownership (1인 로컬 테스트 모드 자동 지원)
+        # Verify case ownership 및 사건 대표 Conversation ID 확립 (P0-02)
         case = get_case_for_user(req.case_id, current_user, db)
+        if not case.primary_conversation_id:
+            case.primary_conversation_id = f"conv_{case.id}"
+            db.commit()
+        conversation_id = case.primary_conversation_id
+    else:
+        conversation_id = req.conversation_id or str(uuid.uuid4())
 
     from ai_legal_helper.observability.context import get_trace_id, get_request_id
 
@@ -64,8 +164,7 @@ async def start_consultation(
     request_id = get_request_id() or str(uuid.uuid4())
     trace_id = get_trace_id() or str(uuid.uuid4())
     
-    # 연속 대화 세션 식별자 결정 및 대화 맥락 복원 (Phase 1)
-    conversation_id = req.conversation_id or str(uuid.uuid4())
+    # 연속 대화 세션 식별자 결정 및 대화 맥락 복원 (Phase 1/2)
     from ai_legal_helper.workflows.conversation_context import load_conversation_context
     try:
         conv_context = load_conversation_context(
@@ -80,8 +179,10 @@ async def start_consultation(
         raise HTTPException(status_code=403, detail=str(pe))
     
     turn_index = conv_context.turn_index
+    now_kst = get_kst_iso()
+    initial_progress = create_initial_progress(request_id, now_kst)
 
-    # Initial status (P1-05 3-tier status model + Phase 1 Context)
+    # Initial status (P1-05 3-tier status model + Case-Centric Progress P0-05)
     resp = ConsultationResponse(
         request_id=request_id,
         conversation_id=conversation_id,
@@ -94,7 +195,8 @@ async def start_consultation(
         routing_status=None,
         question=req.question,
         case_id=req.case_id,
-        created_at=get_kst_iso(),
+        created_at=now_kst,
+        progress=initial_progress,
     )
     # Store user_id to authorize GET later
     _consultations[request_id] = resp
@@ -115,6 +217,7 @@ async def start_consultation(
             verification_status="UNVERIFIED",
             answer_status="WITHHELD",
             routing_status=None,
+            progress=initial_progress.model_dump(),
         )
         db.add(record)
         db.commit()
@@ -142,8 +245,19 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
     )
     start_time = time.time()
     try:
+        # LangGraph 노드 실행 단계별 진행 상태 실시간 콜백
+        async def on_step(node_name: str):
+            if node_name in NODE_TO_PROGRESS_STEP:
+                step_id, msg = NODE_TO_PROGRESS_STEP[node_name]
+                update_progress_step(request_id, step_id, ConsultationStepStatus.RUNNING, msg)
+
         # Run unified workflow
-        result = await run_legal_consultation(req.question, thread_id=request_id, conversation_context=conv_context)
+        result = await run_legal_consultation(
+            req.question,
+            thread_id=request_id,
+            conversation_context=conv_context,
+            on_step_callback=on_step
+        )
         
         elapsed_ms = (time.time() - start_time) * 1000
         
@@ -194,6 +308,12 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
             resp.answer_status = "WITHHELD"
             resp.approval_request = None
             resp.answer = result.get("answer", "처리 중 오류가 발생했습니다.")
+            if resp.progress:
+                resp.progress.updated_at = get_kst_iso()
+                if resp.progress.current_step:
+                    for s in resp.progress.steps:
+                        if s.step_id == resp.progress.current_step:
+                            s.status = ConsultationStepStatus.FAILED
         elif is_approval_required:
             resp.status = "APPROVAL_REQUIRED"
             resp.execution_status = "APPROVAL_REQUIRED"
@@ -201,6 +321,7 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
             resp.answer_status = "WITHHELD"
             resp.approval_request = result.get("approval_request")
             resp.answer = result.get("answer", "해당 쟁점에 필요한 공식 법령(특별법 등) 원문 검색 진행을 위해 사용자 승인이 필요합니다.")
+            update_progress_step(request_id, "step_3", ConsultationStepStatus.WAITING_APPROVAL, "공식 법령 원문 검색 승인 대기 중")
         else:
             resp.status = "SUCCESS"
             resp.execution_status = "COMPLETED"
@@ -216,6 +337,14 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
                 resp.answer_status = "WITHHELD"
             resp.answer = result.get("answer", "")
             resp.approval_request = result.get("approval_request")
+            if resp.progress:
+                resp.progress.current_step = None
+                now_iso = get_kst_iso()
+                resp.progress.updated_at = now_iso
+                for s in resp.progress.steps:
+                    s.status = ConsultationStepStatus.COMPLETED
+                    if not s.completed_at:
+                        s.completed_at = now_iso
         
         # Map sources (서버 Source Registry 기반 표준 Source 스키마 정규화 및 의미 기반 중복 제거)
         from ai_legal_helper.rag.source_schema import normalize_source_dict
@@ -332,6 +461,8 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
                     rec.warnings = resp.warnings
                     rec.selected_agents = resp.selected_agents
                     rec.elapsed_ms = resp.elapsed_ms
+                    if getattr(resp, "progress", None):
+                        rec.progress = resp.progress.model_dump()
                     if getattr(resp, "conversation_id", None):
                         rec.conversation_id = resp.conversation_id
                     if getattr(resp, "turn_index", None):
@@ -368,6 +499,8 @@ async def get_consultation(
         resp = _consultations[request_id]
         if not AUTH_BYPASS and getattr(resp, "_user_id", None) != current_user.id:
             raise HTTPException(status_code=403, detail="해당 상담에 접근할 권한이 없습니다.")
+        if resp.progress is None:
+            resp.progress = _parse_or_build_progress(None, resp.status, resp.request_id, resp.created_at)
         return resp
         
     record = db.query(ConsultationRecord).filter(
@@ -396,6 +529,12 @@ async def get_consultation(
     )
 
     ver_res = record.verification_result or {}
+    prog = _parse_or_build_progress(
+        record.progress,
+        record.status,
+        record.request_id,
+        get_kst_iso(record.created_at) if record.created_at else None
+    )
     return ConsultationResponse(
         request_id=record.request_id,
         conversation_id=record.conversation_id,
@@ -420,6 +559,7 @@ async def get_consultation(
         verified_facts=ver_res.get("verified_facts", []),
         missing_evidence=ver_res.get("missing_evidence", []),
         evidence_citations=ver_res.get("evidence_citations", []),
+        progress=prog,
     )
 
 @router.get("/consultations/{request_id}/status")
@@ -510,6 +650,10 @@ async def decide_statute_search_approval(
         resp.status = "IN_PROGRESS"
         resp.execution_status = "IN_PROGRESS"
         resp.answer = None
+        if decision.approved:
+            update_progress_step(request_id, "step_3", ConsultationStepStatus.RUNNING, "공식 법령 원문 검색 승인 접수 및 재분석 진행 중")
+        else:
+            update_progress_step(request_id, "step_3", ConsultationStepStatus.SKIPPED, "법령 원문 검색 거절 및 현 상태 종결")
     else:
         resp = ConsultationResponse(
             request_id=request_id,
@@ -551,11 +695,17 @@ async def process_consultation_resume(
     start_time = time.time()
 
     try:
+        async def on_step(node_name: str):
+            if node_name in NODE_TO_PROGRESS_STEP:
+                step_id, msg = NODE_TO_PROGRESS_STEP[node_name]
+                update_progress_step(request_id, step_id, ConsultationStepStatus.RUNNING, msg)
+
         # LangGraph Command(resume=...) 호출로 인터럽트된 노드 재개
         result = await run_legal_consultation(
             question="",
             thread_id=request_id,
-            resume_data={"approved": decision.approved, "reason": decision.reason}
+            resume_data={"approved": decision.approved, "reason": decision.reason},
+            on_step_callback=on_step
         )
 
         elapsed_ms = (time.time() - start_time) * 1000
@@ -612,6 +762,14 @@ async def process_consultation_resume(
         resp.selected_agents = result.get("selected_agents", [])
         resp.warnings.extend(result.get("warnings", []))
         resp.approval_request = result.get("approval_request")
+        if resp.progress:
+            resp.progress.current_step = None
+            now_iso = get_kst_iso()
+            resp.progress.updated_at = now_iso
+            for s in resp.progress.steps:
+                s.status = ConsultationStepStatus.COMPLETED
+                if not s.completed_at:
+                    s.completed_at = now_iso
 
         # Sources 정규화 (의미 기반 중복 제거)
         from ai_legal_helper.rag.source_schema import normalize_source_dict
@@ -709,6 +867,8 @@ async def process_consultation_resume(
                     rec.warnings = resp.warnings
                     rec.selected_agents = resp.selected_agents
                     rec.elapsed_ms = resp.elapsed_ms
+                    if getattr(resp, "progress", None):
+                        rec.progress = resp.progress.model_dump()
                     db_session.commit()
         except Exception:
             pass
@@ -727,15 +887,22 @@ async def list_case_consultations(
     case: Case = Depends(get_case_for_user),
     db: Session = Depends(get_db)
 ):
-    """특정 사건에 저장된 모든 상담 내역을 최신순으로 조회한다. conversation_id 필터링을 지원한다."""
+    """특정 사건에 저장된 모든 상담 내역을 시간순(ASC)으로 통합 조회한다 (Case = One Persistent Conversation)."""
     from ai_legal_helper.rag.source_schema import normalize_source_dict
     query = db.query(ConsultationRecord).filter(ConsultationRecord.case_id == case_id)
     if conversation_id:
         query = query.filter(ConsultationRecord.conversation_id == conversation_id)
-    records = query.order_by(ConsultationRecord.created_at.desc()).all()
+    records = query.order_by(ConsultationRecord.created_at.asc(), ConsultationRecord.turn_index.asc()).all()
     
     results = []
     for rec in records:
+        if rec.request_id in _consultations:
+            live_resp = _consultations[rec.request_id]
+            if live_resp.progress is None:
+                live_resp.progress = _parse_or_build_progress(rec.progress, live_resp.status, rec.request_id, live_resp.created_at)
+            results.append(live_resp)
+            continue
+
         sources = []
         seen_keys = set()
         for s in (rec.sources or []):
@@ -748,6 +915,12 @@ async def list_case_consultations(
             getattr(rec, "answer_status", None),
             getattr(rec, "verification_status", None),
             rec.status,
+        )
+        prog = _parse_or_build_progress(
+            rec.progress,
+            rec.status,
+            rec.request_id,
+            get_kst_iso(rec.created_at) if rec.created_at else None
         )
         results.append(ConsultationResponse(
             request_id=rec.request_id,
@@ -768,7 +941,12 @@ async def list_case_consultations(
             selected_agents=rec.selected_agents or [],
             question=rec.question,
             case_id=rec.case_id,
-            created_at=get_kst_iso(rec.created_at) if rec.created_at else None
+            created_at=get_kst_iso(rec.created_at) if rec.created_at else None,
+            issue_results=(rec.verification_result or {}).get("issue_results", []),
+            verified_facts=(rec.verification_result or {}).get("verified_facts", []),
+            missing_evidence=(rec.verification_result or {}).get("missing_evidence", []),
+            evidence_citations=(rec.verification_result or {}).get("evidence_citations", []),
+            progress=prog,
         ))
     return results
 

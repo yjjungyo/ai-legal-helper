@@ -1,42 +1,48 @@
 /**
- * @fileoverview 법률 상담 실행 및 사건별 대화 이력 조회를 관리하는 커스텀 Hook 모듈
+ * @fileoverview 사건 중심 단일 지속 대화(Case-Centric Chat) 관리 커스텀 Hook 모듈
  * 
- * [개선 사항 - Phase 1: Context-Aware Multi-turn Conversation]
- * 1. `activeConversationId` 대화 세션 상태 관리:
- *    - 연속 질문 시 동일 conversation_id를 서버로 전달하여 이전 질의응답 맥락을 복원합니다.
- *    - `startNewConversation()` 호출 시 대화 세션을 초기화하여 완전히 새로운 대화를 시작할 수 있습니다.
- * 2. 활성 상담(Active Consultation)과 완료된 상담 이력(History)의 엄격한 분리:
- *    - IN_PROGRESS / APPROVAL_REQUIRED 상태의 상담은 `result`(활성 상담) 상태로만 관리하고,
- *    - `history`에는 최종 완료(SUCCESS / ERROR)된 과거 상담 기록만 필터링하여 보관합니다.
- * 3. 브라우저 새로고침(F5) 시 세션 연속성 복원:
- *    - 페이지 재진입 시 서버 DB에서 최신 미완료 상담을 감지하여 `result`로 자동 복원하고,
- *      진행 중인 경우 폴링을 자동 재개합니다.
- * 4. HILT 승인/거절 시 단일화된 폴링 및 낙관적 상태 전이 처리.
+ * [개선 사항 - Case = One Persistent Conversation (P0-01, P0-02, P0-04, P0-05)]
+ * 1. '새 대화 시작' 완전 제거: 사건 식별자(caseId)당 단일 대화 스트림(messages)으로 일원화.
+ * 2. 메시지 배열 단일화 (messages):
+ *    - 과거 이력과 진행 중인 상담을 분리하지 않고 시간순(ASC) 단일 배열로 관리.
+ *    - 새 질문 전송 시 스트림 하단에 진행 상태(IN_PROGRESS) 카드가 추가되고 완료 시 인플레이스 전이.
+ * 3. 브라우저 새로고침(F5) 시 영속성 복원:
+ *    - 페이지 재진입 시 DB에서 사건의 전체 상담 이력을 시간순 복원하고,
+ *      마지막 메시지가 IN_PROGRESS인 경우 자동으로 상태 폴링을 재개.
+ * 4. HILT 승인/거절 인플레이스 제어:
+ *    - 승인 시 실시간 공식 법령 검색 및 재분석 폴링 재개, 거절 시 현재 근거 기반 종결.
  */
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { ConsultationResponse } from '../types/consultation';
-import { startConsultation, getConsultation, getCaseConsultations, approveStatuteSearch } from '../api/client';
+import {
+  startConsultation,
+  getConsultation,
+  getCaseConsultations,
+  approveStatuteSearch,
+} from '../api/client';
 
 /**
- * 법률 상담 실행 및 사건별 대화 이력 조회를 관리하는 Hook.
- *
+ * 사건 중심 단일 지속 대화 Hook
  * @param caseId 현재 작업 중인 사건 식별자 UUID
- * @returns 상담 입력값, 완료된 이력 목록, 현재 활성 상담 결과, 대화 세션 ID, 로딩 및 오류 상태, 실행 액션 함수들
  */
 export function useConsultation(caseId?: string) {
   const [question, setQuestion] = useState('');
-  /** 현재 활성화된 연속 대화 세션 식별자 (null인 경우 신규 대화 시작) */
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
-  /** 완료된 과거 상담 내역만 보관 (IN_PROGRESS, APPROVAL_REQUIRED 제외) */
-  const [history, setHistory] = useState<ConsultationResponse[]>([]);
-  /** 현재 진행 중이거나 사용자 승인 대기 중인 단일 활성 상담 객체 */
-  const [result, setResult] = useState<ConsultationResponse | null>(null);
+  /** 사건의 단일 대화 세션 식별자 (서버의 Case.primary_conversation_id와 동기화) */
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  /** 사건의 전체 상담 턴 목록 (시간순 ASC 정렬) */
+  const [messages, setMessages] = useState<ConsultationResponse[]>([]);
+  /** 상담 요청 전송 및 폴링 진행 중 여부 */
   const [loading, setLoading] = useState(false);
+  /** HILT 승인/거절 액션 처리 중 여부 */
+  const [actionLoading, setActionLoading] = useState(false);
+  /** 오류 메시지 */
   const [error, setError] = useState<string | null>(null);
+
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   /**
-   * 실행 중인 상태 폴링 인터벌을 안전하게 해제한다.
+   * 폴링 인터벌 해제
    */
   const clearPollInterval = useCallback(() => {
     if (pollIntervalRef.current !== null) {
@@ -46,18 +52,22 @@ export function useConsultation(caseId?: string) {
   }, []);
 
   /**
-   * 새로운 대화 세션을 시작하도록 현재 대화 ID와 입력을 초기화한다.
+   * 단일 메시지 객체 업데이트 헬퍼
    */
-  const startNewConversation = useCallback(() => {
-    setActiveConversationId(null);
-    setQuestion('');
-    setResult(null);
+  const updateMessageInList = useCallback((updated: ConsultationResponse) => {
+    setMessages((prev) => {
+      const idx = prev.findIndex((m) => m.request_id === updated.request_id);
+      if (idx !== -1) {
+        const copy = [...prev];
+        copy[idx] = updated;
+        return copy;
+      }
+      return [...prev, updated];
+    });
   }, []);
 
   /**
-   * 지정된 상담 요청 ID의 진행 상태를 2초 주기로 주기적 조회(Polling)한다.
-   *
-   * @param requestId 추적 대상 상담 요청 식별자
+   * 지정된 상담 요청 ID의 진행 상태를 1.5초 주기로 폴링
    */
   const startPolling = useCallback(
     (requestId: string) => {
@@ -67,170 +77,158 @@ export function useConsultation(caseId?: string) {
       pollIntervalRef.current = setInterval(async () => {
         try {
           const current = await getConsultation(requestId);
-          setResult(current);
+          updateMessageInList(current);
 
-          // conversation_id 동기화
           if (current.conversation_id) {
-            setActiveConversationId(current.conversation_id);
+            setConversationId(current.conversation_id);
           }
 
-          // 1. HILT 추가 법령 검색 승인 대기 상태로 전이된 경우: 폴링 일시중지 후 사용자 입력 대기
+          // 1. HILT 승인 대기 상태 도달 시: 폴링 멈추고 사용자 승인 대기
           if (current.status === 'APPROVAL_REQUIRED') {
             clearPollInterval();
             setLoading(false);
           } else if (current.status === 'SUCCESS' || current.status === 'ERROR') {
-            // 2. 최종 완료(SUCCESS) 또는 오류(ERROR) 상태 도달 시: 폴링 종료 및 이력 목록 갱신
+            // 2. 최종 완료 상태 도달 시: 폴링 종료
             clearPollInterval();
             setLoading(false);
-            setQuestion('');
-
-            if (caseId) {
-              const records = await getCaseConsultations(caseId);
-              // 완료된 기록만 history에 보관
-              const completedRecords = records.filter(
-                (r) => r.status !== 'IN_PROGRESS' && r.status !== 'APPROVAL_REQUIRED'
-              );
-              setHistory(completedRecords);
-            }
-            // 활성 작업 완료 -> 활성 카드 닫고 상담 이력 최상단에 완료된 답변으로 표시
-            setResult(null);
           }
         } catch (err) {
           clearPollInterval();
           setError(err instanceof Error ? err.message : String(err));
           setLoading(false);
         }
-      }, 2000);
+      }, 1500);
     },
-    [caseId, clearPollInterval]
+    [clearPollInterval, updateMessageInList]
   );
 
   /**
-   * 사건의 상담 내역을 조회하고, 활성 상담과 완료 이력을 분리하여 상태를 동기화한다.
-   * 새로고침(F5) 시 진행 중이던 상담이 있을 경우 자동으로 활성 영역으로 복원하고 폴링을 재개한다.
+   * 사건의 전체 상담 이력을 조회하고 진행 중인 상담이 있다면 폴링을 자동 재개한다.
    */
-  const loadHistory = useCallback(async () => {
+  const loadCaseChat = useCallback(async () => {
     if (!caseId) return;
     try {
       const records = await getCaseConsultations(caseId);
+      // 서버에서 ASC 정렬되어 오지만, 방어적으로 정렬 보장
+      const sorted = [...records].sort((a, b) => {
+        const tA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const tB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return tA - tB;
+      });
+      setMessages(sorted);
 
-      // 최신 레코드 중 미완료(진행 중이거나 승인 대기) 건 탐색
-      const activeRecord = records.find(
-        (r) => r.status === 'IN_PROGRESS' || r.status === 'APPROVAL_REQUIRED'
-      );
-
-      if (activeRecord) {
-        // 활성 작업 복원 및 폴링 재개
-        setResult(activeRecord);
-        if (activeRecord.conversation_id) {
-          setActiveConversationId(activeRecord.conversation_id);
+      if (sorted.length > 0) {
+        const lastMsg = sorted[sorted.length - 1];
+        if (lastMsg.conversation_id) {
+          setConversationId(lastMsg.conversation_id);
         }
-        if (activeRecord.status === 'IN_PROGRESS') {
-          startPolling(activeRecord.request_id);
-        }
-      } else {
-        setResult(null);
-        // 가장 최근에 완료된 대화가 있다면 해당 대화 세션을 기본 활성 대화로 지정
-        if (records.length > 0 && records[0].conversation_id) {
-          setActiveConversationId(records[0].conversation_id);
+        // 마지막 메시지가 진행 중이면 자동 폴링 복원
+        if (lastMsg.status === 'IN_PROGRESS') {
+          startPolling(lastMsg.request_id);
         }
       }
-
-      // 완료된 기록만 과거 이력(history)에 반영
-      const completedRecords = records.filter(
-        (r) => r.status !== 'IN_PROGRESS' && r.status !== 'APPROVAL_REQUIRED'
-      );
-      setHistory(completedRecords);
     } catch (err) {
-      console.warn('Failed to load consultation history:', err);
+      console.warn('[useConsultation] Failed to load case consultations:', err);
     }
   }, [caseId, startPolling]);
 
-  // 마운트 및 caseId 변경 시 이력 조회 및 미완료 작업 복원
+  // 마운트 및 caseId 변경 시 이력 로드
   useEffect(() => {
-    loadHistory();
+    loadCaseChat();
     return () => {
       clearPollInterval();
     };
-  }, [loadHistory, clearPollInterval]);
+  }, [loadCaseChat, clearPollInterval]);
 
   /**
-   * 신규 또는 후속 법률 상담 요청을 서버에 전송하고 실시간 진행 상태 추적을 시작한다.
+   * 새 질문 전송
    */
-  const submit = async () => {
-    if (!question.trim() || !caseId) return;
-    clearPollInterval();
-    setLoading(true);
-    setError(null);
+  const sendQuestion = useCallback(
+    async (questionText?: string) => {
+      const query = (questionText !== undefined ? questionText : question).trim();
+      if (!query || !caseId || loading) return;
 
-    try {
-      const initial = await startConsultation(
-        question,
-        caseId,
-        activeConversationId || undefined
-      );
+      clearPollInterval();
+      setLoading(true);
+      setError(null);
+      setQuestion('');
 
-      if (initial.conversation_id) {
-        setActiveConversationId(initial.conversation_id);
+      try {
+        const initial = await startConsultation(
+          query,
+          caseId,
+          conversationId || undefined
+        );
+
+        if (initial.conversation_id) {
+          setConversationId(initial.conversation_id);
+        }
+
+        // 메시지 스트림에 즉시 추가
+        updateMessageInList(initial);
+
+        // 실시간 상태 추적 시작
+        startPolling(initial.request_id);
+      } catch (err) {
+        clearPollInterval();
+        setError(err instanceof Error ? err.message : String(err));
+        setLoading(false);
       }
-
-      // 활성 상담 상태로 등록하고 폴링 시작
-      setResult(initial);
-      startPolling(initial.request_id);
-    } catch (err) {
-      clearPollInterval();
-      setError(err instanceof Error ? err.message : String(err));
-      setLoading(false);
-    }
-  };
+    },
+    [question, caseId, loading, conversationId, clearPollInterval, updateMessageInList, startPolling]
+  );
 
   /**
-   * HILT 법령 원문 검색 승인 또는 거절 결정을 서버로 전송하고 재개 상태를 폴링한다.
-   *
-   * @param requestId 대상 상담 요청 ID
-   * @param approved 사용자 승인 여부 (true: 승인 후 공식 법령 검색 진행, false: 거절 후 판단 유보)
-   * @param reason 승인 또는 거절 사유 메모
+   * HILT 외부 법령 검색 승인 또는 거절 처리
    */
-  const respondApproval = async (requestId: string, approved: boolean, reason?: string) => {
-    clearPollInterval();
-    setLoading(true);
-    setError(null);
+  const handleApproval = useCallback(
+    async (requestId: string, approved: boolean) => {
+      setActionLoading(true);
+      setError(null);
 
-    // 1. 낙관적(Optimistic) UI 업데이트: 활성 상담의 상태를 IN_PROGRESS로 즉시 전이
-    setResult((prev) =>
-      prev && prev.request_id === requestId
-        ? {
-            ...prev,
-            status: 'IN_PROGRESS',
-            execution_status: 'IN_PROGRESS',
-            answer_status: 'WITHHELD',
-          }
-        : prev
-    );
+      try {
+        const updated = await approveStatuteSearch(requestId, approved);
+        updateMessageInList(updated);
 
-    try {
-      // 2. 서버에 승인 결정 전달 및 재개된 워크플로우 폴링 시작
-      await approveStatuteSearch(requestId, approved, reason);
-      startPolling(requestId);
-    } catch (err) {
-      clearPollInterval();
-      setError(err instanceof Error ? err.message : String(err));
-      setLoading(false);
-    }
-  };
+        if (approved) {
+          // 승인 시 공식 법령 검색 및 재분석 진행되므로 폴링 재개
+          startPolling(requestId);
+        } else {
+          // 거절 시 추가 검색 없이 현재 결과로 종결
+          setLoading(false);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setActionLoading(false);
+      }
+    },
+    [updateMessageInList, startPolling]
+  );
+
+  // 하위 호환성 (구 ChatSection 등에서 사용하는 프로퍼티 매핑)
+  const activeRecord = messages.find(
+    (m) => m.status === 'IN_PROGRESS' || m.status === 'APPROVAL_REQUIRED'
+  );
 
   return {
     question,
     setQuestion,
-    activeConversationId,
-    setActiveConversationId,
-    startNewConversation,
-    history,
-    loadHistory,
-    submit,
-    respondApproval,
-    result,
+    conversationId,
+    messages,
     loading,
+    actionLoading,
     error,
+    sendQuestion,
+    submit: () => sendQuestion(),
+    handleApproval,
+    refreshChat: loadCaseChat,
+    // 하위 호환 필드
+    result: activeRecord || null,
+    history: messages,
+    startNewConversation: () => {
+      // P0-01: 새 대화 시작 기능 제거, 호환용 no-op
+      console.warn('startNewConversation is deprecated in Case-Centric chat.');
+    },
   };
 }

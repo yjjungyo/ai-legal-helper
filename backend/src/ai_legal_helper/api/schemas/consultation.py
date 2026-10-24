@@ -13,6 +13,61 @@
 """
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
+from enum import Enum
+
+
+class ConsultationStepStatus(str, Enum):
+    """상담 단계별 세부 실행 상태 열거형 (P0-05)."""
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    COMPLETED = "COMPLETED"
+    SKIPPED = "SKIPPED"
+    WAITING_APPROVAL = "WAITING_APPROVAL"
+    FAILED = "FAILED"
+
+
+class ConsultationStep(BaseModel):
+    """상담 진행 단계 세부 정보 모델 (P0-05)."""
+    step_id: str = Field(description="단계 식별자 (예: 'step_1' ~ 'step_6')")
+    title: str = Field(description="단계 표제어 (예: '사건 정보와 이전 상담 맥락 확인')")
+    status: ConsultationStepStatus = Field(default=ConsultationStepStatus.PENDING, description="진행 상태")
+    started_at: Optional[str] = Field(default=None, description="시작 시각 (ISO)")
+    completed_at: Optional[str] = Field(default=None, description="종료 시각 (ISO)")
+    message: Optional[str] = Field(default=None, description="진행 상태 추가 안내 문구")
+
+
+class ConsultationProgress(BaseModel):
+    """상담 전체 6단계 진행 상태 모델 (P0-05)."""
+    request_id: str = Field(description="상담 요청 식별자")
+    current_step: Optional[str] = Field(default=None, description="현재 활성 단계 ID")
+    steps: List[ConsultationStep] = Field(default_factory=list, description="6대 진행 단계 목록")
+    updated_at: str = Field(description="마지막 갱신 시각 (ISO)")
+
+
+def create_initial_progress(request_id: str, updated_at: str) -> ConsultationProgress:
+    """초기 6단계 진행 상태 객체를 생성한다.
+
+    Args:
+        request_id: 대상 상담 요청 식별자.
+        updated_at: 생성 시점의 KST ISO 일시 문자열.
+
+    Returns:
+        ConsultationProgress: step_1이 RUNNING 상태로 초기화된 6단계 진행 상태.
+    """
+    return ConsultationProgress(
+        request_id=request_id,
+        current_step="step_1",
+        steps=[
+            ConsultationStep(step_id="step_1", title="사건 정보와 이전 상담 맥락 확인", status=ConsultationStepStatus.RUNNING, started_at=updated_at),
+            ConsultationStep(step_id="step_2", title="사실관계·타임라인·증거 조회", status=ConsultationStepStatus.PENDING),
+            ConsultationStep(step_id="step_3", title="관련 법령 및 판례 검색", status=ConsultationStepStatus.PENDING),
+            ConsultationStep(step_id="step_4", title="법률 쟁점별 분석", status=ConsultationStepStatus.PENDING),
+            ConsultationStep(step_id="step_5", title="증거·법률 근거 검증", status=ConsultationStepStatus.PENDING),
+            ConsultationStep(step_id="step_6", title="최종 상담 답변 작성", status=ConsultationStepStatus.PENDING),
+        ],
+        updated_at=updated_at,
+    )
+
 
 class ConsultationRequest(BaseModel):
     """법률 상담 요청 스키마."""
@@ -111,6 +166,9 @@ class ConsultationResponse(BaseModel):
     verified_facts: Optional[List[Dict[str, Any]]] = None
     missing_evidence: Optional[List[Dict[str, Any]]] = None
     evidence_citations: Optional[List[Dict[str, Any]]] = None
+
+    # Case-Centric Chat UI v1.1 Progress field (P0-05)
+    progress: Optional[ConsultationProgress] = None
 
 
 class ApprovalDecisionRequest(BaseModel):

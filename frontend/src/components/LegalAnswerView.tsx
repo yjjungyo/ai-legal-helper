@@ -7,9 +7,11 @@
 
 import React, { useState } from 'react';
 
-interface LegalAnswerViewProps {
+export interface LegalAnswerViewProps {
   /** 렌더링할 법률 답변 텍스트 */
   content: string;
+  /** 증거 번호 [E01] 클릭 시 호출되는 콜백 */
+  onEvidenceClick?: (label: string) => void;
 }
 
 /**
@@ -77,7 +79,7 @@ function classifySectionTitle(title: string): SectionCategoryConfig {
  * @param text 한 줄의 텍스트
  * @returns React 노드 배열
  */
-export function renderInlineMarkdown(text: string): React.ReactNode[] {
+export function renderInlineMarkdown(text: string, onEvidenceClick?: (label: string) => void): React.ReactNode[] {
   if (!text) return [];
 
   // 토큰 분할 정규식: **볼드**, `인라인코드`, *이탤릭*
@@ -86,6 +88,27 @@ export function renderInlineMarkdown(text: string): React.ReactNode[] {
 
   return parts.map((part, index) => {
     if (!part) return null;
+
+    // 증거 번호: [E01], [E02]
+    const evMatch = part.match(/^\[(E\d{1,3})\]$/);
+    if (evMatch) {
+      const label = evMatch[1];
+      return (
+        <button
+          key={index}
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEvidenceClick?.(label);
+          }}
+          className="chat-evidence-tag"
+          title={`증거 [${label}] 원문 및 발췌 확인`}
+          aria-label={`증거 ${label} 확인`}
+        >
+          [{label}]
+        </button>
+      );
+    }
 
     // 볼드: **text**
     if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
@@ -134,7 +157,7 @@ export function renderInlineMarkdown(text: string): React.ReactNode[] {
 /**
  * 개별 줄의 서식(불릿, 번호 목록, 일반 문장, 빈 줄)에 따라 깔끔한 스타일 적용
  */
-function renderFormattedLine(line: string, index: number): React.ReactNode {
+function renderFormattedLine(line: string, index: number, onEvidenceClick?: (label: string) => void): React.ReactNode {
   const trimmed = line.trim();
   if (!trimmed) {
     return <div key={index} style={{ height: '6px' }} />;
@@ -154,7 +177,7 @@ function renderFormattedLine(line: string, index: number): React.ReactNode {
         }}
       >
         <span style={{ color: 'var(--primary, #3b82f6)', fontWeight: 'bold' }}>•</span>
-        <span style={{ flex: 1, lineHeight: 1.6 }}>{renderInlineMarkdown(textContent)}</span>
+        <span style={{ flex: 1, lineHeight: 1.6 }}>{renderInlineMarkdown(textContent, onEvidenceClick)}</span>
       </div>
     );
   }
@@ -175,7 +198,7 @@ function renderFormattedLine(line: string, index: number): React.ReactNode {
         <span style={{ color: 'var(--text-muted, #64748b)', fontWeight: 600, minWidth: '20px' }}>
           {numMatch[1]}
         </span>
-        <span style={{ flex: 1, lineHeight: 1.6 }}>{renderInlineMarkdown(numMatch[2])}</span>
+        <span style={{ flex: 1, lineHeight: 1.6 }}>{renderInlineMarkdown(numMatch[2], onEvidenceClick)}</span>
       </div>
     );
   }
@@ -194,7 +217,7 @@ function renderFormattedLine(line: string, index: number): React.ReactNode {
           fontStyle: 'italic',
         }}
       >
-        {renderInlineMarkdown(quoteText)}
+        {renderInlineMarkdown(quoteText, onEvidenceClick)}
       </div>
     );
   }
@@ -202,7 +225,7 @@ function renderFormattedLine(line: string, index: number): React.ReactNode {
   // 4. 일반 문장
   return (
     <div key={index} style={{ margin: '2px 0', lineHeight: 1.6 }}>
-      {renderInlineMarkdown(line)}
+      {renderInlineMarkdown(line, onEvidenceClick)}
     </div>
   );
 }
@@ -210,7 +233,7 @@ function renderFormattedLine(line: string, index: number): React.ReactNode {
 /**
  * 구조화된 법률의견서 및 마크다운 텍스트를 섹션별 UI 요소로 파싱하여 렌더링하는 컴포넌트
  */
-export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content }) => {
+export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvidenceClick }) => {
   const [collapsedSections, setCollapsedSections] = useState<Record<number, boolean>>({});
 
   if (!content) return null;
@@ -351,7 +374,7 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content }) => 
                 <span>{sec.title}</span>
               </div>
               <div style={{ fontSize: '0.9em', color: 'var(--text-main)' }}>
-                {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx))}
+                {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx, onEvidenceClick))}
               </div>
             </div>
           );
@@ -387,7 +410,7 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content }) => 
 
               </div>
               <div style={{ fontSize: '0.89em', color: 'var(--text-secondary, #475569)' }}>
-                {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx))}
+                {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx, onEvidenceClick))}
               </div>
             </div>
           );
@@ -459,7 +482,7 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content }) => 
                 </div>
               ) : (
                 <div style={{ fontSize: '0.91em', color: 'var(--text-main)', marginTop: '8px' }}>
-                  {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx))}
+                  {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx, onEvidenceClick))}
                 </div>
               )}
             </div>
@@ -496,7 +519,7 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content }) => 
 
               </div>
               <div style={{ fontSize: '0.91em', color: 'var(--text-main)' }}>
-                {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx))}
+                {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx, onEvidenceClick))}
               </div>
             </div>
           );
@@ -531,7 +554,7 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content }) => 
               </div>
             )}
             <div style={{ fontSize: '0.92em', color: 'var(--text-main)' }}>
-              {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx))}
+              {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx, onEvidenceClick))}
             </div>
           </div>
         );

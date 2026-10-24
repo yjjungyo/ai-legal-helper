@@ -91,6 +91,43 @@ class ConversationContext(BaseModel):
         default="",
         description="이전 대화들의 구조화된 핵심 요약문"
     )
+    case_memory: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="사건 장기 메모리 (기본정보, 당사자, 확정사실수, 등록증거수 등)"
+    )
+
+    def find_relevant_turns(self, query: str, top_k: int = 2) -> List[ConversationTurn]:
+        """현재 질문과 의미상 관련성이 높은 과거 상담 턴을 검색한다 (P0-08).
+
+        Args:
+            query: 현재 사용자의 신규 질문.
+            top_k: 최대 반환할 관련 턴 수.
+
+        Returns:
+            List[ConversationTurn]: 질의 키워드와 매칭된 과거 턴 목록.
+        """
+        if not self.previous_turns or not query:
+            return []
+
+        import re
+        tokens = [t for t in re.findall(r'[가-힣a-zA-Z0-9]{2,}', query) if t not in ("질문", "어떻게", "있나요", "해주세요", "관련", "대해", "대한", "저는")]
+        if not tokens:
+            return []
+
+        scored = []
+        # 최근 턴은 format_context_for_prompt에서 기본 포함되므로, 더 오래된 턴 위주로 검색
+        candidate_turns = self.previous_turns[:-2] if len(self.previous_turns) > 2 else []
+        for turn in candidate_turns:
+            score = 0
+            text_corpus = (turn.question or "") + " " + (turn.answer or "")
+            for token in tokens:
+                if token in text_corpus:
+                    score += 1
+            if score > 0:
+                scored.append((score, turn))
+
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return [item[1] for item in scored[:top_k]]
 
     def to_chat_history_messages(self, max_turns: int = 5) -> List[AnyMessage]:
         """과거 대화 턴들을 LangGraph 및 LLM 호출에 적합한 AnyMessage 리스트로 변환한다.
@@ -133,11 +170,31 @@ class ConversationContext(BaseModel):
         if not self.previous_turns:
             return "(이전 상담 대화 없음 — 신규 대화)"
 
-        parts: List[str] = [f"[이전 상담 대화 이력 (총 {len(self.previous_turns)}턴 중 최근 {min(len(self.previous_turns), max_turns)}턴)]"]
+        parts: List[str] = [
+            f"[이전 상담 대화 이력 및 사건 연속 상담 맥락 (총 {len(self.previous_turns)}턴 중 최근 {min(len(self.previous_turns), max_turns)}턴 및 관련 이력)]",
+            "■ 원칙: 과거 AI 답변은 작성 당시의 잠정 조언이며 사실 원본이 아닙니다. 최신 Fact 및 등록 증거가 과거 답변과 충돌할 경우 최신 증거가 항상 우선합니다."
+        ]
+
+        if self.case_memory:
+            c_title = self.case_memory.get("title", "")
+            c_facts = self.case_memory.get("confirmed_facts_count", 0)
+            c_evs = self.case_memory.get("evidences_count", 0)
+            parts.append(f"■ 사건 메모리: 사건명 '{c_title}' (등록증거 {c_evs}건, 확정사실 {c_facts}건)")
 
         if self.conversation_summary:
             parts.append(f"■ 이전 상담 핵심 요약:\n{self.conversation_summary}\n")
 
+        # 현재 질문과 관련된 오래된 과거 턴 발췌 검색 (P0-08)
+        relevant_turns = self.find_relevant_turns(self.current_question, top_k=2)
+        if relevant_turns:
+            parts.append("■ 현재 질문 관련 과거 상담 발췌:")
+            for r_turn in relevant_turns:
+                r_ans = r_turn.answer.strip()
+                if len(r_ans) > 250:
+                    r_ans = r_ans[:250] + "..."
+                parts.append(f"- 턴 {r_turn.turn_index} 질의: {r_turn.question.strip()[:80]} → 답변 발췌: {r_ans}")
+
+        parts.append("■ 최근 대화 진행:")
         recent_turns = self.previous_turns[-max_turns:]
         for turn in recent_turns:
             q_clean = turn.question.strip().replace("\n", " ")
@@ -158,6 +215,7 @@ class ConversationContext(BaseModel):
             )
 
         return "\n".join(parts).strip()
+
 
 
 def build_conversation_summary(turns: List[ConversationTurn]) -> str:
@@ -220,7 +278,8 @@ def load_conversation_context(
             previous_turns=[],
         )
 
-    # 1. 동일 conversation_id에 속한 모든 상담 레코드 조회 (시간순)
+    # 1. 대화 세션 기준 상담 레코드 조회
+    # (단일 사건 대화 구조에서는 case.primary_conversation_id를 conversation_id로 사용)
     records = (
         db.query(ConsultationRecord)
         .filter(ConsultationRecord.conversation_id == conversation_id)
@@ -228,8 +287,64 @@ def load_conversation_context(
         .all()
     )
 
+    # 2. 소유권 및 격리 검증 (Security & Context Isolation)
+    if records:
+        first_rec = records[0]
+        if case_id and first_rec.case_id and first_rec.case_id != case_id:
+            logger.error(
+                f"[CONVERSATION_CONTEXT_SECURITY] Case mismatch for conversation {conversation_id}: "
+                f"expected case {case_id}, found {first_rec.case_id}"
+            )
+            raise PermissionError(f"해당 대화 세션은 다른 사건(case_id: {first_rec.case_id})에 속해 있습니다.")
+
+        if not auth_bypass and user_id and first_rec.user_id and first_rec.user_id != user_id:
+            logger.error(
+                f"[CONVERSATION_CONTEXT_SECURITY] User mismatch for conversation {conversation_id}: "
+                f"requesting user {user_id}, owner {first_rec.user_id}"
+            )
+            raise PermissionError("해당 대화 세션에 대한 열람 및 작성 권한이 없습니다.")
+
+    # 3. 사건 메모리 구성 (Case Memory - P0-08)
+    case_memory = None
+    if case_id:
+        try:
+            from ai_legal_helper.database.models import Case, Fact, EvidenceDocument
+            case_obj = db.query(Case).filter(Case.id == case_id).first()
+            if case_obj and hasattr(case_obj, "title"):
+                # 실제 모델이거나 적절히 모킹된 객체인 경우
+                if not auth_bypass and user_id and isinstance(case_obj.user_id, str) and case_obj.user_id != user_id:
+                    raise PermissionError("해당 사건에 대한 열람 및 상담 권한이 없습니다.")
+
+                title = case_obj.title if isinstance(case_obj.title, str) else ""
+                case_type = case_obj.case_type if isinstance(case_obj.case_type, str) else ""
+                status = case_obj.status if isinstance(case_obj.status, str) else ""
+
+                facts_count = 0
+                evs_count = 0
+                try:
+                    fc = db.query(Fact).filter(Fact.case_id == case_id).count()
+                    ec = db.query(EvidenceDocument).filter(EvidenceDocument.case_id == case_id).count()
+                    if isinstance(fc, int):
+                        facts_count = fc
+                    if isinstance(ec, int):
+                        evs_count = ec
+                except Exception:
+                    pass
+
+                case_memory = {
+                    "title": title,
+                    "case_type": case_type,
+                    "status": status,
+                    "confirmed_facts_count": facts_count,
+                    "evidences_count": evs_count,
+                }
+        except PermissionError:
+            raise
+        except Exception as e:
+            logger.debug(f"[CONVERSATION_CONTEXT] case_memory build skipped or failed: {e}")
+
     if not records:
-        logger.debug(f"[CONVERSATION_CONTEXT] New conversation session started: {conversation_id}")
+        logger.debug(f"[CONVERSATION_CONTEXT] New conversation session started for case={case_id}, conv={conversation_id}")
         return ConversationContext(
             conversation_id=conversation_id,
             case_id=case_id,
@@ -237,23 +352,8 @@ def load_conversation_context(
             current_question=current_question,
             turn_index=1,
             previous_turns=[],
+            case_memory=case_memory,
         )
-
-    # 2. 사건 및 사용자 소유권 검증 (Security & Context Isolation)
-    first_rec = records[0]
-    if case_id and first_rec.case_id and first_rec.case_id != case_id:
-        logger.error(
-            f"[CONVERSATION_CONTEXT_SECURITY] Case mismatch for conversation {conversation_id}: "
-            f"expected case {case_id}, found {first_rec.case_id}"
-        )
-        raise PermissionError(f"해당 대화 세션은 다른 사건(case_id: {first_rec.case_id})에 속해 있습니다.")
-
-    if not auth_bypass and user_id and first_rec.user_id and first_rec.user_id != user_id:
-        logger.error(
-            f"[CONVERSATION_CONTEXT_SECURITY] User mismatch for conversation {conversation_id}: "
-            f"requesting user {user_id}, owner {first_rec.user_id}"
-        )
-        raise PermissionError("해당 대화 세션에 대한 열람 및 작성 권한이 없습니다.")
 
     # 3. 완료된 턴들만 필터링하여 ConversationTurn 목록 구성
     turns: List[ConversationTurn] = []
@@ -313,5 +413,6 @@ def load_conversation_context(
         last_answer_status=last_answer_status,
         previously_cited_sources=seen_sources,
         conversation_summary=summary,
+        case_memory=case_memory,
     )
 

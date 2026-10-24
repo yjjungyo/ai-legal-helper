@@ -41,6 +41,7 @@ export interface Source {
   filename?: string | null;
   category?: string | null;
   evidence_label?: string | null;
+  label?: string | null;
 }
 
 export interface UsageSummary {
@@ -69,12 +70,52 @@ export interface StatuteSearchApprovalRequest {
   approval_required: boolean;
 }
 
+export type ApprovalRequest = StatuteSearchApprovalRequest;
+
+/**
+ * 상담 단계별 세부 실행 상태 열거형 (P0-05)
+ */
+export type ConsultationStepStatus =
+  | 'PENDING'
+  | 'RUNNING'
+  | 'COMPLETED'
+  | 'SKIPPED'
+  | 'WAITING_APPROVAL'
+  | 'FAILED';
+
+/**
+ * 상담 진행 단계 세부 정보 모델 (P0-05)
+ */
+export interface ConsultationStep {
+  step_id: string;
+  title: string;
+  step_name?: string;
+  status: ConsultationStepStatus;
+  started_at?: string;
+  completed_at?: string;
+  message?: string;
+}
+
+/**
+ * 상담 전체 6단계 진행 상태 모델 (P0-05)
+ */
+export interface ConsultationProgress {
+  request_id: string;
+  current_step: string | null;
+  current_step_name?: string | null;
+  steps: ConsultationStep[];
+  updated_at: string;
+}
+
+
 export interface ConsultationResponse {
   request_id: string;
   conversation_id?: string;
   turn_index?: number;
   trace_id: string;
   status: 'IN_PROGRESS' | 'SUCCESS' | 'ERROR' | 'APPROVAL_REQUIRED';
+  detail?: string;
+  final_disposition?: string;
   // 3계층 상태 분리 (P1-05 Three-Tier Status Model)
   execution_status?: 'IN_PROGRESS' | 'APPROVAL_REQUIRED' | 'COMPLETED' | 'ERROR';
   verification_status?: 'PASS' | 'REVISE' | 'INSUFFICIENT' | 'UNVERIFIED' | string;
@@ -126,6 +167,8 @@ export interface ConsultationResponse {
   verified_facts?: string[];
   missing_evidence?: string[];
   evidence_citations?: Source[];
+  // 사건 중심 Chat v1.1 6단계 실시간 진행 상태 (P0-05)
+  progress?: ConsultationProgress | null;
 }
 
 /**

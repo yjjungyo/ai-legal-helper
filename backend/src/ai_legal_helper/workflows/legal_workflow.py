@@ -643,12 +643,16 @@ def verification_condition(state: LegalState) -> str:
         disposition, disp_reason = determine_final_disposition(issue_res_objs)
         logger.info(f"[DISPOSITION] 쟁점 기반 처분 결정: {disposition} ({disp_reason})")
 
+        # 후보 법령이 존재하고 아직 HILT를 실행하지 않은 경우:
+        # 쟁점 중 법령 누락(missing_statutes)이 있거나 법령 근거 부족 시 사용자 승인을 구하는 HILT 노드로 우선 라우팅
+        any_statute_missing = any(ir.missing_statutes for ir in issue_res_objs)
+        if not hilt_executed and candidate_laws and (any_statute_missing or reason_code in ("LEGAL_SOURCE_MISSING", "LEGAL_SOURCE_INSUFFICIENT")):
+            logger.info(f"[DISPOSITION] 후보 법령({candidate_laws}) 검증을 위해 HILT 법령 검색 승인 요청 노드로 분기합니다.")
+            return "statute_search_approval"
+
         if disposition in ("DELIVERED", "CAUTIONARY"):
             return "finalize"
         elif disposition == "WITHHELD":
-            # 법령 검색 기회가 남아있고 후보 법령이 있는 경우 HILT 승인 요청
-            if not hilt_executed and candidate_laws and reason_code in ("LEGAL_SOURCE_MISSING", "LEGAL_SOURCE_INSUFFICIENT"):
-                return "statute_search_approval"
             # 1회 재검토 가능하면 revise 시도
             if revision_count < 1 and not hilt_executed:
                 return "revise"
@@ -1516,6 +1520,7 @@ async def _execute_consultation(
     resume_data: Optional[Dict[str, Any]],
     checkpointer: Any,
     conversation_context: Optional[Any] = None,
+    on_step_callback: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """지정된 체크포인터 환경에서 실제 LangGraph 워크플로우를 실행하고 결과를 수합한다."""
     from ai_legal_helper.observability.langfuse_client import flush_langfuse, get_langfuse_callback_handler
@@ -1531,6 +1536,7 @@ async def _execute_consultation(
         "callbacks": callbacks,
     }
 
+    interrupt_payload = None
     try:
         if resume_data is not None:
             # 존재하지 않는 thread_id에 대한 resume 방어 검증
@@ -1541,7 +1547,25 @@ async def _execute_consultation(
             if state_tuple is None or not getattr(state_tuple, "checkpoint", None):
                 raise ValueError(f"해당 thread_id('{thread_id}')에 대기 중이거나 저장된 워크플로우 상태가 존재하지 않습니다.")
 
-            final_state = await app.ainvoke(Command(resume=resume_data), config)
+            if on_step_callback:
+                async for event in app.astream(Command(resume=resume_data), config, stream_mode="updates"):
+                    for node_name in event.keys():
+                        if node_name == "__interrupt__":
+                            interrupt_payload = event[node_name][0]
+                        else:
+                            try:
+                                if asyncio.iscoroutinefunction(on_step_callback):
+                                    await on_step_callback(node_name)
+                                else:
+                                    on_step_callback(node_name)
+                            except Exception as ex:
+                                logger.warning(f"[STEP_CALLBACK] Failed on {node_name}: {ex}")
+                state_snapshot = await app.aget_state(config)
+                final_state = dict(state_snapshot.values)
+                if interrupt_payload is not None:
+                    final_state["__interrupt__"] = [interrupt_payload]
+            else:
+                final_state = await app.ainvoke(Command(resume=resume_data), config)
         else:
             history_messages = conversation_context.to_chat_history_messages(max_turns=5) if conversation_context and hasattr(conversation_context, "to_chat_history_messages") else []
             conv_id = getattr(conversation_context, "conversation_id", None) or ""
@@ -1554,7 +1578,25 @@ async def _execute_consultation(
                 "conversation_context": conv_dump,
                 "turn_index": t_idx,
             }
-            final_state = await app.ainvoke(inputs, config)
+            if on_step_callback:
+                async for event in app.astream(inputs, config, stream_mode="updates"):
+                    for node_name in event.keys():
+                        if node_name == "__interrupt__":
+                            interrupt_payload = event[node_name][0]
+                        else:
+                            try:
+                                if asyncio.iscoroutinefunction(on_step_callback):
+                                    await on_step_callback(node_name)
+                                else:
+                                    on_step_callback(node_name)
+                            except Exception as ex:
+                                logger.warning(f"[STEP_CALLBACK] Failed on {node_name}: {ex}")
+                state_snapshot = await app.aget_state(config)
+                final_state = dict(state_snapshot.values)
+                if interrupt_payload is not None:
+                    final_state["__interrupt__"] = [interrupt_payload]
+            else:
+                final_state = await app.ainvoke(inputs, config)
     finally:
         flush_langfuse()
 
@@ -1641,6 +1683,7 @@ async def run_legal_consultation(
     resume_data: Optional[Dict[str, Any]] = None,
     checkpointer: Optional[Any] = None,
     conversation_context: Optional[Any] = None,
+    on_step_callback: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """법률 상담 슈퍼바이저 워크플로우를 실행하고 최종 답변, 출처 또는 승인 대기 상태를 반환한다.
 
@@ -1649,6 +1692,8 @@ async def run_legal_consultation(
         thread_id: 대화 스레드 또는 요청 식별자
         resume_data: HILT 승인/거절 시 재개를 위한 사용자 결정 데이터 (예: {"approved": True})
         checkpointer: 명시적으로 주입할 체크포인터 (미지정 시 환경설정에 따라 자동 선택)
+        conversation_context: 연속 대화 맥락 객체 (ConversationContext)
+        on_step_callback: LangGraph 개별 노드 완료 시 호출되는 진행 상태 콜백 (Callable[[str], Any])
 
     Returns:
         Dict[str, Any]: 상담 처리 결과 딕셔너리.
@@ -1662,7 +1707,7 @@ async def run_legal_consultation(
             pass
 
     if checkpointer is not None:
-        return await _execute_consultation(question, thread_id, resume_data, checkpointer, conversation_context=conversation_context)
+        return await _execute_consultation(question, thread_id, resume_data, checkpointer, conversation_context=conversation_context, on_step_callback=on_step_callback)
 
     checkpointer_type = os.getenv("CHECKPOINTER_TYPE", "postgres").lower()
     if checkpointer_type == "memory" or AsyncPostgresSaver is None:
@@ -1672,9 +1717,10 @@ async def run_legal_consultation(
                 "로컬 MemorySaver로 폴백합니다. 영구 체크포인팅을 위해 pip install langgraph-checkpoint-postgres가 권장됩니다."
             )
         mem_saver = get_memory_checkpointer()
-        return await _execute_consultation(question, thread_id, resume_data, mem_saver, conversation_context=conversation_context)
+        return await _execute_consultation(question, thread_id, resume_data, mem_saver, conversation_context=conversation_context, on_step_callback=on_step_callback)
     else:
         conn_string = get_postgres_conn_string()
         async with AsyncPostgresSaver.from_conn_string(conn_string) as pg_saver:
-            return await _execute_consultation(question, thread_id, resume_data, pg_saver, conversation_context=conversation_context)
+            return await _execute_consultation(question, thread_id, resume_data, pg_saver, conversation_context=conversation_context, on_step_callback=on_step_callback)
+
 

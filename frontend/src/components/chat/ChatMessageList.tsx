@@ -1,0 +1,129 @@
+/**
+ * @fileoverview 단일 사건 대화 스트림(ChatMessageList) 컴포넌트
+ * 사건에 속한 모든 대화 턴을 시간순으로 연속 렌더링하고, 날짜가 바뀌는 지점에 일자 구분선(ChatDateDivider)을
+ * 삽입하며, 신규 메시지 수신 및 진행 상태 갱신 시 부드러운 하단 자동 스크롤을 유지합니다.
+ */
+
+import React, { useRef, useEffect } from 'react';
+import type { ConsultationResponse } from '../../types/consultation';
+import { ChatDateDivider } from './ChatDateDivider';
+import { ChatMessage } from './ChatMessage';
+
+export interface ChatMessageListProps {
+  /** 시간순(ASC)으로 정렬된 전체 대화 턴 목록 */
+  messages: ConsultationResponse[];
+  /** 증거 번호 [E01] 클릭 핸들러 */
+  onEvidenceClick: (label: string) => void;
+  /** HILT 법령 검색 승인 핸들러 */
+  onApprove: (requestId: string) => void;
+  /** HILT 법령 검색 거절 핸들러 */
+  onReject: (requestId: string) => void;
+  /** HILT 승인/거절 액션 로딩 상태 */
+  isActionLoading?: boolean;
+  /** 추천 질문 칩 클릭 시 질문 입력창에 설정하는 콜백 */
+  onSelectSampleQuestion?: (question: string) => void;
+}
+
+/**
+ * 두 날짜 문자열이 서로 다른 날짜(로컬 기준)인지 판별한다.
+ */
+function isDifferentDay(d1Str?: string, d2Str?: string): boolean {
+  if (!d1Str || !d2Str) return true;
+  const d1 = new Date(d1Str);
+  const d2 = new Date(d2Str);
+  return (
+    d1.getFullYear() !== d2.getFullYear() ||
+    d1.getMonth() !== d2.getMonth() ||
+    d1.getDate() !== d2.getDate()
+  );
+}
+
+const SAMPLE_QUESTIONS = [
+  '보증금 전액 반환 가능성 및 대항력 유지 요건은 어떻게 되나요?',
+  '임대차 계약 해지 통보의 유효성과 필요 절차를 검토해주세요.',
+  '임대인의 분할반환 제안 수용 시 권리 보전 방안은 무엇인가요?',
+  '현재 가압류 상황에서 경매 진행 시 배당 순위는 어떻게 되나요?',
+];
+
+/**
+ * 대화 스트림 목록 컴포넌트
+ * @param props 메시지 배열 및 이벤트 핸들러
+ * @returns 스크롤 가능한 대화 스트림 JSX
+ */
+export const ChatMessageList: React.FC<ChatMessageListProps> = ({
+  messages,
+  onEvidenceClick,
+  onApprove,
+  onReject,
+  isActionLoading,
+  onSelectSampleQuestion,
+}) => {
+  const bottomAnchorRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // 메시지 개수나 상태 변경 시 하단으로 자동 스크롤
+  useEffect(() => {
+    bottomAnchorRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages.length, messages[messages.length - 1]?.status, messages[messages.length - 1]?.progress?.current_step]);
+
+  if (messages.length === 0) {
+    return (
+      <main className="case-chat-stream" ref={containerRef}>
+        <div className="chat-empty-state">
+          <div className="chat-empty-icon" aria-hidden="true">
+            💬
+          </div>
+          <h3 style={{ fontSize: '1.2em', fontWeight: 700, color: '#0f172a', margin: '0 0 8px 0' }}>
+            사건 중심 법률 상담을 시작해보세요
+          </h3>
+          <p style={{ fontSize: '0.9em', color: '#64748b', lineHeight: 1.6, margin: 0 }}>
+            등록된 사건 증거(계약서, 등기부등본, 진술 등)와 확정 사실관계를 바탕으로<br />
+            실제 사실에 입각한 전문적인 법률 검토와 행동 가이드를 제공합니다.
+          </p>
+
+          <div className="chat-sample-chips">
+            {SAMPLE_QUESTIONS.map((q, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => onSelectSampleQuestion?.(q)}
+                className="chat-sample-chip"
+              >
+                {q}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div ref={bottomAnchorRef} />
+      </main>
+    );
+  }
+
+  return (
+    <main className="case-chat-stream" ref={containerRef} role="log" aria-label="사건 상담 대화 이력">
+      <div className="case-chat-stream-inner">
+        {messages.map((msg, index) => {
+          const prevMsg = index > 0 ? messages[index - 1] : undefined;
+          const showDateDivider =
+            index === 0 || isDifferentDay(prevMsg?.created_at, msg.created_at);
+
+          return (
+            <React.Fragment key={msg.request_id || `msg-${index}`}>
+              {showDateDivider && msg.created_at && (
+                <ChatDateDivider date={msg.created_at} />
+              )}
+              <ChatMessage
+                message={msg}
+                onEvidenceClick={onEvidenceClick}
+                onApprove={onApprove}
+                onReject={onReject}
+                isActionLoading={isActionLoading}
+              />
+            </React.Fragment>
+          );
+        })}
+        <div ref={bottomAnchorRef} style={{ height: '4px' }} />
+      </div>
+    </main>
+  );
+};
