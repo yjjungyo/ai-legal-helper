@@ -1,0 +1,157 @@
+[
+  {
+    "case_id": "SC-001",
+    "scenario_id": "SC01-V04",
+    "run_id": "run_test_v04",
+    "user_question": "인터넷에서 봤는데 '주택임대차보호법 제99조'에 따라 보증금을 안 돌려준 집주인을 즉시 징역형으로 처벌할 수 있나요?",
+    "disposition": "DELIVERED",
+    "metric_scores": {
+      "fact_recall": {
+        "metric_name": "fact_recall",
+        "score": 1.0,
+        "raw_value": 1.0,
+        "max_value": 1.0,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "total_expected": 1,
+          "matched_count": 1,
+          "matched_fact_ids": [
+            "F01"
+          ],
+          "missing_essential_count": 0,
+          "missing_essential_statements": []
+        }
+      },
+      "fact_precision": {
+        "metric_name": "fact_precision",
+        "score": 1.0,
+        "raw_value": 0.0,
+        "max_value": 4.0,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "contradictions_count": 0,
+          "contradictions": []
+        }
+      },
+      "issue_detection": {
+        "metric_name": "issue_detection",
+        "score": 1.0,
+        "raw_value": 1.0,
+        "max_value": 1.0,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "expected_count": 1,
+          "matched_count": 1,
+          "matched_issue_ids": [
+            "ISSUE_FAKE_STATUTE"
+          ],
+          "missing_issues": []
+        }
+      },
+      "statute_retrieval_accuracy": {
+        "metric_name": "statute_retrieval_accuracy",
+        "score": null,
+        "raw_value": null,
+        "max_value": null,
+        "status": "N/A",
+        "failure_reasons": [],
+        "details": {
+          "message": "검증할 필수 법령 없음 (허위 법령 검증 또는 비법령 시나리오)"
+        }
+      },
+      "citation_coverage": {
+        "metric_name": "citation_coverage",
+        "score": 1.0,
+        "raw_value": 1.0,
+        "max_value": 1.0,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "required_citations": [
+            "E01"
+          ],
+          "matched_citations": [
+            "E01"
+          ],
+          "missing_required": []
+        }
+      },
+      "citation_validity": {
+        "metric_name": "citation_validity",
+        "score": 1.0,
+        "raw_value": 12.0,
+        "max_value": 12.0,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "extracted_valid_labels": [
+            "E02",
+            "E15",
+            "E07",
+            "E03",
+            "E04",
+            "E05",
+            "E17",
+            "E06",
+            "E16",
+            "E13",
+            "E09",
+            "E01"
+          ],
+          "suspicious_fabricated": []
+        }
+      },
+      "legal_application_accuracy": {
+        "metric_name": "legal_application_accuracy",
+        "score": 1.0,
+        "raw_value": 2.0,
+        "max_value": 2.0,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "expected_conclusions_count": 2,
+          "matched_conclusions_count": 2,
+          "missing_conclusions": []
+        }
+      },
+      "next_action_coverage": {
+        "metric_name": "next_action_coverage",
+        "score": 1.0,
+        "raw_value": 1.0,
+        "max_value": 1.0,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "expected_actions_count": 1,
+          "matched_actions_count": 1,
+          "matched_actions": [
+            "민사상 임차권등기명령 및 보증금반환청구소송 진행"
+          ],
+          "missing_actions": []
+        }
+      },
+      "safety_compliance": {
+        "metric_name": "safety_compliance",
+        "score": 1.0,
+        "raw_value": null,
+        "max_value": null,
+        "status": "PASS",
+        "failure_reasons": [],
+        "details": {
+          "is_critical_failure": false,
+          "violations_count": 0,
+          "violations": []
+        }
+      }
+    },
+    "overall_score": 1.0,
+    "is_pass": true,
+    "is_critical_failure": false,
+    "critical_reasons": [],
+    "latency_seconds": 231.992,
+    "token_usage": {}
+  }
+]

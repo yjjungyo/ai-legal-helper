@@ -147,11 +147,20 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
 
     req_id = get_request_id() or "unknown_req"
     trace_id = get_trace_id() or "unknown_trace"
-    case_id = get_case_id()
     
     conv_id = state.get("conversation_id")
     conv_ctx = state.get("conversation_context")
     turn_idx = state.get("turn_index") or 1
+
+    # 사건 ID 복원: 컨텍스트 변수, 상태, 또는 대화 맥락 객체/딕셔너리에서 순차 탐색
+    case_id = (
+        get_case_id()
+        or state.get("case_id")
+        or (conv_ctx.get("case_id") if isinstance(conv_ctx, dict) else getattr(conv_ctx, "case_id", None))
+    )
+    if case_id:
+        from ai_legal_helper.observability.context import set_case_id
+        set_case_id(case_id)
 
     case_context = ""
     # 사건이 지정되지 않은 일반 상담에서는 GraphRAG 를 사용하지 않는다.
@@ -707,7 +716,30 @@ def verification_condition(state: LegalState) -> str:
     #    - 법률적 핵심 뼈대가 검증된 출처에 의해 뒷받침되고 사실관계 입증 주의사항(CASE_EVIDENCE_MISSING)이나
     #      경미한 문구 보완만 남아있는 경우에만 finalize_node로 라우팅하여 조건부 답변(CAUTIONARY)을 제공한다.
     if status == "REVISE":
-        # A) 중대 결함 사유(법령 미확보, 허위/미검증 인용, 증거 상충, 시스템 오류) 존재 시 전달 차단
+        # 1. 허위/미검증 인용 라벨 잔존 시 전달 차단 (Section 7, Section 12)
+        audit = ver_res.get("citation_audit", {}) or {}
+        if audit.get("unverified_citations"):
+            logger.info("[GATING] REVISE 상태이나 허위/미검증 인용 감지로 finalize 차단 -> insufficient(WITHHELD)")
+            return "insufficient"
+
+        # 2. 쟁점 기반 부분 답변(Issue-Level Partial Answer) 평가 (P0-1)
+        #    - 단위 쟁점 중 검증 완료(VERIFIED) 또는 조건부(CONDITIONAL) 쟁점이 1건 이상 존재하고 사건 브리핑이 있는 경우:
+        #      전체 답변을 일괄 WITHHELD로 폐기하지 않고 assemble_grounded_answer를 통해
+        #      검증된 쟁점과 확인된 사실만을 조립하여 조건부 답변(CAUTIONARY)을 제공한다.
+        issue_results = ver_res.get("issue_results") or state.get("issue_results") or []
+        briefing_raw = state.get("case_evidence_briefing")
+        verified_count = sum(1 for r in issue_results if (r.get("status") == "VERIFIED" if isinstance(r, dict) else getattr(r, "status", None) == "VERIFIED"))
+        conditional_count = sum(1 for r in issue_results if (r.get("status") == "CONDITIONAL" if isinstance(r, dict) else getattr(r, "status", None) == "CONDITIONAL"))
+
+        if (verified_count > 0 or conditional_count > 0) and briefing_raw:
+            logger.info(
+                f"[GATING] REVISE 상태이나 검증된 쟁점(VERIFIED={verified_count}, CONDITIONAL={conditional_count}) 존재 "
+                f"-> assemble_grounded_answer 부분 답변 생성을 위해 finalize_node로 라우팅 (P0-1)"
+            )
+            return "finalize"
+
+        # 3. 사건 브리핑이 없거나 검증 가능한 쟁점이 전무한 일반 상담의 경우 안전 게이팅 적용
+        # A) 중대 결함 사유(법령 미확보, 증거 상충, 시스템 오류) 존재 시 전달 차단
         if reason_code in ("LEGAL_SOURCE_MISSING", "CITATION_INVALID", "EVIDENCE_CONFLICT", "VERIFICATION_ERROR"):
             logger.info(f"[GATING] REVISE 상태이나 중대 결함({reason_code})으로 finalize 차단 -> insufficient(WITHHELD)")
             return "insufficient"
@@ -720,12 +752,6 @@ def verification_condition(state: LegalState) -> str:
         ]
         if unsupported_legal_claims:
             logger.info(f"[GATING] REVISE 상태이나 미뒷받침 법률 주장 {len(unsupported_legal_claims)}건 존재로 finalize 차단 -> insufficient(WITHHELD)")
-            return "insufficient"
-
-        # C) 미검증 인용 라벨 잔존 시 전달 차단
-        audit = ver_res.get("citation_audit", {}) or {}
-        if audit.get("unverified_citations"):
-            logger.info("[GATING] REVISE 상태이나 미검증 인용 감지로 finalize 차단 -> insufficient(WITHHELD)")
             return "insufficient"
 
         # D) 핵심 법리는 확보되었고 사실관계 입증 주의(CASE_EVIDENCE_MISSING) 또는 경미한 문구 보완인 경우에만 조건부 확정(CAUTIONARY)
@@ -1001,17 +1027,26 @@ def finalize_node(state: LegalState) -> Dict:
     if briefing_raw:
         briefing_obj = CaseEvidenceBriefing(**briefing_raw)
         all_sources = list(cited_sources)
-        seen_keys = {s.get("source_id") or s.get("file") for s in all_sources if isinstance(s, dict)}
+        seen_keys = {
+            s.get("source_id") or s.get("evidence_id") or s.get("file") or s.get("evidence_label")
+            for s in all_sources
+            if isinstance(s, dict)
+        }
+        # None 제거
+        seen_keys.discard(None)
         for ev_label, ces in briefing_obj.source_registry.items():
-            doc_name = ces.get("file_name") or ces.get("file") or ""
+            if not isinstance(ces, dict):
+                continue
+            doc_name = ces.get("document_name") or ces.get("file_name") or ces.get("file") or ""
             is_cited_in_final = (
                 f"[{ev_label}]" in final
                 or f"[{ev_label}_" in final
+                or f"[{ev_label}:" in final
                 or (doc_name and doc_name in final)
             )
             if is_cited_in_final:
-                k = ces.get("source_id") or ces.get("file")
-                if k not in seen_keys:
+                k = ces.get("evidence_id") or ces.get("source_id") or ces.get("evidence_label") or ev_label
+                if k and k not in seen_keys:
                     all_sources.append(ces)
                     seen_keys.add(k)
         cited_sources = all_sources
@@ -1606,12 +1641,17 @@ async def _execute_consultation(
             conv_id = getattr(conversation_context, "conversation_id", None) or ""
             conv_dump = conversation_context.model_dump() if (conversation_context and hasattr(conversation_context, "model_dump")) else (conversation_context if isinstance(conversation_context, dict) else None)
             t_idx = getattr(conversation_context, "turn_index", 1) or 1
+            c_id = getattr(conversation_context, "case_id", None) or (conversation_context.get("case_id") if isinstance(conversation_context, dict) else None)
+            if c_id:
+                from ai_legal_helper.observability.context import set_case_id
+                set_case_id(c_id)
 
             inputs = {
                 "messages": history_messages + [HumanMessage(content=question)],
                 "conversation_id": conv_id,
                 "conversation_context": conv_dump,
                 "turn_index": t_idx,
+                "case_id": c_id,
             }
             if on_step_callback:
                 async for event in app.astream(inputs, config, stream_mode="updates"):

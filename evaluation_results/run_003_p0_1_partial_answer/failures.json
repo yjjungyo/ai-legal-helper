@@ -1,0 +1,28 @@
+[
+  {
+    "scenario_id": "SC01-V04",
+    "overall_score": 0.7955,
+    "is_critical_failure": false,
+    "critical_reasons": [],
+    "failed_metrics": {
+      "issue_detection": {
+        "metric_name": "issue_detection",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 1.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "핵심 법률 쟁점 1건 누락: [ISSUE_FAKE_STATUTE] 존재하지 않는 가공 조문 및 민형사 구분"
+        ],
+        "details": {
+          "expected_count": 1,
+          "matched_count": 0,
+          "matched_issue_ids": [],
+          "missing_issues": [
+            "[ISSUE_FAKE_STATUTE] 존재하지 않는 가공 조문 및 민형사 구분"
+          ]
+        }
+      }
+    }
+  }
+]

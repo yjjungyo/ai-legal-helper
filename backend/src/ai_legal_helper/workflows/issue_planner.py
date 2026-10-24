@@ -101,8 +101,19 @@ def plan_legal_issues(
     q = question or ""
     q_compact = re.sub(r"\s+", "", q)
 
+    # [P0-1 핵심 개선] 의뢰인이 전문 법률 용어를 몰라도 상황을 진술했을 때(종합 분석 및 대처 요청)
+    # 사건에 등록된 증거(계약서, 가압류 등)를 바탕으로 핵심 법률 쟁점을 포섭한다.
+    is_comprehensive = (
+        any(k in q_compact for k in ("상황", "대처", "어떻게", "분석", "종합", "전체", "법적으로", "알려"))
+        and any(k in q_compact for k in ("보증금", "전세", "임대차", "임차"))
+    )
+    has_attachment_evidence = (
+        any(lbl in briefing.source_registry for lbl in ("E09", "E10"))
+        or any("가압류" in f.statement for f in briefing.facts)
+    )
+
     # 1. 쟁점: 임대차계약 종료 시점 및 효력 발생
-    if any(k in q_compact for k in ("종료", "해지", "만료", "끝", "퇴거", "갱신", "반환", "돌려")):
+    if is_comprehensive or any(k in q_compact for k in ("종료", "해지", "만료", "끝", "퇴거", "갱신", "반환", "돌려")):
         f_ids, e_ids, e_lbls = _match_facts_and_evidences(
             ["계약기간", "종료", "해지", "만료", "퇴거", "보증금", "임대차"], briefing
         )
@@ -134,7 +145,7 @@ def plan_legal_issues(
         )
 
     # 2. 쟁점: 가압류 및 담보권과 임차인 대항력/우선변제권 권리 순위
-    if any(k in q_compact for k in ("가압류", "근저당", "동진은행", "HUG", "순위", "권리관계", "등기")):
+    if any(k in q_compact for k in ("가압류", "근저당", "동진은행", "HUG", "순위", "권리관계", "등기")) or (is_comprehensive and has_attachment_evidence):
         f_ids, e_ids, e_lbls = _match_facts_and_evidences(
             ["가압류", "전입신고", "확정일자", "등기", "동진은행", "HUG", "주민등록"], briefing
         )
@@ -200,7 +211,7 @@ def plan_legal_issues(
         )
 
     # 4. 쟁점: 이사 전 권리보전 절차 (임차권등기명령, 대항력 유지)
-    if any(k in q_compact for k in ("이사", "보전", "임차권등기", "대항력", "점유", "전입유지")):
+    if is_comprehensive or any(k in q_compact for k in ("이사", "보전", "임차권등기", "대항력", "점유", "전입유지", "짐", "열쇠", "비밀번호", "퇴거", "비우", "나가")):
         f_ids, e_ids, e_lbls = _match_facts_and_evidences(
             ["전입신고", "점유", "거주", "열쇠", "출입카드", "이사"], briefing
         )
@@ -258,7 +269,7 @@ def plan_legal_issues(
         )
 
     # 6. 쟁점: 필요한 추가 증거 및 실무적 다음 행동
-    if any(k in q_compact for k in ("추가증거", "다음행동", "미확인", "보완", "행동", "절차", "조치")):
+    if is_comprehensive or any(k in q_compact for k in ("추가증거", "다음행동", "미확인", "보완", "행동", "절차", "조치", "대처", "어떻게", "단계별")):
         missing_props = [g.target_proposition for g in briefing.evidence_gaps]
         issues.append(
             LegalIssueTask(
@@ -272,8 +283,32 @@ def plan_legal_issues(
                 relevant_fact_ids=[f.fact_id for f in briefing.facts if f.adjudication_status == "EVIDENCE_INCOMPLETE"],
                 relevant_evidence_ids=[ev.evidence_id for ev in briefing.evidences],
                 relevant_evidence_labels=[ev.evidence_label for ev in briefing.evidences],
-                required_statutes=["민사소송법 제462조", "민사집행법 제276조"],
+                required_statutes=["주택임대차보호법 제3조", "주택임대차보호법 제3조의3"],
                 missing_evidence=missing_props,
+                priority="HIGH",
+            )
+        )
+
+    # 7. 쟁점: 허위 법령 배제 및 형사처벌/민사 권리구제 (SC01-V04 대응)
+    if any(k in q_compact for k in ("99조", "처벌", "형사", "징역", "고소", "사기", "벌금")):
+        f_ids, e_ids, e_lbls = _match_facts_and_evidences(
+            ["보증금", "계약기간", "미반환"], briefing
+        )
+        issues.append(
+            LegalIssueTask(
+                issue_id="ISSUE_FAKE_STATUTE",
+                issue_title="존재하지 않는 가공 조문 및 민형사 구분 권리구제 절차",
+                legal_questions=[
+                    "주택임대차보호법에 임대인을 형사처벌하는 조항(제99조 등)이 존재하는가?",
+                    "단순 보증금 미반환 행위가 형사상 사기죄 등 범죄에 해당하는가?",
+                    "보증금을 실질적으로 회수하기 위해 취해야 할 올바른 법적 절차는 무엇인가?",
+                ],
+                required_fact_keys=["보증금미반환", "계약체결경위", "변제자력"],
+                relevant_fact_ids=f_ids,
+                relevant_evidence_ids=e_ids,
+                relevant_evidence_labels=sorted(e_lbls),
+                required_statutes=["주택임대차보호법 제3조의2", "민사집행법 제41조", "형법 제347조"],
+                missing_evidence=["기망행위 입증 자료", "계약 당시 편취 고의 증빙"],
                 priority="HIGH",
             )
         )

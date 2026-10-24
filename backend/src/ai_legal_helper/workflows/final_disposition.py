@@ -100,7 +100,7 @@ def score_fact_legal_importance(fact: Any, query: Optional[str] = None) -> float
 def select_grounded_facts_for_display(
     briefing: CaseEvidenceBriefing,
     query: Optional[str] = None,
-    max_facts: int = 12,
+    max_facts: int = 16,
 ) -> List[Any]:
     """등록된 사실관계 중 핵심 요건사실과 질문 연관 사실을 우선 선별하고 출처 다양성을 보장한다 (P0-08).
 
@@ -108,13 +108,13 @@ def select_grounded_facts_for_display(
     1. 신뢰 상태가 직접 입증(EVIDENCE_SUPPORTED, CORROBORATED)된 사실만 대상.
     2. 문서 제목, 단순 서명란, 연락처 등 부차적 메타데이터 배제.
     3. 요건사실 가중치(보증금, 임대차 기간, 대항력, 통고, 가압류 등) 정렬.
-    4. 출처 다양성 보장: 동일 증거 라벨(예: E01)에서 최대 3건까지만 1차 선택하여
-       다른 증거(E02, E03, E05, E09, E10 등)가 고루 포섭되도록 함.
+    4. 출처 다양성 보장: 동일 증거 라벨(예: E01)에서 최대 2건까지만 1차 선택하여
+       다른 증거(E02, E03, E04, E05, E06, E07, E09, E10, E15, E16 등)가 고루 포섭되도록 함.
 
     Args:
         briefing: 사건 증거 브리핑 모델.
         query: 사용자 질문 문자열.
-        max_facts: 반환할 최대 사실 건수 (기본 12건).
+        max_facts: 반환할 최대 사실 건수 (기본 16건).
 
     Returns:
         List[Any]: 선별된 FactItemBrief 객체 리스트.
@@ -137,7 +137,7 @@ def select_grounded_facts_for_display(
     label_counts: Dict[str, int] = {}
     remaining_pool: List[Any] = []
 
-    # 1차 라운드: 증거 라벨별 최대 3건으로 다양성 확보
+    # 1차 라운드: 증거 라벨별 최대 2건으로 다양성 확보
     for f in scored_facts:
         norm_stmt = f.statement.strip()
         if norm_stmt in seen_stmts:
@@ -145,7 +145,7 @@ def select_grounded_facts_for_display(
 
         lbl = f.evidence_label or "UNKNOWN"
         curr_cnt = label_counts.get(lbl, 0)
-        if curr_cnt < 3:
+        if curr_cnt < 2:
             selected.append(f)
             seen_stmts.add(norm_stmt)
             label_counts[lbl] = curr_cnt + 1
@@ -212,14 +212,14 @@ def assemble_grounded_answer(
     draft_answer: str,
     disposition: str,
 ) -> str:
-    """검증된 쟁점과 확인된 사건 증거만을 구조적으로 조립하여 사용자용 최종 답변을 생성한다.
+    """검증된 쟁점과 확인된 사건 증거만을 구조적으로 조립하여 5개 섹션의 사용자용 최종 답변을 생성한다.
 
-    Section 8 (P0-05) 및 Section 9 (P0-06) 원칙:
-    - [1. 사건 종합 판단 및 핵심 결론]
-    - [2. 등록 증거 기반 확인된 사실관계] (E01, E02... 라벨 명시)
-    - [3. 쟁점별 법률 분석 및 판단]
-    - [4. 보완이 필요한 증거 (Evidence Gaps)] (이미 등록된 서류 제외)
-    - [5. 안전한 실무적 다음 행동 가이드]
+    [P0-1 표준 5개 섹션 답변 구조 (Section 5)]
+    1. [1. 현재 확인된 핵심 사실] (E01, E02... 증거 라벨과 함께 입증된 요건사실)
+    2. [2. 현재 판단 가능한 법률 쟁점] (검증 완료된 쟁점의 법률 분석 및 적용 법령)
+    3. [3. 조건부 판단 및 미확인 사항] (조건부 쟁점, 전제 조건, 미확인 사실)
+    4. [4. 지금 할 수 있는 안전한 행동] (점유/전입 유지, 내용증명, 임차권등기명령, 최신 등기부 확인 등)
+    5. [5. 추가 검토가 필요한 사항] (보완 증거 공백, 주의사항 및 전문가 상담 안내)
 
     Args:
         issue_results: 단위 쟁점별 검증 결과 목록.
@@ -231,110 +231,103 @@ def assemble_grounded_answer(
         str: 정돈된 플레인 텍스트 형태의 최종 답변.
     """
     sections = []
+    doc_name_map = {ev.evidence_label: ev.document_name for ev in (briefing.evidences or []) if ev.document_name}
 
-    # 1. 사건 종합 판단 및 핵심 결론 (하드코딩 제거: 쟁점 검증 상태 기반 동적 생성)
-    sections.append("[1. 사건 종합 판단 및 핵심 결론]")
     verified_issues = [r for r in issue_results if r.status == "VERIFIED"]
-    conditional_issues = [r for r in issue_results if r.status == "CONDITIONAL"]
-    needs_evidence_issues = [r for r in issue_results if r.status in ("NEEDS_EVIDENCE", "NEEDS_LEGAL_SOURCE")]
+    conditional_issues = [r for r in issue_results if r.status in ("CONDITIONAL", "NEEDS_EVIDENCE", "NEEDS_LEGAL_SOURCE", "BLOCKED")]
 
-    if disposition == "DELIVERED":
-        sections.append(
-            f"- 등록된 증거와 관련 법령 조문을 대조 검증한 결과, "
-            f"핵심 법률 쟁점 {len(verified_issues)}건에 관한 권리관계 및 사실관계가 명확히 입증되었습니다."
-        )
-    elif disposition == "CAUTIONARY":
-        parts_summary = []
-        if verified_issues:
-            v_titles = ", ".join(f"'{v.issue_title}'" for v in verified_issues)
-            parts_summary.append(f"핵심 사실과 법령이 입증된 {v_titles} 쟁점은 확정적 권리를 행사할 수 있습니다.")
-        if conditional_issues:
-            c_titles = ", ".join(f"'{c.issue_title}'" for c in conditional_issues)
-            parts_summary.append(f"{c_titles} 쟁점은 최신 등기부 전수 확인 또는 실제 경매 배당 절차에 따른 조건부 법률 판단을 제공합니다.")
-        if not parts_summary:
-            parts_summary.append("등록된 증거를 바탕으로 기본 사실관계는 확인되었으나, 일부 쟁점에 관해 조건부 법률 판단을 제공합니다.")
-        sections.append("- " + " ".join(parts_summary))
-    else:
-        sections.append(
-            "- 현재 등록된 증거를 바탕으로 기본 사실관계는 확인되나, 법률상 권리구제를 확정하기 위해 "
-            "일부 추가적인 공적 입증자료의 보완이 필요하여 조건부 가이드를 제공합니다."
-        )
-
-    # 2. 등록 증거 기반 확인된 사실관계 (질문 연관 핵심 요건사실 우선 선별 및 파일명 표시)
-    sections.append("\n[2. 등록 증거 기반 확인된 사실관계]")
-    selected_facts = select_grounded_facts_for_display(briefing, query=draft_answer, max_facts=12)
+    # [1. 현재 확인된 핵심 사실] (질문 연관 핵심 요건사실 우선 선별 및 파일명/증거라벨 명시)
+    sections.append("[1. 현재 확인된 핵심 사실]")
+    selected_facts = select_grounded_facts_for_display(briefing, query=draft_answer, max_facts=16)
     if selected_facts:
         for f in selected_facts:
-            doc_label = f.document_name or f.evidence_label
-            cite_label = f"[{doc_label}]" if doc_label else ""
+            lbl = f.evidence_label or ""
+            doc_name = f.document_name or ""
+            if lbl and doc_name:
+                cite_label = f"[{lbl}] {doc_name}"
+            elif lbl:
+                cite_label = f"[{lbl}]"
+            elif doc_name:
+                cite_label = f"[{doc_name}]"
+            else:
+                cite_label = ""
             sections.append(f"- {f.statement} {cite_label}".strip())
     else:
         sections.append("- 등록된 증거로부터 확인된 기초 사실관계를 정리 중입니다.")
 
-    # 3. 쟁점별 법률 분석 및 판단
-    doc_name_map = {ev.evidence_label: ev.document_name for ev in (briefing.evidences or []) if ev.document_name}
-    sections.append("\n[3. 쟁점별 법률 분석 및 판단]")
-    for idx, r in enumerate(issue_results, 1):
-        status_kr = {
-            "VERIFIED": "검증 완료",
-            "CONDITIONAL": "조건부 판단",
-            "NEEDS_EVIDENCE": "증거 보완 필요",
-            "NEEDS_LEGAL_SOURCE": "법령 근거 보강 필요",
-            "BLOCKED": "판단 유보",
-        }.get(r.status, "검토")
+    # [2. 현재 판단 가능한 법률 쟁점] (검증 완료된 쟁점 중심 법률 판단)
+    sections.append("\n[2. 현재 판단 가능한 법률 쟁점]")
+    if verified_issues:
+        for idx, r in enumerate(verified_issues, 1):
+            sections.append(f"\n{idx}. {r.issue_title} (검증 완료)")
+            for rec in r.safe_recommendations:
+                sections.append(f"  * 법률 판단: {rec}")
+            if r.supported_source_ids:
+                doc_cites = [
+                    f"[{s}] {doc_name_map.get(s, '')}".strip() if s in doc_name_map else f"[{s}]"
+                    for s in sorted(set(r.supported_source_ids))
+                ]
+                cites = ", ".join(doc_cites)
+                sections.append(f"  * 관련 증거: {cites}")
+            if r.supported_statute_ids:
+                laws = ", ".join(r.supported_statute_ids)
+                sections.append(f"  * 적용 법령: {laws}")
+    else:
+        sections.append("- 현재 완전하게 확정할 수 있는 단정적 법률 쟁점은 없으며, 확인된 사실 범위 내에서 아래 조건부 법률 판단을 제공합니다.")
 
-        sections.append(f"\n{idx}. {r.issue_title} ({status_kr})")
+    # [3. 조건부 판단 및 미확인 사항] (조건부/보완필요 쟁점 및 전제 조건)
+    sections.append("\n[3. 조건부 판단 및 미확인 사항]")
+    if conditional_issues:
+        for idx, r in enumerate(conditional_issues, 1):
+            status_kr = {
+                "CONDITIONAL": "조건부 판단",
+                "NEEDS_EVIDENCE": "증거 보완 필요",
+                "NEEDS_LEGAL_SOURCE": "법령 근거 보강 필요",
+                "BLOCKED": "판단 유보",
+            }.get(r.status, "조건부 검토")
+            sections.append(f"\n{idx}. {r.issue_title} ({status_kr})")
+            for rec in r.safe_recommendations:
+                sections.append(f"  * 조건부 판단: {rec}")
+            if r.unresolved_facts:
+                unres_text = ", ".join(r.unresolved_facts[:2])
+                sections.append(f"  * 전제 조건 및 미확인 사실: {unres_text}")
+            if r.supported_statute_ids or r.missing_statutes:
+                laws = ", ".join(r.supported_statute_ids or r.missing_statutes)
+                sections.append(f"  * 관련 법령: {laws}")
+            if r.supported_source_ids:
+                doc_cites = [
+                    f"[{s}] {doc_name_map.get(s, '')}".strip() if s in doc_name_map else f"[{s}]"
+                    for s in sorted(set(r.supported_source_ids))
+                ]
+                cites = ", ".join(doc_cites)
+                sections.append(f"  * 관련 증거: {cites}")
+    else:
+        sections.append("- 현재 핵심 쟁점들에 관한 조건부 유보 사항 없이 검증된 법률 효력을 기준으로 확정 안내합니다.")
 
-        # 해당 쟁점 추천 조치 및 법률 분석
-        for rec in r.safe_recommendations:
-            sections.append(f"  * {rec}")
+    # [4. 지금 할 수 있는 안전한 행동] (구체적이고 안전한 다음 행동 5단계)
+    sections.append("\n[4. 지금 할 수 있는 안전한 행동]")
+    action_items = [
+        "보증금 전액을 반환받거나 관할 법원의 임차권등기명령에 따른 등기가 등기부에 기재되기 전까지는 절대 주택의 점유를 상실(열쇠 인도, 비밀번호 공유, 임의 퇴거)하거나 전입을 옮기지 마십시오. (대항력 및 우선변제권 유지 필수)",
+        "임대인에게 보증금 반환 최고 및 지연손해금(민법 연 5%, 소촉법 연 12%) 청구 내용증명을 발송하여 임대인의 이행지체 책임을 명확히 하십시오.",
+        "계약 종료 즉시 관할 법원에 임차권등기명령을 신청하여 향후 부득이하게 이사할 때에도 기존 대항력과 우선변제권이 온전히 유지·보전되도록 조치하십시오.",
+        "대법원 인터넷등기소를 통해 목적물 부동산의 최신 말소사항 포함 등기사항전부증명서를 발급받아 가압류 외 다른 선순위 권리 변동 여부를 최종 대조하십시오.",
+        "목적물에 관한 경매 절차가 개시될 경우, 배당요구종기 내에 반드시 권리신고 및 배당요구 신청서를 관할 경매법원에 접수하십시오.",
+    ]
+    for idx, act in enumerate(action_items, 1):
+        sections.append(f"{idx}. {act}")
 
-        # 근거 증거 라벨 (등록된 파일명 우선 표시)
-        if r.supported_source_ids:
-            doc_cites = [doc_name_map.get(s, s) for s in r.supported_source_ids]
-            cites = ", ".join(sorted(doc_cites))
-            sections.append(f"  * 관련 증거: [{cites}]")
-
-        # 인용 법령
-        if r.supported_statute_ids:
-            laws = ", ".join(r.supported_statute_ids)
-            sections.append(f"  * 적용 법령: {laws}")
-
-        # 미해결 조건
-        if r.unresolved_facts:
-            unres_text = ", ".join(r.unresolved_facts[:2])
-            sections.append(f"  * 추가 확인 필요 사항: {unres_text}")
-
-    # 4. 보완이 필요한 증거 (Evidence Gaps) - 등록된 증거(E01~E17)를 다시 요구하지 않음
-    sections.append("\n[4. 보완이 필요한 증거 (Evidence Gaps)]")
+    # [5. 추가 검토가 필요한 사항] (증거 공백 안내 및 법률전문가 상담 권고)
+    sections.append("\n[5. 추가 검토가 필요한 사항]")
     if briefing.evidence_gaps:
-        for gap in briefing.evidence_gaps[:5]:
-            act_text = f" -> {gap.recommended_action}" if gap.recommended_action else ""
+        for gap in briefing.evidence_gaps[:4]:
+            act_text = f" (권장: {gap.recommended_action})" if gap.recommended_action else ""
             sections.append(f"- [{gap.priority}] {gap.target_proposition}{act_text}")
     else:
-        sections.append("- 현재 핵심 사실관계를 입증하기 위한 필수 증빙 서류는 충실히 등록되어 있습니다.")
-
-    # 5. 안전한 실무적 다음 행동 가이드 (하드코딩 제거: 쟁점별 권고 조치 기반 동적 조립)
-    sections.append("\n[5. 안전한 실무적 다음 행동 가이드]")
-    action_items: List[str] = []
-    seen_actions = set()
-
-    for r in issue_results:
-        for rec in r.safe_recommendations:
-            rec_clean = rec.strip()
-            if rec_clean and rec_clean not in seen_actions:
-                seen_actions.add(rec_clean)
-                action_items.append(rec_clean)
-
-    if not action_items:
-        action_items = [
-            "보증금 전액을 반환받거나 임차권등기가 등기부에 기재될 때까지 절대 주택 점유를 상실(퇴거/열쇠 반환)하거나 전입을 옮기지 마십시오.",
-            "인터넷등기소를 통해 목적물의 최신 말소사항 포함 등기부를 발급받아 가압류 외 다른 선순위 권리 변동을 최종 대조하십시오.",
-            "계약 종료 즉시 관할 법원에 임차권등기명령 신청 및 보증금 반환 청구 소송(또는 지급명령)을 진행하십시오.",
-        ]
-
-    for idx, act in enumerate(action_items[:5], 1):
-        sections.append(f"{idx}. {act}")
+        sections.append("- 사건 등록 증거 기준 기본 요건사실은 충실히 구비되어 있습니다.")
+    sections.append(
+        "- 미검증 법률 판단이나 일방적 구두 합의에 의존한 조치는 불측의 손해를 초래할 수 있으므로, "
+        "서류를 지참하여 대한법률구조공단(국번없이 132) 또는 변호사의 대면 전문 상담을 병행하시기 바랍니다."
+    )
 
     final_text = "\n".join(sections)
     return clean_markdown_formatting(final_text)

@@ -99,5 +99,5 @@ class GoldCaseScenario(BaseModel):
         "PROVISIONAL", description="검토 상태 (전문가 검토 전은 PROVISIONAL)"
     )
     reviewer: str = Field("AI Legal Helper Verification Team", description="검토자")
-    gold_version: str = Field("1.0", description="Gold 데이터 버전")
+    gold_version: str = Field("1.2", description="Gold 데이터 버전 (v1.2 Freeze)")
 
