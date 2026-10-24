@@ -1028,6 +1028,23 @@ def check_proposition_comparability(
             predicate_match_basis="Proposal responds to Rejection",
         )
 
+    # 3-1. 화행(Speech Act) 분리: 의사표시/해지 통지(NOTICE) vs 이행/퇴거 예정일(STATEMENT/SCHEDULE)
+    # 설명: 임차인이 임대인에게 퇴거 의사를 통지한 행위(통지일)와 실제 퇴거 예정일(목표일)은 서로 다른 시점 차원의 양립 가능한 사실이다.
+    is_notice_a = pa.speech_act == "NOTICE" or any(kw in (pa.statement or "") for kw in ("알렸", "통지", "통보", "고지", "보냈다"))
+    is_notice_b = pb.speech_act == "NOTICE" or any(kw in (pb.statement or "") for kw in ("알렸", "통지", "통보", "고지", "보냈다"))
+    if is_notice_a != is_notice_b:
+        mismatched.append("COMMUNICATION_NOTICE_VS_SCHEDULE")
+        return ComparabilityResult(
+            is_comparable=False,
+            status="CONSISTENT",
+            identity_status="COMPATIBLE",
+            reason_code="NOTICE_DATE_VS_TARGET_DATE",
+            explanation="의사표시·해지 통지를 발송한 일자와 퇴거·이행을 예정한 목표일자는 서로 다른 시점 차원의 양립 가능한 사실입니다.",
+            matched_dimensions=matched,
+            mismatched_dimensions=mismatched,
+            temporal_semantics="Notice Date vs Scheduled Target Date",
+        )
+
     # 4. 거래 단계 및 구성항목 분리: 계약금/잔금 vs 보증금 총액 (CASE-03, S01, S06, S07)
     subtypes = {pa.event_subtype, pb.event_subtype} - {None}
     if pa.event_type == "PAYMENT" and pb.event_type == "PAYMENT":

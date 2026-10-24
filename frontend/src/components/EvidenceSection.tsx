@@ -287,7 +287,7 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
   const [conflictError, setConflictError] = useState<string | null>(null);
   const [adjudications, setAdjudications] = useState<any[]>([]);
   const [evidenceGaps, setEvidenceGaps] = useState<any[]>([]);
-  const [activeInsightTab, setActiveInsightTab] = useState<'verified' | 'gaps' | 'conflicts'>('verified');
+  const [activeInsightTab, setActiveInsightTab] = useState<'all' | 'verified' | 'alleged' | 'gaps' | 'conflicts'>('all');
   const [uploading, setUploading] = useState(false);
   const [showReanalyzePrompt, setShowReanalyzePrompt] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -496,6 +496,86 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
     } catch (err) {
       alert('리뷰 처리에 실패했습니다.');
     }
+  };
+
+  // 사실 확정 상태별 필터링 목록
+  const verifiedList = adjudications.filter(
+    (a) => a.adjudication_status === 'EVIDENCE_SUPPORTED' || a.adjudication_status === 'CORROBORATED'
+  );
+  const allegedList = adjudications.filter((a) => a.adjudication_status === 'PARTY_ALLEGED');
+  const incompleteList = adjudications.filter((a) => a.adjudication_status === 'EVIDENCE_INCOMPLETE');
+  const disputedList = adjudications.filter((a) => a.adjudication_status === 'GENUINELY_DISPUTED');
+
+  /**
+   * 사실 확정 및 심리 결과 단일 카드 렌더러
+   */
+  const renderAdjudicationCard = (adj: any) => {
+    let statusBadgeClass = 'badge-gray';
+    let statusLabel = '확인 사실';
+
+    switch (adj.adjudication_status) {
+      case 'CORROBORATED':
+        statusBadgeClass = 'badge-teal';
+        statusLabel = '다중 보강 사실';
+        break;
+      case 'EVIDENCE_SUPPORTED':
+        statusBadgeClass = 'badge-green';
+        statusLabel = '직접 입증 사실';
+        break;
+      case 'PARTY_ALLEGED':
+        statusBadgeClass = 'badge-blue';
+        statusLabel = '당사자 진술·주장';
+        break;
+      case 'EVIDENCE_INCOMPLETE':
+        statusBadgeClass = 'badge-amber';
+        statusLabel = '증거 보완 필요';
+        break;
+      case 'GENUINELY_DISPUTED':
+        statusBadgeClass = 'badge-red';
+        statusLabel = '실제 상충 (모순)';
+        break;
+      default:
+        statusLabel = adj.adjudication_status || '확인 사실';
+    }
+
+    return (
+      <div
+        key={adj.id}
+        style={{
+          padding: '10px 14px',
+          borderRadius: 'var(--radius-sm)',
+          backgroundColor: 'var(--surface-alt)',
+          border: '1px solid var(--border)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '6px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <span className={`badge ${statusBadgeClass}`} style={{ fontSize: '0.8em' }}>
+            {statusLabel}
+          </span>
+          {adj.primary_relation && adj.primary_relation !== 'SUPPORTS' && (
+            <span className="badge badge-indigo" style={{ fontSize: '0.8em' }}>
+              관계: {adj.primary_relation}
+            </span>
+          )}
+          {adj.document_name && (
+            <span style={{ fontSize: '0.82em', color: 'var(--text-secondary)' }}>
+              📄 {adj.document_name}
+            </span>
+          )}
+        </div>
+        <div style={{ fontSize: '0.9em', fontWeight: 600, color: 'var(--text-primary)' }}>
+          {adj.statement}
+        </div>
+        {adj.adjudication_basis && (
+          <div style={{ fontSize: '0.8em', color: 'var(--text-muted)' }}>
+            💡 {adj.adjudication_basis}
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -820,91 +900,103 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
             <button
               type="button"
+              className={`btn btn-sm ${activeInsightTab === 'all' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setActiveInsightTab('all')}
+            >
+              전체 사실 ({adjudications.length})
+            </button>
+            <button
+              type="button"
               className={`btn btn-sm ${activeInsightTab === 'verified' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setActiveInsightTab('verified')}
             >
-              ✓ 확인된 사실 ({adjudications.filter((a) => a.adjudication_status === 'EVIDENCE_SUPPORTED' || a.adjudication_status === 'CORROBORATED').length})
+              ✓ 직접 입증 사실 ({verifiedList.length})
+            </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${activeInsightTab === 'alleged' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setActiveInsightTab('alleged')}
+            >
+              💬 당사자 진술·주장 ({allegedList.length})
             </button>
             <button
               type="button"
               className={`btn btn-sm ${activeInsightTab === 'gaps' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setActiveInsightTab('gaps')}
             >
-              📋 증거 보완 필요 ({evidenceGaps.length})
+              📋 증거 보완 필요 ({evidenceGaps.length + incompleteList.length})
             </button>
             <button
               type="button"
               className={`btn btn-sm ${activeInsightTab === 'conflicts' ? 'btn-danger' : 'btn-secondary'}`}
               onClick={() => setActiveInsightTab('conflicts')}
             >
-              ⚠️ 실제 상충 ({conflicts.filter((c) => c.status === 'CONTRADICTION').length})
+              ⚠️ 실제 상충 ({conflicts.filter((c) => c?.status === 'CONTRADICTION').length + disputedList.length})
             </button>
           </div>
         </div>
 
-        {/* 탭 1: 확인된 사실 */}
-        {activeInsightTab === 'verified' && (
+        {/* 탭 0: 전체 사실 */}
+        {activeInsightTab === 'all' && (
           <div>
-            {adjudications.filter((a) => a.adjudication_status === 'EVIDENCE_SUPPORTED' || a.adjudication_status === 'CORROBORATED').length === 0 ? (
+            {adjudications.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '0.9em' }}>
-                승인된 직접 처분문서 또는 공문서로 뒷받침된 사실이 아직 없습니다.
+                승인된 사실 및 심리 결과가 아직 없습니다. 좌측 문서에서 사실을 승인해주세요.
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {adjudications
-                  .filter((a) => a.adjudication_status === 'EVIDENCE_SUPPORTED' || a.adjudication_status === 'CORROBORATED')
-                  .map((adj) => (
-                    <div
-                      key={adj.id}
-                      style={{
-                        padding: '10px 14px',
-                        borderRadius: 'var(--radius-sm)',
-                        backgroundColor: 'var(--surface-alt)',
-                        border: '1px solid var(--border)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '6px',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                        <span className="badge badge-green" style={{ fontSize: '0.8em' }}>
-                          {adj.adjudication_status === 'CORROBORATED' ? '다중 보강 사실' : '직접 입증 사실'}
-                        </span>
-                        {adj.primary_relation && adj.primary_relation !== 'SUPPORTS' && (
-                          <span className="badge badge-blue" style={{ fontSize: '0.8em' }}>
-                            관계: {adj.primary_relation}
-                          </span>
-                        )}
-                        {adj.document_name && (
-                          <span style={{ fontSize: '0.82em', color: 'var(--text-secondary)' }}>
-                            📄 {adj.document_name}
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: '0.9em', fontWeight: 600, color: 'var(--text-primary)' }}>
-                        {adj.statement}
-                      </div>
-                      {adj.adjudication_basis && (
-                        <div style={{ fontSize: '0.8em', color: 'var(--text-muted)' }}>
-                          💡 {adj.adjudication_basis}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                {adjudications.map(renderAdjudicationCard)}
               </div>
             )}
           </div>
         )}
 
-        {/* 탭 2: 증거 보완 필요 */}
+        {/* 탭 1: 직접 입증 사실 */}
+        {activeInsightTab === 'verified' && (
+          <div>
+            <div style={{ fontSize: '0.84em', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+              📄 계약서, 공문서, 금융기관 이체내역 등 객관적인 처분문서 및 공적 기록에 의해 직접 뒷받침된 사실입니다.
+            </div>
+            {verifiedList.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '0.9em' }}>
+                승인된 직접 처분문서 또는 공문서로 뒷받침된 사실이 아직 없습니다.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {verifiedList.map(renderAdjudicationCard)}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 탭 2: 당사자 진술·주장 */}
+        {activeInsightTab === 'alleged' && (
+          <div>
+            <div style={{ fontSize: '0.84em', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+              💬 진술서, 확인서, 문자메시지 등 당사자 일방의 진술에 기반한 사실입니다. 법적 효력을 높이기 위해 필요 시 추가 공적 서류 소명이 권장됩니다.
+            </div>
+            {allegedList.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '0.9em' }}>
+                당사자 진술 또는 비공식 대화로 분류된 사실이 없습니다.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {allegedList.map(renderAdjudicationCard)}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 탭 3: 증거 보완 필요 */}
         {activeInsightTab === 'gaps' && (
           <div>
-            {evidenceGaps.length === 0 ? (
+            {evidenceGaps.length === 0 && incompleteList.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '0.9em' }}>
                 현재 발견된 필수 증거 공백이 없습니다. 모든 요건사실이 증빙되었거나 추가 자료가 불필요합니다.
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {incompleteList.map(renderAdjudicationCard)}
                 {evidenceGaps.map((gap) => (
                   <div
                     key={gap.id}
@@ -963,7 +1055,7 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
           </div>
         )}
 
-        {/* 탭 3: 실제 상충 */}
+        {/* 탭 4: 실제 상충 */}
         {activeInsightTab === 'conflicts' && (
           <div>
             {conflictError && (
@@ -981,12 +1073,13 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
                 ⚠️ {conflictError}
               </div>
             )}
-            {!conflictError && conflicts.filter((c) => c?.status === 'CONTRADICTION').length === 0 ? (
+            {!conflictError && conflicts.filter((c) => c?.status === 'CONTRADICTION').length === 0 && disputedList.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '0.9em' }}>
                 🎉 확인된 실제 상충(모순) 내역이 없습니다. 증거 간 내용이 일치하거나 양립 가능합니다.
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {disputedList.map(renderAdjudicationCard)}
                 {conflicts
                   .filter((c) => typeof c === 'string' || c?.status === 'CONTRADICTION')
                   .map((c, idx) => {

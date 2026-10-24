@@ -173,6 +173,23 @@ class TestCase01To07Scenarios:
         assert not comp.is_comparable
         assert comp.status == "DIFFERENT_CONTEXT"
 
+    def test_r07_notice_date_vs_scheduled_target_date(self):
+        """[R07-B] 의사표시 통지 일자와 퇴거 예정일은 서로 다른 시점 차원이므로 상충이 아님."""
+        stmt1 = "이수현은 2026년 4월 1일 임대인에게 2026년 9월 30일 퇴거 의사를 문자로 알렸다."
+        stmt2 = "퇴거 예정일은 2026년 9월 30일이다."
+
+        prop1 = extract_semantic_proposition(stmt1)
+        prop2 = extract_semantic_proposition(stmt2)
+
+        comp = check_proposition_comparability(prop1, prop2)
+        assert not comp.is_comparable
+        assert comp.status == "CONSISTENT"
+        assert comp.reason_code == "NOTICE_DATE_VS_TARGET_DATE"
+
+        adj = adjudicate_fact(prop2, candidate_facts=[prop1])
+        assert adj.adjudication_status != "GENUINELY_DISPUTED"
+        assert adj.primary_relation == "SUPPORTS"
+
 
 # ==============================================================================
 # 2. 7대 증거 신뢰성 차원 평가 검증 (R08 ~ R14)
