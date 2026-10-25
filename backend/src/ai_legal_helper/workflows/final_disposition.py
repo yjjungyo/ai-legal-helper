@@ -268,8 +268,9 @@ def extract_case_prior_verified_repayments(briefing: CaseEvidenceBriefing) -> Tu
     """사건에 이미 공적으로 입증·확정된 임대인의 보증금 일부 반환(변제) 내역을 동적으로 합산한다.
 
     최초 계약금·잔금 지급(임차인 -> 임대인)과 임대인의 보증금 반환(임대인 -> 임차인)을
-    엄격히 구분하고, 실제 반환 거래 단위(일자, 금액, 출처)로 식별하여 중복 추출되더라도
-    한 번만 반영한다 (P0-3.1).
+    엄격히 구분하고, 실제 반환 거래 단위(일자, 금액, 고유 거래번호, 계좌, 차수 등)로 식별하여
+    중복 사본은 차단하고, 식별자가 구분되는 동시/동액 거래는 각각 합산한다.
+    고유 거래 식별자가 없어 동일성이 불확실한 거래는 확정 집계를 보류하여 이중 차감을 방지한다 (P0-3.1).
 
     Args:
         briefing: 현재 사건 증거 브리핑 모델.
@@ -279,7 +280,7 @@ def extract_case_prior_verified_repayments(briefing: CaseEvidenceBriefing) -> Tu
     """
     total_repaid = 0
     repaid_sources = []
-    seen_transactions: Set[Tuple[str, int]] = set()
+    accepted_txs: List[Dict[str, Any]] = []
 
     for f in (briefing.facts or []):
         is_verified = (
@@ -290,6 +291,9 @@ def extract_case_prior_verified_repayments(briefing: CaseEvidenceBriefing) -> Tu
         if not is_verified:
             continue
         stmt = f.statement or ""
+        doc_name = f.document_name or f.evidence_label or ""
+        combined_text = f"{stmt} {doc_name}"
+
         # 임차인의 최초 보증금 지급 내역은 임대인의 반환으로 오인 배제
         if any(w in stmt for w in ["계약금", "잔금 지급", "전액 지급 완료", "임대인 계좌로", "임차인이 지급", "보증금을 지급"]):
             continue
@@ -307,22 +311,130 @@ def extract_case_prior_verified_repayments(briefing: CaseEvidenceBriefing) -> Tu
             if amt <= 0:
                 continue
 
-            # 거래 단위 식별 (거래 일자 및 금액)
+            # 거래 단위 식별자 추출 (작업 2)
             dates = extract_dates_from_text(stmt)
             tx_date = sorted(dates)[0] if dates else (str(getattr(f, "occurred_at", None) or ""))
             doc_ref = f.source_evidence_id or f.evidence_label or f.document_name or ""
-            tx_key = (tx_date, amt) if tx_date else (doc_ref, amt)
 
-            # 동일 거래가 서로 다른 증거 및 Fact에서 중복 추출되더라도 1회만 반영
-            if tx_key in seen_transactions:
-                continue
-            seen_transactions.add(tx_key)
+            # 1. 거래번호 / 승인번호 / 일련번호 / 전문번호
+            m_txid = re.search(r"(?:거래번호|승인번호|전문번호|관리번호|일련번호|tx[-_]?id|txid)[\s:]*([A-Za-z0-9_-]+)", combined_text, re.IGNORECASE)
+            tx_id = m_txid.group(1).strip() if m_txid else None
 
-            total_repaid += amt
+            # 2. 거래 시각 (시분초 또는 시분)
+            m_time = re.search(r"(\d{1,2}:\d{2}(?::\d{2})?)", combined_text)
+            if not m_time:
+                m_time = re.search(r"(\d{1,2}시\s*\d{1,2}분(?:\s*\d{1,2}초)?)", combined_text)
+            tx_time = m_time.group(1).strip() if m_time else None
+
+            # 3. 차수 / 회차 (1차, 2차 등)
+            m_ord = re.search(r"(\d+)\s*(?:차|회|번째)\s*(?:입금|변제|지급|반환|이체)?", combined_text)
+            tx_ord = m_ord.group(1).strip() if m_ord else None
+
+            # 4. 계좌번호
+            m_acc = re.search(r"(?:계좌|계좌번호)[\s:]*([0-9-]+)", combined_text)
+            tx_acc = m_acc.group(1).strip() if m_acc else None
+
+            # 5. 사본 / 중복 표기 여부
+            is_copy = any(w in combined_text for w in ["사본", "중복", "재발급", "동일 거래", "copy"])
+
             src = f.document_name or f.evidence_label or "확인된 증거"
-            repaid_sources.append(f"{amt:,}원 [{src}]")
+
+            # 기존 수락된 거래들과 비교하여 중복 / 별개 / 의심 식별
+            is_duplicate = False
+            is_distinct = False
+            is_ambiguous = False
+
+            for ex in accepted_txs:
+                # 같은 문서 출처이거나 명시적 사본인 경우 -> 중복 처리
+                if doc_ref and ex["doc_ref"] and doc_ref == ex["doc_ref"]:
+                    is_duplicate = True
+                    break
+                if is_copy and ex["amt"] == amt and (not tx_date or ex["date"] == tx_date):
+                    is_duplicate = True
+                    break
+
+                # 금액과 날짜가 일치하는 경우 정밀 판별
+                if ex["amt"] == amt and ex["date"] == tx_date and tx_date:
+                    if tx_id and ex["tx_id"]:
+                        if tx_id == ex["tx_id"]:
+                            is_duplicate = True
+                            break
+                        else:
+                            is_distinct = True
+                    elif (tx_time and ex["tx_time"] and tx_time != ex["tx_time"]) or \
+                         (tx_ord and ex["tx_ord"] and tx_ord != ex["tx_ord"]) or \
+                         (tx_acc and ex["tx_acc"] and tx_acc != ex["tx_acc"]):
+                        is_distinct = True
+                    else:
+                        # 고유 식별자가 없고 동일성이 불확실한 경우 -> 중복 의심 보류
+                        is_ambiguous = True
+                        break
+
+            if is_duplicate:
+                continue
+
+            if is_ambiguous:
+                # 고유 거래 식별자가 없고 동일성이 불확실하면 확정 판단 보류
+                repaid_sources.append(
+                    f"[보류] {amt:,}원 [{src}] (동일 일자·금액 거래 중복 의심 / 고유 거래번호 미확인으로 합산 보류)"
+                )
+                continue
+
+            # 신규 거래로 확정 집계
+            accepted_txs.append({
+                "amt": amt,
+                "date": tx_date,
+                "tx_id": tx_id,
+                "tx_time": tx_time,
+                "tx_ord": tx_ord,
+                "tx_acc": tx_acc,
+                "doc_ref": doc_ref,
+                "src": src,
+            })
+            total_repaid += amt
+            ord_prefix = f"{tx_ord}차 " if tx_ord else ""
+            id_suffix = f" (거래번호: {tx_id})" if tx_id else ""
+            repaid_sources.append(f"{ord_prefix}{amt:,}원 [{src}]{id_suffix}")
 
     return total_repaid, repaid_sources
+
+
+def extract_case_attachment_info(briefing: CaseEvidenceBriefing) -> Tuple[bool, Optional[str], str, bool]:
+    """가압류 사실 존재 여부, 가압류 등기일자, 관련 문서명, 증거 검증 여부를 Fact와 Evidence에서 동적으로 추출한다.
+
+    Returns:
+        Tuple[bool, Optional[str], str, bool]: (가압류 언급 여부, 가압류 등기일자, 문서명, 증거검증 여부)
+    """
+    has_attachment = False
+    attachment_date = None
+    doc_name = find_case_attachment_evidence_name(briefing)
+    is_verified = False
+
+    for f in (briefing.facts or []):
+        stmt = f.statement or ""
+        if "가압류" in stmt or "압류" in stmt:
+            has_attachment = True
+            fact_verified = (
+                f.adjudication_status in ("EVIDENCE_SUPPORTED", "CORROBORATED")
+                or getattr(f, "trust_level", "") == "EVIDENCE_SUPPORTED"
+                or getattr(f, "verification_status", "") in ("DOCUMENT_VERIFIED", "VERIFIED")
+            )
+            dates = extract_dates_from_text(stmt)
+            if dates:
+                attachment_date = sorted(dates)[0]
+            if fact_verified:
+                is_verified = True
+                if f.document_name or f.evidence_label:
+                    doc_name = f.document_name or f.evidence_label
+
+    for ev in (briefing.evidences or []):
+        dname = ev.document_name or ""
+        if "가압류" in dname:
+            has_attachment = True
+            if getattr(ev, "verification_status", "") in ("VERIFIED", "DOCUMENT_VERIFIED", "REVIEWED", "APPROVED"):
+                is_verified = True
+
+    return has_attachment, attachment_date, doc_name, is_verified
 
 
 def extract_case_opposing_power_date(briefing: CaseEvidenceBriefing) -> Optional[str]:
@@ -433,10 +545,33 @@ def detect_case_delta(
     )
 
     if has_repayment_mention or has_verified_payment_fact:
-        # 질문 내 언급된 금액 추출
-        q_amts = extract_amounts_from_text(q_corpus)
-        cand_amts = [a for a in q_amts if a != contract_deposit_krw and a > 0]
-        asserted_krw = max(cand_amts) if cand_amts else 0
+        # 질문 내 언급된 변제/입금 금액 정밀 추출 (남은 잔액 수치와 엄격 분리)
+        asserted_krw = 0
+        # 1. '입금/변제/반환/송금/돌려/지급' 문맥의 변제 주장 금액 우선 추출
+        m_repay = re.search(
+            r"(\d+(?:\s*억|\s*천만|\s*만|\s*원|,|\d)+)\s*(?:원)?을?\s*(?:일부\s*)?(?:추가로\s*|더\s*|새로\s*)?(?:변제|반환|입금|송금|돌려|갚|부쳤|지급)",
+            current_question or q_corpus
+        )
+        if not m_repay:
+            m_repay = re.search(
+                r"(?:변제|반환|입금|송금|돌려받|받은|갚은)\s*(?:금액이?|돈이?)?\s*(\d+(?:\s*억|\s*천만|\s*만|\s*원|,|\d)+)\s*원",
+                current_question or q_corpus
+            )
+        if m_repay:
+            repay_amts = extract_amounts_from_text(m_repay.group(0))
+            cand_repay = [a for a in repay_amts if a != contract_deposit_krw and a > 0]
+            if cand_repay:
+                asserted_krw = max(cand_repay)
+        elif not has_verified_payment_fact:
+            # 확정된 변제 증거가 없는 상태에서만 일반 금액 중 잔액 표현 제외 탐색
+            q_amts = extract_amounts_from_text(current_question or q_corpus)
+            cand_amts = [a for a in q_amts if a != contract_deposit_krw and a > 0]
+            if cand_amts:
+                # '남은', '잔액', '미반환', '잔여' 뒤의 금액은 잔액 문의이므로 변제 주장액에서 제외
+                m_bal_q = re.search(r"(?:남은|잔액은?|미반환|잔여).*?(\d+(?:\s*억|\s*천만|\s*만|\s*원|,|\d)+)\s*원", current_question or q_corpus)
+                bal_in_q = max(extract_amounts_from_text(m_bal_q.group(0))) if m_bal_q else None
+                cand_no_bal = [a for a in cand_amts if a != bal_in_q]
+                asserted_krw = max(cand_no_bal) if cand_no_bal else (max(cand_amts) if not bal_in_q else 0)
 
         # Fact 중 새롭게 입증된 반환 금액 및 파일명 탐색
         ev_transfer_doc_name = None
@@ -461,51 +596,93 @@ def detect_case_delta(
                         explicit_fact_balance = max(b_amts)
                 break
 
+        is_new_allegation = (
+            asserted_krw > 0
+            and (asserted_krw != prior_repaid_krw or any(w in q_corpus for w in ["추가", "또", "더", "새로", "새로운", "다시"]))
+        )
+
         if has_verified_payment_fact:
-            # 확정된 반환액 계산 (하드코딩 기본값 배제)
-            repaid_amt = prior_repaid_krw if prior_repaid_krw > 0 else (ev_transfer_amt or asserted_krw)
-            if repaid_amt > 0:
-                total_confirmed_repaid = max(prior_repaid_krw, repaid_amt)
-                if explicit_fact_balance is not None:
-                    confirmed_balance = explicit_fact_balance
-                else:
-                    confirmed_balance = max(0, contract_deposit_krw - total_confirmed_repaid) if contract_deposit_krw else 0
+            if is_new_allegation and prior_repaid_krw > 0:
+                # [작업 1] 기존 확정 변제와 신규 구두 주장 분리
+                # 예: 기존 확정 2천만원 + 신규 주장 3천만원
+                confirmed_balance = max(0, contract_deposit_krw - prior_repaid_krw) if contract_deposit_krw else 0
+                provisional_balance = max(0, confirmed_balance - asserted_krw)
                 doc_label = ev_transfer_doc_name or (prior_sources[0] if prior_sources else "확인된 증거")
+
                 calc_basis = {
-                    "status": "CONFIRMED",
+                    "status": "PARTIALLY_CONFIRMED_WITH_NEW_ALLEGATION",
                     "contract_deposit_krw": contract_deposit_krw,
-                    "verified_partial_repayment_krw": total_confirmed_repaid,
-                    "alleged_partial_repayment_krw": 0,
+                    "verified_partial_repayment_krw": prior_repaid_krw,
+                    "alleged_partial_repayment_krw": asserted_krw,
+                    "confirmed_unrepaid_balance_krw": confirmed_balance,
+                    "provisional_unrepaid_balance_krw": provisional_balance,
                     "unrepaid_balance_krw": confirmed_balance,
                 }
 
-                changed_facts.append(f"보증금 중 {repaid_amt:,}원 일부 변제 입금 확인 [{doc_label}]")
+                changed_facts.append(
+                    f"기존 보증금 중 {prior_repaid_krw:,}원 일부 변제 확정 [{doc_label}] 및 "
+                    f"의뢰인의 신규 {asserted_krw:,}원 추가 입금 진술 접수 (신규 주장 증빙 미제출 / USER_ALLEGED)"
+                )
                 impacted_determinations.append(
-                    f"보증금 반환 청구 가능 잔액이 {contract_deposit_krw:,}원에서 {confirmed_balance:,}원으로 감축 확정됨 "
-                    f"(지연손해금 기산 대상 원금도 잔액 {confirmed_balance:,}원 기준으로 적용). "
-                    "일부 변제된 금액은 민법 제479조에 따라 기발생 지연손해금 및 비용에 우선 충당된 후 잔여 원본에 충당되며, "
-                    f"변제일 이후에는 잔여 원금 {confirmed_balance:,}원에 대해서만 법정 지연손해금이 기산됨"
+                    f"공적으로 확인된 미반환 잔액은 {confirmed_balance:,}원(지연손해금 기산 대상 원금)이며, "
+                    f"의뢰인의 추가 {asserted_krw:,}원 입금 진술이 객관적 금융 증빙으로 확인될 경우 잠정 잔액은 {provisional_balance:,}원으로 감축될 수 있음. "
+                    f"단, 신규 입금 증빙(이체확인증 등) 확인 전까지는 법률상 확정 미반환 잔액 {confirmed_balance:,}원을 기준으로 청구 금액 및 지연손해금을 산정함. "
+                    "일부 변제금은 민법 제479조에 따라 비용·이자·원본 순으로 충당됨"
                 )
                 preserved_determinations.append(
-                    "임차인의 선순위 대항력 및 우선변제권, 임차권등기명령 신청 권한, 계약 해지 효력은 "
-                    "보증금 일부 변제와 무관하게 전액 반환 시까지 온전히 유지됨"
+                    "임차인의 대항력, 우선변제권 및 임차권등기명령 신청 권한은 보증금 전액 반환 시까지 온전히 유지됨"
                 )
                 new_next_actions.append(
-                    f"미반환 잔액 {confirmed_balance:,}원에 대한 지급명령 신청 또는 보증금 반환 청구 소송 제기"
+                    f"확정 미반환 잔액 {confirmed_balance:,}원을 기준으로 지급명령 또는 보증금 반환 청구 소송을 준비하되, "
+                    f"신규 {asserted_krw:,}원 추가 입금에 대한 계좌 이체확인증 또는 영수증 원본을 증거로 등록하여 입증할 것"
                 )
             else:
-                # 확정 사실은 식별되었으나 구체적 수치 산출이 불가한 경우 임의 금액을 대입하지 않고 확인 필요로 안내
-                changed_facts.append("보증금 일부 변제 사실 확인 (금액 특정 불가 / 증거 재검토 요망)")
-                impacted_determinations.append(
-                    "보증금 일부 변제 사실은 공적으로 확인되었으나 구체적인 변제 수치가 특정되지 않아 잔액을 즉시 확정할 수 없음. "
-                    "상세 금융 거래 내역 및 이체확인증에 대한 재검토가 필요함"
-                )
-                preserved_determinations.append(
-                    "임차인의 대항력, 우선변제권 및 전액 반환 청구 권리는 보증금 완제 시까지 온전히 유지됨"
-                )
-                new_next_actions.append(
-                    "정확한 변제 잔액 산정을 위해 금융 거래 상세 내역서 또는 영수증 원본 재확인"
-                )
+                # 확정된 반환액 계산 (하드코딩 기본값 배제)
+                repaid_amt = prior_repaid_krw if prior_repaid_krw > 0 else (ev_transfer_amt or asserted_krw)
+                if repaid_amt > 0:
+                    total_confirmed_repaid = max(prior_repaid_krw, repaid_amt)
+                    if explicit_fact_balance is not None:
+                        confirmed_balance = explicit_fact_balance
+                    else:
+                        confirmed_balance = max(0, contract_deposit_krw - total_confirmed_repaid) if contract_deposit_krw else 0
+                    doc_label = ev_transfer_doc_name or (prior_sources[0] if prior_sources else "확인된 증거")
+                    calc_basis = {
+                        "status": "CONFIRMED",
+                        "contract_deposit_krw": contract_deposit_krw,
+                        "verified_partial_repayment_krw": total_confirmed_repaid,
+                        "alleged_partial_repayment_krw": 0,
+                        "confirmed_unrepaid_balance_krw": confirmed_balance,
+                        "provisional_unrepaid_balance_krw": confirmed_balance,
+                        "unrepaid_balance_krw": confirmed_balance,
+                    }
+
+                    changed_facts.append(f"보증금 중 {repaid_amt:,}원 일부 변제 입금 확인 [{doc_label}]")
+                    impacted_determinations.append(
+                        f"보증금 반환 청구 가능 잔액이 {contract_deposit_krw:,}원에서 {confirmed_balance:,}원으로 감축 확정됨 "
+                        f"(지연손해금 기산 대상 원금도 잔액 {confirmed_balance:,}원 기준으로 적용). "
+                        "일부 변제된 금액은 민법 제479조에 따라 기발생 지연손해금 및 비용에 우선 충당된 후 잔여 원본에 충당되며, "
+                        f"변제일 이후에는 잔여 원금 {confirmed_balance:,}원에 대해서만 법정 지연손해금이 기산됨"
+                    )
+                    preserved_determinations.append(
+                        "임차인의 선순위 대항력 및 우선변제권, 임차권등기명령 신청 권한, 계약 해지 효력은 "
+                        "보증금 일부 변제와 무관하게 전액 반환 시까지 온전히 유지됨"
+                    )
+                    new_next_actions.append(
+                        f"미반환 잔액 {confirmed_balance:,}원에 대한 지급명령 신청 또는 보증금 반환 청구 소송 제기"
+                    )
+                else:
+                    # 확정 사실은 식별되었으나 구체적 수치 산출이 불가한 경우 임의 금액을 대입하지 않고 확인 필요로 안내
+                    changed_facts.append("보증금 일부 변제 사실 확인 (금액 특정 불가 / 증거 재검토 요망)")
+                    impacted_determinations.append(
+                        "보증금 일부 변제 사실은 공적으로 확인되었으나 구체적인 변제 수치가 특정되지 않아 잔액을 즉시 확정할 수 없음. "
+                        "상세 금융 거래 내역 및 이체확인증에 대한 재검토가 필요함"
+                    )
+                    preserved_determinations.append(
+                        "임차인의 대항력, 우선변제권 및 전액 반환 청구 권리는 보증금 완제 시까지 온전히 유지됨"
+                    )
+                    new_next_actions.append(
+                        "정확한 변제 잔액 산정을 위해 금융 거래 상세 내역서 또는 영수증 원본 재확인"
+                    )
         else:
             # 증빙 미제출 또는 미승인 상태 (USER_ALLEGED / 하드코딩 기본값 배제)
             alleged_amt = asserted_krw or ev_transfer_amt
@@ -516,6 +693,8 @@ def detect_case_delta(
                     "contract_deposit_krw": contract_deposit_krw,
                     "verified_partial_repayment_krw": prior_repaid_krw,
                     "alleged_partial_repayment_krw": alleged_amt,
+                    "confirmed_unrepaid_balance_krw": contract_deposit_krw,
+                    "provisional_unrepaid_balance_krw": provisional_balance,
                     "unrepaid_balance_krw": provisional_balance,
                 }
 
@@ -564,29 +743,47 @@ def detect_case_delta(
             "확인한 후에 비로소 이사(점유 이전)할 것"
         )
 
-    # 3. 새로운 가압류 사실 추가 (S02 / P0-3.1)
+    # 3. 새로운 가압류 사실 추가 (S02 / P0-3.1 권리순위 검증 강화)
     attachment_terms = ["가압류", "압류", "강제집행"]
-    has_attachment_fact = any(
-        "가압류" in (f.statement or "") and ("등기" in (f.statement or "") or "추가" in (f.statement or "") or "설정" in (f.statement or "") or "을구" in (f.statement or ""))
-        and f.trust_level in ("EVIDENCE_SUPPORTED", "USER_ALLEGED")
-        for f in (briefing.facts or [])
-    )
+    has_attachment_fact, attachment_date, att_doc_name, is_att_verified = extract_case_attachment_info(briefing)
     is_multi_turn = bool(conv_context and getattr(conv_context, "turn_index", 1) > 1) if not isinstance(conv_context, dict) else (conv_context.get("turn_index", 1) > 1)
-    if any(t in q_corpus for t in attachment_terms) or (has_attachment_fact and is_multi_turn):
-        tenant_date = extract_case_opposing_power_date(briefing) or "대항요건 구비일"
-        prior_encumbrances = extract_case_prior_encumbrances(briefing, tenant_date)
-        att_doc_name = find_case_attachment_evidence_name(briefing)
 
-        changed_facts.append(f"목적물 부동산에 후순위 가압류 등기 사실 추가 확인 [{att_doc_name}]")
-        if prior_encumbrances:
+    if any(t in q_corpus for t in attachment_terms) or (has_attachment_fact and is_multi_turn):
+        tenant_date = extract_case_opposing_power_date(briefing)
+        prior_encumbrances = extract_case_prior_encumbrances(briefing, tenant_date)
+
+        if not is_att_verified or not attachment_date:
+            # 등기일자나 증거 검증이 없는 상태: '후순위', '1순위', '최우선 배당' 단정 전면 금지 (작업 3)
+            changed_facts.append(f"목적물 부동산에 대한 신규 가압류 언급/등기 사실 접수 (등기일자 미검증 / 권리순위 미확정) [{att_doc_name}]")
             impacted_determinations.append(
-                f"목적물에 선순위 담보물권({prior_encumbrances[0]})이 존재하므로 1순위 최우선 배당이 당연 보장되지 않으며, "
+                "가압류의 구체적 등기 접수일자 및 권리설정 내역이 공적 증거(등기사항전부증명서)로 검증되지 않아, "
+                "임차인의 대항요건·확정일자와의 권리 선후관계를 즉시 확정할 수 없음. "
+                "등기부 확인 전까지는 '1순위' 또는 '최우선 배당'을 단정할 수 없음"
+            )
+            preserved_determinations.append(
+                f"임차인이 기취득한 대항요건({tenant_date or '전입/확정일자'})에 따른 기본적 법적 지위 보존"
+            )
+            new_next_actions.append(
+                "대법원 인터넷등기소에서 최신 부동산등기사항전부증명서(을구)를 발급받아 "
+                "가압류의 정확한 등기 접수일자 및 선순위 권리 존재 여부를 확인하고 증거로 등록할 것"
+            )
+        elif prior_encumbrances:
+            # 선순위 담보물권이 존재하는 경우: 1순위 최우선 배당 불가
+            changed_facts.append(f"목적물 부동산에 가압류 등기 사실 추가 확인 [{att_doc_name}]")
+            impacted_determinations.append(
+                f"목적물에 선순위 담보물권({prior_encumbrances[0]})이 존재하므로 1순위 최우선 배당이 불가하며, "
                 "선순위 채권최고액과 경매 낙찰가율에 따른 배당 순위 및 잔여 담보 가치를 면밀히 검토해야 함"
             )
             preserved_determinations.append(
-                f"임차인의 대항요건({tenant_date}) 취득에 따른 법적 대항력 및 상대적 권리 순위"
+                f"임차인의 대항요건({tenant_date or '구비일'}) 취득에 따른 법적 대항력 및 상대적 권리 순위"
             )
-        else:
+            new_next_actions.append(
+                "대법원 인터넷등기소를 통한 등기사항전부증명서 추가 변동 모니터링 및 향후 경매 개시 시 "
+                "배당요구종기 내 권리신고 및 배당요구 신청서 접수"
+            )
+        elif tenant_date and attachment_date and attachment_date > tenant_date:
+            # 임차인의 대항요건/확정일자가 가압류 등기일보다 앞서는 것이 검증된 경우
+            changed_facts.append(f"목적물 부동산에 후순위 가압류 등기 사실 추가 확인 [{att_doc_name}]")
             impacted_determinations.append(
                 f"[판단할 수 있는 사실]: 신규 가압류 채권자에 대해서는 임차인의 대항요건 및 확정일자({tenant_date})가 앞서므로 기존 우선순위 보존 및 대항력 유지. "
                 "[추가로 필요한 등기·법률정보]: 단, 등기사항전부증명서(을구) 상의 다른 선순위 근저당권이나 조세채권(당해세) 법정기일 등 우선채권 변동 여부를 추가 확인해야 최종 경매 배당 순위가 확정되며, 확정일자 및 선순위 권리 확인 전까지 절대적 1순위 또는 전액 최우선 배당을 단정할 수 없음"
@@ -594,10 +791,23 @@ def detect_case_delta(
             preserved_determinations.append(
                 f"임차인의 1순위 대항력 및 우선변제권 ({tenant_date} 확정일자 기준 후순위 가압류 대비 선순위 지위 유지)"
             )
-        new_next_actions.append(
-            "대법원 인터넷등기소를 통한 등기사항전부증명서 추가 변동 모니터링 및 향후 경매 개시 시 "
-            "배당요구종기 내 권리신고 및 배당요구 신청서 접수"
-        )
+            new_next_actions.append(
+                "대법원 인터넷등기소를 통한 등기사항전부증명서 추가 변동 모니터링 및 향후 경매 개시 시 "
+                "배당요구종기 내 권리신고 및 배당요구 신청서 접수"
+            )
+        else:
+            # 가압류 등기일이 임차인 대항력보다 앞서거나 같은 경우
+            changed_facts.append(f"목적물 부동산에 선행/동순위 가압류 등기 사실 추가 확인 [{att_doc_name}]")
+            impacted_determinations.append(
+                f"가압류 등기일({attachment_date})이 임차인의 대항요건 구비일({tenant_date or '미확인'})보다 앞서거나 같아 "
+                "임차인이 가압류 채권자에게 우선적 대항력을 주장하기 어려우며 동순위 안분배당 또는 열후할 수 있음"
+            )
+            preserved_determinations.append(
+                "임대차계약에 기초한 임대인에 대한 일반 보증금 반환 채권 유지"
+            )
+            new_next_actions.append(
+                "전문 변호사와 신속한 대면 상담을 통해 배당 순위 및 보증금 보전 대책 강구"
+            )
 
     # 4. 기존 사실 정정 (S03: '통지일이 2024년 3월 20일이에요')
     correction_terms = ["날짜가 달라", "정정", "잘못 알았", "통지일이", "통지일은"]

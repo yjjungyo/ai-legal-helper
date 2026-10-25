@@ -66,6 +66,7 @@ from ai_legal_helper.workflows.conversation_context import (
     ConversationTurn,
     load_conversation_context,
 )
+from ai_legal_helper.workflows.legal_workflow import run_legal_consultation
 
 client = TestClient(app)
 
@@ -909,21 +910,25 @@ def test_api_concurrent_post_turn_collision_prevention_flow(case_300m: Case, tes
         with ThreadPoolExecutor(max_workers=4) as executor:
             responses = list(executor.map(invoke_post, range(4)))
 
-        # 모든 요청이 200 성공하고 고유 request_id를 발급받았는지 검증
+        # 모든 요청이 200 성공하고 고유 request_id와 순차적 turn_index를 발급받았는지 검증
         req_ids = set()
+        turn_indices = []
         for r in responses:
             assert r.status_code == 200, f"동시 요청 실패: {r.text}"
             data = r.json()
             assert "request_id" in data
             req_ids.add(data["request_id"])
+            turn_indices.append(data["turn_index"])
         assert len(req_ids) == 4, "동시 요청에서 중복된 request_id가 발생했습니다."
+        assert sorted(turn_indices) == [1, 2, 3, 4], f"턴 번호가 순차적(1,2,3,4)으로 배정되지 않았습니다: {sorted(turn_indices)}"
 
         # DB에 생성된 상담 레코드 턴 확인
         with SessionLocal() as check_db:
             records = check_db.query(ConsultationRecord).filter(
                 ConsultationRecord.case_id == target_case_id
             ).all()
-            assert len(records) >= 4
+            db_turns = [r.turn_index for r in records]
+            assert sorted(db_turns) == [1, 2, 3, 4]
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 
@@ -1029,3 +1034,238 @@ def test_api_cross_case_and_unauthorized_access_blocked_flow(db: Session, case_3
         assert cross_conv_res.status_code == 403, f"타인 대화 세션 접근 차단 실패: {cross_conv_res.status_code}"
     finally:
         app.dependency_overrides.pop(get_current_user, None)
+
+
+# ==============================================================================
+# P0-3.1 최종 잔여 결함 수정 검증 테스트 (작업 1 ~ 4)
+# ==============================================================================
+
+def test_task1_confirmed_repayment_plus_new_oral_allegation_separation(db: Session, case_300m: Case, test_user_a: User):
+    """[P0-3.1 작업 1] 기확정 반환 2천만 원 사건에서 3천만 원 추가 입금 구두 진술 접수 시:
+    - 기존 확정 반환액: 2천만 원 (verified_partial_repayment_krw == 20,000,000)
+    - 신규 미확인 주장: 3천만 원 (alleged_partial_repayment_krw == 30,000,000)
+    - 확정 미반환 잔액: 2억 8천만 원 (confirmed_unrepaid_balance_krw == 280,000,000)
+    - 신규 주장 사실 가정 잠정 잔액: 2억 5천만 원 (provisional_unrepaid_balance_krw == 250,000,000)
+    - 추가 입금 증빙 승인 전 전체 5천만 원 확정 차감 방지 및 calculation_basis 분리 명시.
+    """
+    # 1. 기존 확정 반환 Fact 추가 (2천만 원)
+    fact_repaid_20m = Fact(
+        id=f"fact_rep20_{uuid.uuid4().hex[:8]}",
+        case_id=case_300m.id,
+        statement="2024년 2월 10일 임대인이 보증금 중 20,000,000원을 일부 변제 입금하였다.",
+        verification_status="DOCUMENT_VERIFIED",
+        source_type="DOCUMENT_SUPPORTED",
+    )
+    db.add(fact_repaid_20m)
+    db.commit()
+
+    briefing = build_case_evidence_briefing(db, case_300m.id)
+    repaid_total, _ = extract_case_prior_verified_repayments(briefing)
+    assert repaid_total == 20_000_000
+
+    # 2. 신규 3천만 원 추가 입금 구두 진술 분석 (증빙 미제출)
+    delta = detect_case_delta(
+        briefing=briefing,
+        current_question="집주인이 오늘 3천만 원을 추가로 입금했다고 하네요. 얼마 남은 건가요?",
+        resolved_query="추가 입금 30000000원 진술에 따른 보증금 잔액 및 지연손해금 영향 분석",
+    )
+
+    assert delta is not None
+    assert delta["has_delta"] is True
+    calc = delta["calculation_basis"]
+    assert calc["status"] == "PARTIALLY_CONFIRMED_WITH_NEW_ALLEGATION"
+    assert calc["contract_deposit_krw"] == 300_000_000
+    assert calc["verified_partial_repayment_krw"] == 20_000_000
+    assert calc["alleged_partial_repayment_krw"] == 30_000_000
+    assert calc["confirmed_unrepaid_balance_krw"] == 280_000_000
+    assert calc["provisional_unrepaid_balance_krw"] == 250_000_000
+    assert calc["unrepaid_balance_krw"] == 280_000_000  # 확정 잔액 유지
+
+    # 섹션별 명확한 분리 문구 검증
+    assert any("20,000,000원 일부 변제 확정" in cf and "30,000,000원 추가 입금 진술" in cf for cf in delta["changed_facts"])
+    assert any("280,000,000원" in idet and "250,000,000원" in idet for idet in delta["impacted_determinations"])
+    assert any("30,000,000원" in act and "이체확인증" in act for act in delta["new_next_actions"])
+
+
+def test_task2_transaction_disambiguation_and_copy_deduplication():
+    """[P0-3.1 작업 2] 거래 단위 중복 계산 개선 및 식별자 판별 검증:
+    1. 동일 날짜·금액이라도 거래번호(TX-1001 vs TX-1002)가 다르면 각각 집계 (총 4천만 원)
+    2. 동일 날짜·금액이라도 차수(1차 vs 2차)가 다르면 각각 집계 (총 4천만 원)
+    3. 동일 거래에 대한 사본 표기(사본/중복)는 중복 집계 금지 (총 2천만 원)
+    4. 식별자가 없고 동일성이 불확실한 별개 문서는 중복 합산 보류 및 경고 표기 (총 2천만 원)
+    """
+    # Case 1: 고유 거래번호 상이 (TX-1001 vs TX-1002) -> 각각 집계 40M
+    briefing_distinct_id = CaseEvidenceBriefing(
+        case_id="case_t2_1",
+        title="거래번호 상이 사건",
+        facts=[
+            FactItemBrief(
+                fact_id="f1",
+                statement="2024년 3월 1일 임대인이 20,000,000원을 일부 변제 입금하였다. (거래번호: TX-1001)",
+                adjudication_status="EVIDENCE_SUPPORTED",
+                document_name="1차_이체증.pdf",
+            ),
+            FactItemBrief(
+                fact_id="f2",
+                statement="2024년 3월 1일 임대인이 20,000,000원을 일부 변제 입금하였다. (거래번호: TX-1002)",
+                adjudication_status="EVIDENCE_SUPPORTED",
+                document_name="2차_이체증.pdf",
+            ),
+        ],
+    )
+    total_1, sources_1 = extract_case_prior_verified_repayments(briefing_distinct_id)
+    assert total_1 == 40_000_000
+    assert len([s for s in sources_1 if not s.startswith("[보류]")]) == 2
+
+    # Case 2: 차수 상이 (1차 vs 2차) -> 각각 집계 40M
+    briefing_distinct_ord = CaseEvidenceBriefing(
+        case_id="case_t2_2",
+        title="차수 상이 사건",
+        facts=[
+            FactItemBrief(
+                fact_id="f3",
+                statement="2024년 3월 1일 임대인이 1차 20,000,000원을 일부 변제 입금하였다.",
+                adjudication_status="EVIDENCE_SUPPORTED",
+                document_name="1차입금증.pdf",
+            ),
+            FactItemBrief(
+                fact_id="f4",
+                statement="2024년 3월 1일 임대인이 2차 20,000,000원을 일부 변제 입금하였다.",
+                adjudication_status="EVIDENCE_SUPPORTED",
+                document_name="2차입금증.pdf",
+            ),
+        ],
+    )
+    total_2, sources_2 = extract_case_prior_verified_repayments(briefing_distinct_ord)
+    assert total_2 == 40_000_000
+
+    # Case 3: 동일 거래 사본 (사본 파일명 및 동일 거래 표기) -> 20M 유지
+    briefing_copy = CaseEvidenceBriefing(
+        case_id="case_t2_3",
+        title="동일 거래 사본 사건",
+        facts=[
+            FactItemBrief(
+                fact_id="f5",
+                statement="2024년 3월 1일 임대인이 20,000,000원을 일부 변제 입금 확인",
+                adjudication_status="EVIDENCE_SUPPORTED",
+                document_name="이체확인증_원본.pdf",
+            ),
+            FactItemBrief(
+                fact_id="f6",
+                statement="2024년 3월 1일 임대인이 20,000,000원을 일부 변제 입금 확인 (사본)",
+                adjudication_status="EVIDENCE_SUPPORTED",
+                document_name="이체확인증_사본.pdf",
+            ),
+        ],
+    )
+    total_3, _ = extract_case_prior_verified_repayments(briefing_copy)
+    assert total_3 == 20_000_000
+
+    # Case 4: 식별자 부재 불확실 중복 -> 합산 보류 및 경고 안내 (20M 유지)
+    briefing_ambiguous = CaseEvidenceBriefing(
+        case_id="case_t2_4",
+        title="식별자 부재 중복 의심 사건",
+        facts=[
+            FactItemBrief(
+                fact_id="f7",
+                statement="2024년 3월 1일 임대인이 20,000,000원을 일부 변제 입금 확인",
+                adjudication_status="EVIDENCE_SUPPORTED",
+                document_name="문서A.pdf",
+            ),
+            FactItemBrief(
+                fact_id="f8",
+                statement="2024년 3월 1일 임대인이 20,000,000원을 일부 변제 입금 확인",
+                adjudication_status="EVIDENCE_SUPPORTED",
+                document_name="문서B.pdf",
+            ),
+        ],
+    )
+    total_4, sources_4 = extract_case_prior_verified_repayments(briefing_ambiguous)
+    assert total_4 == 20_000_000  # 불확실 거래 이중 차감 방지
+    assert any("[보류]" in s and "중복 의심" in s for s in sources_4)
+
+
+def test_task3_attachment_priority_verification_nuancing():
+    """[P0-3.1 작업 3] 권리순위 검증 강화 및 단정 표현 차단 검증:
+    1. 가압류 등기일 미검증 시 '1순위', '최우선 배당', '후순위 가압류' 단정 금지
+    2. 선순위 근저당권 존재 시 '1순위 최우선 배당' 불가 명시
+    3. 검증된 날짜 선후관계(대항력 2022.03 < 가압류 2024.05)에서만 상대적 선순위 설명
+    """
+    # 1. 미검증 가압류 언급: 단정 배제 및 등기부 확인 지침
+    briefing_unverified_att = CaseEvidenceBriefing(
+        case_id="case_att_unverified",
+        title="미검증 가압류 사건",
+        facts=[
+            FactItemBrief(
+                fact_id="f1",
+                statement="임차인은 2022년 3월 1일 전입신고 및 확정일자를 갖추었다",
+                adjudication_status="EVIDENCE_SUPPORTED",
+            )
+        ],
+    )
+    delta_unverified = detect_case_delta(
+        briefing=briefing_unverified_att,
+        current_question="등기부에 가압류가 들어왔다는데 제 순위는 어떻게 되나요?",
+        resolved_query="가압류 언급에 따른 권리순위 분석",
+    )
+    assert delta_unverified is not None
+    assert any("등기일자 미검증 / 권리순위 미확정" in cf for cf in delta_unverified["changed_facts"])
+    assert any("'1순위' 또는 '최우선 배당'을 단정할 수 없음" in idet for idet in delta_unverified["impacted_determinations"])
+    # 후순위 가압류 단정 표현 부재 확인
+    assert not any("후순위 가압류 등기 사실 추가 확인" in cf for cf in delta_unverified["changed_facts"])
+
+    # 2. 선순위 근저당권 존재: 1순위 최우선 배당 불가 명시
+    briefing_prior_mortgage = CaseEvidenceBriefing(
+        case_id="case_mortgage",
+        title="선순위 근저당권 존재 사건",
+        facts=[
+            FactItemBrief(
+                fact_id="f1",
+                statement="임차인은 2022년 3월 1일 전입신고 및 확정일자를 갖추었다",
+                adjudication_status="EVIDENCE_SUPPORTED",
+            ),
+            FactItemBrief(
+                fact_id="f2",
+                statement="2021년 5월 1일 선순위 근저당권 채권최고액 1억 원이 설정되어 있다",
+                adjudication_status="EVIDENCE_SUPPORTED",
+            ),
+            FactItemBrief(
+                fact_id="f3",
+                statement="2024년 5월 10일 목적물에 가압류 등기가 추가되었다",
+                adjudication_status="EVIDENCE_SUPPORTED",
+            ),
+        ],
+    )
+    delta_mortgage = detect_case_delta(
+        briefing=briefing_prior_mortgage,
+        current_question="가압류가 또 들어왔는데 제 배당 순위는 어떻게 되나요?",
+    )
+    assert delta_mortgage is not None
+    assert any("선순위 담보물권" in idet and "1순위 최우선 배당이 불가" in idet for idet in delta_mortgage["impacted_determinations"])
+
+
+@pytest.mark.asyncio
+async def test_task4_live_workflow_execution_without_mock(db: Session, case_300m: Case):
+    """[P0-3.1 작업 4] 실제 run_legal_consultation 워크플로우를 모의 객체(mock) 없이
+    직접 실행하여 전체 LangGraph 노드(의도분석->라우팅->감독자초기화)를 통합 검증한다.
+    모의 워크플로우(_e2e_mock_run_consultation)와 실제 워크플로우를 구분하여 실행성을 보장한다.
+    """
+    question_text = "임대차 계약이 끝났는데 보증금 3억 원을 아직 돌려받지 못했습니다. 어떻게 해야 하나요?"
+    thread_id = f"thread_live_{uuid.uuid4().hex[:8]}"
+    conv_ctx = ConversationContext(
+        conversation_id=f"conv_live_{uuid.uuid4().hex[:8]}",
+        case_id=case_300m.id,
+        current_question=question_text,
+        turn_index=1,
+    )
+    result = await run_legal_consultation(
+        question_text,
+        thread_id=thread_id,
+        conversation_context=conv_ctx,
+    )
+    assert result is not None
+    assert "answer" in result
+    assert result["status"] in ("SUCCESS", "APPROVAL_REQUIRED")
+    assert len(result["answer"]) > 0
+    assert "request_id" in result
+    assert result.get("request_id") is not None

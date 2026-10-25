@@ -19,7 +19,9 @@ React 프론트엔드와 통신하는 FastAPI 라우터 모듈이다.
 import os
 import uuid
 import time
+import threading
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import Dict, Any, List, Optional
 
@@ -46,6 +48,22 @@ router = APIRouter()
 
 # In-memory store for consultation tasks (ephemeral for P1)
 _consultations: Dict[str, ConsultationResponse] = {}
+
+# 대화 세션 단위 동시성 제어 락 (P0-3.1 작업 4)
+_conversation_locks: Dict[str, threading.Lock] = {}
+_global_conv_lock = threading.Lock()
+
+
+def _get_conversation_lock(conversation_id: str) -> threading.Lock:
+    """대화 세션(conversation_id) 단위의 동시성 제어 뮤텍스 락을 반환한다.
+
+    복수의 비동기 요청이나 스레드가 동일 대화 세션에 동시 접근 시,
+    턴 번호(turn_index)의 단조 증가와 고유성을 원자적으로 보장한다 (P0-3.1).
+    """
+    with _global_conv_lock:
+        if conversation_id not in _conversation_locks:
+            _conversation_locks[conversation_id] = threading.Lock()
+        return _conversation_locks[conversation_id]
 
 NODE_TO_PROGRESS_STEP: Dict[str, tuple[str, str]] = {
     "supervisor_initialize": ("step_1", "사건 기본정보 및 대화 맥락 확인 완료"),
@@ -164,67 +182,88 @@ async def start_consultation(
     request_id = get_request_id() or str(uuid.uuid4())
     trace_id = get_trace_id() or str(uuid.uuid4())
     
-    # 연속 대화 세션 식별자 결정 및 대화 맥락 복원 (Phase 1/2)
-    from ai_legal_helper.workflows.conversation_context import load_conversation_context
-    try:
-        conv_context = load_conversation_context(
-            db=db,
-            conversation_id=conversation_id,
-            current_question=req.question,
-            case_id=req.case_id,
-            user_id=current_user.id,
-            auth_bypass=AUTH_BYPASS,
-        )
-    except PermissionError as pe:
-        raise HTTPException(status_code=403, detail=str(pe))
-    
-    turn_index = conv_context.turn_index
-    now_kst = get_kst_iso()
-    initial_progress = create_initial_progress(request_id, now_kst)
+    # 대화 세션별 뮤텍스 락 획득을 통한 동시 요청 간 turn_index 순차 보장 및 경합 방지 (P0-3.1 작업 4)
+    conv_lock = _get_conversation_lock(conversation_id)
+    with conv_lock:
+        # 연속 대화 세션 식별자 결정 및 대화 맥락 복원 (Phase 1/2)
+        from ai_legal_helper.workflows.conversation_context import load_conversation_context
+        try:
+            conv_context = load_conversation_context(
+                db=db,
+                conversation_id=conversation_id,
+                current_question=req.question,
+                case_id=req.case_id,
+                user_id=current_user.id,
+                auth_bypass=AUTH_BYPASS,
+            )
+        except PermissionError as pe:
+            raise HTTPException(status_code=403, detail=str(pe))
 
-    # Initial status (P1-05 3-tier status model + Case-Centric Progress P0-05)
-    resp = ConsultationResponse(
-        request_id=request_id,
-        conversation_id=conversation_id,
-        turn_index=turn_index,
-        trace_id=trace_id,
-        status="IN_PROGRESS",
-        execution_status="IN_PROGRESS",
-        verification_status="UNVERIFIED",
-        answer_status="WITHHELD",
-        routing_status=None,
-        question=req.question,
-        case_id=req.case_id,
-        created_at=now_kst,
-        progress=initial_progress,
-    )
-    # Store user_id to authorize GET later
-    _consultations[request_id] = resp
-    setattr(resp, "_user_id", current_user.id)
-    
-    # DB에 초기 상담 레코드 영구 저장
-    try:
-        record = ConsultationRecord(
-            case_id=req.case_id,
-            user_id=current_user.id,
+        # DB와 메모리 내 활성 상담을 통틀어 최신 턴 번호를 원자적으로 계산
+        max_turn_db = db.query(func.max(ConsultationRecord.turn_index)).filter(
+            ConsultationRecord.conversation_id == conversation_id
+        ).scalar() or 0
+
+        in_flight_turns = [
+            c.turn_index for c in _consultations.values()
+            if c.conversation_id == conversation_id and c.turn_index is not None
+        ]
+        max_turn = max(max_turn_db, max(in_flight_turns) if in_flight_turns else 0)
+        turn_index = max(conv_context.turn_index, max_turn + 1)
+        conv_context.turn_index = turn_index
+
+        now_kst = get_kst_iso()
+        initial_progress = create_initial_progress(request_id, now_kst)
+
+        # Initial status (P1-05 3-tier status model + Case-Centric Progress P0-05)
+        resp = ConsultationResponse(
             request_id=request_id,
             conversation_id=conversation_id,
             turn_index=turn_index,
             trace_id=trace_id,
-            question=req.question,
             status="IN_PROGRESS",
             execution_status="IN_PROGRESS",
             verification_status="UNVERIFIED",
             answer_status="WITHHELD",
             routing_status=None,
-            progress=initial_progress.model_dump(),
+            question=req.question,
+            case_id=req.case_id,
+            created_at=now_kst,
+            progress=initial_progress,
         )
-        db.add(record)
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        logger.warning(f"[START_CONSULTATION] DB record initial save failed: {e}")
-    
+        # Store user_id to authorize GET later
+        _consultations[request_id] = resp
+        setattr(resp, "_user_id", current_user.id)
+
+        # DB에 초기 상담 레코드 영구 저장 (충돌 방지 및 재시도 정책 적용)
+        retry_turn = turn_index
+        for attempt in range(3):
+            try:
+                record = ConsultationRecord(
+                    case_id=req.case_id,
+                    user_id=current_user.id,
+                    request_id=request_id,
+                    conversation_id=conversation_id,
+                    turn_index=retry_turn,
+                    trace_id=trace_id,
+                    question=req.question,
+                    status="IN_PROGRESS",
+                    execution_status="IN_PROGRESS",
+                    verification_status="UNVERIFIED",
+                    answer_status="WITHHELD",
+                    routing_status=None,
+                    progress=initial_progress.model_dump(),
+                )
+                db.add(record)
+                db.commit()
+                resp.turn_index = retry_turn
+                conv_context.turn_index = retry_turn
+                break
+            except Exception as e:
+                db.rollback()
+                logger.warning(f"[START_CONSULTATION] DB record initial save failed (attempt {attempt+1}): {e}")
+                retry_turn += 1
+
     # Schedule background task with conversation context
     background_tasks.add_task(process_consultation, request_id, trace_id, req, conv_context)
     
