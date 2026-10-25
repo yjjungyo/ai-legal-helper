@@ -22,11 +22,14 @@ AI Legal Helper — P0-3.1 Dynamic Case State Integrity & E2E Verification 테�
 import uuid
 import pytest
 from concurrent.futures import ThreadPoolExecutor
-from typing import Generator
+from typing import Generator, Any, Optional
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from ai_legal_helper.api.main import app
+from ai_legal_helper.api.dependencies import get_current_user
+from ai_legal_helper.api.routes.consultation import _consultations
 from ai_legal_helper.database.session import SessionLocal
 from ai_legal_helper.database.models import (
     User,
@@ -50,12 +53,14 @@ from ai_legal_helper.case_intelligence.evidence_manager import (
 from ai_legal_helper.workflows.final_disposition import (
     detect_case_delta,
     assemble_grounded_answer,
+    determine_final_disposition,
     extract_case_contract_deposit,
     extract_case_prior_verified_repayments,
     extract_case_opposing_power_date,
     extract_case_notice_delivery_date,
     find_case_attachment_evidence_name,
 )
+from ai_legal_helper.agents.issue_verifier import IssueVerificationResult
 from ai_legal_helper.workflows.conversation_context import (
     ConversationContext,
     ConversationTurn,
@@ -119,6 +124,7 @@ def case_300m(db: Session, test_user_a: User) -> Case:
         case_type="HOUSING_LEASE",
         status="OPEN",
         version=1,
+        primary_conversation_id=f"conv_{cid}",
     )
     db.add(case)
     db.commit()
@@ -610,3 +616,416 @@ def test_e10_cross_case_isolation(db: Session, case_300m: Case, test_user_a: Use
             case_id=cid_b,  # 사건 B의 ID로 사건 A 세션 접근 시도
             user_id=test_user_b.id,
         )
+
+
+# ==============================================================================
+# 실제 FastAPI 엔드포인트 E2E 테스트 스위트 (Section 4)
+# ==============================================================================
+
+async def _e2e_mock_run_consultation(
+    question: str,
+    thread_id: str,
+    conversation_context: Optional[Any] = None,
+    on_step_callback: Optional[Any] = None,
+) -> dict:
+    """실제 DB 브리핑과 final_disposition을 연계하여 Fast E2E 검증을 지원하는 모의 워크플로우 실행기.
+
+    Args:
+        question: 의뢰인 질의 텍스트.
+        thread_id: 고유 스레드/요청 식별자.
+        conversation_context: 복원된 대화 맥락 객체.
+        on_step_callback: 노드별 실시간 진행 상태 콜백.
+
+    Returns:
+        dict: detect_case_delta 및 assemble_grounded_answer 기반의 최종 상담 결과 딕셔너리.
+    """
+    with SessionLocal() as s_db:
+        cid = getattr(conversation_context, "case_id", None)
+        briefing = build_case_evidence_briefing(s_db, cid, question) if cid else CaseEvidenceBriefing()
+
+        delta = detect_case_delta(
+            briefing=briefing,
+            conv_context=conversation_context,
+            current_question=question,
+        )
+
+        has_approved_ev = bool(briefing and briefing.evidences and any(e.status == "APPROVED" for e in briefing.evidences))
+        is_confirmed = bool(delta and delta.get("calculation_basis", {}).get("status") == "CONFIRMED")
+
+        issue_res = [
+            IssueVerificationResult(
+                issue_id="task_deposit_balance",
+                issue_title="보증금 반환 및 잔액 산정",
+                status="VERIFIED" if has_approved_ev else "CONDITIONAL",
+                determination_type="FACT_VERIFIED" if is_confirmed else "USER_ALLEGED_PENDING_PROOF",
+                claim_citations=[],
+            )
+        ]
+
+        final_disp, _ = determine_final_disposition(issue_res)
+
+        ans = assemble_grounded_answer(
+            issue_results=issue_res,
+            briefing=briefing,
+            draft_answer=f"질문 '{question}'에 대하여 현재 사건의 권리관계와 보증금 반환 현황을 검토한 결과입니다.",
+            disposition=final_disp,
+            conv_context=conversation_context,
+            current_question=question,
+            case_delta=delta,
+        )
+
+        sources = []
+        for ev in (briefing.evidences or []):
+            if getattr(ev, "status", None) == "APPROVED":
+                sources.append({
+                    "source_id": ev.evidence_id,
+                    "source_type": "CASE_EVIDENCE",
+                    "title": ev.document_name,
+                    "file": ev.document_name,
+                    "page": 1,
+                })
+
+        return {
+            "status": "SUCCESS",
+            "answer": ans,
+            "case_delta": delta,
+            "verification_result": {
+                "status": "PASS" if final_disp == "DELIVERED" else "REVISE",
+                "case_delta": delta,
+                "issue_results": [r.model_dump() for r in issue_res],
+            },
+            "conversation_id": getattr(conversation_context, "conversation_id", None),
+            "turn_index": getattr(conversation_context, "turn_index", 1),
+            "cited_sources": sources,
+            "claim_citations": [],
+            "warnings": [],
+        }
+
+
+def test_api_partial_repayment_20m_krw_provisional_flow(case_300m: Case, test_user_a: User):
+    """POST /api/v1/consultations 호출 시 2천만원 지급 주장 질문에 대해 잠정 상태와 2.8억 잔액이 반환되는지 검증한다."""
+    app.dependency_overrides[get_current_user] = lambda: test_user_a
+    try:
+        with patch("ai_legal_helper.api.routes.consultation.run_legal_consultation", side_effect=_e2e_mock_run_consultation):
+            res = client.post(
+                "/api/v1/consultations",
+                json={
+                    "question": "임대인이 20,000,000원을 일부 변제 입금했다고 주장하는데 남은 보증금은 얼마인가요?",
+                    "case_id": case_300m.id,
+                },
+            )
+            assert res.status_code == 200, f"상담 생성 실패: {res.text}"
+            res_data = res.json()
+            req_id = res_data["request_id"]
+
+            # 상담 상세 결과 조회
+            detail_res = client.get(f"/api/v1/consultations/{req_id}")
+            assert detail_res.status_code == 200
+            data = detail_res.json()
+
+            # 잠정(PROVISIONAL) 상태 및 2억 8천만원 잔액 검증
+            delta = data.get("case_delta")
+            assert delta is not None, "case_delta가 응답에 누락되었습니다."
+            assert delta["has_delta"] is True
+            calc_basis = delta["calculation_basis"]
+            assert calc_basis["status"] == "PROVISIONAL"
+            assert calc_basis["alleged_partial_repayment_krw"] == 20_000_000
+            assert calc_basis["unrepaid_balance_krw"] == 280_000_000
+
+            # 답변 텍스트 내 잠정 안내 및 금액 명시 확인
+            ans = data.get("answer", "")
+            assert "280,000,000" in ans or "2억 8,000" in ans
+            assert "잠정" in ans or "USER_ALLEGED" in ans or "확인 필요" in ans
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_api_deposit_transfer_evidence_approved_confirms_balance_flow(db: Session, case_300m: Case, test_user_a: User):
+    """process_evidence_review(APPROVE) 승인 후 POST /api/v1/consultations 호출 시 확정 2.8억 및 원본 파일명이 연결되는지 검증한다."""
+    app.dependency_overrides[get_current_user] = lambda: test_user_a
+    try:
+        # 이체확인증 증거 등록 및 승인
+        ev_file_name = "임대인_보증금일부반환_이체확인증.pdf"
+        doc_id = f"ev_api_{uuid.uuid4().hex[:8]}"
+        ev_doc = EvidenceDocument(
+            id=doc_id,
+            case_id=case_300m.id,
+            original_filename=ev_file_name,
+            safe_storage_key=f"storage/{doc_id}.pdf",
+            media_type="application/pdf",
+            size_bytes=2048,
+            sha256=f"sha_{uuid.uuid4().hex[:16]}",
+            status="UPLOADED",
+        )
+        db.add(ev_doc)
+        db.flush()
+
+        claim = EvidenceClaim(
+            id=f"claim_api_{uuid.uuid4().hex[:8]}",
+            case_id=case_300m.id,
+            evidence_id=ev_doc.id,
+            statement="임대인이 2024년 2월 10일 보증금 중 20,000,000원을 일부 변제 입금하였다.",
+            assertion_status="DOCUMENT_STATES",
+            review_status="PENDING_REVIEW",
+        )
+        db.add(claim)
+        db.commit()
+
+        # 관리자 증거 승인
+        process_evidence_review(db, claim.id, "APPROVE", expected_case_id=case_300m.id, expected_evidence_id=ev_doc.id)
+
+        with patch("ai_legal_helper.api.routes.consultation.run_legal_consultation", side_effect=_e2e_mock_run_consultation):
+            res = client.post(
+                "/api/v1/consultations",
+                json={
+                    "question": "이체확인증이 승인되었는데 현재 확정된 남은 보증금 잔액은 얼마인가요?",
+                    "case_id": case_300m.id,
+                },
+            )
+            assert res.status_code == 200
+            req_id = res.json()["request_id"]
+
+            detail_res = client.get(f"/api/v1/consultations/{req_id}")
+            assert detail_res.status_code == 200
+            data = detail_res.json()
+
+            # 확정(CONFIRMED) 상태 및 2억 8천만원 잔액 검증
+            delta = data.get("case_delta")
+            assert delta is not None
+            calc_basis = delta["calculation_basis"]
+            assert calc_basis["status"] == "CONFIRMED"
+            assert calc_basis["verified_partial_repayment_krw"] == 20_000_000
+            assert calc_basis["unrepaid_balance_krw"] == 280_000_000
+
+            # 답변 텍스트 내 확정 잔액 및 원본 파일명 인용 검증
+            ans = data.get("answer", "")
+            assert "280,000,000" in ans or "2억 8,000" in ans
+            assert ev_file_name in ans
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_api_duplicate_evidence_approval_prevents_double_counting_flow(db: Session, case_300m: Case, test_user_a: User):
+    """동일 거래 증거를 중복 등록 및 승인하더라도 잔액이 260,000,000원으로 이중 차감되지 않고 280,000,000원으로 유지되는지 검증한다."""
+    app.dependency_overrides[get_current_user] = lambda: test_user_a
+    try:
+        # 1차 이체증 등록 및 승인
+        doc1_id = f"ev_orig_{uuid.uuid4().hex[:8]}"
+        doc1 = EvidenceDocument(
+            id=doc1_id,
+            case_id=case_300m.id,
+            original_filename="보증금반환_1차_이체증.pdf",
+            safe_storage_key=f"storage/{doc1_id}.pdf",
+            media_type="application/pdf",
+            size_bytes=1024,
+            sha256=f"sha_{uuid.uuid4().hex[:16]}",
+            status="UPLOADED",
+        )
+        db.add(doc1)
+        db.flush()
+        claim1 = EvidenceClaim(
+            id=f"cl_orig_{uuid.uuid4().hex[:8]}",
+            case_id=case_300m.id,
+            evidence_id=doc1.id,
+            statement="임대인이 2024년 2월 10일 20,000,000원을 일부 변제 입금하였다.",
+            assertion_status="DOCUMENT_STATES",
+            review_status="PENDING_REVIEW",
+        )
+        db.add(claim1)
+        db.commit()
+        process_evidence_review(db, claim1.id, "APPROVE", expected_case_id=case_300m.id, expected_evidence_id=doc1.id)
+
+        # 2차 동일 거래 중복 입금증 등록 및 승인 (동일 날짜 2024.02.10, 동일 금액 20,000,000원)
+        doc2_id = f"ev_dup_{uuid.uuid4().hex[:8]}"
+        doc2 = EvidenceDocument(
+            id=doc2_id,
+            case_id=case_300m.id,
+            original_filename="보증금반환_중복_사본.pdf",
+            safe_storage_key=f"storage/{doc2_id}.pdf",
+            media_type="application/pdf",
+            size_bytes=1024,
+            sha256=f"sha_{uuid.uuid4().hex[:16]}",
+            status="UPLOADED",
+        )
+        db.add(doc2)
+        db.flush()
+        claim2 = EvidenceClaim(
+            id=f"cl_dup_{uuid.uuid4().hex[:8]}",
+            case_id=case_300m.id,
+            evidence_id=doc2.id,
+            statement="임대인이 2024년 2월 10일 보증금 중 20,000,000원을 일부 반환하여 입금 확인되었다.",
+            assertion_status="DOCUMENT_STATES",
+            review_status="PENDING_REVIEW",
+        )
+        db.add(claim2)
+        db.commit()
+        process_evidence_review(db, claim2.id, "APPROVE", expected_case_id=case_300m.id, expected_evidence_id=doc2.id)
+
+        with patch("ai_legal_helper.api.routes.consultation.run_legal_consultation", side_effect=_e2e_mock_run_consultation):
+            res = client.post(
+                "/api/v1/consultations",
+                json={
+                    "question": "중복 입금증 제출 후 최종 확정 보증금 잔액은 얼마인가요?",
+                    "case_id": case_300m.id,
+                },
+            )
+            assert res.status_code == 200
+            req_id = res.json()["request_id"]
+
+            data = client.get(f"/api/v1/consultations/{req_id}").json()
+            delta = data.get("case_delta")
+            assert delta is not None
+            calc_basis = delta["calculation_basis"]
+            # 이중 차감 방지: 2.6억원이 아니라 2.8억원 유지
+            assert calc_basis["verified_partial_repayment_krw"] == 20_000_000
+            assert calc_basis["unrepaid_balance_krw"] == 280_000_000
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_api_concurrent_post_turn_collision_prevention_flow(case_300m: Case, test_user_a: User):
+    """동일 사건 대화 세션에 4개 동시 POST /api/v1/consultations 요청 시 교착이나 턴 충돌 없이 정상 접수되는지 검증한다."""
+    target_case_id = str(case_300m.id)
+    target_user_id = str(test_user_a.id)
+
+    # 스레드 안전한 사용자 픽스처 제공 (세션 분리 및 Detached 인스턴스)
+    def get_thread_safe_user():
+        with SessionLocal() as s:
+            u = s.query(User).filter(User.id == target_user_id).first()
+            if u:
+                s.expunge(u)
+            return u
+
+    app.dependency_overrides[get_current_user] = get_thread_safe_user
+    try:
+        def invoke_post(idx: int):
+            with patch("ai_legal_helper.api.routes.consultation.run_legal_consultation", side_effect=_e2e_mock_run_consultation):
+                thread_client = TestClient(app)
+                return thread_client.post(
+                    "/api/v1/consultations",
+                    json={"question": f"동시 질의 {idx}", "case_id": target_case_id},
+                )
+
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            responses = list(executor.map(invoke_post, range(4)))
+
+        # 모든 요청이 200 성공하고 고유 request_id를 발급받았는지 검증
+        req_ids = set()
+        for r in responses:
+            assert r.status_code == 200, f"동시 요청 실패: {r.text}"
+            data = r.json()
+            assert "request_id" in data
+            req_ids.add(data["request_id"])
+        assert len(req_ids) == 4, "동시 요청에서 중복된 request_id가 발생했습니다."
+
+        # DB에 생성된 상담 레코드 턴 확인
+        with SessionLocal() as check_db:
+            records = check_db.query(ConsultationRecord).filter(
+                ConsultationRecord.case_id == target_case_id
+            ).all()
+            assert len(records) >= 4
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_api_session_reload_retains_latest_balance_flow(db: Session, case_300m: Case, test_user_a: User):
+    """메모리 캐시를 초기화한 후에도 세션 및 사건 조회 API에서 최신 확정 잔액(2.8억)이 무손실 유지되는지 검증한다."""
+    app.dependency_overrides[get_current_user] = lambda: test_user_a
+    try:
+        # 이체확인증 승인
+        doc_id = f"ev_rel_{uuid.uuid4().hex[:8]}"
+        doc = EvidenceDocument(
+            id=doc_id,
+            case_id=case_300m.id,
+            original_filename="보증금_일부반환_영수증.pdf",
+            safe_storage_key=f"storage/{doc_id}.pdf",
+            media_type="application/pdf",
+            size_bytes=1024,
+            sha256=f"sha_{uuid.uuid4().hex[:16]}",
+            status="UPLOADED",
+        )
+        db.add(doc)
+        db.flush()
+        claim = EvidenceClaim(
+            id=f"cl_rel_{uuid.uuid4().hex[:8]}",
+            case_id=case_300m.id,
+            evidence_id=doc.id,
+            statement="임대인이 2024년 2월 10일 보증금 중 20,000,000원을 일부 변제 입금하였다.",
+            assertion_status="DOCUMENT_STATES",
+            review_status="PENDING_REVIEW",
+        )
+        db.add(claim)
+        db.commit()
+        process_evidence_review(db, claim.id, "APPROVE", expected_case_id=case_300m.id, expected_evidence_id=doc.id)
+
+        # 상담 요청 실행
+        with patch("ai_legal_helper.api.routes.consultation.run_legal_consultation", side_effect=_e2e_mock_run_consultation):
+            res = client.post(
+                "/api/v1/consultations",
+                json={"question": "잔액 확인 요청", "case_id": case_300m.id},
+            )
+            assert res.status_code == 200
+            post_data = res.json()
+            req_id = post_data["request_id"]
+            conv_id = post_data["conversation_id"]
+
+        # 서버 메모리 캐시 완전 초기화 (재시작 시뮬레이션)
+        _consultations.clear()
+
+        # 1. 단일 상담 상세 조회 API (DB에서 역직렬화)
+        detail_res = client.get(f"/api/v1/consultations/{req_id}")
+        assert detail_res.status_code == 200
+        detail_data = detail_res.json()
+        assert detail_data["case_delta"] is not None
+        assert detail_data["case_delta"]["calculation_basis"]["status"] == "CONFIRMED"
+        assert detail_data["case_delta"]["calculation_basis"]["unrepaid_balance_krw"] == 280_000_000
+
+        # 2. 대화 세션 상세 이력 조회 API (DB 기반 전체 턴 복원)
+        conv_res = client.get(f"/api/v1/cases/{case_300m.id}/conversations/{conv_id}")
+        assert conv_res.status_code == 200
+        conv_data = conv_res.json()
+        assert conv_data["conversation_id"] == conv_id
+        assert len(conv_data["turns"]) >= 1
+        latest_turn = conv_data["turns"][-1]
+        assert latest_turn["case_delta"] is not None
+        assert latest_turn["case_delta"]["calculation_basis"]["unrepaid_balance_krw"] == 280_000_000
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_api_cross_case_and_unauthorized_access_blocked_flow(db: Session, case_300m: Case, test_user_a: User, test_user_b: User):
+    """사용자 B가 사용자 A 소유 사건의 상담 생성 및 조회 시 HTTP 403 Forbidden 차단되는지 검증한다."""
+    # 사용자 A로 사전 상담 1건 생성
+    app.dependency_overrides[get_current_user] = lambda: test_user_a
+    try:
+        with patch("ai_legal_helper.api.routes.consultation.run_legal_consultation", side_effect=_e2e_mock_run_consultation):
+            res_a = client.post(
+                "/api/v1/consultations",
+                json={"question": "사용자 A의 전용 상담 질의", "case_id": case_300m.id},
+            )
+            assert res_a.status_code == 200
+            req_id_a = res_a.json()["request_id"]
+            conv_id_a = res_a.json()["conversation_id"]
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+    # 사용자 B로 인증 전환
+    app.dependency_overrides[get_current_user] = lambda: test_user_b
+    try:
+        # 1. 사용자 B가 사용자 A의 case_id로 신규 상담 POST 시도 -> 403 차단
+        with patch("ai_legal_helper.api.routes.consultation.run_legal_consultation", side_effect=_e2e_mock_run_consultation):
+            cross_post_res = client.post(
+                "/api/v1/consultations",
+                json={"question": "타인 사건 침범 질의", "case_id": case_300m.id},
+            )
+            assert cross_post_res.status_code == 403, f"타인 사건 접근 차단 실패: {cross_post_res.status_code}"
+
+        # 2. 사용자 B가 사용자 A의 상담 결과 GET 시도 -> 403 차단
+        cross_get_res = client.get(f"/api/v1/consultations/{req_id_a}")
+        assert cross_get_res.status_code == 403, f"타인 상담 조회 차단 실패: {cross_get_res.status_code}"
+
+        # 3. 사용자 B가 사용자 A의 대화 세션 상세 GET 시도 -> 403 차단
+        cross_conv_res = client.get(f"/api/v1/cases/{case_300m.id}/conversations/{conv_id_a}")
+        assert cross_conv_res.status_code == 403, f"타인 대화 세션 접근 차단 실패: {cross_conv_res.status_code}"
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)

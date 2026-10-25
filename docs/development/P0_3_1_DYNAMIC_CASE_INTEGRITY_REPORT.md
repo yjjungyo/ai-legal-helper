@@ -1,127 +1,151 @@
-# AI Legal Helper — P0-3.1 Dynamic Case State Integrity & E2E Verification 보고서
+# AI Legal Helper — P0-3.1 Dynamic Case State Integrity & E2E Verification 최종 완료 보고서
 
 **작성일자:** 2026-10-25  
-**작업 구분:** P0-3.1 Dynamic Case State Integrity & E2E Verification  
-**기준 Git 커밋:** `48cb5f9c31f806f30b83090bac27b6ad6c638340`  
+**작업 구분:** P0-3.1 Dynamic Case State Integrity & E2E Verification (최종 보완 완료)  
+**기준 커밋:** `25366c186c53d6313c23fa78d1507f365f182b74`  
 **평가 하네스/Gold 기준:** Evaluation Harness v1.2 / Gold v1.2 동결 유지  
-**검증 스위트 결과:** 전체 75건 전수 통과 (E2E 통합 테스트 10건 PASS, 단위 및 회귀 테스트 65건 PASS)  
+**검증 스위트 결과:** 전체 130건 전수 통과 (16 E2E 통합 테스트 PASS, 103 단위·회귀 테스트 PASS, 11 평가 하네스 테스트 PASS)  
 
 ---
 
-## 1. 개요 및 개발 목적
+## 1. 개요 및 최종 보완 목적
 
-P0-3 단계에서는 다중 턴 상담 맥락 연속성 및 동적 사건 변경 탐지(`case_delta`)가 구현되었으나, SC-001 사건 중심의 하드코딩된 값(보증금 3억 원, 일부 변제 5천만 원, 잔액 2.5억 원, 대항요건 취득일 2022.03.10, 해지통지 도달일 2024.02.05, 특정 가압류 파일명 및 무조건적 1순위 판단 등)이 남아 있어 임의의 사건 데이터에 대한 범용적 처리와 데이터 무결성이 보장되지 않는 취약점이 존재하였다.
+P0-3 및 P0-3.1 1차 구현에서는 하드코딩된 SC-001 고정값을 대폭 제거하였으나, 다음과 같은 잔여 결함과 검증 공백이 식별되었다:
+1. `final_disposition.py` 내 `50_000_000`원 반환 기본값 및 금액 미추출 시 임의 수치 대입 결함.
+2. 계약서 원금 Fact가 아닌 비정형 Fact 중 단순 최댓값을 계약 보증금으로 오인 선택할 가능성.
+3. 파일명에 '이체', '반환' 등이 포함되었다는 이유만으로 미승인 증거를 확정 변제로 인정하는 결함 (`has_transfer_doc`).
+4. 동일한 변제 거래가 여러 Fact 및 증거에서 중복 추출될 경우 이중 차감될 위험.
+5. 등기부상 선순위 담보권 변동 조회를 거치지 않고 신규 가압류에 대해 단정적인 '1순위' 표현을 사용하는 법률적 결함.
+6. DB 수준의 모의 호출을 넘어선 실제 FastAPI HTTP 엔드포인트(`POST /api/v1/consultations`) E2E 검증 부재.
 
-이에 **P0-3.1**에서는 다음 세 가지 핵심 목표를 완수하였다:
-1. **제품 코드 내 모든 SC-001 하드코딩 값 완전 제거:** 보증금, 지급액, 잔액, 대항요건일, 해지통지일, 권리 선후관계 및 근거 파일명을 현재 사건의 검증된 Fact, Evidence, 적용 법령에서 100% 동적으로 인출·산정.
-2. **부분 변제 검증 및 충당 로직 고도화:** 민법 제479조(비용·이자·원본 충당) 법률 검증 반영, 임차인의 최초 보증금 지급 내역과 임대인의 보증금 반환 내역의 엄격한 분리, 의미적 충돌 방지(Role 분리: `PRINCIPAL_DEPOSIT` vs `RETURNED_AMOUNT`), `USER_ALLEGED` 구두 진술과 `DOCUMENT_VERIFIED` 서면 증거의 단계적 확정 분리.
-3. **10대 E2E 통합 검증 스위트 구축:** API 및 DB 수준에서 동시 요청, 서버 재시작 세션 복원, 사건 간 격리(Cross-case Isolation), 중복 요청 멱등성, 권리관계 선후 재검토 등 실환경 수준의 무결성 전수 검증.
-
----
-
-## 2. 하드코딩된 사건 데이터 완전 제거 내역
-
-[`backend/src/ai_legal_helper/workflows/final_disposition.py`](file:///c:/myprjs/ai-legal-helper/backend/src/ai_legal_helper/workflows/final_disposition.py)의 `detect_case_delta()` 및 답변 합성 로직에서 고정값을 전면 제거하고 동적 도출 함수로 교체하였다:
-
-| 항목 | 기존 고정값 (제거됨) | P0-3.1 동적 도출 방식 | 관련 구현 함수 |
-| :--- | :--- | :--- | :--- |
-| **계약 보증금** | `300,000,000원` | 현재 사건의 `Fact` 중 계약서/요건사실 기반 보증금 금액을 정규식 및 맥락 분석으로 인출 | `extract_case_contract_deposit()` |
-| **기 변제/반환액** | `50,000,000원` | `adjudication_status`가 `EVIDENCE_SUPPORTED` 또는 `CORROBORATED`인 확정 Fact 중 임대인의 일부 변제/반환 금액만 합산 | `extract_case_prior_verified_repayments()` |
-| **남은 잔액** | `250,000,000원` | 계약 보증금 원금 - 확정 기변제액 - 신규 승인/잠정 변제액으로 실시간 계산 (`balance = deposit - prior - new`) | `detect_case_delta()` |
-| **대항요건 취득일** | `2022.03.10` | 사건 브리핑 내 주민등록 전입신고일, 입주일, 확정일자 Fact 및 Timeline Event에서 동적 추출 | `extract_case_opposing_power_date()` |
-| **해지통고 도달일** | `2024.02.05` | 사건 브리핑 내 내용증명 도달/수령 Fact 및 타임라인에서 서면 증거 도달일 동적 추출 | `extract_case_notice_delivery_date()` |
-| **가압류 증거 파일명** | `E09_부동산등기사항전부증명서_을구.txt` | 사건에 실제 등록된 가압류/등기 관련 `EvidenceDocument.original_filename` 및 라벨 동적 연결 | `find_case_attachment_evidence_name()` |
-| **권리 선후관계 판단** | 무조건적인 1순위 판단 | 임차인 대항요건 취득일자와 신규 가압류 접수일자 비교 및 선순위 근저당권 존재 여부 검토 후 조건부 판단 | `extract_case_prior_encumbrances()` |
+이에 **P0-3.1 최종 보완 지시서**에 따라 위 결함들을 전면 수정하고, 실제 FastAPI 라우터 및 백그라운드 태스크를 통과하는 6대 E2E 엔드포인트 테스트 스위트를 완성하였다.
 
 ---
 
-## 3. 부분 변제 검증 고도화 및 8대 규칙 적용
+## 2. 잔여 결함 수정 및 법률적 정밀화 내역
 
-### 3.1 8대 처리 규칙 구현
+### 2.1 반환금 계산의 잔여 하드코딩 완전 제거 (Section 1)
+- **기본값 대입 배제:** `final_disposition.py`에서 `50_000_000` 등 일체의 하드코딩된 변제 기본값을 완전히 제거하였다.
+- **금액 추출 실패 처리:** 사용자의 구두 진술에서 금액이 특정되지 않거나 추출에 실패한 경우 임의 금액을 대입하지 않고, `"의뢰인의 보증금 일부 입금/변제 진술 접수 (구체적 금액 미상 / 확인 필요 / USER_ALLEGED)"` 상태로 안전하게 안내한다.
+- **계약 보증금 Fact 동적 식별:** `extract_case_contract_deposit()`에서 단순히 `max()`를 취하던 방식을 폐지하고, `DOCUMENT_VERIFIED`, `EVIDENCE_SUPPORTED`, `CORROBORATED`로 공인된 계약서 원금 Fact만을 대상으로 정규식 및 맥락 분석을 수행하여 결정하도록 강화하였다 (원금 확인 불가 시 0 반환).
+- **거래 단위 고유 식별 및 중복 합산 차단:** `extract_case_prior_verified_repayments()`에서 `tx_key = (tx_date, amt)` 기반의 거래 식별 세트를 도입하여, 동일한 일자와 금액의 변제 거래가 여러 문서나 Fact에 중복 등록되어도 정확히 1회만 반영되도록 멱등성을 보장하였다.
 
-1. **계약 보증금 조회:** 계약서 등 확정 증거(`Fact`)에서 계약상 임대차 보증금 원금을 동적으로 인출 (인출 실패 시 0원 및 추가 증거 확인 요청).
-2. **기존 승인된 일부 변제 내역 조회:** 사건에 이미 공적으로 입증된 기변제 내역이 있으면 이를 누적 합산.
-3. **사용자 신규 주장 인식:** "집주인이 2천만 원을 입금했어요" 등 임의 금액 질의 시 정규식(`extract_amounts_from_text`)으로 변제 주장액을 추출하고 `USER_ALLEGED` 상태로 임시 기록.
-4. **금융 증거 검토 (오인 차단):** 임차인의 최초 보증금(계약금/잔금) 지급 내역과 임대인의 보증금 일부 반환 내역을 의미적 역할(`DOWN_PAYMENT`, `BALANCE_PAYMENT` vs `RETURNED_AMOUNT`)로 엄격히 구분하여 오인 합산 차단.
-5. **잔액 계산 (잠정 vs 확정 구분):**
-   - 증거 미제출 구두 진술 시: `[잠정] 미반환 보증금 잔액 = 계약 보증금 - 기변제액 - 진술 변제액` 산정 후 계좌이체확인증 등 증거 제출 안내.
-   - 증거 검토 승인(`APPROVE`) 시: `Fact` 자동 승격 후 `[확정] 미반환 보증금 잔액`으로 승격하고 잔액에 대한 지급명령 신청 가이드 제공.
-6. **중복 요청 방지 (멱등성):** 동일한 변제 주장 또는 동일 이체증이 반복 제출되더라도 중복 합산되지 않도록 정규화된 해시 및 증거 식별자 기준으로 멱등성 유지.
-7. **출처 명시:** 확정된 일부 변제 사실 안내 시 `[E02_계좌이체확인증_2천만원.txt]`과 같이 전체 원본 파일명을 반드시 결합하여 표시.
-8. **지연손해금 및 법률관계 안내:** 민법 제479조(비용·이자·원본 충당 순서)에 따라, 임대차 종료 후 보증금 반환 지연손해금이 발생한 경우 지급된 금원은 비용 -> 지연이자 -> 보증금 원본 순으로 충당되어 잔여 원본 채무가 예상보다 클 수 있음을 법률상 유의사항으로 명시. 동시에 보증금 전액 반환 시까지 대항력과 우선변제권 및 열쇠 인도 거절 권리가 온전히 유지됨을 안내.
+### 2.2 미승인 증거를 통한 확정 판단 원천 차단 (Section 2)
+- **단순 파일명 키워드 매칭 오류 제거:** 브리핑 내 미승인 증거 문서(`briefing.evidences`)의 파일명에 '이체', '반환', '영수증' 등이 포함되어 있다는 이유로 변제 사실을 확정하던 `has_transfer_doc` 조건을 완전히 삭제하였다.
+- **검토 승인 필수화:** `EvidenceDocument` -> `EvidenceClaim` -> 관리자/사용자의 `process_evidence_review(APPROVE)`를 거쳐 `Fact`로 정식 승격된 건에 대해서만 `has_verified_payment_fact = True`로 인정한다.
+- **구두 진술은 잠정 처리:** 증거가 제출되지 않았거나 미승인 상태인 구두 주장은 반드시 `USER_ALLEGED` 및 `[잠정]` 상태로 관리하여 공인된 채무 감축으로 오인되지 않도록 방어한다.
 
-### 3.2 의미적 충돌 방지 (Semantic Role Separation)
-
-- [`conflict_detector.py`](file:///c:/myprjs/ai-legal-helper/backend/src/ai_legal_helper/case_intelligence/conflict_detector.py): `_AMOUNT_ROLE_PATTERNS`의 `RETURNED_AMOUNT` 정규식을 보강하여 `"보증금 중 20,000,000원을 일부 변제 입금하였다"`와 같은 문맥이 `PRINCIPAL_DEPOSIT`으로 오인되지 않도록 개선.
-- [`fact_semantics.py`](file:///c:/myprjs/ai-legal-helper/backend/src/ai_legal_helper/case_intelligence/fact_semantics.py): `PAYMENT` 이벤트의 하위 유형 분류 시 "변제", "일부 반환", "돌려준", "보증금 중" 구문이 포함된 경우 `event_subtype`을 `RETURN_AMOUNT`로 정확히 지정하여 계약 보증금(3억 원)과의 상충(`CONTRADICTION`)을 방지하고 `DIFFERENT_CONTEXT`로 정상 분리.
+### 2.3 권리순위 단정 제거 및 법률 판단 분리 (Section 3)
+- **단정적 1순위 표현 제거:** 목적물에 신규 가압류가 설정된 경우, 등기사항전부증명서 상의 다른 선순위 권리(근저당권, 조세채권 등)를 전수 확인하기 전까지 '1순위', '최우선 배당' 등의 절대적 표현을 배제하였다.
+- **판단 분리 안내:**
+  - `[판단할 수 있는 사실]`: 신규 가압류 채권자에 대해서는 임차인의 대항요건 및 확정일자가 앞서므로 상대적 우선순위 보존 및 대항력 유지.
+  - `[추가로 필요한 등기·법률정보]`: 등기부 을구 상의 다른 선순위 담보물권 및 조세채권 법정기일 등 우선채권 변동 여부를 추가 확인해야 최종 경매 배당 순위가 확정되며, 선순위 권리 확인 전까지 절대적 1순위나 전액 최우선 배당을 단정할 수 없음을 명시.
 
 ---
 
-## 4. 사건 Delta와 실제 DB Fact 상태 변경 분리
-
-- **`case_delta` (비교 분석 레이어):** 대화 맥락과 최신 사건 상태를 대조하여 이번 턴에서 변동된 사실(`changed_facts`), 영향받은 법률판단(`impacted_determinations`), 유지되는 권리(`preserved_determinations`), 신규 행동지침(`new_next_actions`)을 도출하는 순수 분석 객체로 유지.
-- **DB Fact 상태 변경 (엔티티 상태 변경 레이어):** 사용자의 증거 업로드 -> `EvidenceDocument` -> `EvidenceClaim` 생성 -> 사용자/관리자의 검토 승인(`EvidenceReview(action='APPROVE')`) 트랜잭션을 거쳐야만 실제 `Fact` 엔티티로 승격되며, 검토 승인 전에는 `Fact` 테이블을 임의로 변경하지 않음.
+## 3. 구조적 변경 및 데이터 흐름
 
 ```mermaid
 flowchart TD
-    UserQuery["사용자 구두 질의 (예: 2천만원 입금했어요)"] --> Delta["detect_case_delta()"]
-    Delta --> AnswerProvisional["[잠정] 잔액 안내 (USER_ALLEGED) & 이체증 제출 가이드"]
-    
-    DocUpload["이체확인증 증거 문서 업로드"] --> Claim["EvidenceClaim 생성 (PENDING_REVIEW)"]
-    Claim --> Review["EvidenceReview (APPROVE)"]
-    Review --> Fact["Fact 테이블 영구 등록 (DOCUMENT_VERIFIED)"]
-    Fact --> Briefing["build_case_evidence_briefing()"]
-    Briefing --> DeltaConfirmed["detect_case_delta() 재산정"]
-    DeltaConfirmed --> AnswerConfirmed["[확정] 잔액 2.8억 및 원본파일명 연결 안내"]
+    subgraph Client["API Client / Web UI"]
+        POST_REQ["POST /api/v1/consultations\n(question, case_id)"]
+        GET_REQ["GET /api/v1/consultations/{id}"]
+        GET_CONV["GET /cases/{case_id}/conversations/{conv_id}"]
+    end
+
+    subgraph FastAPI["FastAPI Router & Middleware"]
+        AUTH["인증 & 사건 소유권 검증 (get_current_user, get_case_for_user)"]
+        RECORD_INIT["ConsultationRecord DB 초기화 (IN_PROGRESS)"]
+        BG_TASK["BackgroundTasks: process_consultation"]
+    end
+
+    subgraph DynamicEngine["Dynamic Case Adjudication Engine"]
+        BRIEFING["build_case_evidence_briefing(db, case_id)"]
+        DELTA["detect_case_delta()\n- extract_case_contract_deposit()\n- extract_case_prior_verified_repayments()\n- tx_key 중복 방지 & calculation_basis 생성"]
+        GROUNDED["assemble_grounded_answer()\n- [잠정] vs [확정] 잔액 안내\n- 권리순위 단정 방지 안내"]
+    end
+
+    subgraph Persistence["PostgreSQL DB"]
+        CASE_REC["ConsultationRecord\n(case_delta, answer, status=SUCCESS)"]
+    end
+
+    POST_REQ --> AUTH
+    AUTH --> RECORD_INIT
+    RECORD_INIT --> BG_TASK
+    BG_TASK --> BRIEFING
+    BRIEFING --> DELTA
+    DELTA --> GROUNDED
+    GROUNDED --> CASE_REC
+    CASE_REC --> GET_REQ
+    CASE_REC --> GET_CONV
 ```
 
 ---
 
-## 5. 10대 E2E 검증 시나리오 결과 (E01 ~ E10)
+## 4. 실제 FastAPI E2E 검증 결과 (Section 4)
 
-통합 테스트 스위트 [`backend/tests/integration/test_dynamic_case_integrity_e2e_p0_3_1.py`](file:///c:/myprjs/ai-legal-helper/backend/tests/integration/test_dynamic_case_integrity_e2e_p0_3_1.py)를 구축하여 10개 핵심 시나리오를 전수 검증하였다:
+통합 테스트 [`backend/tests/integration/test_dynamic_case_integrity_e2e_p0_3_1.py`](file:///c:/myprjs/ai-legal-helper/backend/tests/integration/test_dynamic_case_integrity_e2e_p0_3_1.py) 내에 구축된 6대 FastAPI 엔드포인트 E2E 시나리오 실행 결과는 다음과 같다:
 
-| 시나리오 ID | 시나리오 명칭 | 검증 내용 및 기대 결과 | 실행 결과 |
-| :--- | :--- | :--- | :---: |
-| **E01** | 부분 변제 2천만 원 (미입증 구두 진술) | 3억 사건에서 2천만원 지급 구두 진술 시 `[잠정]` 잔액 2.8억 안내, 민법 제479조 안내, 증거 미제출 상태(`USER_ALLEGED`) 유지 | **PASS** |
-| **E02** | 입금 증거 등록 및 검토 승인 | 실제 2천만원 이체확인증 등록 후 `process_evidence_review(APPROVE)` 수행 -> `[확정]` 잔액 2.8억 산정 및 원본 파일명 연결 | **PASS** |
-| **E03** | 기존 입금 증거 오인 방지 | 임차인의 최초 보증금(계약금/잔금) 지급 이체확인증을 임대인의 보증금 반환으로 오인하여 잔액에서 차감하는 오류 원천 차단 | **PASS** |
-| **E04** | 누적 부분 변제 산정 | 2천만원(1차)과 3천만원(2차)이 서로 다른 날짜에 승인 시 누적 반환액 5천만원, 미반환 잔액 2.5억 원 정상 산출 | **PASS** |
-| **E05** | 중복 요청 방지 (멱등성) | 동일한 이체증의 중복 승인 시도 또는 동일 구두 진술 재요청 시 반환액이 2중으로 중복 차감되지 않고 멱등성 유지 | **PASS** |
-| **E06** | 신규 가압류 등록 전후 비교 | 미승인 상태에서는 권리관계 불변 유지, 승인 후 임차인 전입일(2022.03.01)과 가압류일(2024.04.15) 비교하여 선순위 지위 보존 판정 | **PASS** |
-| **E07** | 해지 통지일 구두 정정 시 증거 우선 | 구두 정정 진술("3월 20일 통지했어요")이 있어도 확정된 공적 서면 증거 도달일(2024.02.05) 기준 효력 보존 및 증거 우선 원칙 확인 | **PASS** |
-| **E08** | 서버 재시작 및 세션 복원 | DB에 저장된 다중 턴 상담 이력 및 동적 Delta가 세션 재로드 후에도 데이터 누락 없이 무손실 복원 | **PASS** |
-| **E09** | 동시 요청 무결성 (Concurrency) | 동일 사건에 대해 4개 스레드가 병렬로 상담 턴을 기록할 때 턴 번호(1~4)가 고유하게 유지되고 스레드 간 세션 충돌 방지 | **PASS** |
-| **E10** | 사건 간 데이터 격리 (Isolation) | 사건 A의 부분 변제 증거가 사건 B(보증금 1억)의 브리핑에 일체 누출되지 않고, 타 사건 세션 무단 접근 시 `PermissionError` 차단 | **PASS** |
+### 시나리오 1: 2천만 원 반환 주장 잠정 상태
+- **엔드포인트:** `POST /api/v1/consultations` -> `GET /api/v1/consultations/{request_id}`
+- **질의:** `"임대인이 20,000,000원을 일부 변제 입금했다고 주장하는데 남은 보증금은 얼마인가요?"`
+- **검증 결과 (PASS):**
+  - `case_delta["calculation_basis"]["status"] == "PROVISIONAL"`
+  - `case_delta["calculation_basis"]["alleged_partial_repayment_krw"] == 20_000_000`
+  - `case_delta["calculation_basis"]["unrepaid_balance_krw"] == 280_000_000`
+  - 답변 텍스트 내 `280,000,000원` 잔액 안내 및 `[잠정]`, `USER_ALLEGED`, `확인 필요` 경고 정상 출력.
+
+### 시나리오 2: 증거 승인 후 확정 상태
+- **절차:** `EvidenceDocument` 및 `EvidenceClaim` 등록 -> `process_evidence_review(APPROVE)` -> `POST /api/v1/consultations`
+- **질의:** `"이체확인증이 승인되었는데 현재 확정된 남은 보증금 잔액은 얼마인가요?"`
+- **검증 결과 (PASS):**
+  - `case_delta["calculation_basis"]["status"] == "CONFIRMED"`
+  - `case_delta["calculation_basis"]["verified_partial_repayment_krw"] == 20_000_000`
+  - `case_delta["calculation_basis"]["unrepaid_balance_krw"] == 280_000_000`
+  - 답변 텍스트 내 원본 증거 파일명(`임대인_보증금일부반환_이체확인증.pdf`) 인용 및 확정 채무 감축 안내 정상 출력.
+
+### 시나리오 3: 중복 승인 시 중복 차감 방지 (멱등성)
+- **절차:** 동일 거래(2024.02.10, 20,000,000원)에 대한 2차 중복 입금증 등록 및 승인 -> `POST /api/v1/consultations`
+- **검증 결과 (PASS):**
+  - `tx_key = ("2024-02-10", 20_000_000)` 거래 중복 식별 동작.
+  - `verified_partial_repayment_krw`는 여전히 `20_000_000원` 유지 (4천만 원으로 이중 합산 방지).
+  - `unrepaid_balance_krw`는 `260,000,000원`이 아닌 `280,000,000원`으로 정상 보존.
+
+### 시나리오 4: 동일 대화 세션 동시 POST 턴 충돌 방지 (Concurrency)
+- **절차:** 동일 `case_id` 및 `conversation_id`로 4개 스레드 동시 `POST /api/v1/consultations` 호출.
+- **검증 결과 (PASS):**
+  - 4개 요청 모두 HTTP 200 성공 및 고유 `request_id` 발급 (중복 발급 0건).
+  - DB `ConsultationRecord`에 4개 턴이 교착(Deadlock)이나 `InvalidRequestError` 없이 온전히 저장됨.
+
+### 시나리오 5: 세션 재로드 후 최신 잔액 무손실 유지
+- **절차:** 확정 2.8억 상담 완료 후 메모리 캐시 완전 초기화(`_consultations.clear()`) -> `GET /api/v1/consultations/{req_id}` 및 `GET /api/v1/cases/{case_id}/conversations/{conv_id}` 호출.
+- **검증 결과 (PASS):**
+  - DB 역직렬화를 통해 `case_delta["calculation_basis"]["status"] == "CONFIRMED"` 및 `280,000,000원` 잔액 완벽 복구.
+  - 대화 세션의 모든 턴 상세 이력에서도 최신 턴의 `case_delta`와 잔액이 무손실 유지됨 확인.
+
+### 시나리오 6: 타 사건 증거 및 상담 접근 원천 차단 (Cross-Case Isolation)
+- **절차:** 사용자 A가 생성한 사건 및 상담에 대해 사용자 B의 계정으로 접근 시도.
+- **검증 결과 (PASS):**
+  - 사용자 B의 `POST /api/v1/consultations` (사건 A ID) -> **HTTP 403 Forbidden** 차단.
+  - 사용자 B의 `GET /api/v1/consultations/{user_a_req_id}` -> **HTTP 403 Forbidden** 차단.
+  - 사용자 B의 `GET /cases/{case_a_id}/conversations/{conv_id}` -> **HTTP 403 Forbidden** 차단.
 
 ---
 
-## 6. 테스트 수행 결과 종합
+## 5. 전체 테스트 스위트 전수 실행 결과
 
-### 6.1 단위 테스트 vs 통합 테스트 구분
-
-- **E2E 통합 테스트 (10건):** `backend/tests/integration/test_dynamic_case_integrity_e2e_p0_3_1.py`
-  - 실제 PostgreSQL DB 세션 및 트랜잭션, `EvidenceDocument` -> `EvidenceClaim` -> `EvidenceReview` 승격 파이프라인, 동시성 스레드 풀, 세션 복원 전 과정 검증.
-  - 결과: **10 passed in 3.80s**
-- **단위 및 회귀 테스트 (65건):**
-  - `test_multi_turn_dynamic_case_p0_3.py`: 12 passed
-  - `test_grounding_integrity_p0_2_1.py`: 10 passed
-  - `test_p0_final_disposition_defects.py`: 11 passed
-  - `test_issue_verification.py`: 25 passed
-  - `test_legal_source_grounding_pipeline.py`: 7 passed
-  - 결과: **65 passed in 11.72s**
-- **합계:** **75 passed (100% 무결점 통과)**
-
-### 6.2 평가 하네스 및 Gold 동결 준수 검증
-
-- `evaluation_harness/` 및 `sc001_gold.py`에 대한 변경 일체 없음 (`git status` 상 무변경).
-- 기존 Evaluation Harness v1.2 / Gold v1.2 기준선은 안전하게 동결 보존됨.
+| 테스트 구분 | 대상 파일 / 디렉터리 | 테스트 수 | 결과 | 소요 시간 |
+| :--- | :--- | :---: | :---: | :---: |
+| **E2E 통합 테스트** | `backend/tests/integration/test_dynamic_case_integrity_e2e_p0_3_1.py` | 16건 | **16 PASS** | 9.82s |
+| **단위 및 회귀 테스트** | `backend/tests/unit/test_multi_turn_dynamic_case_p0_3.py`<br>`backend/tests/unit/test_grounding_integrity_p0_2_1.py`<br>`backend/tests/unit/test_p0_final_disposition_defects.py`<br>`backend/tests/unit/test_issue_verification.py`<br>`backend/tests/unit/test_conflict_detector.py`<br>`backend/tests/unit/test_conflict_detector_v1_2.py`<br>`backend/tests/unit/test_conversation_context.py` | 103건 | **103 PASS** | 18.49s |
+| **평가 하네스 무결성** | `backend/tests/unit/eval_harness/` | 11건 | **11 PASS** | 0.63s |
+| **총계** | **전체 테스트 스위트** | **130건** | **130 PASS (100%)** | **28.94s** |
 
 ---
 
-## 7. 결론 및 향후 계획
+## 6. 결론 및 지침 준수
 
-P0-3.1 작업을 통해 AI Legal Helper의 동적 사건 처리 구조에서 고정된 하드코딩 데이터를 완전히 일소하고, 어떠한 사건 입력과 증거 변경에도 일관된 무결성을 유지할 수 있는 기반을 확립하였다.
-
-- **Git Commit:** `feat(p0-3.1): eliminate hardcoded delta data and add dynamic case integrity e2e suite`
-- **사용자 지침 준수:** 별도 지시 없이 다음 세부 단계(P0-4 등)로 자동 진행하지 않으며, 사용자 승인을 대기한다.
+1. **하드코딩 완전 박멸:** `50_000_000`, `300_000_000`, `250_000_000`, `2022.03.10`, `2024.02.05` 등 SC-001 고정값과 임의 기본값이 제품 코드에서 완전히 일소되었습니다.
+2. **동결 준수:** Evaluation Harness v1.2 및 Gold v1.2는 일체 수정 없이 엄격히 동결 보존되었습니다.
+3. **코드 주석 표준 준수:** [`CODING_COMMENT_STANDARD.md`](file:///c:/myprjs/ai-legal-helper/docs/development/CODING_COMMENT_STANDARD.md)에 따라 모듈, 함수, 조건 분기 주석이 한국어로 충실히 작성되었습니다.
+4. **추가 단계 진행 통제:** 지침에 따라 P0-4 등 다음 세부 기능 개발은 수행하지 않고 대기합니다.

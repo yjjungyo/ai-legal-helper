@@ -566,6 +566,7 @@ async def get_consultation(
         missing_evidence=ver_res.get("missing_evidence", []),
         evidence_citations=ver_res.get("evidence_citations", []),
         claim_citations=ver_res.get("claim_citations", []),
+        case_delta=ver_res.get("case_delta"),
         progress=prog,
     )
 
@@ -1075,6 +1076,7 @@ async def get_case_conversation_detail(
                 missing_evidence=(rec.verification_result or {}).get("missing_evidence", []),
                 evidence_citations=(rec.verification_result or {}).get("evidence_citations", []),
                 claim_citations=(rec.verification_result or {}).get("claim_citations", []),
+                case_delta=(rec.verification_result or {}).get("case_delta"),
                 selected_agents=rec.selected_agents or [],
                 question=rec.question,
                 case_id=rec.case_id,
