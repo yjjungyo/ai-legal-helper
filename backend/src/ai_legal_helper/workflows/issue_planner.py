@@ -269,7 +269,14 @@ def plan_legal_issues(
         )
 
     # 6. 쟁점: 필요한 추가 증거 및 실무적 다음 행동
-    if is_comprehensive or any(k in q_compact for k in ("추가증거", "다음행동", "미확인", "보완", "행동", "절차", "조치", "대처", "어떻게", "단계별")):
+    is_lease_context = (
+        any(k in q_compact for k in ("보증금", "전세", "임대차", "임차", "집주인", "세입자", "퇴거", "이사"))
+        or "임대차" in (briefing.case_type or "")
+        or "임대차" in (briefing.title or "")
+        or "보증금" in (briefing.title or "")
+        or any(lbl.startswith("E") for lbl in briefing.source_registry)
+    )
+    if is_lease_context and (is_comprehensive or any(k in q_compact for k in ("추가증거", "다음행동", "미확인", "보완", "행동", "조치", "대처", "단계별"))):
         missing_props = [g.target_proposition for g in briefing.evidence_gaps]
         issues.append(
             LegalIssueTask(

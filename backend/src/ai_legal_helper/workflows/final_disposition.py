@@ -262,7 +262,7 @@ def assemble_grounded_answer(
     sections.append("\n[2. 현재 판단 가능한 법률 쟁점]")
     if verified_issues:
         for idx, r in enumerate(verified_issues, 1):
-            sections.append(f"\n{idx}. {r.issue_title} (검증 완료)")
+            sections.append(f"\n{idx}. '{r.issue_title}' (검증 완료)")
             for rec in r.safe_recommendations:
                 sections.append(f"  * 법률 판단: {rec}")
             if r.supported_source_ids:
@@ -288,7 +288,7 @@ def assemble_grounded_answer(
                 "NEEDS_LEGAL_SOURCE": "법령 근거 보강 필요",
                 "BLOCKED": "판단 유보",
             }.get(r.status, "조건부 검토")
-            sections.append(f"\n{idx}. {r.issue_title} ({status_kr})")
+            sections.append(f"\n{idx}. '{r.issue_title}' ({status_kr})")
             for rec in r.safe_recommendations:
                 sections.append(f"  * 조건부 판단: {rec}")
             if r.unresolved_facts:
@@ -307,8 +307,8 @@ def assemble_grounded_answer(
     else:
         sections.append("- 현재 핵심 쟁점들에 관한 조건부 유보 사항 없이 검증된 법률 효력을 기준으로 확정 안내합니다.")
 
-    # [4. 지금 할 수 있는 안전한 행동] (구체적이고 안전한 다음 행동 5단계)
-    sections.append("\n[4. 지금 할 수 있는 안전한 행동]")
+    # [4. 지금 할 수 있는 안전한 행동 가이드] (구체적이고 안전한 다음 행동 5단계)
+    sections.append("\n[4. 지금 할 수 있는 안전한 행동 가이드]")
     action_items = [
         "보증금 전액을 반환받거나 관할 법원의 임차권등기명령에 따른 등기가 등기부에 기재되기 전까지는 절대 주택의 점유를 상실(열쇠 인도, 비밀번호 공유, 임의 퇴거)하거나 전입을 옮기지 마십시오. (대항력 및 우선변제권 유지 필수)",
         "임대인에게 보증금 반환 최고 및 지연손해금(민법 연 5%, 소촉법 연 12%) 청구 내용증명을 발송하여 임대인의 이행지체 책임을 명확히 하십시오.",
@@ -417,7 +417,7 @@ def build_claim_citations(
     [P0-2 Grounding 요구사항]
     1. [1. 현재 확인된 핵심 사실] 섹션의 각 사실 명제를 실제 EvidenceDocument, EvidenceClaim, EvidenceSpan에 매핑한다.
     2. [2. 현재 판단 가능한 법률 쟁점] 및 [3. 조건부 판단]의 각 판단을 관련 법령(Statute) 및 사건 증거에 매핑한다.
-    3. [4. 지금 할 수 있는 안전한 행동]의 각 단계별 행동 요건을 관련 증거 및 실정법 조문에 매핑한다.
+    3. [4. 지금 할 수 있는 안전한 행동 가이드]의 각 단계별 행동 요건을 관련 증거 및 실정법 조문에 매핑한다.
     4. 프론트엔드 슬라이드오버 드로어 및 LLM Judge가 인용 태그([E01], [E03] 등)를 통해 즉시 원문 발췌(text_excerpt)를
        인덱스 추정 없이 정확하게 조회할 수 있도록 지원한다.
 
@@ -432,174 +432,187 @@ def build_claim_citations(
     if not briefing or not briefing.case_id:
         return []
 
-    # 1. 대상 사건의 모든 EvidenceClaim 및 연결된 EvidenceSpan 사전 로드
-    db = SessionLocal()
-    doc_claims_map: Dict[str, List[EvidenceClaim]] = {}
     try:
-        claims = (
-            db.query(EvidenceClaim)
-            .filter(EvidenceClaim.case_id == briefing.case_id)
-            .all()
-        )
-        for c in claims:
-            doc_claims_map.setdefault(c.evidence_id, []).append(c)
-    except Exception as e:
-        logger.warning(f"[BUILD_CLAIM_CITATIONS] EvidenceClaim 조회 실패: {e}")
-    finally:
-        db.close()
+        # 1. 대상 사건의 모든 EvidenceClaim 및 연결된 EvidenceSpan 사전 로드 (세션 활성 중 순수 딕셔너리로 추출)
+        doc_claims_map: Dict[str, List[Dict[str, Any]]] = {}
+        with SessionLocal() as db:
+            from sqlalchemy.orm import selectinload
+            claims = (
+                db.query(EvidenceClaim)
+                .options(selectinload(EvidenceClaim.spans))
+                .filter(EvidenceClaim.case_id == briefing.case_id)
+                .all()
+            )
+            for c in claims:
+                spans_data = []
+                for s in (c.spans or []):
+                    spans_data.append({
+                        "id": s.id,
+                        "text_excerpt": s.text_excerpt,
+                        "page_number": s.page_number,
+                    })
+                doc_claims_map.setdefault(c.evidence_id, []).append({
+                    "id": c.id,
+                    "statement": c.statement or "",
+                    "spans": spans_data,
+                })
 
-    def _find_best_claim_and_span(ev_id: str, target_stmt: str = "") -> Tuple[Optional[EvidenceClaim], Optional[EvidenceSpan]]:
-        """증거 문서 ID와 대상 진술문 키워드를 바탕으로 가장 연관성이 높은 Claim 및 Span을 탐색한다."""
-        c_list = doc_claims_map.get(ev_id, [])
-        if not c_list:
-            return None, None
-        if target_stmt:
-            words = set(re.findall(r"[가-힣0-9]{2,}", target_stmt))
-            best_c = None
-            best_overlap = -1
+        def _find_best_claim_and_span(ev_id: str, target_stmt: str = "") -> Tuple[Optional[str], Optional[str], Optional[str]]:
+            """증거 문서 ID와 대상 진술문 키워드를 바탕으로 가장 연관성이 높은 Claim ID, Span ID, text_excerpt를 탐색한다."""
+            c_list = doc_claims_map.get(ev_id, [])
+            if not c_list:
+                return None, None, None
+            if target_stmt:
+                words = set(re.findall(r"[가-힣0-9]{2,}", target_stmt))
+                best_c = None
+                best_overlap = -1
+                for c in c_list:
+                    c_words = set(re.findall(r"[가-힣0-9]{2,}", c["statement"]))
+                    overlap = len(words.intersection(c_words))
+                    if overlap > best_overlap:
+                        best_overlap = overlap
+                        best_c = c
+                if best_c and best_overlap > 0:
+                    primary_span = best_c["spans"][0] if best_c["spans"] else None
+                    return best_c["id"], (primary_span["id"] if primary_span else None), (primary_span["text_excerpt"] if primary_span else None)
             for c in c_list:
-                c_words = set(re.findall(r"[가-힣0-9]{2,}", c.statement or ""))
-                overlap = len(words.intersection(c_words))
-                if overlap > best_overlap:
-                    best_overlap = overlap
-                    best_c = c
-            if best_c and best_overlap > 0:
-                primary_span = best_c.spans[0] if best_c.spans else None
-                return best_c, primary_span
-        for c in c_list:
-            if c.spans:
-                return c, c.spans[0]
-        return c_list[0], None
+                if c["spans"]:
+                    s0 = c["spans"][0]
+                    return c["id"], s0["id"], s0["text_excerpt"]
+            return c_list[0]["id"], None, None
 
-    citations: List[ClaimCitation] = []
+        citations: List[ClaimCitation] = []
 
-    # 2. [1. 현재 확인된 핵심 사실] 섹션 사실관계 접지
-    selected_facts = select_grounded_facts_for_display(briefing, query=final_answer, max_facts=16)
-    for f in selected_facts:
-        lbl = f.evidence_label or ""
-        reg = briefing.source_registry.get(lbl) or {}
-        doc_id = f.source_evidence_id or reg.get("evidence_id")
-        doc_name = f.document_name or reg.get("document_name")
-        ev_refs = []
-        if doc_id:
-            c, s = _find_best_claim_and_span(doc_id, f.statement)
-            ev_refs.append(ClaimReference(
-                evidence_id=doc_id,
-                evidence_label=lbl or None,
-                claim_id=c.id if c else None,
-                span_id=s.id if s else None,
-                text_excerpt=s.text_excerpt if s else None,
-                document_name=doc_name,
-            ))
-        citations.append(ClaimCitation(
-            citation_tag=f"[{lbl}]" if lbl else "[증거]",
-            claim_text=f.statement,
-            grounding_status="SUPPORTED",
-            evidence_refs=ev_refs,
-            legal_refs=[],
-            explanation="사건 등록 증거 원문 및 발췌 확인 완료",
-        ))
-
-    # 3. [2. 현재 판단 가능한 법률 쟁점] 및 [3. 조건부 판단] 접지
-    for r in (issue_results or []):
-        ev_refs = []
-        for src_lbl in (r.supported_source_ids or []):
-            reg = briefing.source_registry.get(src_lbl) or {}
-            doc_id = reg.get("evidence_id")
-            doc_name = reg.get("document_name")
+        # 2. [1. 현재 확인된 핵심 사실] 섹션 사실관계 접지
+        selected_facts = select_grounded_facts_for_display(briefing, query=final_answer, max_facts=16)
+        for f in selected_facts:
+            lbl = f.evidence_label or ""
+            reg = briefing.source_registry.get(lbl) or {}
+            doc_id = f.source_evidence_id or reg.get("evidence_id")
+            doc_name = f.document_name or reg.get("document_name")
+            ev_refs = []
             if doc_id:
-                c, s = _find_best_claim_and_span(doc_id, r.issue_title)
+                c_id, s_id, excerpt = _find_best_claim_and_span(doc_id, f.statement)
                 ev_refs.append(ClaimReference(
                     evidence_id=doc_id,
-                    evidence_label=src_lbl,
-                    claim_id=c.id if c else None,
-                    span_id=s.id if s else None,
-                    text_excerpt=s.text_excerpt if s else None,
+                    evidence_label=lbl or None,
+                    claim_id=c_id,
+                    span_id=s_id,
+                    text_excerpt=excerpt,
                     document_name=doc_name,
                 ))
-        leg_refs = []
-        for stat in (r.supported_statute_ids or []):
-            leg_refs.append({
+            citations.append(ClaimCitation(
+                citation_tag=f"[{lbl}]" if lbl else "[증거]",
+                claim_text=f.statement,
+                grounding_status="SUPPORTED",
+                evidence_refs=ev_refs,
+                legal_refs=[],
+                explanation="사건 등록 증거 원문 및 발췌 확인 완료",
+            ))
+
+        # 3. [2. 현재 판단 가능한 법률 쟁점] 및 [3. 조건부 판단] 접지
+        for r in (issue_results or []):
+            ev_refs = []
+            for src_lbl in (r.supported_source_ids or []):
+                reg = briefing.source_registry.get(src_lbl) or {}
+                doc_id = reg.get("evidence_id")
+                doc_name = reg.get("document_name")
+                if doc_id:
+                    c_id, s_id, excerpt = _find_best_claim_and_span(doc_id, r.issue_title)
+                    ev_refs.append(ClaimReference(
+                        evidence_id=doc_id,
+                        evidence_label=src_lbl,
+                        claim_id=c_id,
+                        span_id=s_id,
+                        text_excerpt=excerpt,
+                        document_name=doc_name,
+                    ))
+            leg_refs = []
+            for stat in (r.supported_statute_ids or []):
+                leg_refs.append({
+                    "statute_id": stat,
+                    "statute_name": stat.split("제")[0].strip() if "제" in stat else stat,
+                    "article": "제" + stat.split("제")[1].strip() if "제" in stat else None,
+                    "grounding_status": "SUPPORTED",
+                })
+            tag = ", ".join([f"[{s}]" for s in sorted(set(r.supported_source_ids))]) if r.supported_source_ids else "[법률근거]"
+            gr_status = "SUPPORTED" if r.status == "VERIFIED" else "CONDITIONALLY_SUPPORTED"
+            for rec in r.safe_recommendations:
+                citations.append(ClaimCitation(
+                    citation_tag=tag,
+                    claim_text=rec,
+                    grounding_status=gr_status,
+                    evidence_refs=ev_refs,
+                    legal_refs=leg_refs,
+                    explanation=f"{r.issue_title} ({r.status})",
+                ))
+
+        # 4. [4. 지금 할 수 있는 안전한 행동 가이드] 5대 조치사항 접지
+        action_item_configs = [
+            {
+                "tag": "[E01], [E03], [E16]",
+                "text": "보증금 전액을 반환받거나 관할 법원의 임차권등기명령에 따른 등기가 등기부에 기재되기 전까지는 절대 주택의 점유를 상실(열쇠 인도, 비밀번호 공유, 임의 퇴거)하거나 전입을 옮기지 마십시오. (대항력 및 우선변제권 유지 필수)",
+                "evidence_labels": ["E01", "E03", "E16"],
+                "statute": "주택임대차보호법 제3조 제1항",
+            },
+            {
+                "tag": "[E05], [E15]",
+                "text": "임대인에게 보증금 반환 최고 및 지연손해금(민법 연 5%, 소촉법 연 12%) 청구 내용증명을 발송하여 임대인의 이행지체 책임을 명확히 하십시오.",
+                "evidence_labels": ["E05", "E15"],
+                "statute": "민법 제544조, 소송촉진 등에 관한 특례법 제3조",
+            },
+            {
+                "tag": "[E01], [E03]",
+                "text": "계약 종료 즉시 관할 법원에 임차권등기명령을 신청하여 향후 부득이하게 이사할 때에도 기존 대항력과 우선변제권이 온전히 유지·보전되도록 조치하십시오.",
+                "evidence_labels": ["E01", "E03"],
+                "statute": "주택임대차보호법 제3조의3",
+            },
+            {
+                "tag": "[E09], [E10], [E11]",
+                "text": "대법원 인터넷등기소를 통해 목적물 부동산의 최신 말소사항 포함 등기사항전부증명서를 발급받아 가압류 외 다른 선순위 권리 변동 여부를 최종 대조하십시오.",
+                "evidence_labels": ["E09", "E10", "E11"],
+                "statute": "부동산등기법",
+            },
+            {
+                "tag": "[E01], [E09], [E10]",
+                "text": "목적물에 관한 경매 절차가 개시될 경우, 선순위 대항력을 바탕으로 보증금 전액을 낙찰자에게 인수시킬지 또는 배당요구종기 내에 권리신고 및 배당요구 신청서를 관할 경매법원에 접수하여 우선배당받을지 신중히 선택하여 진행하십시오.",
+                "evidence_labels": ["E01", "E09", "E10"],
+                "statute": "주택임대차보호법 제3조의2 제2항, 민사집행법 제84조",
+            },
+        ]
+        for act in action_item_configs:
+            ev_refs = []
+            for src_lbl in act["evidence_labels"]:
+                reg = briefing.source_registry.get(src_lbl) or {}
+                doc_id = reg.get("evidence_id")
+                doc_name = reg.get("document_name")
+                if doc_id:
+                    c_id, s_id, excerpt = _find_best_claim_and_span(doc_id, act["text"])
+                    ev_refs.append(ClaimReference(
+                        evidence_id=doc_id,
+                        evidence_label=src_lbl,
+                        claim_id=c_id,
+                        span_id=s_id,
+                        text_excerpt=excerpt,
+                        document_name=doc_name,
+                    ))
+            stat = act["statute"]
+            leg_refs = [{
                 "statute_id": stat,
                 "statute_name": stat.split("제")[0].strip() if "제" in stat else stat,
                 "article": "제" + stat.split("제")[1].strip() if "제" in stat else None,
                 "grounding_status": "SUPPORTED",
-            })
-        tag = ", ".join([f"[{s}]" for s in sorted(set(r.supported_source_ids))]) if r.supported_source_ids else "[법률근거]"
-        gr_status = "SUPPORTED" if r.status == "VERIFIED" else "CONDITIONALLY_SUPPORTED"
-        for rec in r.safe_recommendations:
+            }]
             citations.append(ClaimCitation(
-                citation_tag=tag,
-                claim_text=rec,
-                grounding_status=gr_status,
+                citation_tag=act["tag"],
+                claim_text=act["text"],
+                grounding_status="SUPPORTED",
                 evidence_refs=ev_refs,
                 legal_refs=leg_refs,
-                explanation=f"{r.issue_title} ({r.status})",
+                explanation="권리보전을 위한 법정 단계별 행동 지침",
             ))
 
-    # 4. [4. 지금 할 수 있는 안전한 행동] 5대 조치사항 접지
-    action_item_configs = [
-        {
-            "tag": "[E01], [E03], [E16]",
-            "text": "보증금 전액을 반환받거나 관할 법원의 임차권등기명령에 따른 등기가 등기부에 기재되기 전까지는 절대 주택의 점유를 상실(열쇠 인도, 비밀번호 공유, 임의 퇴거)하거나 전입을 옮기지 마십시오. (대항력 및 우선변제권 유지 필수)",
-            "evidence_labels": ["E01", "E03", "E16"],
-            "statute": "주택임대차보호법 제3조 제1항",
-        },
-        {
-            "tag": "[E05], [E15]",
-            "text": "임대인에게 보증금 반환 최고 및 지연손해금(민법 연 5%, 소촉법 연 12%) 청구 내용증명을 발송하여 임대인의 이행지체 책임을 명확히 하십시오.",
-            "evidence_labels": ["E05", "E15"],
-            "statute": "민법 제544조, 소송촉진 등에 관한 특례법 제3조",
-        },
-        {
-            "tag": "[E01], [E03]",
-            "text": "계약 종료 즉시 관할 법원에 임차권등기명령을 신청하여 향후 부득이하게 이사할 때에도 기존 대항력과 우선변제권이 온전히 유지·보전되도록 조치하십시오.",
-            "evidence_labels": ["E01", "E03"],
-            "statute": "주택임대차보호법 제3조의3",
-        },
-        {
-            "tag": "[E09], [E10], [E11]",
-            "text": "대법원 인터넷등기소를 통해 목적물 부동산의 최신 말소사항 포함 등기사항전부증명서를 발급받아 가압류 외 다른 선순위 권리 변동 여부를 최종 대조하십시오.",
-            "evidence_labels": ["E09", "E10", "E11"],
-            "statute": "부동산등기법",
-        },
-        {
-            "tag": "[E01], [E09], [E10]",
-            "text": "목적물에 관한 경매 절차가 개시될 경우, 선순위 대항력을 바탕으로 보증금 전액을 낙찰자에게 인수시킬지 또는 배당요구종기 내에 권리신고 및 배당요구 신청서를 관할 경매법원에 접수하여 우선배당받을지 신중히 선택하여 진행하십시오.",
-            "evidence_labels": ["E01", "E09", "E10"],
-            "statute": "주택임대차보호법 제3조의2 제2항, 민사집행법 제84조",
-        },
-    ]
-    for act in action_item_configs:
-        ev_refs = []
-        for src_lbl in act["evidence_labels"]:
-            reg = briefing.source_registry.get(src_lbl) or {}
-            doc_id = reg.get("evidence_id")
-            doc_name = reg.get("document_name")
-            if doc_id:
-                c, s = _find_best_claim_and_span(doc_id, act["text"])
-                ev_refs.append(ClaimReference(
-                    evidence_id=doc_id,
-                    evidence_label=src_lbl,
-                    claim_id=c.id if c else None,
-                    span_id=s.id if s else None,
-                    text_excerpt=s.text_excerpt if s else None,
-                    document_name=doc_name,
-                ))
-        stat = act["statute"]
-        leg_refs = [{
-            "statute_id": stat,
-            "statute_name": stat.split("제")[0].strip() if "제" in stat else stat,
-            "article": "제" + stat.split("제")[1].strip() if "제" in stat else None,
-            "grounding_status": "SUPPORTED",
-        }]
-        citations.append(ClaimCitation(
-            citation_tag=act["tag"],
-            claim_text=act["text"],
-            grounding_status="SUPPORTED",
-            evidence_refs=ev_refs,
-            legal_refs=leg_refs,
-            explanation="권리보전을 위한 법정 단계별 행동 지침",
-        ))
-
-    return [c.model_dump() for c in citations]
+        return [c.model_dump() for c in citations]
+    except Exception as e:
+        logger.warning(f"[BUILD_CLAIM_CITATIONS] 예외 발생: {e}", exc_info=True)
+        return []
