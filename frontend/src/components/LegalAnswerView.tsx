@@ -6,14 +6,22 @@
  */
 
 import React, { useState } from 'react';
+import type { ClaimCitation } from '../types/consultation';
+
+export interface CitationMeta {
+  evidenceId?: string;
+  claimId?: string;
+  spanId?: string;
+}
 
 export interface LegalAnswerViewProps {
   /** 렌더링할 법률 답변 텍스트 */
   content: string;
   /** 증거 번호 [E01] 클릭 시 호출되는 콜백 */
-  onEvidenceClick?: (label: string) => void;
+  onEvidenceClick?: (label: string, meta?: CitationMeta) => void;
+  /** 문장별 원자적 접지 인용 목록 (P0-2) */
+  claimCitations?: ClaimCitation[];
 }
-
 /**
  * 8대 권장 구성요소 분류 정보
  */
@@ -79,7 +87,11 @@ function classifySectionTitle(title: string): SectionCategoryConfig {
  * @param text 한 줄의 텍스트
  * @returns React 노드 배열
  */
-export function renderInlineMarkdown(text: string, onEvidenceClick?: (label: string) => void): React.ReactNode[] {
+export function renderInlineMarkdown(
+  text: string,
+  onEvidenceClick?: (label: string, meta?: CitationMeta) => void,
+  claimCitations?: ClaimCitation[]
+): React.ReactNode[] {
   if (!text) return [];
 
   // 토큰 분할 정규식: **볼드**, `인라인코드`, *이탤릭*
@@ -93,13 +105,29 @@ export function renderInlineMarkdown(text: string, onEvidenceClick?: (label: str
     const evMatch = (part.match(/^\[E\d{1,3}/i) || part.match(/\.(pdf|docx|txt|png|jpg|jpeg)\]$/i)) ? part.match(/^\[(.*)\]$/) : null;
     if (evMatch) {
       const label = evMatch[1];
+      let meta: CitationMeta | undefined;
+      if (claimCitations && claimCitations.length > 0) {
+        const cleanUpper = label.replace(/[\[\]]/g, '').trim().toUpperCase();
+        const match = claimCitations.find((c) =>
+          c.citation_tag.toUpperCase().includes(cleanUpper) ||
+          c.evidence_refs.some((r) => (r.evidence_label || '').toUpperCase() === cleanUpper || (r.document_name || '').toUpperCase().includes(cleanUpper))
+        );
+        if (match && match.evidence_refs.length > 0) {
+          const ref = match.evidence_refs.find((r) => (r.evidence_label || '').toUpperCase() === cleanUpper || (r.document_name || '').toUpperCase().includes(cleanUpper)) || match.evidence_refs[0];
+          meta = {
+            evidenceId: ref.evidence_id,
+            claimId: ref.claim_id || undefined,
+            spanId: ref.span_id || undefined,
+          };
+        }
+      }
       return (
         <button
           key={index}
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            onEvidenceClick?.(label);
+            onEvidenceClick?.(label, meta);
           }}
           className="chat-evidence-tag"
           title={`증거 [${label}] 원문 및 발췌 확인`}
@@ -157,7 +185,7 @@ export function renderInlineMarkdown(text: string, onEvidenceClick?: (label: str
 /**
  * 개별 줄의 서식(불릿, 번호 목록, 일반 문장, 빈 줄)에 따라 깔끔한 스타일 적용
  */
-function renderFormattedLine(line: string, index: number, onEvidenceClick?: (label: string) => void): React.ReactNode {
+function renderFormattedLine(line: string, index: number, onEvidenceClick?: (label: string, meta?: CitationMeta) => void, claimCitations?: ClaimCitation[]): React.ReactNode {
   const trimmed = line.trim();
   if (!trimmed) {
     return <div key={index} style={{ height: '6px' }} />;
@@ -177,7 +205,7 @@ function renderFormattedLine(line: string, index: number, onEvidenceClick?: (lab
         }}
       >
         <span style={{ color: 'var(--primary, #3b82f6)', fontWeight: 'bold' }}>•</span>
-        <span style={{ flex: 1, lineHeight: 1.6 }}>{renderInlineMarkdown(textContent, onEvidenceClick)}</span>
+        <span style={{ flex: 1, lineHeight: 1.6 }}>{renderInlineMarkdown(textContent, onEvidenceClick, claimCitations)}</span>
       </div>
     );
   }
@@ -198,7 +226,7 @@ function renderFormattedLine(line: string, index: number, onEvidenceClick?: (lab
         <span style={{ color: 'var(--text-muted, #64748b)', fontWeight: 600, minWidth: '20px' }}>
           {numMatch[1]}
         </span>
-        <span style={{ flex: 1, lineHeight: 1.6 }}>{renderInlineMarkdown(numMatch[2], onEvidenceClick)}</span>
+        <span style={{ flex: 1, lineHeight: 1.6 }}>{renderInlineMarkdown(numMatch[2], onEvidenceClick, claimCitations)}</span>
       </div>
     );
   }
@@ -217,7 +245,7 @@ function renderFormattedLine(line: string, index: number, onEvidenceClick?: (lab
           fontStyle: 'italic',
         }}
       >
-        {renderInlineMarkdown(quoteText, onEvidenceClick)}
+        {renderInlineMarkdown(quoteText, onEvidenceClick, claimCitations)}
       </div>
     );
   }
@@ -225,7 +253,7 @@ function renderFormattedLine(line: string, index: number, onEvidenceClick?: (lab
   // 4. 일반 문장
   return (
     <div key={index} style={{ margin: '2px 0', lineHeight: 1.6 }}>
-      {renderInlineMarkdown(line, onEvidenceClick)}
+      {renderInlineMarkdown(line, onEvidenceClick, claimCitations)}
     </div>
   );
 }
@@ -233,7 +261,7 @@ function renderFormattedLine(line: string, index: number, onEvidenceClick?: (lab
 /**
  * 구조화된 법률의견서 및 마크다운 텍스트를 섹션별 UI 요소로 파싱하여 렌더링하는 컴포넌트
  */
-export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvidenceClick }) => {
+export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvidenceClick, claimCitations }) => {
   const [collapsedSections, setCollapsedSections] = useState<Record<number, boolean>>({});
 
   if (!content) return null;
@@ -374,7 +402,7 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
                 <span>{sec.title}</span>
               </div>
               <div style={{ fontSize: '0.9em', color: 'var(--text-main)' }}>
-                {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx, onEvidenceClick))}
+                {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx, onEvidenceClick, claimCitations))}
               </div>
             </div>
           );
@@ -410,7 +438,7 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
 
               </div>
               <div style={{ fontSize: '0.89em', color: 'var(--text-secondary, #475569)' }}>
-                {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx, onEvidenceClick))}
+                {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx, onEvidenceClick, claimCitations))}
               </div>
             </div>
           );
@@ -482,7 +510,7 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
                 </div>
               ) : (
                 <div style={{ fontSize: '0.91em', color: 'var(--text-main)', marginTop: '8px' }}>
-                  {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx, onEvidenceClick))}
+                  {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx, onEvidenceClick, claimCitations))}
                 </div>
               )}
             </div>
@@ -519,7 +547,7 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
 
               </div>
               <div style={{ fontSize: '0.91em', color: 'var(--text-main)' }}>
-                {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx, onEvidenceClick))}
+                {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx, onEvidenceClick, claimCitations))}
               </div>
             </div>
           );
@@ -554,7 +582,7 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
               </div>
             )}
             <div style={{ fontSize: '0.92em', color: 'var(--text-main)' }}>
-              {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx, onEvidenceClick))}
+              {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx, onEvidenceClick, claimCitations))}
             </div>
           </div>
         );

@@ -358,17 +358,23 @@ def build_case_evidence_briefing(
             )
         )
 
-    # 6. Source Registry 구성 (인용 검증 및 Verifier/Synthesizer 공통 참조)
+    # 6. Source Registry 구성 (인용 검증 및 Verifier/Synthesizer 공통 참조, P0-2)
     source_registry: Dict[str, Dict[str, Any]] = {}
     for ev_item in evidence_items:
         entry = {
+            "source_id": f"EVIDENCE:{ev_item.evidence_label}",
             "evidence_id": ev_item.evidence_id,
             "evidence_label": ev_item.evidence_label,
+            "label": ev_item.evidence_label,
             "document_name": ev_item.document_name,
+            "filename": ev_item.document_name,
+            "file": ev_item.document_name or ev_item.evidence_label,
+            "title": ev_item.document_name or ev_item.evidence_label,
             "source_type": "CASE_EVIDENCE",
-            "citation_tag": f"[{ev_item.document_name or ev_item.evidence_label}]",
+            "citation_tag": f"[{ev_item.evidence_label}]",
         }
         source_registry[ev_item.evidence_label] = entry
+        source_registry[ev_item.evidence_id] = entry
         if ev_item.document_name:
             source_registry[ev_item.document_name] = entry
 

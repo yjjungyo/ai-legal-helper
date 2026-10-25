@@ -2,6 +2,8 @@ export interface EvidenceDocument {
   id: string;
   case_id: string;
   original_filename: string;
+  filename?: string;
+  evidence_label?: string;
   media_type: string;
   size_bytes: number;
   status: string; // UPLOADED, EXTRACTING, REVIEW_REQUIRED, FAILED, COMPLETED

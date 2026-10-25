@@ -80,9 +80,10 @@ class LegalState(MessagesState):
     resolved_query: Optional[str] = None
     intent_decision: Optional[Dict[str, Any]] = None
 
-    # Issue-Level Verification & Evidence-Grounded Consultation v1.0
+    # Issue-Level Verification & Evidence-Grounded Consultation v1.0 & P0-2
     case_evidence_briefing: Optional[Dict[str, Any]] = None
     case_evidence_sources: Optional[List[Dict[str, Any]]] = None
     issue_tasks: Optional[List[Dict[str, Any]]] = None
     issue_results: Optional[List[Dict[str, Any]]] = None
+    claim_citations: Optional[List[Dict[str, Any]]] = None
 

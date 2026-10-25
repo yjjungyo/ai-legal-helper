@@ -6,14 +6,14 @@
 
 import React, { useState } from 'react';
 import type { ConsultationResponse } from '../../types/consultation';
-import { LegalAnswerView } from '../LegalAnswerView';
+import { LegalAnswerView, type CitationMeta } from '../LegalAnswerView';
 import { ConsultationProgress } from './ConsultationProgress';
 
 export interface AssistantMessageProps {
   /** 상담 응답 전체 데이터 객체 */
   message: ConsultationResponse;
   /** 증거 번호 [E01] 클릭 핸들러 */
-  onEvidenceClick: (label: string) => void;
+  onEvidenceClick: (label: string, meta?: CitationMeta) => void;
   /** HILT 법령 검색 승인 핸들러 */
   onApprove: (requestId: string) => void;
   /** HILT 법령 검색 거절 핸들러 */
@@ -213,12 +213,19 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
                   </span>
                   {message.sources.map((s, idx) => {
                     const sid = s.source_id || s.document_id || s.file || `SRC-${idx + 1}`;
-                    const isEv = sid.startsWith('E') || (s.file && s.file.startsWith('E'));
+                    const evLabel = s.evidence_label || s.label || (sid.startsWith('E') ? sid : (s.file && s.file.startsWith('E') ? s.file.split('_')[0] : null));
+                    const isEv = s.source_type === 'CASE_EVIDENCE' || Boolean(evLabel);
                     return (
                       <span
                         key={idx}
                         onClick={() => {
-                          if (isEv && s.label) onEvidenceClick(s.label);
+                          if (isEv && evLabel) {
+                            onEvidenceClick(evLabel, {
+                              evidenceId: s.evidence_id || undefined,
+                              claimId: s.claim_id || undefined,
+                              spanId: s.span_id || undefined,
+                            });
+                          }
                         }}
                         style={{
                           fontSize: '0.76em',
@@ -230,7 +237,7 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
                           cursor: isEv ? 'pointer' : 'default',
                         }}
                       >
-                        {s.label ? `[${s.label}] ` : ''}{s.title || s.file || sid}
+                        {evLabel ? `[${evLabel}] ` : ''}{s.title || s.file || sid}
                       </span>
                     );
                   })}

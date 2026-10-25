@@ -42,6 +42,38 @@ export interface Source {
   category?: string | null;
   evidence_label?: string | null;
   label?: string | null;
+  claim_id?: string | null;
+  span_id?: string | null;
+  text_excerpt?: string | null;
+}
+
+/**
+ * 주장에 대응하는 구체적 증거 문서, 추출 클레임 및 텍스트 발췌 참조 모델 (P0-2)
+ */
+export interface ClaimReference {
+  evidence_id: string;
+  evidence_label?: string | null;
+  claim_id?: string | null;
+  span_id?: string | null;
+  text_excerpt?: string | null;
+  document_name?: string | null;
+}
+
+/**
+ * 답변 내 개별 명제/권고와 실제 증거 및 법률 출처 간의 원자적 접지(Grounding) 매핑 모델 (P0-2)
+ */
+export interface ClaimCitation {
+  citation_tag: string;
+  claim_text: string;
+  grounding_status?: 'SUPPORTED' | 'CONDITIONALLY_SUPPORTED' | 'UNGROUNDED' | string;
+  evidence_refs: ClaimReference[];
+  legal_refs?: Array<{
+    statute_id: string;
+    statute_name?: string | null;
+    article?: string | null;
+    grounding_status?: string | null;
+  }>;
+  explanation?: string | null;
 }
 
 export interface UsageSummary {
@@ -167,6 +199,8 @@ export interface ConsultationResponse {
   verified_facts?: string[];
   missing_evidence?: string[];
   evidence_citations?: Source[];
+  // 답변 문장별 원자적 증거·법령 접지 인용 목록 (P0-2)
+  claim_citations?: ClaimCitation[];
   // 사건 중심 Chat v1.1 6단계 실시간 진행 상태 (P0-05)
   progress?: ConsultationProgress | null;
 }

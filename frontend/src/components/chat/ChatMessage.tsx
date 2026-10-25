@@ -8,12 +8,13 @@ import React from 'react';
 import type { ConsultationResponse } from '../../types/consultation';
 import { UserMessage } from './UserMessage';
 import { AssistantMessage } from './AssistantMessage';
+import type { CitationMeta } from '../LegalAnswerView';
 
 export interface ChatMessageProps {
   /** 상담 레코드 객체 */
   message: ConsultationResponse;
   /** 증거 번호 [E01] 클릭 핸들러 */
-  onEvidenceClick: (label: string) => void;
+  onEvidenceClick: (label: string, meta?: CitationMeta) => void;
   /** HILT 법령 검색 승인 핸들러 */
   onApprove: (requestId: string) => void;
   /** HILT 법령 검색 거절 핸들러 */

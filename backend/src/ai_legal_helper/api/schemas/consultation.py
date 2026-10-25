@@ -117,6 +117,30 @@ class Source(BaseModel):
     filename: Optional[str] = None
     category: Optional[str] = None
 
+    # 원자적 증거 접지(Grounding) 필드 (P0-2)
+    claim_id: Optional[str] = None
+    span_id: Optional[str] = None
+    text_excerpt: Optional[str] = None
+
+class ClaimReference(BaseModel):
+    """주장에 대응하는 구체적 증거 문서, 추출 클레임 및 텍스트 발췌 참조 모델 (P0-2)."""
+    evidence_id: str = Field(description="증거 문서 UUID")
+    evidence_label: Optional[str] = Field(default=None, description="증거 표시 라벨 (예: 'E01')")
+    claim_id: Optional[str] = Field(default=None, description="추출 주장 UUID")
+    span_id: Optional[str] = Field(default=None, description="원문 발췌 위치 UUID")
+    text_excerpt: Optional[str] = Field(default=None, description="원문 발췌 인용문")
+    document_name: Optional[str] = Field(default=None, description="증거 원본 파일명")
+
+
+class ClaimCitation(BaseModel):
+    """답변 내 개별 명제/권고와 실제 증거 및 법률 출처 간의 원자적 접지(Grounding) 매핑 모델 (P0-2)."""
+    citation_tag: str = Field(description="증거 인용 태그 (예: '[E01]', '[E01], [E03]')")
+    claim_text: str = Field(description="인용된 사실 진술문 또는 법률 판단 문장")
+    grounding_status: str = Field(default="SUPPORTED", description="근거 검증 상태 ('SUPPORTED', 'CONDITIONALLY_SUPPORTED', 'UNGROUNDED')")
+    evidence_refs: List[ClaimReference] = Field(default_factory=list, description="연결된 증거 원문 발췌 목록")
+    legal_refs: List[Dict[str, Any]] = Field(default_factory=list, description="연결된 법령 및 판례 조문 정보")
+    explanation: Optional[str] = Field(default=None, description="접지 상세 설명 또는 전제 조건")
+
 class UsageSummary(BaseModel):
     total_calls: int
     actual_calls: int
@@ -161,11 +185,12 @@ class ConsultationResponse(BaseModel):
     # P4.1 HILT Statute Search Approval fields
     approval_request: Optional[Dict[str, Any]] = None
 
-    # Issue-Level Verification & Evidence Grounding fields (Section 15.2)
+    # Issue-Level Verification & Evidence Grounding fields (Section 15.2 & P0-2)
     issue_results: Optional[List[Dict[str, Any]]] = None
     verified_facts: Optional[List[Dict[str, Any]]] = None
     missing_evidence: Optional[List[Dict[str, Any]]] = None
     evidence_citations: Optional[List[Dict[str, Any]]] = None
+    claim_citations: List[ClaimCitation] = Field(default_factory=list, description="답변 문장별 원자적 증거·법령 접지 인용 목록 (P0-2)")
 
     # Case-Centric Chat UI v1.1 Progress field (P0-05)
     progress: Optional[ConsultationProgress] = None

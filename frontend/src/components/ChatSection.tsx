@@ -24,6 +24,7 @@ import { CaseChatHeader } from './chat/CaseChatHeader';
 import { ChatMessageList } from './chat/ChatMessageList';
 import { ChatComposer } from './chat/ChatComposer';
 import { EvidenceSourceDrawer } from './chat/EvidenceSourceDrawer';
+import type { CitationMeta } from './LegalAnswerView';
 
 export interface ChatSectionProps {
   /** 현재 작업 대상 사건 식별자 UUID */
@@ -56,6 +57,9 @@ export const ChatSection: React.FC<ChatSectionProps> = ({ caseId }) => {
 
   // 3. 우측 증거 출처 슬라이드오버 드로어 제어 상태
   const [activeEvidenceLabel, setActiveEvidenceLabel] = useState<string | null>(null);
+  const [activeEvidenceId, setActiveEvidenceId] = useState<string | null>(null);
+  const [activeClaimId, setActiveClaimId] = useState<string | null>(null);
+  const [activeSpanId, setActiveSpanId] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   /**
@@ -82,8 +86,11 @@ export const ChatSection: React.FC<ChatSectionProps> = ({ caseId }) => {
   /**
    * [E01], [E02] 등 증거 번호 클릭 핸들러
    */
-  const handleEvidenceClick = useCallback((label: string) => {
+  const handleEvidenceClick = useCallback((label: string, meta?: CitationMeta) => {
     setActiveEvidenceLabel(label);
+    setActiveEvidenceId(meta?.evidenceId || null);
+    setActiveClaimId(meta?.claimId || null);
+    setActiveSpanId(meta?.spanId || null);
     setIsDrawerOpen(true);
   }, []);
 
@@ -167,6 +174,9 @@ export const ChatSection: React.FC<ChatSectionProps> = ({ caseId }) => {
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         selectedLabel={activeEvidenceLabel}
+        selectedEvidenceId={activeEvidenceId}
+        selectedClaimId={activeClaimId}
+        selectedSpanId={activeSpanId}
         caseId={caseId}
         evidenceDocuments={evidenceDocs}
         onNavigateToEvidence={handleNavigateToEvidence}

@@ -127,7 +127,10 @@ def list_evidence(case: Case = Depends(get_case_for_user), db: Session = Depends
     각 문서에 속한 EvidenceClaim의 검토 상태(PENDING 잔여 여부)와 EvidenceDocument.status가
     불일치하는 경우(예: 모든 Claim이 승인되었으나 문서 상태가 REVIEW_REQUIRED로 남아 있는 경우)
     자동으로 APPROVED 상태로 동기화하여 반환한다.
+    또한 사건 전체 문서에 대한 결정론적 증거 번호 라벨(E01, E02...)을 부여하여 반환한다.
     """
+    from ai_legal_helper.case_intelligence.case_briefing import assign_evidence_labels
+
     docs = (
         db.query(EvidenceDocument)
         .filter_by(case_id=case.id)
@@ -143,11 +146,14 @@ def list_evidence(case: Case = Depends(get_case_for_user), db: Session = Depends
     if status_changed:
         db.commit()
 
+    label_map = assign_evidence_labels(docs)
+
     return [
         {
             "id": d.id,
             "filename": d.original_filename,
             "original_filename": d.original_filename,
+            "evidence_label": label_map.get(d.id, "E??"),
             "media_type": d.media_type,
             "size_bytes": d.size_bytes,
             "status": d.status,
@@ -502,6 +508,17 @@ def trigger_evidence_extraction(
     """지정된 증거 문서에 대해 텍스트 및 AI 사실 추출(또는 재추출) 작업을 백그라운드로 실행한다."""
     doc = db.query(EvidenceDocument).filter_by(id=evidence_id, case_id=case.id).first()
     if not doc:
+        # UUID로 조회되지 않은 경우 라벨(예: 'E01') 또는 파일명 접두사로 검색 (P0-2)
+        from ai_legal_helper.case_intelligence.case_briefing import assign_evidence_labels
+        case_docs = db.query(EvidenceDocument).filter_by(case_id=case.id).all()
+        label_map = assign_evidence_labels(case_docs)
+        clean_target = evidence_id.strip("[]").upper()
+        for cd in case_docs:
+            if label_map.get(cd.id, "").upper() == clean_target or (cd.original_filename and cd.original_filename.upper().startswith(clean_target)):
+                doc = cd
+                evidence_id = cd.id
+                break
+    if not doc:
         raise HTTPException(status_code=404, detail="증거 문서를 찾을 수 없습니다.")
 
     doc.status = "EXTRACTING"
@@ -524,6 +541,17 @@ def get_evidence_claims(
 ):
     """특정 증거 문서에서 도출된 주장(Claim) 후보들과 원문(Span) 정보를 반환한다."""
     doc = db.query(EvidenceDocument).filter_by(id=evidence_id, case_id=case.id).first()
+    if not doc:
+        # UUID로 조회되지 않은 경우 라벨(예: 'E01') 또는 파일명 접두사로 검색 (P0-2)
+        from ai_legal_helper.case_intelligence.case_briefing import assign_evidence_labels
+        case_docs = db.query(EvidenceDocument).filter_by(case_id=case.id).all()
+        label_map = assign_evidence_labels(case_docs)
+        clean_target = evidence_id.strip("[]").upper()
+        for cd in case_docs:
+            if label_map.get(cd.id, "").upper() == clean_target or (cd.original_filename and cd.original_filename.upper().startswith(clean_target)):
+                doc = cd
+                evidence_id = cd.id
+                break
     if not doc:
         raise HTTPException(status_code=404, detail="증거 문서를 찾을 수 없습니다.")
 
@@ -579,6 +607,17 @@ def review_evidence_claim(
     - claim_id가 요청된 case_id 및 evidence_id에 속하는지 엄격히 검증한다 (불일치 시 404/400 반환).
     """
     doc = db.query(EvidenceDocument).filter_by(id=evidence_id, case_id=case.id).first()
+    if not doc:
+        # UUID로 조회되지 않은 경우 라벨(예: 'E01') 또는 파일명 접두사로 검색 (P0-2)
+        from ai_legal_helper.case_intelligence.case_briefing import assign_evidence_labels
+        case_docs = db.query(EvidenceDocument).filter_by(case_id=case.id).all()
+        label_map = assign_evidence_labels(case_docs)
+        clean_target = evidence_id.strip("[]").upper()
+        for cd in case_docs:
+            if label_map.get(cd.id, "").upper() == clean_target or (cd.original_filename and cd.original_filename.upper().startswith(clean_target)):
+                doc = cd
+                evidence_id = cd.id
+                break
     if not doc:
         raise HTTPException(status_code=404, detail="증거 문서를 찾을 수 없습니다.")
 

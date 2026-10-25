@@ -8,12 +8,13 @@ import React, { useRef, useEffect } from 'react';
 import type { ConsultationResponse } from '../../types/consultation';
 import { ChatDateDivider } from './ChatDateDivider';
 import { ChatMessage } from './ChatMessage';
+import type { CitationMeta } from '../LegalAnswerView';
 
 export interface ChatMessageListProps {
   /** 시간순(ASC)으로 정렬된 전체 대화 턴 목록 */
   messages: ConsultationResponse[];
   /** 증거 번호 [E01] 클릭 핸들러 */
-  onEvidenceClick: (label: string) => void;
+  onEvidenceClick: (label: string, meta?: CitationMeta) => void;
   /** HILT 법령 검색 승인 핸들러 */
   onApprove: (requestId: string) => void;
   /** HILT 법령 검색 거절 핸들러 */

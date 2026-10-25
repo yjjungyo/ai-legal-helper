@@ -1024,8 +1024,13 @@ def finalize_node(state: LegalState) -> Dict:
     cited_sources = final_audit.get("cited_sources") or final_audit.get("verified_sources", [])
 
     # Case Evidence Sources 중 최종 확정된 답변 본문(final)에 실제로 인용된 증거만 선별 (P0-10)
+    claim_citations_data = []
     if briefing_raw:
         briefing_obj = CaseEvidenceBriefing(**briefing_raw)
+        if issue_results_raw:
+            from ai_legal_helper.workflows.final_disposition import build_claim_citations
+            claim_citations_data = build_claim_citations(issue_res_objs, briefing_obj, final)
+
         all_sources = list(cited_sources)
         seen_keys = {
             s.get("source_id") or s.get("evidence_id") or s.get("file") or s.get("evidence_label")
@@ -1051,6 +1056,8 @@ def finalize_node(state: LegalState) -> Dict:
                     seen_keys.add(k)
         cited_sources = all_sources
 
+    ver_res["claim_citations"] = claim_citations_data
+
     return {
         "final_answer": final,
         "sources": cited_sources,
@@ -1059,6 +1066,8 @@ def finalize_node(state: LegalState) -> Dict:
         "final_disposition": final_disp,
         "messages": [AIMessage(content=final)],
         "issue_results": issue_results_raw,
+        "claim_citations": claim_citations_data,
+        "verification_result": ver_res,
     }
 
 

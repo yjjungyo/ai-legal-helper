@@ -375,11 +375,16 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
         resp.selected_agents = result.get("selected_agents", [])
         resp.warnings.extend(result.get("warnings", []))
 
-        # Issue-level Verification v1.0 Fields
+        # Issue-level Verification v1.0 & P0-2 Grounding Fields
         resp.issue_results = result.get("issue_results", [])
         resp.verified_facts = result.get("verified_facts", [])
         resp.missing_evidence = result.get("missing_evidence", [])
         resp.evidence_citations = result.get("evidence_citations", [])
+        from ai_legal_helper.api.schemas.consultation import ClaimCitation
+        resp.claim_citations = [
+            ClaimCitation(**c) if isinstance(c, dict) else c
+            for c in (result.get("claim_citations") or (resp.verification_result or {}).get("claim_citations") or [])
+        ]
 
         # 요구사항 5: Langfuse 루트 Span/Trace에 최종 출처·검증·실행시간·토큰 요약 기록 (P2-02)
         try:
@@ -559,6 +564,7 @@ async def get_consultation(
         verified_facts=ver_res.get("verified_facts", []),
         missing_evidence=ver_res.get("missing_evidence", []),
         evidence_citations=ver_res.get("evidence_citations", []),
+        claim_citations=ver_res.get("claim_citations", []),
         progress=prog,
     )
 
@@ -946,6 +952,7 @@ async def list_case_consultations(
             verified_facts=(rec.verification_result or {}).get("verified_facts", []),
             missing_evidence=(rec.verification_result or {}).get("missing_evidence", []),
             evidence_citations=(rec.verification_result or {}).get("evidence_citations", []),
+            claim_citations=(rec.verification_result or {}).get("claim_citations", []),
             progress=prog,
         ))
     return results
@@ -1062,6 +1069,11 @@ async def get_case_conversation_detail(
                 elapsed_ms=rec.elapsed_ms,
                 warnings=rec.warnings or [],
                 verification_result=rec.verification_result or {},
+                issue_results=(rec.verification_result or {}).get("issue_results", []),
+                verified_facts=(rec.verification_result or {}).get("verified_facts", []),
+                missing_evidence=(rec.verification_result or {}).get("missing_evidence", []),
+                evidence_citations=(rec.verification_result or {}).get("evidence_citations", []),
+                claim_citations=(rec.verification_result or {}).get("claim_citations", []),
                 selected_agents=rec.selected_agents or [],
                 question=rec.question,
                 case_id=rec.case_id,

@@ -71,11 +71,14 @@ class StandardSource(BaseModel):
 
     # 4. 사건 증거(CASE_EVIDENCE) 및 일반 문서(DOCUMENT) 전용 필드
     evidence_id: Optional[str] = None
+    evidence_label: Optional[str] = None
+    label: Optional[str] = None
     span_id: Optional[str] = None
     claim_id: Optional[str] = None
     paragraph_index: Optional[int] = None
     filename: Optional[str] = None
     page: Optional[str] = None
+    text_excerpt: Optional[str] = None
 
     # 5. 기존 API/UI 하위 호환용 필드
     file: str = "?"
@@ -457,6 +460,11 @@ def normalize_source_dict(raw: Any) -> Dict[str, Any]:
         case_number=raw.get("case_number") if source_type == "PRECEDENT" else None,
         decision_date=raw.get("decision_date") if source_type == "PRECEDENT" else None,
         evidence_id=raw.get("evidence_id"),
+        evidence_label=raw.get("evidence_label") or raw.get("label"),
+        label=raw.get("label") or raw.get("evidence_label"),
+        span_id=raw.get("span_id"),
+        claim_id=raw.get("claim_id"),
+        text_excerpt=raw.get("text_excerpt"),
         filename=filename,
         page=page,
         file=filename or raw.get("file") or source_id,
