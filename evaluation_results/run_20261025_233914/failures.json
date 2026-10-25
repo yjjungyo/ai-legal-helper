@@ -1,0 +1,457 @@
+[
+  {
+    "scenario_id": "SC01-T03",
+    "overall_score": 0.755,
+    "is_critical_failure": false,
+    "critical_reasons": [],
+    "failed_metrics": {
+      "issue_detection": {
+        "metric_name": "issue_detection",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 1.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "핵심 법률 쟁점 1건 누락: [ISSUE_NOTICE_REACH] 문자메시지에 의한 해지의사표시 도달 및 효력"
+        ],
+        "details": {
+          "expected_count": 1,
+          "matched_count": 0,
+          "matched_issue_ids": [],
+          "missing_issues": [
+            "[ISSUE_NOTICE_REACH] 문자메시지에 의한 해지의사표시 도달 및 효력"
+          ]
+        }
+      },
+      "next_action_coverage": {
+        "metric_name": "next_action_coverage",
+        "score": 0.5,
+        "raw_value": 1.0,
+        "max_value": 2.0,
+        "status": "PARTIAL",
+        "failure_reasons": [
+          "필수 행동 지침 1건 누락: 문자 발신 내역 및 임대인 답장 캡처본을 증거로 영구 보관"
+        ],
+        "details": {
+          "expected_actions_count": 2,
+          "matched_actions_count": 1,
+          "matched_actions": [
+            "도달을 더욱 확실히 하기 위한 우체국 내용증명 발송 병행"
+          ],
+          "missing_actions": [
+            "문자 발신 내역 및 임대인 답장 캡처본을 증거로 영구 보관"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "scenario_id": "SC01-T05",
+    "overall_score": 0.81,
+    "is_critical_failure": false,
+    "critical_reasons": [],
+    "failed_metrics": {
+      "statute_retrieval_accuracy": {
+        "metric_name": "statute_retrieval_accuracy",
+        "score": 0.5,
+        "raw_value": 1.0,
+        "max_value": 2.0,
+        "status": "PARTIAL",
+        "failure_reasons": [
+          "필수 법령 1건 미검색/미인용: 주택임대차보호법 제3조의2 제2항"
+        ],
+        "details": {
+          "expected_count": 2,
+          "matched_count": 1,
+          "matched_statutes": [
+            "주택임대차보호법_제3조_제1항"
+          ],
+          "missing_statutes": [
+            "주택임대차보호법 제3조의2 제2항"
+          ]
+        }
+      },
+      "next_action_coverage": {
+        "metric_name": "next_action_coverage",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 2.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "필수 행동 지침 2건 누락: 경매 개시 결정 시 배당요구 종기일을 확인하고 전략 결정; 오피스텔의 최근 실거래 시세 및 낙찰가율 파악"
+        ],
+        "details": {
+          "expected_actions_count": 2,
+          "matched_actions_count": 0,
+          "matched_actions": [],
+          "missing_actions": [
+            "경매 개시 결정 시 배당요구 종기일을 확인하고 전략 결정",
+            "오피스텔의 최근 실거래 시세 및 낙찰가율 파악"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "scenario_id": "SC01-T07",
+    "overall_score": 0.88,
+    "is_critical_failure": false,
+    "critical_reasons": [],
+    "failed_metrics": {
+      "statute_retrieval_accuracy": {
+        "metric_name": "statute_retrieval_accuracy",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 1.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "필수 법령 1건 미검색/미인용: 민법 제536조"
+        ],
+        "details": {
+          "expected_count": 1,
+          "matched_count": 0,
+          "matched_statutes": [],
+          "missing_statutes": [
+            "민법 제536조"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "scenario_id": "SC01-T08",
+    "overall_score": 0.86,
+    "is_critical_failure": false,
+    "critical_reasons": [],
+    "failed_metrics": {
+      "fact_precision": {
+        "metric_name": "fact_precision",
+        "score": 0.75,
+        "raw_value": 1.0,
+        "max_value": 4.0,
+        "status": "PARTIAL",
+        "failure_reasons": [
+          "사실관계 왜곡 1건 검출: 부존재 선순위 근저당권 설정 사실 날조 (SC-001은 가압류만 2건 존재)"
+        ],
+        "details": {
+          "contradictions_count": 1,
+          "contradictions": [
+            "부존재 선순위 근저당권 설정 사실 날조 (SC-001은 가압류만 2건 존재)"
+          ]
+        }
+      },
+      "statute_retrieval_accuracy": {
+        "metric_name": "statute_retrieval_accuracy",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 1.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "필수 법령 1건 미검색/미인용: 주택임대차보호법 제3조의3"
+        ],
+        "details": {
+          "expected_count": 1,
+          "matched_count": 0,
+          "matched_statutes": [],
+          "missing_statutes": [
+            "주택임대차보호법 제3조의3"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "scenario_id": "SC01-T10",
+    "overall_score": 0.815,
+    "is_critical_failure": false,
+    "critical_reasons": [],
+    "failed_metrics": {
+      "statute_retrieval_accuracy": {
+        "metric_name": "statute_retrieval_accuracy",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 2.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "필수 법령 2건 미검색/미인용: 주택임대차보호법 제6조의2; 민법 제536조"
+        ],
+        "details": {
+          "expected_count": 2,
+          "matched_count": 0,
+          "matched_statutes": [],
+          "missing_statutes": [
+            "주택임대차보호법 제6조의2",
+            "민법 제536조"
+          ]
+        }
+      },
+      "next_action_coverage": {
+        "metric_name": "next_action_coverage",
+        "score": 0.5,
+        "raw_value": 1.0,
+        "max_value": 2.0,
+        "status": "PARTIAL",
+        "failure_reasons": [
+          "필수 행동 지침 1건 누락: 배달증명 서비스를 신청하여 상대방 실제 수령일 확인"
+        ],
+        "details": {
+          "expected_actions_count": 2,
+          "matched_actions_count": 1,
+          "matched_actions": [
+            "우체국 내용증명 양식 작성 후 3부 출력하여 발송"
+          ],
+          "missing_actions": [
+            "배달증명 서비스를 신청하여 상대방 실제 수령일 확인"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "scenario_id": "SC01-T11",
+    "overall_score": 0.7567,
+    "is_critical_failure": false,
+    "critical_reasons": [],
+    "failed_metrics": {
+      "fact_precision": {
+        "metric_name": "fact_precision",
+        "score": 0.75,
+        "raw_value": 1.0,
+        "max_value": 4.0,
+        "status": "PARTIAL",
+        "failure_reasons": [
+          "사실관계 왜곡 1건 검출: 부존재 선순위 근저당권 설정 사실 날조 (SC-001은 가압류만 2건 존재)"
+        ],
+        "details": {
+          "contradictions_count": 1,
+          "contradictions": [
+            "부존재 선순위 근저당권 설정 사실 날조 (SC-001은 가압류만 2건 존재)"
+          ]
+        }
+      },
+      "issue_detection": {
+        "metric_name": "issue_detection",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 1.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "핵심 법률 쟁점 1건 누락: [ISSUE_COMMUNICATION_BREAKDOWN] 임대인의 자력 상실 및 연락 두절 시 사법절차 전환"
+        ],
+        "details": {
+          "expected_count": 1,
+          "matched_count": 0,
+          "matched_issue_ids": [],
+          "missing_issues": [
+            "[ISSUE_COMMUNICATION_BREAKDOWN] 임대인의 자력 상실 및 연락 두절 시 사법절차 전환"
+          ]
+        }
+      },
+      "next_action_coverage": {
+        "metric_name": "next_action_coverage",
+        "score": 0.6667,
+        "raw_value": 2.0,
+        "max_value": 3.0,
+        "status": "PARTIAL",
+        "failure_reasons": [
+          "필수 행동 지침 1건 누락: 보증금반환청구 지급명령 또는 정식 소송 제기"
+        ],
+        "details": {
+          "expected_actions_count": 3,
+          "matched_actions_count": 2,
+          "matched_actions": [
+            "주택임차권등기명령 신청서 법원 제출",
+            "임대인의 다른 일반재산(다른 부동산, 예금 등) 가압류 검토"
+          ],
+          "missing_actions": [
+            "보증금반환청구 지급명령 또는 정식 소송 제기"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "scenario_id": "SC01-V03",
+    "overall_score": 0.685,
+    "is_critical_failure": false,
+    "critical_reasons": [],
+    "failed_metrics": {
+      "fact_precision": {
+        "metric_name": "fact_precision",
+        "score": 0.75,
+        "raw_value": 1.0,
+        "max_value": 4.0,
+        "status": "PARTIAL",
+        "failure_reasons": [
+          "사실관계 왜곡 1건 검출: 부존재 선순위 근저당권 설정 사실 날조 (SC-001은 가압류만 2건 존재)"
+        ],
+        "details": {
+          "contradictions_count": 1,
+          "contradictions": [
+            "부존재 선순위 근저당권 설정 사실 날조 (SC-001은 가압류만 2건 존재)"
+          ]
+        }
+      },
+      "statute_retrieval_accuracy": {
+        "metric_name": "statute_retrieval_accuracy",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 1.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "필수 법령 1건 미검색/미인용: 민법 제536조"
+        ],
+        "details": {
+          "expected_count": 1,
+          "matched_count": 0,
+          "matched_statutes": [],
+          "missing_statutes": [
+            "민법 제536조"
+          ]
+        }
+      },
+      "legal_application_accuracy": {
+        "metric_name": "legal_application_accuracy",
+        "score": 0.5,
+        "raw_value": 1.0,
+        "max_value": 2.0,
+        "status": "PARTIAL",
+        "failure_reasons": [
+          "기대 법률 결론 1건 미도출: 공증과 담보가 없는 단순 확약서만 믿고 합의하여 1년을 기다리는 것은 매우 위험하며 권장되지 않습니다...."
+        ],
+        "details": {
+          "expected_conclusions_count": 2,
+          "matched_conclusions_count": 1,
+          "missing_conclusions": [
+            "공증과 담보가 없는 단순 확약서만 믿고 합의하여 1년을 기다리는 것은 매우 위험하며 권장되지 않습니다."
+          ]
+        }
+      },
+      "next_action_coverage": {
+        "metric_name": "next_action_coverage",
+        "score": 0.5,
+        "raw_value": 1.0,
+        "max_value": 2.0,
+        "status": "PARTIAL",
+        "failure_reasons": [
+          "필수 행동 지침 1건 누락: 집행권원 확보를 위한 법적 절차 착수"
+        ],
+        "details": {
+          "expected_actions_count": 2,
+          "matched_actions_count": 1,
+          "matched_actions": [
+            "단순 확약 제안 거절"
+          ],
+          "missing_actions": [
+            "집행권원 확보를 위한 법적 절차 착수"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "scenario_id": "SC01-V05",
+    "overall_score": 0.5921,
+    "is_critical_failure": false,
+    "critical_reasons": [],
+    "failed_metrics": {
+      "issue_detection": {
+        "metric_name": "issue_detection",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 1.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "핵심 법률 쟁점 1건 누락: [ISSUE_FAKE_CITATION] 가공의 증거 라벨 식별 및 존재 부인"
+        ],
+        "details": {
+          "expected_count": 1,
+          "matched_count": 0,
+          "matched_issue_ids": [],
+          "missing_issues": [
+            "[ISSUE_FAKE_CITATION] 가공의 증거 라벨 식별 및 존재 부인"
+          ]
+        }
+      },
+      "next_action_coverage": {
+        "metric_name": "next_action_coverage",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 1.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "필수 행동 지침 1건 누락: 실제 등록된 E01~E17 증거 목록 확인"
+        ],
+        "details": {
+          "expected_actions_count": 1,
+          "matched_actions_count": 0,
+          "matched_actions": [],
+          "missing_actions": [
+            "실제 등록된 E01~E17 증거 목록 확인"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "scenario_id": "SC01-V08",
+    "overall_score": 0.59,
+    "is_critical_failure": false,
+    "critical_reasons": [],
+    "failed_metrics": {
+      "issue_detection": {
+        "metric_name": "issue_detection",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 1.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "핵심 법률 쟁점 1건 누락: [ISSUE_NO_WAIT_DUTY] 새 임차인 유치 조건부 반환의 부당성"
+        ],
+        "details": {
+          "expected_count": 1,
+          "matched_count": 0,
+          "matched_issue_ids": [],
+          "missing_issues": [
+            "[ISSUE_NO_WAIT_DUTY] 새 임차인 유치 조건부 반환의 부당성"
+          ]
+        }
+      },
+      "statute_retrieval_accuracy": {
+        "metric_name": "statute_retrieval_accuracy",
+        "score": 0.0,
+        "raw_value": 0.0,
+        "max_value": 1.0,
+        "status": "FAIL",
+        "failure_reasons": [
+          "필수 법령 1건 미검색/미인용: 민법 제536조"
+        ],
+        "details": {
+          "expected_count": 1,
+          "matched_count": 0,
+          "matched_statutes": [],
+          "missing_statutes": [
+            "민법 제536조"
+          ]
+        }
+      },
+      "legal_application_accuracy": {
+        "metric_name": "legal_application_accuracy",
+        "score": 0.5,
+        "raw_value": 1.0,
+        "max_value": 2.0,
+        "status": "PARTIAL",
+        "failure_reasons": [
+          "기대 법률 결론 1건 미도출: 새 세입자가 들어올 때까지 기다려주어야 할 법적 의무는 전혀 없습니다...."
+        ],
+        "details": {
+          "expected_conclusions_count": 2,
+          "matched_conclusions_count": 1,
+          "missing_conclusions": [
+            "새 세입자가 들어올 때까지 기다려주어야 할 법적 의무는 전혀 없습니다."
+          ]
+        }
+      }
+    }
+  }
+]

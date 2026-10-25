@@ -235,9 +235,11 @@ async def start_consultation(
         _consultations[request_id] = resp
         setattr(resp, "_user_id", current_user.id)
 
-        # DB에 초기 상담 레코드 영구 저장 (충돌 방지 및 재시도 정책 적용)
+        # DB에 초기 상담 레코드 영구 저장 (DB 수준 고유 제약조건 및 재시도 정책 적용)
         retry_turn = turn_index
-        for attempt in range(3):
+        record_saved = False
+        max_retries = 3
+        for attempt in range(max_retries):
             try:
                 record = ConsultationRecord(
                     case_id=req.case_id,
@@ -258,13 +260,32 @@ async def start_consultation(
                 db.commit()
                 resp.turn_index = retry_turn
                 conv_context.turn_index = retry_turn
+                record_saved = True
                 break
             except Exception as e:
                 db.rollback()
-                logger.warning(f"[START_CONSULTATION] DB record initial save failed (attempt {attempt+1}): {e}")
-                retry_turn += 1
+                logger.warning(
+                    f"[START_CONSULTATION] 상담 기록 초기 저장 실패 (시도 {attempt+1}/{max_retries}): {e}"
+                )
+                # 다중 프로세스 동시 경합 시 선점된 DB의 최신 turn_index 재조회
+                max_turn_db_retry = db.query(func.max(ConsultationRecord.turn_index)).filter(
+                    ConsultationRecord.conversation_id == conversation_id
+                ).scalar() or 0
+                retry_turn = max(retry_turn + 1, max_turn_db_retry + 1)
 
-    # Schedule background task with conversation context
+        if not record_saved:
+            # 최종 저장 실패 시 메모리 캐시 정리 및 백그라운드 작업 차단
+            _consultations.pop(request_id, None)
+            logger.error(
+                f"[START_CONSULTATION] 상담 기록 DB 저장 실패: request_id={request_id}, "
+                f"conversation_id={conversation_id} ({max_retries}회 재시도 실패). 백그라운드 작업을 실행하지 않고 HTTP 500을 반환합니다."
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="상담 기록을 데이터베이스에 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+            )
+
+    # DB에 성공적으로 저장된 경우에만 백그라운드 워크플로우 스케줄링
     background_tasks.add_task(process_consultation, request_id, trace_id, req, conv_context)
     
     return resp

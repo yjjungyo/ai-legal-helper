@@ -1740,6 +1740,8 @@ async def _execute_consultation(
             "intent": final_state.get("intent"),
             "resolved_query": final_state.get("resolved_query"),
             "intent_decision": final_state.get("intent_decision"),
+            "case_delta": final_state.get("case_delta"),
+            "draft_answer": final_state.get("draft_answer"),
         }
 
     final_answer = final_state.get("final_answer", "답변을 생성하지 못했습니다.")

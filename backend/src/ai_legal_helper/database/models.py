@@ -9,7 +9,7 @@ Case Intelligence 데이터베이스 모델 (Database Models)
 
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, Float, Text, DateTime, ForeignKey, JSON, Boolean, desc
+from sqlalchemy import Column, String, Integer, Float, Text, DateTime, ForeignKey, JSON, Boolean, desc, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from ai_legal_helper.database.session import Base
@@ -543,8 +543,13 @@ class ConsultationRecord(Base):
     
     사건(Case) 또는 사용자(User) 단위로 진행된 법률 상담 요청 및 AI 답변 결과를 영구 저장한다.
     새로고침 또는 다른 화면 이동 후 복귀 시에도 상담 대화 이력이 유지되도록 한다.
+    동일 대화 세션 내에서 다중 프로세스/스레드 간 턴 번호 중복을 방지하기 위해
+    (conversation_id, turn_index) 고유 복합 제약조건을 DB 수준에서 보장한다.
     """
     __tablename__ = "consultations"
+    __table_args__ = (
+        UniqueConstraint("conversation_id", "turn_index", name="uq_consultations_conversation_turn"),
+    )
 
     id = Column(String, primary_key=True, default=generate_uuid)
     case_id = Column(String, ForeignKey("cases.id", ondelete="CASCADE"), nullable=True)

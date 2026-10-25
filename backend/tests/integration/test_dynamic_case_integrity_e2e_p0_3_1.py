@@ -1184,6 +1184,70 @@ def test_task2_transaction_disambiguation_and_copy_deduplication():
     assert total_4 == 20_000_000  # 불확실 거래 이중 차감 방지
     assert any("[보류]" in s and "중복 의심" in s for s in sources_4)
 
+    # Case 5: [운영 전 잔여 결함 1] 동일 문서(신한은행_거래내역서.pdf) 내 거래번호가 상이한 복수 거래 각각 합산 (20M + 30M = 50M)
+    briefing_single_doc_multi_tx = CaseEvidenceBriefing(
+        case_id="case_t2_5",
+        title="단일 은행거래내역서 내 복수 거래 사건",
+        facts=[
+            FactItemBrief(
+                fact_id="f9",
+                statement="2024년 3월 10일 임대인이 20,000,000원을 일부 변제 입금하였다. (거래번호: TX-1001)",
+                adjudication_status="EVIDENCE_SUPPORTED",
+                document_name="신한은행_거래내역서.pdf",
+            ),
+            FactItemBrief(
+                fact_id="f10",
+                statement="2024년 3월 15일 임대인이 30,000,000원을 일부 변제 입금하였다. (거래번호: TX-1002)",
+                adjudication_status="EVIDENCE_SUPPORTED",
+                document_name="신한은행_거래내역서.pdf",
+            ),
+        ],
+    )
+    total_5, sources_5 = extract_case_prior_verified_repayments(briefing_single_doc_multi_tx)
+    assert total_5 == 50_000_000, f"동일 문서 내 거래번호 상이 거래가 각각 합산되지 않았습니다: {total_5}"
+    assert len([s for s in sources_5 if not s.startswith("[보류]")]) == 2
+
+    # Case 6: 동일 문서 내 동일 거래번호 중복 사본 -> 20M 유지 (중복 차감 방지)
+    briefing_single_doc_dup_tx = CaseEvidenceBriefing(
+        case_id="case_t2_6",
+        title="단일 문서 내 동일 거래번호 중복 사건",
+        facts=[
+            FactItemBrief(
+                fact_id="f11",
+                statement="2024년 3월 10일 임대인이 20,000,000원을 일부 변제 입금하였다. (거래번호: TX-1001)",
+                adjudication_status="EVIDENCE_SUPPORTED",
+                document_name="신한은행_거래내역서.pdf",
+            ),
+            FactItemBrief(
+                fact_id="f12",
+                statement="2024년 3월 10일 임대인이 20,000,000원을 일부 변제 입금 확인 (거래번호: TX-1001)",
+                adjudication_status="EVIDENCE_SUPPORTED",
+                document_name="신한은행_거래내역서.pdf",
+            ),
+        ],
+    )
+    total_6, sources_6 = extract_case_prior_verified_repayments(briefing_single_doc_dup_tx)
+    assert total_6 == 20_000_000, f"동일 거래번호의 중복 건이 합산되었습니다: {total_6}"
+
+    # Case 7: 단일 진술문 내 복수 행 거래 추출 (20M + 15M = 35M)
+    briefing_multiline_stmt = CaseEvidenceBriefing(
+        case_id="case_t2_7",
+        title="단일 진술문 내 복수 거래 행 사건",
+        facts=[
+            FactItemBrief(
+                fact_id="f13",
+                statement=(
+                    "2024년 3월 10일 임대인이 20,000,000원을 일부 변제 입금 (거래번호: TX-3001)\n"
+                    "2024년 3월 15일 임대인이 15,000,000원을 일부 변제 입금 (거래번호: TX-3002)"
+                ),
+                adjudication_status="EVIDENCE_SUPPORTED",
+                document_name="통합_은행거래내역서.pdf",
+            ),
+        ],
+    )
+    total_7, _ = extract_case_prior_verified_repayments(briefing_multiline_stmt)
+    assert total_7 == 35_000_000, f"단일 진술문 내 복수 행 거래가 합산되지 않았습니다: {total_7}"
+
 
 def test_task3_attachment_priority_verification_nuancing():
     """[P0-3.1 작업 3] 권리순위 검증 강화 및 단정 표현 차단 검증:
@@ -1269,3 +1333,110 @@ async def test_task4_live_workflow_execution_without_mock(db: Session, case_300m
     assert len(result["answer"]) > 0
     assert "request_id" in result
     assert result.get("request_id") is not None
+
+
+def test_task2_db_save_failure_suppresses_background_tasks_and_returns_500(case_300m: Case, test_user_a: User):
+    """[P0-3 운영 전 잔여 결함 2] 상담 레코드 DB 저장이 최종 실패한 경우
+    HTTP 500을 반환하고 백그라운드 작업을 실행하지 않으며 메모리 상태를 정리하는지 검증한다.
+    """
+    app.dependency_overrides[get_current_user] = lambda: test_user_a
+    try:
+        # DB 세션의 commit 메소드가 예외를 던지도록 모킹
+        with patch.object(Session, "commit", side_effect=Exception("Simulated DB fatal commit failure")):
+            with patch("ai_legal_helper.api.routes.consultation.process_consultation") as mock_bg_task:
+                res = client.post(
+                    "/api/v1/consultations",
+                    json={
+                        "question": "DB 저장 실패 테스트 질의",
+                        "case_id": case_300m.id,
+                    },
+                )
+                assert res.status_code == 500, f"예상치 못한 응답 코드: {res.status_code}, {res.text}"
+                data = res.json()
+                assert "상담 기록을 데이터베이스에 저장하지 못했습니다" in data.get("detail", "")
+
+                # 백그라운드 태스크가 일체 스케줄링/호출되지 않았음을 검증
+                assert not mock_bg_task.called, "DB 저장 실패에도 불구하고 백그라운드 작업이 스케줄링되었습니다."
+
+                # 메모리 저장소(_consultations)에 고아 레코드가 잔존하지 않는지 검증
+                orphan_entries = [r for r, v in _consultations.items() if v.question == "DB 저장 실패 테스트 질의"]
+                assert len(orphan_entries) == 0, f"실패한 상담의 메모리 고아 레코드가 남아 있습니다: {orphan_entries}"
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+@pytest.mark.asyncio
+async def test_task3_live_langgraph_disposition_update_on_evidence_approval(db: Session, case_300m: Case):
+    """[P0-3 운영 전 잔여 결함 3] 실제 LangGraph 워크플로우에서 신규 증거(2천만 원 이체증)
+    승인 후 법률 판단 및 미반환 잔액(2.8억)이 동적으로 갱신되는지 모의 객체 없이 검증한다.
+    """
+    # 1. 신규 2천만 원 일부 변제 이체증 등록 및 승인
+    doc_id = f"ev_live_{uuid.uuid4().hex[:8]}"
+    doc = EvidenceDocument(
+        id=doc_id,
+        case_id=case_300m.id,
+        original_filename="임대인_일부변제_2천만원_이체확인증.pdf",
+        safe_storage_key=f"storage/{doc_id}.pdf",
+        media_type="application/pdf",
+        size_bytes=2048,
+        sha256=f"sha_{uuid.uuid4().hex[:16]}",
+        status="UPLOADED",
+    )
+    db.add(doc)
+    db.flush()
+
+    claim = EvidenceClaim(
+        id=f"cl_live_{uuid.uuid4().hex[:8]}",
+        case_id=case_300m.id,
+        evidence_id=doc.id,
+        statement="임대인이 2024년 2월 10일 보증금 중 20,000,000원을 일부 변제 입금하였다. (거래번호: TX-9001)",
+        assertion_status="DOCUMENT_STATES",
+        review_status="PENDING_REVIEW",
+    )
+    db.add(claim)
+    db.commit()
+
+    # 증거 승인 및 Fact 승격
+    process_evidence_review(db, claim.id, "APPROVE", expected_case_id=case_300m.id, expected_evidence_id=doc.id)
+
+    # 2. 실제 LangGraph 워크플로우 실행
+    question = "이체확인증이 승인되었는데 현재 남아있는 보증금 잔액은 얼마이고 어떻게 해야 하나요?"
+    thread_id = f"thread_live_eval_{uuid.uuid4().hex[:8]}"
+    conv_ctx = ConversationContext(
+        conversation_id=f"conv_live_eval_{uuid.uuid4().hex[:8]}",
+        case_id=case_300m.id,
+        current_question=question,
+        turn_index=1,
+    )
+
+    result = await run_legal_consultation(
+        question,
+        thread_id=thread_id,
+        conversation_context=conv_ctx,
+    )
+
+    assert result is not None
+    assert result.get("status") in ("SUCCESS", "APPROVAL_REQUIRED")
+    ans = result.get("answer", "")
+    assert len(ans) > 0
+
+    # 3. 신규 증거 승인 반영 검증: 확정 2.8억 원 잔액 및 변제 사실 안내 확인
+    delta = result.get("case_delta")
+    if delta and delta.get("calculation_basis"):
+        calc = delta["calculation_basis"]
+        assert calc.get("verified_partial_repayment_krw") == 20_000_000
+        assert calc.get("unrepaid_balance_krw") == 280_000_000
+
+    # 4. 답변 텍스트 또는 승인 요청 사유(explanation) 내 잔액(2.8억 원 / 280,000,000원) 및 변제(2천만 원) 명시 확인
+    ans = result.get("answer", "")
+    draft_ans = result.get("draft_answer", "")
+    appr_exp = (result.get("approval_request") or {}).get("explanation", "")
+    full_response_text = f"{ans} {draft_ans} {appr_exp}"
+
+    assert any(term in full_response_text for term in ["280,000,000", "2억 8,000", "280000000", "2.8억"]), (
+        f"워크플로우 결과에 확정 잔액 2.8억 원이 명시되지 않았습니다: {full_response_text[:300]}"
+    )
+    assert any(term in full_response_text for term in ["20,000,000", "2,000만", "2000만", "2천만"]), (
+        f"워크플로우 결과에 승인된 2천만 원 일부 변제 사실이 반영되지 않았습니다: {full_response_text[:300]}"
+    )
+
