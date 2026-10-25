@@ -292,3 +292,4 @@ P0-2 목표였던 Claim-to-Source Grounding 및 프론트엔드 Interactive Draw
   - `frontend/src/components/chat/ChatMessageList.tsx`
   - `frontend/src/components/chat/ChatSection.tsx`
   - `frontend/src/components/LegalAnswerView.tsx`
+
