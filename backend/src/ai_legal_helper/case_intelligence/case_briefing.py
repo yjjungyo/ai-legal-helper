@@ -74,6 +74,10 @@ class FactItemBrief(BaseModel):
     document_name: Optional[str] = Field(None, description="근거 증거 문서명")
     confidence: float = Field(1.0, description="신뢰도 점수 (0.0~1.0)")
     supporting_evidence_labels: List[str] = Field(default_factory=list, description="지지하는 모든 증거 번호 목록")
+    trust_level: str = Field(
+        "USER_ALLEGED",
+        description="P0-3 논리적 사실 상태 (USER_ALLEGED, EVIDENCE_PENDING, EVIDENCE_SUPPORTED, DISPUTED, SUPERSEDED)"
+    )
 
 
 class TimelineItemBrief(BaseModel):
@@ -286,6 +290,13 @@ def build_case_evidence_briefing(
         if lbl and lbl not in sup_labels:
             sup_labels.append(lbl)
 
+        from ai_legal_helper.case_intelligence.fact_adjudicator import map_to_fact_trust_level
+        trust_lvl = map_to_fact_trust_level(
+            verification_status=f.verification_status,
+            adjudication_status=adj_status,
+            source_type=f.source_type,
+        )
+
         fact_brief = FactItemBrief(
             fact_id=f.id,
             statement=f.statement,
@@ -296,11 +307,12 @@ def build_case_evidence_briefing(
             document_name=source_doc.original_filename if source_doc else None,
             confidence=f.confidence or 1.0,
             supporting_evidence_labels=sup_labels,
+            trust_level=trust_lvl,
         )
         fact_items.append(fact_brief)
 
         # 실제 대립 상충 항목 별도 수집
-        if adj_status == "GENUINELY_DISPUTED":
+        if adj_status == "GENUINELY_DISPUTED" or trust_lvl == "DISPUTED":
             disputed_items.append(
                 DisputedConflictBrief(
                     fact_id=f.id,

@@ -89,7 +89,11 @@ INTENT_PROMPT = PromptTemplate.from_template(
 - 짧은 질문이라도 이전 대화가 있다면 생략된 법률적 의미를 살려 'resolved_query'를 구체적으로 작성하세요.
   * 예: 현재 질문 "이제 뭘 해야 하죠?" + 이전 대화 "보증금 미반환 및 가압류 분쟁"
     → resolved_query: "앞선 보증금 반환 지연 및 가압류 분쟁 분석을 바탕으로 의뢰인이 지금 우선적으로 취해야 할 단계별 조치 가이드"
+  * 예: 현재 질문 "그럼 지금 이사를 가도 돼?" + 이전 대화 "보증금 미반환 분쟁"
+    → resolved_query: "보증금 미반환 및 임차권등기명령 완료 전 목적물 퇴거(이사/점유 이전) 시 대항력 및 우선변제권 유지 여부와 퇴거 안전 요건"
 - 사실관계를 새로 진술하는 경우(FACT_CLARIFICATION), 그 사실이 기존 판단에 어떤 영향을 미치는지 재검토할 수 있도록 resolved_query를 구성하세요.
+  * 예: 현재 질문 "임대인이 5천만원을 입금했다고 합니다"
+    → resolved_query: "의뢰인의 보증금 일부 입금/변제 주장에 따른 보증금 잔액 변동 및 입금 증거 확인 필요성 검토"
 
 #### [대화 맥락]
 {conversation_context}
@@ -163,6 +167,45 @@ def _heuristic_rule_fallback(
         )
 
     # 3. 이전 대화가 있는 후속 턴
+    # 3-1. 조기 퇴거 / 점유 이전 / 이사 질의 (S05: "그럼 지금 이사를 가도 돼?")
+    moveout_keywords = ["이사", "퇴거", "열쇠", "비밀번호", "짐 빼", "방 빼", "나가도", "이사가도"]
+    if any(k in q_clean for k in moveout_keywords):
+        return IntentDecision(
+            intent=ConsultationIntent.FOLLOWUP_QUESTION,
+            resolved_query=f"보증금 미반환 및 임차권등기명령 완료 전 목적물 퇴거(이사/점유 이전) 시 대항력 및 우선변제권 유지 여부와 퇴거 안전 요건: {q_clean}",
+            requires_specialist=True,
+            requires_retrieval=True,
+            requires_verification=True,
+            requires_full_analysis=False,
+            reason="보증금 미반환 상태에서 이사/퇴거 및 점유 상실 시 대항력 상실 위험에 관한 세부 쟁점 질의",
+        )
+
+    # 3-2. 보증금 일부 변제 / 입금 주장 (S01: "5천만원 입금했다고 합니다")
+    repayment_keywords = ["5천만원", "5000만원", "5,000만원", "입금", "변제", "일부 반환", "돌려받", "돌려줬"]
+    if any(k in q_clean for k in repayment_keywords):
+        return IntentDecision(
+            intent=ConsultationIntent.FACT_CLARIFICATION,
+            resolved_query=f"의뢰인의 보증금 일부 입금/변제 주장에 따른 보증금 잔액 변동 및 입금 증거 확인 필요성 검토: {q_clean}",
+            requires_specialist=True,
+            requires_retrieval=False,
+            requires_verification=True,
+            requires_full_analysis=False,
+            reason="사용자의 보증금 일부 변제 주장 사실 진술",
+        )
+
+    # 3-3. 날짜 및 사실관계 정정 (S03: "통지일이 2024년 3월 20일이에요")
+    correction_keywords = ["날짜가 달라", "정정", "잘못 알았", "통지일이", "통지일은"]
+    if any(k in q_clean for k in correction_keywords):
+        return IntentDecision(
+            intent=ConsultationIntent.FACT_CLARIFICATION,
+            resolved_query=f"의뢰인의 기존 사실(통지일 등) 정정 진술과 기존 등록된 서면 증거 대조 및 법률효과 발생일 재검토: {q_clean}",
+            requires_specialist=True,
+            requires_retrieval=False,
+            requires_verification=True,
+            requires_full_analysis=False,
+            reason="사용자의 기존 사실 정정 진술",
+        )
+
     action_keywords = ["뭘 해야", "어떻게 해야", "다음 조치", "다음 단계", "앞으로 뭘", "그다음은", "지금 해야", "취해야 할"]
     if any(k in q_clean for k in action_keywords):
         return IntentDecision(

@@ -58,6 +58,10 @@ class ConversationTurn(BaseModel):
         default=None,
         description="상담 생성 일시 (ISO 문자열)"
     )
+    case_delta: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="해당 턴에서 식별된 사건 사실·증거 변동 및 법률 판단 비교 (P0-3)"
+    )
 
 
 class ConversationContext(BaseModel):
@@ -376,6 +380,10 @@ def load_conversation_context(
                     seen_source_ids.add(sid)
                     seen_sources.append(s)
 
+        cdelta = None
+        if isinstance(rec.verification_result, dict):
+            cdelta = rec.verification_result.get("case_delta")
+
         turn = ConversationTurn(
             turn_index=rec.turn_index or (len(turns) + 1),
             request_id=rec.request_id,
@@ -385,6 +393,7 @@ def load_conversation_context(
             verification_status=rec.verification_status,
             cited_sources=rec_sources,
             created_at=rec.created_at.isoformat() if rec.created_at else None,
+            case_delta=cdelta,
         )
         turns.append(turn)
 

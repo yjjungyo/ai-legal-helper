@@ -86,4 +86,5 @@ class LegalState(MessagesState):
     issue_tasks: Optional[List[Dict[str, Any]]] = None
     issue_results: Optional[List[Dict[str, Any]]] = None
     claim_citations: Optional[List[Dict[str, Any]]] = None
+    case_delta: Optional[Dict[str, Any]] = None
 

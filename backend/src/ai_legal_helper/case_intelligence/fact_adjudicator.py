@@ -16,6 +16,7 @@
 5. 한국어 코딩 주석 표준(CODING_COMMENT_STANDARD.md)을 준수한다.
 """
 
+from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, Field
 
@@ -25,6 +26,61 @@ from ai_legal_helper.case_intelligence.fact_semantics import (
 )
 from ai_legal_helper.case_intelligence.evidence_reliability import EvidenceAssessmentResult
 from ai_legal_helper.case_intelligence.evidence_gap import EvidenceGapItem, detect_evidence_gap
+
+
+# ==============================================================================
+# 0. P0-3 논리적 사실 상태 체계 (Logical Fact Trust Status)
+# ==============================================================================
+
+class FactTrustLevel(str, Enum):
+    """P0-3 사건 중심 사실의 5대 논리적 신뢰 상태 열거형.
+
+    - USER_ALLEGED: 사용자 일방 진술, 아직 객관적 증거 미제출 또는 미확인 상태.
+    - EVIDENCE_PENDING: 증거 문서가 등록되었으나 추출 검토 또는 심리 대기 중인 상태.
+    - EVIDENCE_SUPPORTED: 등록된 공적 서면 증거에 의해 확실히 입증·뒷받침된 상태.
+    - DISPUTED: 기존 등록 증거나 확정 자료와 실질적으로 대립·모순되는 상태.
+    - SUPERSEDED: 새로운 입증 정보(일부 변제, 정정 공문서 등)로 대체된 과거 사실.
+    """
+    USER_ALLEGED = "USER_ALLEGED"
+    EVIDENCE_PENDING = "EVIDENCE_PENDING"
+    EVIDENCE_SUPPORTED = "EVIDENCE_SUPPORTED"
+    DISPUTED = "DISPUTED"
+    SUPERSEDED = "SUPERSEDED"
+
+
+def map_to_fact_trust_level(
+    verification_status: Optional[str] = None,
+    adjudication_status: Optional[str] = None,
+    source_type: Optional[str] = None,
+) -> str:
+    """기존 Fact 및 FactAdjudication 상태값을 P0-3의 5대 논리적 사실 상태로 매핑한다.
+
+    불필요한 DB enum이나 테이블 생성 없이 기존 모델 필드와의 논리적 매핑을 통해
+    완전한 하위 호환성을 보장한다.
+
+    Args:
+        verification_status: Fact.verification_status ('DOCUMENT_VERIFIED', 'PARTY_ASSERTED', 'DISPUTED', 'SUPERSEDED' 등).
+        adjudication_status: FactAdjudication.adjudication_status ('EVIDENCE_SUPPORTED', 'CORROBORATED', 'PARTY_ALLEGED', 'EVIDENCE_INCOMPLETE', 'GENUINELY_DISPUTED' 등).
+        source_type: Fact.source_type ('DOCUMENT_SUPPORTED', 'PARTY_ALLEGATION', 'USER_CLAIM', 'AI_INFERENCE' 등).
+
+    Returns:
+        str: FactTrustLevel 문자열 ('USER_ALLEGED', 'EVIDENCE_PENDING', 'EVIDENCE_SUPPORTED', 'DISPUTED', 'SUPERSEDED').
+    """
+    ver = (verification_status or "").strip().upper()
+    adj = (adjudication_status or "").strip().upper()
+    src = (source_type or "").strip().upper()
+
+    if ver == "SUPERSEDED" or adj == "SUPERSEDED":
+        return FactTrustLevel.SUPERSEDED.value
+    if ver == "DISPUTED" or adj == "GENUINELY_DISPUTED":
+        return FactTrustLevel.DISPUTED.value
+    if adj in ("EVIDENCE_SUPPORTED", "CORROBORATED") or ver in ("DOCUMENT_VERIFIED", "VERIFIED"):
+        return FactTrustLevel.EVIDENCE_SUPPORTED.value
+    if adj == "EVIDENCE_INCOMPLETE" or (ver == "UNVERIFIED" and src == "DOCUMENT_SUPPORTED"):
+        return FactTrustLevel.EVIDENCE_PENDING.value
+    if src in ("PARTY_ALLEGATION", "USER_CLAIM") or adj == "PARTY_ALLEGED" or ver == "PARTY_ASSERTED":
+        return FactTrustLevel.USER_ALLEGED.value
+    return FactTrustLevel.USER_ALLEGED.value
 
 
 # ==============================================================================

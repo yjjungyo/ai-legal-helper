@@ -995,18 +995,38 @@ def finalize_node(state: LegalState) -> Dict:
 
     briefing_raw = state.get("case_evidence_briefing")
     issue_results_raw = ver_res.get("issue_results") or state.get("issue_results") or []
+    case_delta = None
 
     if briefing_raw and issue_results_raw:
         from ai_legal_helper.case_intelligence.case_briefing import CaseEvidenceBriefing
         from ai_legal_helper.agents.issue_verifier import IssueVerificationResult
-        from ai_legal_helper.workflows.final_disposition import assemble_grounded_answer, determine_final_disposition
+        from ai_legal_helper.workflows.final_disposition import (
+            assemble_grounded_answer,
+            determine_final_disposition,
+            detect_case_delta,
+        )
 
         briefing_obj = CaseEvidenceBriefing(**briefing_raw)
         issue_res_objs = [IssueVerificationResult(**ir) for ir in issue_results_raw]
         calc_disp, _ = determine_final_disposition(issue_res_objs)
         final_disp = calc_disp
 
-        final = assemble_grounded_answer(issue_res_objs, briefing_obj, state.get("draft_answer", ""), final_disp)
+        case_delta = detect_case_delta(
+            briefing=briefing_obj,
+            conv_context=state.get("conversation_context"),
+            current_question=state.get("question", ""),
+            resolved_query=state.get("resolved_query", ""),
+        )
+
+        final = assemble_grounded_answer(
+            issue_res_objs,
+            briefing_obj,
+            state.get("draft_answer", ""),
+            final_disp,
+            conv_context=state.get("conversation_context"),
+            current_question=state.get("question", ""),
+            case_delta=case_delta,
+        )
     else:
         sanitized = sanitize_unverified_citations(
             state.get("draft_answer", ""),
@@ -1062,17 +1082,20 @@ def finalize_node(state: LegalState) -> Dict:
         cited_sources = all_sources
 
     ver_res["claim_citations"] = claim_citations_data
+    if case_delta:
+        ver_res["case_delta"] = case_delta
 
     return {
         "final_answer": final,
+        "answer": final,
         "sources": cited_sources,
         "cited_sources": cited_sources,
         "claim_citations": claim_citations_data,
+        "case_delta": case_delta,
         "warnings": warnings,
         "final_disposition": final_disp,
         "messages": [AIMessage(content=final)],
         "issue_results": issue_results_raw,
-        "claim_citations": claim_citations_data,
         "verification_result": ver_res,
     }
 

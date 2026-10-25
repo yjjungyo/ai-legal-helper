@@ -192,6 +192,9 @@ class ConsultationResponse(BaseModel):
     evidence_citations: Optional[List[Dict[str, Any]]] = None
     claim_citations: List[ClaimCitation] = Field(default_factory=list, description="답변 문장별 원자적 증거·법령 접지 인용 목록 (P0-2)")
 
+    # P0-3 Multi-turn Case Delta & Determination Comparison
+    case_delta: Optional[Dict[str, Any]] = Field(default=None, description="사건 사실·증거 변동 및 법률 판단 변경 비교 (P0-3)")
+
     # Case-Centric Chat UI v1.1 Progress field (P0-05)
     progress: Optional[ConsultationProgress] = None
 

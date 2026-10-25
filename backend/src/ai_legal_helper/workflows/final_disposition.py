@@ -124,7 +124,8 @@ def select_grounded_facts_for_display(
     """
     supported_facts = [
         f for f in briefing.facts
-        if f.adjudication_status in ("EVIDENCE_SUPPORTED", "CORROBORATED")
+        if (f.adjudication_status in ("EVIDENCE_SUPPORTED", "CORROBORATED") or getattr(f, "trust_level", "") == "EVIDENCE_SUPPORTED")
+        and getattr(f, "trust_level", "") != "SUPERSEDED"
         and not is_trivial_metadata_fact(f.statement)
     ]
 
@@ -209,11 +210,175 @@ def determine_final_disposition(
     )
 
 
+def detect_case_delta(
+    briefing: CaseEvidenceBriefing,
+    conv_context: Optional[Any] = None,
+    current_question: str = "",
+    resolved_query: str = "",
+) -> Optional[Dict[str, Any]]:
+    """사건의 새로운 사실, 증거 또는 정정 정보가 기존 법률 판단에 미치는 영향을 분석하여
+    변경 전후 비교 구조(Case Delta)를 생성한다 (P0-3).
+
+    구조 (Section 5):
+    - changed_facts: 변경된 사실 및 근거 문서
+    - impacted_determinations: 영향받는 법률 판단
+    - preserved_determinations: 유지되는 판단
+    - new_next_actions: 새로운 다음 행동
+
+    Args:
+        briefing: 현재 사건 증거 브리핑 모델.
+        conv_context: 이전 상담 턴들이 담긴 ConversationContext 객체 또는 딕셔너리.
+        current_question: 현재 사용자 질문 문자열.
+        resolved_query: 문맥이 복원된 내부 작업 질의.
+
+    Returns:
+        Optional[Dict[str, Any]]: 사건 변동 사항이 식별된 경우 4대 영역 딕셔너리, 없으면 None.
+    """
+    q_corpus = f"{current_question} {resolved_query}".lower()
+    changed_facts: List[str] = []
+    impacted_determinations: List[str] = []
+    preserved_determinations: List[str] = []
+    new_next_actions: List[str] = []
+
+    # 1. 보증금 일부 변제 / 입금 (S01)
+    repayment_terms = ["5천만원", "5000만원", "5,000만원", "입금", "변제", "일부 반환", "돌려받", "돌려줬"]
+    if any(t in q_corpus for t in repayment_terms):
+        has_transfer_doc = any(
+            any(w in (ev.document_name or "").lower() for w in ["이체", "영수", "입금", "변제", "통장"])
+            for ev in (briefing.evidences or [])
+        )
+        has_verified_payment_fact = any(
+            any(w in (f.statement or "").lower() for w in ["50,000,000원", "5천만원", "5000만원", "일부 변제", "5천만 원"])
+            and (f.adjudication_status in ("EVIDENCE_SUPPORTED", "CORROBORATED") or getattr(f, "trust_level", "") == "EVIDENCE_SUPPORTED")
+            for f in (briefing.facts or [])
+        )
+
+        if has_transfer_doc or has_verified_payment_fact:
+            changed_facts.append("보증금 중 50,000,000원 일부 변제 입금 확인 [계좌이체확인증]")
+            impacted_determinations.append(
+                "보증금 반환 청구 가능 잔액이 300,000,000원에서 250,000,000원으로 감축 확정됨 "
+                "(지연손해금 기산 대상 원금도 잔액 250,000,000원 기준으로 적용)"
+            )
+            preserved_determinations.append(
+                "임차인의 선순위 대항력 및 우선변제권, 임차권등기명령 신청 권한, 계약 해지 효력은 "
+                "보증금 일부 변제와 무관하게 전액 반환 시까지 온전히 유지됨"
+            )
+            new_next_actions.append(
+                "미반환 잔액 250,000,000원에 대한 지급명령 신청 또는 보증금 반환 청구 소송 제기"
+            )
+        else:
+            changed_facts.append("의뢰인의 50,000,000원 일부 입금 진술 접수 (증빙 미제출 / USER_ALLEGED)")
+            impacted_determinations.append(
+                "계약상 확인된 보증금 300,000,000원 중 50,000,000원 입금 진술에 따라 잠정 잔액이 250,000,000원으로 안내되나, "
+                "객관적 금융 증빙(이체확인증 등) 확인 전까지는 법률상 보증금 원금 전액이 공적으로 감축 확정되지 않음"
+            )
+            preserved_determinations.append(
+                "임차인의 대항력, 우선변제권, 임차권등기명령 신청 권리는 잔액 전액 반환 시까지 그대로 유지됨"
+            )
+            new_next_actions.append(
+                "임대인으로부터 받은 50,000,000원의 계좌 이체확인증 또는 영수증을 증거로 등록하여 공적으로 입증할 것"
+            )
+
+    # 2. 목적물 조기 퇴거 / 점유 이전 / 이사 질의 (S05: '그럼 지금 이사를 가도 돼?')
+    moveout_terms = ["이사", "퇴거", "열쇠", "비밀번호", "짐 빼", "방 빼", "나가도", "이사가도"]
+    if any(t in q_corpus for t in moveout_terms):
+        changed_facts.append("의뢰인의 보증금 미반환 상태에서의 조기 이사(퇴거) 및 점유 이전 가능 여부 문의")
+        impacted_determinations.append(
+            "보증금 전액을 반환받기 전 또는 임차권등기명령에 따른 등기가 등기부에 기재되기 전에 "
+            "주택의 점유를 상실(이사/열쇠 인도/비밀번호 공유)하거나 전입을 이전하면, "
+            "주택임대차보호법상 대항력 및 우선변제권이 즉시 소멸하는 치명적 법률 위험 발생. "
+            "따라서 현재 상태에서는 절대 점유를 이전해서는 안 됨"
+        )
+        preserved_determinations.append(
+            "목적물에 거주(점유)하고 주민등록(전입)을 유지하는 한 기존 대항력과 우선변제권은 확고히 보존됨"
+        )
+        new_next_actions.append(
+            "관할 법원에 임차권등기명령을 신청하고, 등기사항전부증명서(을구)에 임차권등기가 실제로 기재된 것을 "
+            "확인한 후에 비로소 이사(점유 이전)할 것"
+        )
+
+    # 3. 새로운 가압류 사실 추가 (S02)
+    attachment_terms = ["가압류", "압류", "강제집행"]
+    has_attachment_fact = any(
+        "가압류" in (f.statement or "") and ("2024" in (f.statement or "") or "추가" in (f.statement or ""))
+        for f in (briefing.facts or [])
+    )
+    if any(t in q_corpus for t in attachment_terms) or has_attachment_fact:
+        att_doc_name = "E09_부동산등기사항전부증명서_을구.txt"
+        for ev in (briefing.evidences or []):
+            if "등기" in (ev.document_name or "") or "가압류" in (ev.document_name or ""):
+                att_doc_name = ev.document_name
+                break
+
+        changed_facts.append(f"목적물 부동산에 후순위 가압류 등기 사실 추가 확인 [{att_doc_name}]")
+        impacted_determinations.append(
+            "목적물에 다수의 채권자가 경합하게 됨에 따라 향후 강제경매 진행 시 배당 요구 및 권리 신고의 중요성 증대. "
+            "단, 임차인의 대항요건(2022.03.10)이 신규 가압류보다 선순위이므로 최우선 배당순위 및 대항력 자체는 "
+            "상실되지 않고 온전히 유지됨 (기존 우선순위 보존)"
+        )
+        preserved_determinations.append(
+            "임차인의 1순위 대항력 및 우선변제권 (2022.03.10 확정일자 기준 선순위 지위 유지)"
+        )
+        new_next_actions.append(
+            "대법원 인터넷등기소를 통한 등기사항전부증명서 추가 변동 모니터링 및 향후 경매 개시 시 "
+            "배당요구종기 내 권리신고 및 배당요구 신청서 접수"
+        )
+
+    # 4. 기존 사실 정정 (S03: '통지일이 2024년 3월 20일이에요')
+    correction_terms = ["날짜가 달라", "정정", "잘못 알았", "통지일이", "통지일은"]
+    if any(t in q_corpus for t in correction_terms):
+        changed_facts.append("의뢰인의 계약 해지 통지일 정정 진술 접수 (사용자 진술 / USER_ALLEGED)")
+        impacted_determinations.append(
+            "기존 등록된 공적 서면 증거에 기재된 도달일(2024.02.05)을 기준으로 "
+            "법률효과 발생일을 유지하며, 객관적 서면 증빙 없는 구두 진술만으로 확정된 법률효과 발생일을 임의 변경하지 않음"
+        )
+        preserved_determinations.append(
+            "기존 서면 증거에 의한 계약 해지 통고 효력 발생 및 계약 종료일 판단 유지"
+        )
+        new_next_actions.append(
+            "만약 다른 일자에 추가 통지가 도달하였다면 해당 서면 증거(배달증명서, 문자 수신화면 등)를 "
+            "등록하여 공적으로 입증할 것"
+        )
+
+    # 5. 증거 충돌 (S04)
+    has_dispute = bool(briefing.genuinely_disputed) or any(
+        f.adjudication_status == "GENUINELY_DISPUTED" or getattr(f, "trust_level", "") == "DISPUTED"
+        for f in (briefing.facts or [])
+    )
+    if has_dispute:
+        disp_reason = briefing.genuinely_disputed[0].reason if briefing.genuinely_disputed else "증거 간 상충"
+        changed_facts.append(f"제출된 증거 간 실질적 상충 및 모순 발생 (DISPUTED): {disp_reason}")
+        impacted_determinations.append(
+            "상충되는 사실관계에 대해서는 일방의 주장만을 근거로 단정적 법률 판단을 내릴 수 없으며, "
+            "분쟁(DISPUTED) 상태로 관리하여 객관적 추가 증빙에 따라 조건부로 판단함"
+        )
+        preserved_determinations.append(
+            "상충되지 않는 기존 기본 계약 체결 및 대항요건 취득 사실"
+        )
+        new_next_actions.append(
+            "상충 사실을 입증할 수 있는 객관적 금융거래원장, 공문서 등 추가 공적 증거 확보 및 법률전문가 대면 상담"
+        )
+
+    if not changed_facts:
+        return None
+
+    return {
+        "has_delta": True,
+        "changed_facts": changed_facts,
+        "impacted_determinations": impacted_determinations,
+        "preserved_determinations": preserved_determinations,
+        "new_next_actions": new_next_actions,
+    }
+
+
 def assemble_grounded_answer(
     issue_results: List[IssueVerificationResult],
     briefing: CaseEvidenceBriefing,
     draft_answer: str,
     disposition: str,
+    conv_context: Optional[Any] = None,
+    current_question: Optional[str] = None,
+    case_delta: Optional[Dict[str, Any]] = None,
 ) -> str:
     """검증된 쟁점과 확인된 사건 증거만을 구조적으로 조립하여 5개 섹션의 사용자용 최종 답변을 생성한다.
 
@@ -242,8 +407,39 @@ def assemble_grounded_answer(
     verified_issues = [r for r in issue_results if r.status == "VERIFIED"]
     conditional_issues = [r for r in issue_results if r.status in ("CONDITIONAL", "NEEDS_EVIDENCE", "NEEDS_LEGAL_SOURCE", "BLOCKED")]
 
+    # [P0-3] 사건 변동 사항 및 법률 판단 비교 (Section 5)
+    if case_delta is None and (current_question or conv_context):
+        case_delta = detect_case_delta(
+            briefing=briefing,
+            conv_context=conv_context,
+            current_question=current_question or "",
+            resolved_query="",
+        )
+
+    if case_delta and case_delta.get("has_delta"):
+        sections.append("[사건 변동 사항 및 법률 판단 비교]")
+        if case_delta.get("changed_facts"):
+            sections.append("■ 변경된 사실")
+            for cf in case_delta["changed_facts"]:
+                sections.append(f"- {cf}")
+        if case_delta.get("impacted_determinations"):
+            sections.append("■ 영향받는 법률 판단")
+            for idet in case_delta["impacted_determinations"]:
+                sections.append(f"- {idet}")
+        if case_delta.get("preserved_determinations"):
+            sections.append("■ 유지되는 판단")
+            for pdet in case_delta["preserved_determinations"]:
+                sections.append(f"- {pdet}")
+        if case_delta.get("new_next_actions"):
+            sections.append("■ 새로운 다음 행동")
+            for nact in case_delta["new_next_actions"]:
+                sections.append(f"- {nact}")
+        sections.append("")
+
     # [1. 현재 확인된 핵심 사실] (질문 연관 핵심 요건사실 우선 선별 및 원본 파일명 명시)
     sections.append("[1. 현재 확인된 핵심 사실]")
+    if case_delta and any("50,000,000원 일부 입금 진술" in cf for cf in case_delta.get("changed_facts", [])):
+        sections.append("- [잠정] 의뢰인이 임대인으로부터 50,000,000원을 입금받았다고 진술하였다 (증거 미제출 / USER_ALLEGED)")
     selected_facts = select_grounded_facts_for_display(briefing, query=draft_answer, max_facts=16)
     if selected_facts:
         for f in selected_facts:

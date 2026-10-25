@@ -385,6 +385,7 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
             ClaimCitation(**c) if isinstance(c, dict) else c
             for c in (result.get("claim_citations") or (resp.verification_result or {}).get("claim_citations") or [])
         ]
+        resp.case_delta = result.get("case_delta") or (resp.verification_result or {}).get("case_delta")
 
         # 요구사항 5: Langfuse 루트 Span/Trace에 최종 출처·검증·실행시간·토큰 요약 기록 (P2-02)
         try:
