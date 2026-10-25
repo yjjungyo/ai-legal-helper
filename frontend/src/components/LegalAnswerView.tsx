@@ -90,54 +90,90 @@ function classifySectionTitle(title: string): SectionCategoryConfig {
 export function renderInlineMarkdown(
   text: string,
   onEvidenceClick?: (label: string, meta?: CitationMeta) => void,
-  claimCitations?: ClaimCitation[]
+  claimCitations?: ClaimCitation[],
+  lineContext?: string
 ): React.ReactNode[] {
   if (!text) return [];
 
-  // 토큰 분할 정규식: **볼드**, `인라인코드`, *이탤릭*
+  // 토큰 분할 정규식: **볼드**, `인라인코드`, *이탤릭*, [증거파일명], [E01] 등
   const tokenRegex = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*|\[(?:E\d{1,3}[^\]]*|[^\]]+\.(?:pdf|docx|txt|png|jpg|jpeg))\]|\[E\d{1,3}\])/gi;
   const parts = text.split(tokenRegex);
 
   return parts.map((part, index) => {
     if (!part) return null;
 
-    // 증거 번호: [E01], [E02]
-    const evMatch = (part.match(/^\[E\d{1,3}/i) || part.match(/\.(pdf|docx|txt|png|jpg|jpeg)\]$/i)) ? part.match(/^\[(.*)\]$/) : null;
+    // 증거 번호 또는 파일명: [E01], [E01_주택임대차계약서.txt]
+    const evMatch = (part.match(/^\[E\d{1,3}/i) || part.match(/\.(pdf|docx|txt|png|jpg|jpeg)\]$/i) || part.match(/^\[.+\]$/))
+      ? part.match(/^\[(.*)\]$/)
+      : null;
+
     if (evMatch) {
-      const label = evMatch[1];
+      const rawLabel = evMatch[1].trim();
       let meta: CitationMeta | undefined;
+      let resolvedDocName = rawLabel;
+
       if (claimCitations && claimCitations.length > 0) {
-        const cleanUpper = label.replace(/[\[\]]/g, '').trim().toUpperCase();
-        const match = claimCitations.find((c) =>
-          c.citation_tag.toUpperCase().includes(cleanUpper) ||
-          c.evidence_refs.some((r) => (r.evidence_label || '').toUpperCase() === cleanUpper || (r.document_name || '').toUpperCase().includes(cleanUpper))
-        );
+        const cleanUpper = rawLabel.replace(/[\[\]]/g, '').trim().toUpperCase();
+
+        // 1. 현재 문장/라인 컨텍스트와 매칭되는 ClaimCitation 우선 필터링 (동일 증거 다중 인용 충돌 방지)
+        const ctx = (lineContext || text).trim();
+        const lineCitations = claimCitations.filter((c) => {
+          if (!c.claim_text) return false;
+          const cSnippet = c.claim_text.slice(0, 18);
+          const tSnippet = ctx.slice(0, 18);
+          return ctx.includes(cSnippet) || c.claim_text.includes(tSnippet);
+        });
+
+        // 2. 현재 문장 전용 매칭 후보가 있으면 우선 사용, 없으면 전체 citations 풀 사용
+        const searchPool = lineCitations.length > 0 ? lineCitations : claimCitations;
+
+        const match = searchPool.find((c) => {
+          const tagUpper = (c.citation_tag || '').toUpperCase();
+          return (
+            tagUpper.includes(cleanUpper) ||
+            c.evidence_refs.some((r) => {
+              const rLbl = (r.evidence_label || '').toUpperCase();
+              const rName = (r.document_name || '').toUpperCase();
+              return rLbl === cleanUpper || rName === cleanUpper || rName.includes(cleanUpper) || cleanUpper.includes(rName);
+            })
+          );
+        });
+
         if (match && match.evidence_refs.length > 0) {
-          const ref = match.evidence_refs.find((r) => (r.evidence_label || '').toUpperCase() === cleanUpper || (r.document_name || '').toUpperCase().includes(cleanUpper)) || match.evidence_refs[0];
+          const ref =
+            match.evidence_refs.find((r) => {
+              const rLbl = (r.evidence_label || '').toUpperCase();
+              const rName = (r.document_name || '').toUpperCase();
+              return rLbl === cleanUpper || rName === cleanUpper || rName.includes(cleanUpper) || cleanUpper.includes(rName);
+            }) || match.evidence_refs[0];
+
           meta = {
             evidenceId: ref.evidence_id,
             claimId: ref.claim_id || undefined,
             spanId: ref.span_id || undefined,
           };
+          if (ref.document_name) {
+            resolvedDocName = ref.document_name;
+          }
         }
       }
+
       return (
         <button
           key={index}
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            onEvidenceClick?.(label, meta);
+            onEvidenceClick?.(resolvedDocName || rawLabel, meta);
           }}
           className="chat-evidence-tag"
-          title={`증거 [${label}] 원문 및 발췌 확인`}
-          aria-label={`증거 ${label} 확인`}
+          title={`증거 [${resolvedDocName}] 원문 및 발췌 확인`}
+          aria-label={`증거 ${resolvedDocName} 확인`}
         >
-          📄 [{label}]
+          📄 [{resolvedDocName}]
         </button>
       );
     }
-
     // 볼드: **text**
     if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
       return (
@@ -205,7 +241,7 @@ function renderFormattedLine(line: string, index: number, onEvidenceClick?: (lab
         }}
       >
         <span style={{ color: 'var(--primary, #3b82f6)', fontWeight: 'bold' }}>•</span>
-        <span style={{ flex: 1, lineHeight: 1.6 }}>{renderInlineMarkdown(textContent, onEvidenceClick, claimCitations)}</span>
+        <span style={{ flex: 1, lineHeight: 1.6 }}>{renderInlineMarkdown(textContent, onEvidenceClick, claimCitations, line)}</span>
       </div>
     );
   }
@@ -226,7 +262,7 @@ function renderFormattedLine(line: string, index: number, onEvidenceClick?: (lab
         <span style={{ color: 'var(--text-muted, #64748b)', fontWeight: 600, minWidth: '20px' }}>
           {numMatch[1]}
         </span>
-        <span style={{ flex: 1, lineHeight: 1.6 }}>{renderInlineMarkdown(numMatch[2], onEvidenceClick, claimCitations)}</span>
+        <span style={{ flex: 1, lineHeight: 1.6 }}>{renderInlineMarkdown(numMatch[2], onEvidenceClick, claimCitations, line)}</span>
       </div>
     );
   }
@@ -245,7 +281,7 @@ function renderFormattedLine(line: string, index: number, onEvidenceClick?: (lab
           fontStyle: 'italic',
         }}
       >
-        {renderInlineMarkdown(quoteText, onEvidenceClick, claimCitations)}
+        {renderInlineMarkdown(quoteText, onEvidenceClick, claimCitations, line)}
       </div>
     );
   }
@@ -253,14 +289,10 @@ function renderFormattedLine(line: string, index: number, onEvidenceClick?: (lab
   // 4. 일반 문장
   return (
     <div key={index} style={{ margin: '2px 0', lineHeight: 1.6 }}>
-      {renderInlineMarkdown(line, onEvidenceClick, claimCitations)}
+      {renderInlineMarkdown(line, onEvidenceClick, claimCitations, line)}
     </div>
   );
 }
-
-/**
- * 구조화된 법률의견서 및 마크다운 텍스트를 섹션별 UI 요소로 파싱하여 렌더링하는 컴포넌트
- */
 export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvidenceClick, claimCitations }) => {
   const [collapsedSections, setCollapsedSections] = useState<Record<number, boolean>>({});
 

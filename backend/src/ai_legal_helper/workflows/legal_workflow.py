@@ -1029,7 +1029,12 @@ def finalize_node(state: LegalState) -> Dict:
         briefing_obj = CaseEvidenceBriefing(**briefing_raw)
         if issue_results_raw:
             from ai_legal_helper.workflows.final_disposition import build_claim_citations
-            claim_citations_data = build_claim_citations(issue_res_objs, briefing_obj, final)
+            claim_citations_data = build_claim_citations(
+                issue_results=issue_res_objs,
+                briefing=briefing_obj,
+                final_answer=final,
+                retrieved_sources=state.get("retrieved_sources", []),
+            )
 
         all_sources = list(cited_sources)
         seen_keys = {
@@ -1062,6 +1067,7 @@ def finalize_node(state: LegalState) -> Dict:
         "final_answer": final,
         "sources": cited_sources,
         "cited_sources": cited_sources,
+        "claim_citations": claim_citations_data,
         "warnings": warnings,
         "final_disposition": final_disp,
         "messages": [AIMessage(content=final)],

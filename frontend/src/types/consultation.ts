@@ -39,6 +39,7 @@ export interface Source {
   // 사건 증거(CASE_EVIDENCE) 및 일반 문서(DOCUMENT) 전용 필드
   evidence_id?: string | null;
   filename?: string | null;
+  original_filename?: string | null;
   category?: string | null;
   evidence_label?: string | null;
   label?: string | null;

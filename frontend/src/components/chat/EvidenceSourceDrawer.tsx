@@ -55,10 +55,9 @@ function findDocument(
 ): EvidenceDocument | undefined {
   if (!documents || documents.length === 0) return undefined;
 
-  // 1. UUID 기반 직접 매핑 (가장 정확한 식별)
+  // 1. UUID 기반 직접 매핑 (P0-2.1: UUID가 전달됐지만 해당 문서를 찾을 수 없는 경우 다른 문서로 대체하지 않는다)
   if (selectedEvidenceId) {
-    const docById = documents.find((doc) => doc.id === selectedEvidenceId);
-    if (docById) return docById;
+    return documents.find((doc) => doc.id === selectedEvidenceId);
   }
 
   if (!label) return undefined;
@@ -68,19 +67,19 @@ function findDocument(
   const cleanLabel = firstLabel.replace(/[\[\]]/g, '').trim();
   const cleanUpper = cleanLabel.toUpperCase();
 
-  // 2. evidence_label 일치 확인 (예: E01)
-  const labelMatch = documents.find((doc) => {
-    const el = (doc.evidence_label || '').trim().toUpperCase();
-    return el === cleanUpper;
-  });
-  if (labelMatch) return labelMatch;
-
-  // 3. 파일명 전체 일치 확인
+  // 2. 파일명 전체 일치 우선 확인 (P0-2.1: 원본 파일명 우선)
   const exactMatch = documents.find((doc) => {
     const fn = (doc.original_filename || doc.filename || '').trim();
     return fn === cleanLabel || fn.toUpperCase() === cleanUpper;
   });
   if (exactMatch) return exactMatch;
+
+  // 3. evidence_label 일치 확인 (예: E01)
+  const labelMatch = documents.find((doc) => {
+    const el = (doc.evidence_label || '').trim().toUpperCase();
+    return el === cleanUpper;
+  });
+  if (labelMatch) return labelMatch;
 
   // 4. 파일명 접두사 일치 확인 (예: E01_ 또는 E01 시작부)
   const prefixMatch = documents.find((doc) => {
@@ -175,7 +174,7 @@ export const EvidenceSourceDrawer: React.FC<EvidenceSourceDrawerProps> = ({
     return null;
   }
 
-  const displayTag = matchedDoc?.evidence_label || selectedLabel || '증거';
+  const displayTag = matchedDoc?.original_filename || matchedDoc?.filename || selectedLabel || '증거 문서';
 
   return (
     <>

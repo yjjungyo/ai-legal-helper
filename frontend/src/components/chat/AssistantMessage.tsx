@@ -193,6 +193,7 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
               <LegalAnswerView
                 content={message.answer || ''}
                 onEvidenceClick={onEvidenceClick}
+                claimCitations={message.claim_citations || (message.verification_result as any)?.claim_citations}
               />
 
               {/* 하단 인용 출처 목록 배지 */}
@@ -215,12 +216,13 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
                     const sid = s.source_id || s.document_id || s.file || `SRC-${idx + 1}`;
                     const evLabel = s.evidence_label || s.label || (sid.startsWith('E') ? sid : (s.file && s.file.startsWith('E') ? s.file.split('_')[0] : null));
                     const isEv = s.source_type === 'CASE_EVIDENCE' || Boolean(evLabel);
+                    const displayName = s.original_filename || s.title || s.file || sid;
                     return (
                       <span
                         key={idx}
                         onClick={() => {
-                          if (isEv && evLabel) {
-                            onEvidenceClick(evLabel, {
+                          if (isEv) {
+                            onEvidenceClick(displayName, {
                               evidenceId: s.evidence_id || undefined,
                               claimId: s.claim_id || undefined,
                               spanId: s.span_id || undefined,
@@ -237,7 +239,7 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
                           cursor: isEv ? 'pointer' : 'default',
                         }}
                       >
-                        {evLabel ? `[${evLabel}] ` : ''}{s.title || s.file || sid}
+                        {isEv ? `📄 ${displayName}` : displayName}
                       </span>
                     );
                   })}
