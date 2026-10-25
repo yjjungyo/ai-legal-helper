@@ -128,7 +128,7 @@ _AMOUNT_ROLE_PATTERNS: Tuple[Tuple[str, re.Pattern[str]], ...] = (
     ("MODIFIED_CONTRACT_AMOUNT", re.compile(r"증액|감액|변경\s*보증금|갱신\s*보증금|인상|인하")),
     ("TOTAL_AMOUNT", re.compile(r"합계|총액|전체\s*보증금|보증금\s*전액")),
     ("RETURN_REQUEST_AMOUNT", re.compile(r"반환\s*요청|반환을\s*요청|반환\s*청구")),
-    ("RETURNED_AMOUNT", re.compile(r"일부\s*반환|반환한\s*금액|반환된\s*금액|반환받은|돌려받은|돌려준|회수한|공제\s*후\s*반환|원을\s*반환하|원을\s*반환했")),
+    ("RETURNED_AMOUNT", re.compile(r"보증금\s*(?:중|에서)|일부\s*(?:반환|변제|지급|입금)|반환한\s*금액|반환된\s*금액|반환받은|돌려받은|돌려준|회수한|공제\s*후\s*반환|원을\s*(?:일부\s*)?(?:반환|변제|입금)|변제(?:하였|했|입금)")),
     ("REMAINING_DEBT", re.compile(r"미반환|미지급|잔여\s*채무|잔존\s*채무|남은\s*금액|못\s*받은|연체액|체불액")),
     ("DAMAGES_OR_PENALTY", re.compile(r"손해배상|위약금|지연손해금|수리비|원상복구|배상액|청구액")),
     ("DOWN_PAYMENT", re.compile(r"계약금|가계약금")),

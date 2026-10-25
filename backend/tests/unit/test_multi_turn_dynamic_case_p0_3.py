@@ -231,8 +231,8 @@ class TestScenarioS01PartialRepayment:
 
         assert delta is not None
         assert delta["has_delta"] is True
-        # 증거 확인 및 2.5억 감축 확정 명시
-        assert any("50,000,000원 일부 변제 입금 확인 [계좌이체확인증]" in f for f in delta["changed_facts"])
+        # 증거 확인 및 2.5억 감축 확정 명시 (관련 증거파일 전체 이름 연결)
+        assert any("50,000,000원 일부 변제 입금 확인" in f and "계좌이체확인증" in f for f in delta["changed_facts"])
         assert any("250,000,000원으로 감축 확정됨" in idet for idet in delta["impacted_determinations"])
         assert any("미반환 잔액 250,000,000원에 대한 지급명령 신청" in act for act in delta["new_next_actions"])
 

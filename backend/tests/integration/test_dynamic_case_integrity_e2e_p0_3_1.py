@@ -1,0 +1,612 @@
+# -*- coding: utf-8 -*-
+"""
+모듈명: test_dynamic_case_integrity_e2e_p0_3_1.py
+
+[모듈 개요]
+AI Legal Helper — P0-3.1 Dynamic Case State Integrity & E2E Verification 테스트 스위트.
+동적 사건 상태 처리의 무결성을 API 및 DB 수준에서 종합 검증한다.
+
+[10대 E2E 검증 시나리오]
+- E01: 부분 변제 2천만 원 (3억 사건에서 2천만원 지급 주장 시 [잠정] 잔액 2.8억 산정 및 증거 미확인 상태 유지)
+- E02: 입금 증거 등록 및 검토 승인 (실제 2천만원 이체증 승인 후 [확정] 잔액 2.8억 승격 및 원본 파일명 연결)
+- E03: 기존 입금 증거 오인 방지 (최초 보증금 지급 이체증을 임대인의 보증금 반환 증거로 오인 차단)
+- E04: 누적 부분 변제 (2천만원과 3천만원이 서로 다른 날짜에 승인 시 누적 반환액 5천만원, 미반환 잔액 2.5억 산정)
+- E05: 중복 요청 방지 (동일 이체증 중복 업로드나 상담 재시도 시 반환액 중복 합산 차단)
+- E06: 가압류 신규 등록 (새 등기 증거 미승인 시 권리관계 불변, 승인 후 실제 등기일과 임차인 대항력 순위 재검토)
+- E07: 통지일 정정 (정정 진술과 원문 증거가 다를 때 기존 확정 사실 보존 및 증거 도달일 우선 적용)
+- E08: 서버 재시작 및 세션 복원 (DB에 보존된 사실 변경 및 대화 이력이 새 세션에서 무손실 복원)
+- E09: 동시 요청 (동일 사건에 대한 병렬 상담 요청 시 턴 번호 중복 및 상태 충돌 방지)
+- E10: 사건 격리 (사건 A의 부분 변제 증거/결과가 사건 B의 잔액 산정이나 상담에 일체 누출되지 않음)
+"""
+
+import uuid
+import pytest
+from concurrent.futures import ThreadPoolExecutor
+from typing import Generator
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
+
+from ai_legal_helper.api.main import app
+from ai_legal_helper.database.session import SessionLocal
+from ai_legal_helper.database.models import (
+    User,
+    Case,
+    EvidenceDocument,
+    EvidenceClaim,
+    EvidenceLink,
+    Fact,
+    Event,
+    ConsultationRecord,
+)
+from ai_legal_helper.case_intelligence.case_briefing import (
+    CaseEvidenceBriefing,
+    FactItemBrief,
+    EvidenceItemBrief,
+    build_case_evidence_briefing,
+)
+from ai_legal_helper.case_intelligence.evidence_manager import (
+    process_evidence_review,
+)
+from ai_legal_helper.workflows.final_disposition import (
+    detect_case_delta,
+    assemble_grounded_answer,
+    extract_case_contract_deposit,
+    extract_case_prior_verified_repayments,
+    extract_case_opposing_power_date,
+    extract_case_notice_delivery_date,
+    find_case_attachment_evidence_name,
+)
+from ai_legal_helper.workflows.conversation_context import (
+    ConversationContext,
+    ConversationTurn,
+    load_conversation_context,
+)
+
+client = TestClient(app)
+
+
+@pytest.fixture
+def db() -> Generator[Session, None, None]:
+    """격리된 테스트용 DB 세션 픽스처."""
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.rollback()
+        session.close()
+
+
+@pytest.fixture
+def test_user_a(db: Session) -> User:
+    """테스트 사용자 A 픽스처."""
+    uid = f"user_a_{uuid.uuid4().hex[:8]}"
+    user = User(
+        id=uid,
+        email=f"{uid}@legal.test",
+        password_hash="mock_hash_a",
+        display_name="임차인A",
+        status="ACTIVE",
+    )
+    db.add(user)
+    db.commit()
+    return user
+
+
+@pytest.fixture
+def test_user_b(db: Session) -> User:
+    """테스트 사용자 B 픽스처."""
+    uid = f"user_b_{uuid.uuid4().hex[:8]}"
+    user = User(
+        id=uid,
+        email=f"{uid}@legal.test",
+        password_hash="mock_hash_b",
+        display_name="임차인B",
+        status="ACTIVE",
+    )
+    db.add(user)
+    db.commit()
+    return user
+
+
+@pytest.fixture
+def case_300m(db: Session, test_user_a: User) -> Case:
+    """보증금 3억 원 임대차 사건 픽스처."""
+    cid = f"case_300m_{uuid.uuid4().hex[:8]}"
+    case = Case(
+        id=cid,
+        user_id=test_user_a.id,
+        title="보증금 3억 원 반환 분쟁 사건",
+        case_type="HOUSING_LEASE",
+        status="OPEN",
+        version=1,
+    )
+    db.add(case)
+    db.commit()
+
+    # 1. 계약 보증금 Fact (300,000,000원)
+    f1 = Fact(
+        id=f"fact_dep_{uuid.uuid4().hex[:8]}",
+        case_id=cid,
+        statement="임대차계약 체결일은 2022년 2월 20일이고, 보증금은 300,000,000원이다.",
+        verification_status="DOCUMENT_VERIFIED",
+        source_type="DOCUMENT_SUPPORTED",
+    )
+    # 2. 대항력 및 확정일자 Fact (2022년 3월 1일)
+    f2 = Fact(
+        id=f"fact_opp_{uuid.uuid4().hex[:8]}",
+        case_id=cid,
+        statement="임차인은 2022년 3월 1일 주택에 입주 및 전입신고를 마치고 확정일자를 부여받았다.",
+        verification_status="DOCUMENT_VERIFIED",
+        source_type="DOCUMENT_SUPPORTED",
+    )
+    # 3. 해지통고 도달 Fact (2024년 2월 5일)
+    f3 = Fact(
+        id=f"fact_not_{uuid.uuid4().hex[:8]}",
+        case_id=cid,
+        statement="임대차계약 해지통고 내용증명 우편이 2024년 2월 5일 임대인에게 도달 완료되었다.",
+        verification_status="DOCUMENT_VERIFIED",
+        source_type="DOCUMENT_SUPPORTED",
+    )
+    db.add_all([f1, f2, f3])
+    db.commit()
+    return case
+
+
+# ==============================================================================
+# E01 — 부분 변제 2천만 원 (미입증 구두 진술)
+# ==============================================================================
+def test_e01_partial_repayment_20m_krw_provisional(db: Session, case_300m: Case):
+    """3억 원 사건에서 2천만 원 지급 주장 시 잠정 잔액 2억 8천만 원을 안내하고 확정 승격을 차단한다."""
+    briefing = build_case_evidence_briefing(db, case_300m.id)
+
+    # 계약 보증금 동적 인출 확인
+    assert extract_case_contract_deposit(briefing) == 300_000_000
+
+    delta = detect_case_delta(
+        briefing=briefing,
+        current_question="집주인이 2천만 원을 입금했어요. 남은 보증금은 얼마인가요?",
+        resolved_query="의뢰인의 보증금 일부 입금/변제 주장에 따른 보증금 잔액 변동 및 입금 증거 확인 필요성 검토",
+    )
+
+    assert delta is not None
+    assert delta["has_delta"] is True
+    # 1. USER_ALLEGED 사실 식별
+    assert any("20,000,000원 일부 입금 진술 접수" in f and "USER_ALLEGED" in f for f in delta["changed_facts"])
+    # 2. 잠정 잔액 280,000,000원 도출 및 채무충당(민법 제479조) 안내
+    assert any("280,000,000원으로 안내되나" in idet and "민법 제479조" in idet for idet in delta["impacted_determinations"])
+    # 3. 대항력·우선변제권 및 반환청구 권리는 전액 반환 시까지 유지
+    assert any("임차인의 대항력, 우선변제권" in pdet for pdet in delta["preserved_determinations"])
+    # 4. 이체확인증 등록 권고
+    assert any("20,000,000원의 계좌 이체확인증 또는 영수증을 증거로 등록" in act for act in delta["new_next_actions"])
+
+    # 답변 조립 시 [사건 변동 사항 및 법률 판단 비교]와 [잠정] 표시 확인
+    answer = assemble_grounded_answer(
+        issue_results=[],
+        briefing=briefing,
+        draft_answer="2천만원 입금 관련",
+        disposition="CAUTIONARY",
+        case_delta=delta,
+    )
+    assert "[사건 변동 사항 및 법률 판단 비교]" in answer
+    assert "[잠정]" in answer
+    assert "20,000,000원" in answer
+
+
+# ==============================================================================
+# E02 — 입금 증거 등록 및 검토 승인
+# ==============================================================================
+def test_e02_deposit_transfer_evidence_approved_confirms_balance(db: Session, case_300m: Case):
+    """실제 2천만 원 이체 증거를 등록·검토·승인한 뒤 미반환 잔액 2억 8천만 원이 확정되는지 검증한다."""
+    # 1. 2천만원 이체확인증 EvidenceDocument 생성
+    doc_id = f"doc_trans_{uuid.uuid4().hex[:8]}"
+    doc = EvidenceDocument(
+        id=doc_id,
+        case_id=case_300m.id,
+        original_filename="보증금_일부반환_이체확인증_2천만원.txt",
+        safe_storage_key=f"storage/{doc_id}.txt",
+        media_type="text/plain",
+        size_bytes=200,
+        sha256=f"sha_{uuid.uuid4().hex[:16]}",
+        status="UPLOADED",
+    )
+    db.add(doc)
+    db.flush()
+
+    # 2. EvidenceClaim 생성
+    claim_id = f"claim_trans_{uuid.uuid4().hex[:8]}"
+    claim = EvidenceClaim(
+        id=claim_id,
+        case_id=case_300m.id,
+        evidence_id=doc.id,
+        statement="임대인이 2024년 5월 1일 보증금 중 20,000,000원을 일부 변제 입금하였다.",
+        assertion_status="DOCUMENT_STATES",
+        review_status="PENDING_REVIEW",
+    )
+    db.add(claim)
+    db.commit()
+
+    # 3. EvidenceReview 실행 (APPROVE) -> Fact 자동 승격
+    process_evidence_review(
+        db=db,
+        claim_id=claim.id,
+        action="APPROVE",
+        expected_case_id=case_300m.id,
+        expected_evidence_id=doc.id,
+    )
+
+    # 4. 브리핑 재구축 후 갱신 상태 검증
+    briefing = build_case_evidence_briefing(db, case_300m.id)
+    repaid_total, repaid_srcs = extract_case_prior_verified_repayments(briefing)
+    assert repaid_total == 20_000_000
+    assert any("20,000,000원" in s for s in repaid_srcs)
+
+    delta = detect_case_delta(
+        briefing=briefing,
+        current_question="이제 남은 보증금 잔액은 얼마이고 무엇을 해야 하나요?",
+        resolved_query="일부 변제 확인 후 잔여 보증금 잔액 산정 및 다음 조치",
+    )
+
+    assert delta is not None
+    assert delta["has_delta"] is True
+    # 전체 파일명 연결 확인 (Rule 8)
+    assert any("20,000,000원 일부 변제 입금 확인" in f and "보증금_일부반환_이체확인증_2천만원.txt" in f for f in delta["changed_facts"])
+    # 2억 8천만원 감축 확정
+    assert any("280,000,000원으로 감축 확정됨" in idet for idet in delta["impacted_determinations"])
+    # 잔액 2.8억원에 대한 지급명령 신청 가이드
+    assert any("280,000,000원에 대한 지급명령 신청" in act for act in delta["new_next_actions"])
+
+
+# ==============================================================================
+# E03 — 기존 입금 증거 오인 방지 (최초 보증금 지급 vs 임대인 반환)
+# ==============================================================================
+def test_e03_tenant_initial_deposit_payment_not_misclassified_as_landlord_return(db: Session, case_300m: Case):
+    """임차인의 최초 보증금 지급 이체증(계약금·잔금)을 임대인의 반환으로 오인 합산하지 않는다."""
+    # 최초 계약금/잔금 지급 이체증 추가 등록
+    doc = EvidenceDocument(
+        id=f"doc_initial_{uuid.uuid4().hex[:8]}",
+        case_id=case_300m.id,
+        original_filename="E01_계약금_잔금_지급_이체확인증.txt",
+        safe_storage_key="storage/initial.txt",
+        media_type="text/plain",
+        size_bytes=100,
+        sha256="sha_init",
+        status="APPROVED",
+    )
+    db.add(doc)
+    fact_tenant_payment = Fact(
+        id=f"fact_pay_{uuid.uuid4().hex[:8]}",
+        case_id=case_300m.id,
+        statement="임차인은 2022년 3월 1일 잔금 270,000,000원을 임대인 계좌로 전액 지급 완료하였다.",
+        verification_status="DOCUMENT_VERIFIED",
+        source_type="DOCUMENT_SUPPORTED",
+        source_ref=doc.id,
+    )
+    db.add(fact_tenant_payment)
+    db.commit()
+
+    briefing = build_case_evidence_briefing(db, case_300m.id)
+    # 최초 보증금 지급 내역은 임대인의 반환금으로 합산되지 않아야 함 (0원)
+    repaid_total, _ = extract_case_prior_verified_repayments(briefing)
+    assert repaid_total == 0
+
+    # 일반 상담 질의 시 반환액 0원, 미반환 잔액 3억 원 유지 확인
+    delta = detect_case_delta(
+        briefing=briefing,
+        current_question="전세보증금을 아직 못 받았습니다. 어떻게 대처해야 하나요?",
+        resolved_query="",
+    )
+    # 질문에 반환 관련 단어가 없으므로 delta는 None
+    assert delta is None
+
+
+# ==============================================================================
+# E04 — 누적 부분 변제 (2천만 원 + 3천만 원 = 5천만 원)
+# ==============================================================================
+def test_e04_cumulative_partial_repayments_20m_and_30m(db: Session, case_300m: Case):
+    """서로 다른 일자에 확인된 2천만 원과 3천만 원이 누적 5천만 원 반환, 잔액 2.5억 원으로 정밀 산정된다."""
+    # 1. 첫 번째 반환 Fact (2천만 원)
+    f1 = Fact(
+        id=f"fact_r1_{uuid.uuid4().hex[:8]}",
+        case_id=case_300m.id,
+        statement="임대인이 2024년 4월 1일 보증금 중 일부 변제 20,000,000원을 입금 확인하였다.",
+        verification_status="DOCUMENT_VERIFIED",
+        source_type="DOCUMENT_SUPPORTED",
+    )
+    # 2. 두 번째 반환 Fact (3천만 원)
+    f2 = Fact(
+        id=f"fact_r2_{uuid.uuid4().hex[:8]}",
+        case_id=case_300m.id,
+        statement="임대인이 2024년 5월 1일 보증금 중 일부 변제 30,000,000원을 추가 입금 확인하였다.",
+        verification_status="DOCUMENT_VERIFIED",
+        source_type="DOCUMENT_SUPPORTED",
+    )
+    db.add_all([f1, f2])
+    db.commit()
+
+    briefing = build_case_evidence_briefing(db, case_300m.id)
+    repaid_total, repaid_srcs = extract_case_prior_verified_repayments(briefing)
+
+    # 누적 5천만 원 확인
+    assert repaid_total == 50_000_000
+    assert len(repaid_srcs) == 2
+
+    # 잔액 2.5억 원 산정
+    contract_deposit = extract_case_contract_deposit(briefing)
+    assert contract_deposit == 300_000_000
+    remaining_balance = contract_deposit - repaid_total
+    assert remaining_balance == 250_000_000
+
+
+# ==============================================================================
+# E05 — 중복 요청 방지 (Idempotency)
+# ==============================================================================
+def test_e05_duplicate_request_idempotency(db: Session, case_300m: Case):
+    """동일한 이체증이나 사실을 중복 조회하거나 반복 질문해도 반환액이 이중 합산되지 않는다."""
+    # 동일 2천만 원 반환 Fact 등록
+    f = Fact(
+        id=f"fact_dup_{uuid.uuid4().hex[:8]}",
+        case_id=case_300m.id,
+        statement="임대인이 20,000,000원을 일부 변제 입금 확인하였다.",
+        verification_status="DOCUMENT_VERIFIED",
+        source_type="DOCUMENT_SUPPORTED",
+    )
+    db.add(f)
+    db.commit()
+
+    briefing = build_case_evidence_briefing(db, case_300m.id)
+    repaid_1, _ = extract_case_prior_verified_repayments(briefing)
+    repaid_2, _ = extract_case_prior_verified_repayments(briefing)
+
+    assert repaid_1 == 20_000_000
+    assert repaid_2 == 20_000_000  # 4천만 원으로 누적되지 않음
+
+
+# ==============================================================================
+# E06 — 가압류 신규 등록 (미승인 시 권리관계 불변, 승인 후 선순위 평가)
+# ==============================================================================
+def test_e06_new_attachment_unapproved_vs_approved(db: Session, case_300m: Case):
+    """새 등기 증거 미승인 시 권리관계가 불변이며, 승인 후 임차인 대항력(2022.03.01)과의 선후관계를 평가한다."""
+    # 1. 미승인 상태의 가압류 등기부 업로드
+    doc_id = f"doc_att_{uuid.uuid4().hex[:8]}"
+    doc = EvidenceDocument(
+        id=doc_id,
+        case_id=case_300m.id,
+        original_filename="부동산등기사항전부증명서_을구.txt",
+        safe_storage_key=f"storage/{doc_id}.txt",
+        media_type="text/plain",
+        size_bytes=100,
+        sha256="sha_att",
+        status="UPLOADED",  # 미승인
+    )
+    db.add(doc)
+    db.commit()
+
+    # 미승인 상태 브리핑: 가압류 Fact 부재
+    briefing_unapproved = build_case_evidence_briefing(db, case_300m.id)
+    assert not any("가압류" in f.statement for f in briefing_unapproved.facts)
+
+    # 2. 가압류 Claim 승인하여 Fact로 승격
+    fact_att = Fact(
+        id=f"fact_att_{uuid.uuid4().hex[:8]}",
+        case_id=case_300m.id,
+        statement="2024년 5월 10일 목적물에 채권자 동진은행의 50,000,000원 가압류 등기가 추가 설정되었다.",
+        verification_status="DOCUMENT_VERIFIED",
+        source_type="DOCUMENT_SUPPORTED",
+        source_ref=doc.id,
+    )
+    db.add(fact_att)
+    doc.status = "APPROVED"
+    db.commit()
+
+    briefing_approved = build_case_evidence_briefing(db, case_300m.id)
+    opp_date = extract_case_opposing_power_date(briefing_approved)
+    assert opp_date == "2022.03.01"
+
+    delta = detect_case_delta(
+        briefing=briefing_approved,
+        current_question="가압류가 등기부에 추가되었는데 제 보증금 순위가 밀리나요?",
+        resolved_query="가압류 추가에 따른 임차인의 대항력 및 배당순위 영향 검토",
+    )
+
+    assert delta is not None
+    assert delta["has_delta"] is True
+    # 가압류 추가 확인 및 등기부 원본 문서명 연결
+    assert any("가압류 등기 사실 추가 확인" in f and "부동산등기사항전부증명서_을구.txt" in f for f in delta["changed_facts"])
+    # 2022.03.01 대항요건이 신규 가압류(2024년)보다 선순위이므로 기존 우선순위 보존
+    assert any("기존 우선순위 보존" in idet for idet in delta["impacted_determinations"])
+    assert any("2022.03.01" in pdet for pdet in delta["preserved_determinations"])
+
+
+# ==============================================================================
+# E07 — 통지일 정정 (구두 진술 vs 서면 증거 도달일 우선)
+# ==============================================================================
+def test_e07_notice_delivery_date_correction_preserves_evidence_date(db: Session, case_300m: Case):
+    """사용자가 통지일을 구두로 다르게 말하더라도 등록된 서면 증거의 도달일(2024.02.05)을 유지한다."""
+    briefing = build_case_evidence_briefing(db, case_300m.id)
+    actual_date = extract_case_notice_delivery_date(briefing)
+    assert actual_date == "2024.02.05"
+
+    delta = detect_case_delta(
+        briefing=briefing,
+        current_question="제가 날짜를 잘못 알았는데, 통지일이 2024년 3월 20일이에요.",
+        resolved_query="의뢰인의 통지일 정정 진술과 서면 증거 도달일 대조",
+    )
+
+    assert delta is not None
+    assert delta["has_delta"] is True
+    # 사용자 진술은 USER_ALLEGED로 기록
+    assert any("USER_ALLEGED" in f for f in delta["changed_facts"])
+    # 서면 증거의 실제 도달일(2024.02.05)을 기준으로 법률효과 유지 및 임의 변경 차단
+    assert any("2024.02.05" in idet and "임의 변경하지 않음" in idet for idet in delta["impacted_determinations"])
+
+
+# ==============================================================================
+# E08 — 서버 재시작 및 세션 복원
+# ==============================================================================
+def test_e08_server_restart_and_session_continuity(db: Session, case_300m: Case, test_user_a: User):
+    """DB에 보존된 사실 변경 및 대화 이력이 새 세션에서 무손실 복원되는지 검증한다."""
+    conv_id = f"conv_{case_300m.id}"
+
+    # 1. 첫 번째 턴 기록 (case_delta 포함)
+    mock_delta = {
+        "has_delta": True,
+        "changed_facts": ["의뢰인의 20,000,000원 일부 입금 진술 접수 (USER_ALLEGED)"],
+        "impacted_determinations": ["잠정 잔액 280,000,000원"],
+        "preserved_determinations": ["대항력 유지"],
+        "new_next_actions": ["이체확인증 제출"],
+    }
+    rec1 = ConsultationRecord(
+        request_id=f"req_{uuid.uuid4().hex[:8]}",
+        case_id=case_300m.id,
+        user_id=test_user_a.id,
+        conversation_id=conv_id,
+        turn_index=1,
+        question="2천만원 입금받았어요",
+        answer="잠정 잔액은 2억 8천만원입니다.",
+        status="SUCCESS",
+        execution_status="COMPLETED",
+        answer_status="CAUTIONARY",
+        verification_result={"case_delta": mock_delta},
+    )
+    db.add(rec1)
+    db.commit()
+
+    # 2. 서버 재시작 시뮬레이션: 세션 캐시 무효화 후 새로운 컨텍스트 로드
+    db.expire_all()
+    restored_ctx = load_conversation_context(
+        db=db,
+        conversation_id=conv_id,
+        current_question="다음에는 무엇을 해야 하나요?",
+        case_id=case_300m.id,
+        user_id=test_user_a.id,
+    )
+
+    assert restored_ctx is not None
+    assert restored_ctx.conversation_id == conv_id
+    assert restored_ctx.case_id == case_300m.id
+    assert restored_ctx.turn_index == 2  # 다음 턴 번호는 2
+    assert len(restored_ctx.previous_turns) == 1
+    # 복원된 턴의 delta 검증
+    assert restored_ctx.previous_turns[0].case_delta is not None
+    assert "20,000,000원" in restored_ctx.previous_turns[0].case_delta["changed_facts"][0]
+
+
+# ==============================================================================
+# E09 — 동시 요청 (Concurrent Turn Consistency)
+# ==============================================================================
+def test_e09_concurrent_requests_handling(case_300m: Case, test_user_a: User):
+    """동일 사건에 대해 병렬로 동시 상담 턴 기록 시 충돌 없이 턴이 순차 증가하는지 검증한다."""
+    conv_id = f"conv_concurrent_{uuid.uuid4().hex[:8]}"
+    target_case_id = str(case_300m.id)
+    target_user_id = str(test_user_a.id)
+
+    def record_concurrent_turn(turn_no: int):
+        with SessionLocal() as local_db:
+            rec = ConsultationRecord(
+                request_id=f"req_{uuid.uuid4().hex[:8]}",
+                case_id=target_case_id,
+                user_id=target_user_id,
+                conversation_id=conv_id,
+                turn_index=turn_no + 1,
+                question=f"동시 질문 {turn_no}",
+                answer=f"동시 답변 {turn_no}",
+                status="SUCCESS",
+                execution_status="COMPLETED",
+                answer_status="DELIVERED",
+            )
+            local_db.add(rec)
+            local_db.commit()
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = [executor.submit(record_concurrent_turn, i) for i in range(4)]
+        for f in futures:
+            f.result()
+
+    with SessionLocal() as verify_db:
+        ctx = load_conversation_context(
+            db=verify_db,
+            conversation_id=conv_id,
+            current_question="마지막 질문",
+            case_id=target_case_id,
+            user_id=target_user_id,
+        )
+        assert ctx is not None
+        assert len(ctx.previous_turns) == 4
+        # 턴 번호가 1, 2, 3, 4로 고유하게 부여되었는지 확인
+        turn_indices = [t.turn_index for t in ctx.previous_turns]
+        assert sorted(turn_indices) == [1, 2, 3, 4]
+
+
+# ==============================================================================
+# E10 — 사건 격리 (Cross-case Isolation)
+# ==============================================================================
+def test_e10_cross_case_isolation(db: Session, case_300m: Case, test_user_a: User, test_user_b: User):
+    """사건 A의 부분 변제 증거/결과가 사건 B의 보증금 잔액 산정이나 상담에 일체 누출되지 않는다."""
+    # 사건 B 생성 (보증금 1억 원)
+    cid_b = f"case_100m_{uuid.uuid4().hex[:8]}"
+    case_b = Case(
+        id=cid_b,
+        user_id=test_user_b.id,
+        title="사건 B - 보증금 1억 원",
+        case_type="HOUSING_LEASE",
+        status="OPEN",
+        version=1,
+    )
+    db.add(case_b)
+    db.commit()
+
+    fact_b = Fact(
+        id=f"fact_b_{uuid.uuid4().hex[:8]}",
+        case_id=cid_b,
+        statement="임대차계약상 보증금은 100,000,000원이다.",
+        verification_status="DOCUMENT_VERIFIED",
+        source_type="DOCUMENT_SUPPORTED",
+    )
+    db.add(fact_b)
+    db.commit()
+
+    # 사건 A에 2천만 원 변제 사실 추가
+    fact_a_repay = Fact(
+        id=f"fact_a_rep_{uuid.uuid4().hex[:8]}",
+        case_id=case_300m.id,
+        statement="임대인이 20,000,000원을 일부 변제 입금 확인하였다.",
+        verification_status="DOCUMENT_VERIFIED",
+        source_type="DOCUMENT_SUPPORTED",
+    )
+    db.add(fact_a_repay)
+    db.commit()
+
+    # 사건 B 브리핑 생성 및 검증
+    briefing_b = build_case_evidence_briefing(db, cid_b)
+    # 사건 B의 보증금은 1억 원이어야 함 (사건 A의 3억 원 누출 차단)
+    assert extract_case_contract_deposit(briefing_b) == 100_000_000
+    # 사건 B의 기변제액은 0원이어야 함 (사건 A의 2천만 원 누출 차단)
+    repaid_b, _ = extract_case_prior_verified_repayments(briefing_b)
+    assert repaid_b == 0
+
+    # 사건 A에 속한 상담 대화 세션 레코드 생성
+    conv_a_id = f"conv_{case_300m.id}"
+    rec_a = ConsultationRecord(
+        request_id=f"req_{uuid.uuid4().hex[:8]}",
+        case_id=case_300m.id,
+        user_id=test_user_a.id,
+        conversation_id=conv_a_id,
+        turn_index=1,
+        question="사건 A 질문",
+        answer="사건 A 답변",
+        status="SUCCESS",
+        execution_status="COMPLETED",
+        answer_status="DELIVERED",
+    )
+    db.add(rec_a)
+    db.commit()
+
+    # 타 사용자가 사건 A의 대화 세션에 교차 접근 시 403 Forbidden 차단 검증
+    with pytest.raises(PermissionError):
+        load_conversation_context(
+            db=db,
+            conversation_id=conv_a_id,
+            current_question="접근 시도",
+            case_id=cid_b,  # 사건 B의 ID로 사건 A 세션 접근 시도
+            user_id=test_user_b.id,
+        )

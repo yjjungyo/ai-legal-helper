@@ -593,7 +593,9 @@ def extract_semantic_fact(
             event_subtype = "RENT"
         elif "급여" in compact or "임금" in compact:
             event_subtype = "WAGE"
-        elif "반환" in compact and not ("보증금" in compact and ("계약" in compact or "원금" in compact)):
+        elif ("반환" in compact or "변제" in compact or "돌려" in compact) and (
+            "일부" in compact or "중" in compact or not ("보증금" in compact and ("계약" in compact or "원금" in compact))
+        ):
             event_subtype = "RETURN_AMOUNT"
         else:
             event_subtype = "PRINCIPAL_DEPOSIT"

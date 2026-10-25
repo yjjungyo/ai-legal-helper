@@ -92,7 +92,7 @@ INTENT_PROMPT = PromptTemplate.from_template(
   * 예: 현재 질문 "그럼 지금 이사를 가도 돼?" + 이전 대화 "보증금 미반환 분쟁"
     → resolved_query: "보증금 미반환 및 임차권등기명령 완료 전 목적물 퇴거(이사/점유 이전) 시 대항력 및 우선변제권 유지 여부와 퇴거 안전 요건"
 - 사실관계를 새로 진술하는 경우(FACT_CLARIFICATION), 그 사실이 기존 판단에 어떤 영향을 미치는지 재검토할 수 있도록 resolved_query를 구성하세요.
-  * 예: 현재 질문 "임대인이 5천만원을 입금했다고 합니다"
+  * 예: 현재 질문 "집주인이 2천만 원을 입금했다고 합니다" (또는 "임대인이 일부 변제했습니다")
     → resolved_query: "의뢰인의 보증금 일부 입금/변제 주장에 따른 보증금 잔액 변동 및 입금 증거 확인 필요성 검토"
 
 #### [대화 맥락]
@@ -180,9 +180,9 @@ def _heuristic_rule_fallback(
             reason="보증금 미반환 상태에서 이사/퇴거 및 점유 상실 시 대항력 상실 위험에 관한 세부 쟁점 질의",
         )
 
-    # 3-2. 보증금 일부 변제 / 입금 주장 (S01: "5천만원 입금했다고 합니다")
-    repayment_keywords = ["5천만원", "5000만원", "5,000만원", "입금", "변제", "일부 반환", "돌려받", "돌려줬"]
-    if any(k in q_clean for k in repayment_keywords):
+    # 3-2. 보증금 일부 변제 / 입금 주장 (e.g. "집주인이 2천만 원을 입금했어요", "5천만원 입금했다고 합니다")
+    repayment_keywords = ["입금", "변제", "일부 반환", "돌려받", "돌려줬", "돌려주", "송금", "갚았", "부쳤", "일부 지급"]
+    if any(k in q_clean for k in repayment_keywords) and any(w in q_clean for w in ["원", "만", "천", "억", "입금", "변제", "돌려", "받았", "보냈", "집주인", "임대인"]):
         return IntentDecision(
             intent=ConsultationIntent.FACT_CLARIFICATION,
             resolved_query=f"의뢰인의 보증금 일부 입금/변제 주장에 따른 보증금 잔액 변동 및 입금 증거 확인 필요성 검토: {q_clean}",
