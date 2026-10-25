@@ -2,7 +2,7 @@
 
 **작성일자:** 2026-10-25  
 **작업 구분:** P0-3.1 Dynamic Case State Integrity & E2E Verification (최종 잔여 결함 수정 및 전체 검증 완료)  
-**기준 커밋:** `6885d70fbc9e0bd894b44c6cd32e2d62e8b54ede`  
+**기준 커밋:** `7f67572` (최종 반영 SHA)  
 **평가 하네스/Gold 기준:** Evaluation Harness v1.2 / Gold v1.2 동결 유지  
 **검증 스위트 결과:** 전체 134건 전수 통과 (20 E2E 통합 테스트 PASS, 103 단위·회귀 테스트 PASS, 11 평가 하네스 테스트 PASS)  
 
