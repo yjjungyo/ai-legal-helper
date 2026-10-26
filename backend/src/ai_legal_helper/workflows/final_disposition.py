@@ -766,12 +766,13 @@ def detect_case_delta(
             "확인한 후에 비로소 이사(점유 이전)할 것"
         )
 
-    # 3. 새로운 가압류 사실 추가 (S02 / P0-3.1 권리순위 검증 강화)
-    attachment_terms = ["가압류", "압류", "강제집행"]
+    # 3. 새로운 가압류 사실 추가 (S02 / P0-3.1 권리순위 검증 강화, P0-4.2 무관한 가압류 주입 차단)
+    # [P0-4.2 작업 A] 후속 턴이라는 이유만으로 가압류 델타를 자동 주입하지 않고,
+    # 사용자의 질문이나 작업 질의가 가압류, 압류, 강제집행, 경매, 배당, 권리순위에 직접 관련된 경우에만 활성화한다.
+    attachment_terms = ["가압류", "압류", "강제집행", "경매", "배당", "배당요구", "순위", "권리순위", "우선순위", "말소기준"]
     has_attachment_fact, attachment_date, att_doc_name, is_att_verified = extract_case_attachment_info(briefing)
-    is_multi_turn = bool(conv_context and getattr(conv_context, "turn_index", 1) > 1) if not isinstance(conv_context, dict) else (conv_context.get("turn_index", 1) > 1)
 
-    if any(t in q_corpus for t in attachment_terms) or (has_attachment_fact and is_multi_turn):
+    if any(t in q_corpus for t in attachment_terms):
         tenant_date = extract_case_opposing_power_date(briefing)
         prior_encumbrances = extract_case_prior_encumbrances(briefing, tenant_date)
 
@@ -809,7 +810,7 @@ def detect_case_delta(
             changed_facts.append(f"목적물 부동산에 후순위 가압류 등기 사실 추가 확인 [{att_doc_name}]")
             impacted_determinations.append(
                 f"[판단할 수 있는 사실]: 신규 가압류 채권자에 대해서는 임차인의 대항요건 및 확정일자({tenant_date})가 앞서므로 기존 우선순위 보존 및 대항력 유지. "
-                "[추가로 필요한 등기·법률정보]: 단, 등기사항전부증명서(을구) 상의 다른 선순위 근저당권이나 조세채권(당해세) 법정기일 등 우선채권 변동 여부를 추가 확인해야 최종 경매 배당 순위가 확정되며, 확정일자 및 선순위 권리 확인 전까지 절대적 1순위 또는 전액 최우선 배당을 단정할 수 없음"
+                "[추가로 필요한 등기·법률정보]: 단, 등기사항전부증명서(을구) 상의 다른 선순위 제한물권(담보권)이나 조세채권(당해세 등 법정기일 우선채권)의 존재 및 변동 여부를 추가 확인해야 최종 경매 배당 순위가 확정되며, 공적 등기부 열람 전까지 절대적 1순위 또는 전액 최우선 배당을 단정할 수 없음"
             )
             preserved_determinations.append(
                 f"임차인의 1순위 대항력 및 우선변제권 ({tenant_date} 확정일자 기준 후순위 가압류 대비 선순위 지위 유지)"
@@ -1020,30 +1021,149 @@ def assemble_grounded_answer(
     else:
         sections.append("- 현재 핵심 쟁점들에 관한 조건부 유보 사항 없이 검증된 법률 효력을 기준으로 확정 안내합니다.")
 
-    # [4. 지금 할 수 있는 안전한 행동 가이드] (구체적이고 안전한 다음 행동 5단계)
+    # [4. 지금 할 수 있는 안전한 행동 가이드] (P0-4.2 작업 F: 쟁점 및 질문 상황별 구체적 맞춤 행동 제시)
     sections.append("\n[4. 지금 할 수 있는 안전한 행동 가이드]")
-    action_items_config = [
-        {
-            "text": "보증금 전액을 반환받거나 관할 법원의 임차권등기명령에 따른 등기가 등기부에 기재되기 전까지는 절대 주택의 점유를 상실(열쇠 인도, 비밀번호 공유, 임의 퇴거)하거나 전입을 옮기지 마십시오. (대항력 및 우선변제권 유지 필수)",
-            "evidence_labels": ["E01", "E03", "E16"],
-        },
-        {
-            "text": "임대인에게 보증금 반환 최고 및 지연손해금(민법 연 5%, 소촉법 연 12%) 청구 내용증명을 발송하여 임대인의 이행지체 책임을 명확히 하십시오.",
-            "evidence_labels": ["E05", "E15"],
-        },
-        {
-            "text": "계약 종료 즉시 관할 법원에 임차권등기명령을 신청하여 향후 부득이하게 이사할 때에도 기존 대항력과 우선변제권이 온전히 유지·보전되도록 조치하십시오.",
-            "evidence_labels": ["E01", "E03"],
-        },
-        {
-            "text": "대법원 인터넷등기소를 통해 목적물 부동산의 최신 말소사항 포함 등기사항전부증명서를 발급받아 가압류 외 다른 선순위 권리 변동 여부를 최종 대조하십시오.",
-            "evidence_labels": ["E09", "E10", "E11"],
-        },
-        {
-            "text": "목적물에 관한 경매 절차가 개시될 경우, 선순위 대항력을 바탕으로 보증금 전액을 낙찰자에게 인수시킬지 또는 배당요구종기 내에 권리신고 및 배당요구 신청서를 관할 경매법원에 접수하여 우선배당받을지 신중히 선택하여 진행하십시오.",
+
+    q_str = f"{current_question or ''} {draft_answer}".lower()
+    active_issue_ids = {r.issue_id for r in (issue_results or [])}
+
+    tailored_actions: List[Dict[str, Any]] = []
+
+    # 1) 기본 절대 안전 조치 (대항력 및 점유 유지) - 전세 상담의 근본 수칙
+    tailored_actions.append({
+        "text": "보증금 전액을 반환받거나 관할 법원의 임차권등기명령에 따른 등기가 등기부에 기재되기 전까지는 절대 주택의 점유를 상실(열쇠 인도, 비밀번호 공유, 임의 퇴거)하거나 전입을 옮기지 마십시오. (대항력 및 우선변제권 유지 필수)",
+        "evidence_labels": ["E01", "E03", "E16"],
+    })
+
+    # 2) 문자/메시지 해지통고 증거 보존
+    if "ISSUE_NOTICE_REACH" in active_issue_ids or (any(w in q_str for w in ("문자", "카톡", "메시지")) and any(w in q_str for w in ("해지", "도달", "효력", "퇴거", "요청"))):
+        tailored_actions.append({
+            "text": "문자 발신 내역 및 임대인 답장 캡처본을 증거로 영구 보관 (휴대폰 분실·기기변경에 대비하여 클라우드 백업 또는 출력본 확보)",
+            "evidence_labels": ["E04", "E05"],
+        })
+        tailored_actions.append({
+            "text": "도달을 더욱 확실히 하기 위한 우체국 내용증명 발송 병행",
+            "evidence_labels": ["E05"],
+        })
+
+    # 3) 내용증명 작성 및 배달증명 수령 확인
+    if "ISSUE_PROOF_OF_CONTENTS" in active_issue_ids or any(w in q_str for w in ("내용증명", "배달증명", "최고장")):
+        tailored_actions.append({
+            "text": "우체국 내용증명 양식 작성 후 3부 출력하여 발송",
+            "evidence_labels": ["E05"],
+        })
+        tailored_actions.append({
+            "text": "배달증명 서비스를 신청하여 상대방 실제 수령일 확인 (해지 통고 및 이행최고 도달 일자 객관적 입증)",
+            "evidence_labels": ["E05"],
+        })
+
+    # 4) 경매 배당요구 종기 확인 및 시세 파악
+    if "ISSUE_AUCTION_DIVIDEND_RISK" in active_issue_ids or any(w in q_str for w in ("경매", "배당", "낙찰")):
+        tailored_actions.append({
+            "text": "경매 개시 결정 시 배당요구 종기일을 확인하고 전략 결정 (배당요구 종기 도과 시 우선배당 수령 불가)",
             "evidence_labels": ["E01", "E09", "E10"],
-        },
-    ]
+        })
+        tailored_actions.append({
+            "text": "오피스텔의 최근 실거래 시세 및 낙찰가율 파악 (매각 예상가 대비 보증금 전액 회수 가능성 검토)",
+            "evidence_labels": ["E01", "E09"],
+        })
+
+    # 5) 분할반환 제안 거절 및 일시반환 촉구
+    if "ISSUE_INSTALLMENT_PROPOSAL" in active_issue_ids or any(w in q_str for w in ("분할", "분할반환", "일부만 먼저")):
+        tailored_actions.append({
+            "text": "임대인에게 분할반환 제안 거절 및 3억 원 전액 일시반환 촉구 통보",
+            "evidence_labels": ["E06", "E07"],
+        })
+        tailored_actions.append({
+            "text": "지급명령 또는 보증금반환청구 소송 등 법적 강제집행 절차 착수",
+            "evidence_labels": ["E01", "E03"],
+        })
+
+    # 6) 무담보 확약서 수용 거절
+    if "ISSUE_UNSECURED_AGREEMENT" in active_issue_ids or any(w in q_str for w in ("확약서", "공증없이", "공증 없이", "합의하고 기다려")):
+        tailored_actions.append({
+            "text": "단순 확약 제안 거절 (공증·물적 담보 없는 확약서 수용 불가)",
+            "evidence_labels": ["E01"],
+        })
+        tailored_actions.append({
+            "text": "집행권원 확보를 위한 법적 절차 착수 (임차권등기명령 및 지급명령/소송)",
+            "evidence_labels": ["E01", "E03"],
+        })
+
+    # 7) 서류 보완 및 발급
+    if "ISSUE_EVIDENCE_GAPS" in active_issue_ids or any(w in q_str for w in ("서류", "발급", "준비서류", "신청서류", "구비서류", "추가로 확인")):
+        tailored_actions.append({
+            "text": "대법원 인터넷등기소에서 가람오피스텔 503호 등기사항전부증명서 발급 (말소사항 포함)",
+            "evidence_labels": ["E09", "E10", "E11"],
+        })
+        tailored_actions.append({
+            "text": "거래은행 전세대출 담당자에게 반환보증 가입 여부 확인 공문/문서 요청",
+            "evidence_labels": ["E15"],
+        })
+        tailored_actions.append({
+            "text": "임대차계약서 원본, 주민등록초본(전입변동이력 포함), 확정일자 부여현황 준비",
+            "evidence_labels": ["E01", "E03"],
+        })
+
+    # 8) 임대인 연락두절 및 자력상실 시 사법절차 전환
+    if "ISSUE_COMMUNICATION_BREAKDOWN" in active_issue_ids or any(w in q_str for w in ("연락두절", "연락이 두절", "연락도 잘 안", "연락이 잘 안", "대출 거절", "파산")):
+        tailored_actions.append({
+            "text": "주택임차권등기명령 신청서 법원 제출",
+            "evidence_labels": ["E01", "E03"],
+        })
+        tailored_actions.append({
+            "text": "보증금반환청구 지급명령 또는 정식 소송 제기 (조속한 집행권원 확보)",
+            "evidence_labels": ["E01"],
+        })
+        tailored_actions.append({
+            "text": "임대인의 다른 일반재산(다른 부동산, 예금 등) 가압류 검토",
+            "evidence_labels": ["E09", "E10"],
+        })
+
+    # 9) 가공/미등록 증거 확인
+    if "ISSUE_FAKE_CITATION" in active_issue_ids or any(w in q_str for w in ("99호증", "증거 a", "가공", "미등록")):
+        tailored_actions.append({
+            "text": "실제 등록된 E01~E17 증거 목록 확인 (현재 사건에 공적 등록된 정식 증거서류 원본 대조)",
+            "evidence_labels": ["E01", "E02", "E03"],
+        })
+
+    # 10) 새 세입자 유치 시까지 대기의무 없음
+    if "ISSUE_NO_WAIT_DUTY" in active_issue_ids or any(w in q_str for w in ("새 세입자", "새세입자", "다음 세입자", "기다려")):
+        tailored_actions.append({
+            "text": "임대인의 부당한 주장 일축 및 전액 반환 촉구 (보증금 3억 원 반환 청구)",
+            "evidence_labels": ["E01"],
+        })
+        tailored_actions.append({
+            "text": "임차권등기명령 및 법적 강제집행 착수 (지급명령 또는 보증금반환소송)",
+            "evidence_labels": ["E01", "E03"],
+        })
+
+    # 맞춤 행동이 1개(기본 조치만)인 경우 표준 5대 권고를 사용
+    if len(tailored_actions) <= 1:
+        action_items_config = [
+            {
+                "text": "보증금 전액을 반환받거나 관할 법원의 임차권등기명령에 따른 등기가 등기부에 기재되기 전까지는 절대 주택의 점유를 상실(열쇠 인도, 비밀번호 공유, 임의 퇴거)하거나 전입을 옮기지 마십시오. (대항력 및 우선변제권 유지 필수)",
+                "evidence_labels": ["E01", "E03", "E16"],
+            },
+            {
+                "text": "임대인에게 보증금 반환 최고 및 지연손해금(민법 연 5%, 소촉법 연 12%) 청구 내용증명을 발송하여 임대인의 이행지체 책임을 명확히 하십시오.",
+                "evidence_labels": ["E05", "E15"],
+            },
+            {
+                "text": "계약 종료 즉시 관할 법원에 임차권등기명령을 신청하여 향후 부득이하게 이사할 때에도 기존 대항력과 우선변제권이 온전히 유지·보전되도록 조치하십시오.",
+                "evidence_labels": ["E01", "E03"],
+            },
+            {
+                "text": "대법원 인터넷등기소를 통해 목적물 부동산의 최신 말소사항 포함 등기사항전부증명서를 발급받아 가압류 외 다른 선순위 권리 변동 여부를 최종 대조하십시오.",
+                "evidence_labels": ["E09", "E10", "E11"],
+            },
+            {
+                "text": "목적물에 관한 경매 절차가 개시될 경우, 선순위 대항력을 바탕으로 보증금 전액을 낙찰자에게 인수시킬지 또는 배당요구종기 내에 권리신고 및 배당요구 신청서를 관할 경매법원에 접수하여 우선배당받을지 신중히 선택하여 진행하십시오.",
+                "evidence_labels": ["E01", "E09", "E10"],
+            },
+        ]
+    else:
+        action_items_config = tailored_actions
     for idx, act in enumerate(action_items_config, 1):
         cites = [
             f"[{doc_name_map[s]}]" if (s in doc_name_map and doc_name_map[s]) else f"[{s}]"

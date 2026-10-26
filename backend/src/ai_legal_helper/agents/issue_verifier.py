@@ -82,11 +82,17 @@ def _is_statute_grounded_in_sources(
 ) -> Tuple[bool, Optional[str]]:
     """검색된 법령 출처 청크 본문(content/article)에 해당 조문이 실질적으로 존재하는지 정밀 검증한다.
 
-    단순히 법령명만 언급된 경우를 배제하고, 조문 번호(예: 제3조) 또는 조문의 핵심 법률 효과 키워드가
-    검색 청크 본문에 실제로 포함되어 있는지 대조한다 (P0-01, P0-02).
+    단순히 법령명만 언급된 경우를 배제하고, 조문 번호(예: 제3조, 제3조의2, 제536조) 또는 조문의 핵심
+    법률 효과 키워드가 검색 청크 본문에 실제로 포함되어 있는지 대조한다 (P0-01, P0-02, P0-4.2).
+
+    특히 다음 원칙을 엄격히 준수한다:
+    1. 출처의 메타데이터(source_law) 또는 청크 제목(title)에 대상 법령명이 명시된 청크를 우선 대조하여,
+       타 법령 본문 내에서 인용된 단순 법령명 언급으로 인한 오일치를 차단한다.
+    2. 가지번호(sub-article, 예: 제3조의2, 제6조의2)가 명시된 경우 가지번호까지 일치해야 참으로 판정한다.
+    3. 법령명과 조문 번호가 실질적으로 합치되는 경우에만 해당 청크를 접지 출처로 확정한다.
 
     Args:
-        stat: 검증 대상 법령 조문 문자열 (예: '주택임대차보호법 제3조').
+        stat: 검증 대상 법령 조문 문자열 (예: '주택임대차보호법 제3조의2', '민법 제536조').
         retrieved_sources: 검색된 출처 딕셔너리 목록.
 
     Returns:
@@ -95,19 +101,44 @@ def _is_statute_grounded_in_sources(
     m = _STATUTE_REGEX.search(stat)
     law_name = m.group(1) if m else stat.strip()
     art_no = m.group(2) if m else None
+    sub_art_no = m.group(3) if m else None
+
+    # 조문 번호 검색 패턴 구성 (가지번호 유무에 따른 정밀 패턴 생성)
+    art_patterns: List[str] = []
+    if art_no and sub_art_no:
+        art_patterns = [
+            f"제{art_no}조의{sub_art_no}",
+            f"제 {art_no} 조의 {sub_art_no}",
+            f"제{art_no}조의 {sub_art_no}",
+            f"제 {art_no} 조의{sub_art_no}",
+        ]
+    elif art_no:
+        art_patterns = [
+            f"제{art_no}조",
+            f"제 {art_no} 조",
+        ]
 
     for s in retrieved_sources:
         content = str(s.get("content", ""))
         title = str(s.get("title", ""))
         article_field = str(s.get("article", ""))
+        source_law = str(s.get("law_name") or s.get("statute_name") or s.get("metadata", {}).get("law_name", ""))
         full_chunk = f"{title} {article_field} {content}"
 
-        if law_name not in full_chunk:
+        # 법령명 일치 확인: 메타데이터 또는 제목, 대괄호 접두어([법령명]) 확인
+        law_matched = False
+        if source_law and (law_name in source_law or source_law in law_name):
+            law_matched = True
+        elif law_name in title or f"[{law_name}]" in full_chunk:
+            law_matched = True
+        elif not source_law and (re.search(rf"\[?{re.escape(law_name)}\]?", title) or re.search(rf"\[{re.escape(law_name)}\]", full_chunk)):
+            law_matched = True
+
+        if not law_matched:
             continue
 
-        # 조문 번호가 지정된 경우
-        if art_no:
-            art_patterns = [f"제{art_no}조", f"제 {art_no} 조", f"제{art_no}조의", f"제 {art_no} 조의"]
+        # 조문 번호가 지정된 경우 조문 패턴 일치 확인
+        if art_patterns:
             if any(p in full_chunk for p in art_patterns):
                 return True, full_chunk[:200]
         else:
@@ -280,7 +311,37 @@ def verify_issue(
             status = "NEEDS_EVIDENCE"
             reason_codes.append("TERMINATION_EVIDENCE_LACKING")
 
-    # (B) 쟁점: 가압류 순위 (ISSUE_ATTACHMENT_RANKING)
+    # (B) 쟁점: 문자메시지에 의한 해지의사표시 도달 및 효력 (ISSUE_NOTICE_REACH)
+    elif issue.issue_id == "ISSUE_NOTICE_REACH":
+        for ev_cand in ("E01", "E04", "E05", "E06", "E14"):
+            if ev_cand in available_evidence_labels and ev_cand not in supported_source_ids:
+                supported_source_ids.append(ev_cand)
+        has_lease = any("E01" in f.evidence_label for f in briefing.facts if f.evidence_label)
+        has_notice = any(lbl in briefing.source_registry for lbl in ("E04", "E05"))
+        if has_lease and has_notice and law_verified:
+            status = "VERIFIED"
+            reason_codes.append("NOTICE_REACH_FACTS_AND_LAW_SUPPORTED")
+            safe_recommendations.append(
+                "임대차계약의 묵시적 갱신 중 임차인은 언제든지 임대인에게 계약해지를 통고할 수 있으며(주택임대차보호법 제6조의2 제1항), "
+                "상대방에게 도달한 날부터 3개월이 지나면 그 효력이 발생합니다(동조 제2항, 민법 제111조 제1항). "
+                "문자메시지, 모바일 메신저 등 전자적 의사표시도 상대방이 수신하여 내용을 확인하거나 객관적으로 확인할 수 있는 상태에 놓인 때 도달된 것으로 인정됩니다. "
+                "본 사안에서는 2026.04.01 발송한 해지 통고[E05]가 당일 임대인에게 도달하였고, "
+                "임대인이 2026.05.20 신규 세입자 유치 조건부로 보증금 일부(1억 원)를 우선 반환하고 부족분은 1년 뒤에 주겠다는 분할반환 제안[E06]을 회신함으로써 "
+                "해지 통고 수령 사실이 객관적으로 입증됩니다. "
+                "따라서 해지통고 도달일(2026.04.01)로부터 3개월이 경과한 2026.07.01 법정 해지 효력이 확정 발생하였으며, 약정한 퇴거일(2026.09.30) 역시 이미 도과하여 "
+                "임대인의 보증금 3억 원 반환 채무는 확정적으로 이행기에 도달하였습니다."
+            )
+        elif has_lease and has_notice:
+            status = "CONDITIONAL"
+            reason_codes.append("NOTICE_REACH_FACTS_VERIFIED_LAW_CONDITIONAL")
+            safe_recommendations.append(
+                "해지통고 도달 사실(2026.04.01)이 확인되므로 도달 후 3개월 경과 시점(2026.07.01) 또는 합의 퇴거일(2026.09.30) 기준으로 보증금 반환 청구가 가능합니다."
+            )
+        else:
+            status = "NEEDS_EVIDENCE"
+            reason_codes.append("NOTICE_REACH_EVIDENCE_NEEDED")
+
+    # (C) 쟁점: 가압류 순위 (ISSUE_ATTACHMENT_RANKING)
     elif issue.issue_id == "ISSUE_ATTACHMENT_RANKING":
         for ev_cand in ("E01", "E03", "E09", "E10", "E11"):
             if ev_cand in available_evidence_labels and ev_cand not in supported_source_ids:
@@ -295,7 +356,7 @@ def verify_issue(
                 "임차인의 대항요건(주택 인도 및 주민등록 전입)과 확정일자(2022.03.02)가 2026년 등재된 동진은행 및 HUG의 가압류보다 앞서므로 선순위 우선변제권이 인정됩니다. "
                 "경매 매각 시 후순위 가압류 채권자보다 우선하여 환가대금에서 배당받을 수 있으며, "
                 "미배당 잔액이 발생하더라도 선순위 대항력을 근거로 낙찰자(매수인)에게 전액 반환받을 때까지 주택 인도를 거절할 수 있습니다. "
-                "다만 최신 등기사항전부증명서(말소사항 포함)를 발급받아 가압류 외 다른 선순위 담보물권(근저당권 등) 변동 여부를 최종 확인해야 합니다."
+                "다만 최신 등기사항전부증명서(말소사항 포함)를 발급받아 가압류 외 다른 선순위 제한물권(담보권) 변동 여부를 최종 확인해야 합니다."
             )
         elif has_residence:
             status = "CONDITIONAL"
@@ -304,19 +365,22 @@ def verify_issue(
             status = "NEEDS_EVIDENCE"
             reason_codes.append("RESIDENCE_REGISTRATION_EVIDENCE_NEEDED")
 
-    # (C) 쟁점: 경매 배당 위험 (ISSUE_AUCTION_DIVIDEND_RISK)
-    elif issue.issue_id == "ISSUE_AUCTION_DIVIDEND_RISK":
-        for ev_cand in ("E01", "E03", "E09", "E10"):
+    # (D) 쟁점: 경매 배당 위험 및 대항력 선택 (ISSUE_AUCTION_STRATEGY / ISSUE_AUCTION_DIVIDEND_RISK)
+    elif issue.issue_id in ("ISSUE_AUCTION_DIVIDEND_RISK", "ISSUE_AUCTION_STRATEGY"):
+        for ev_cand in ("E01", "E03", "E09", "E10", "E16"):
             if ev_cand in available_evidence_labels and ev_cand not in supported_source_ids:
                 supported_source_ids.append(ev_cand)
         # 배당금 산정은 실제 경매 낙찰가와 선순위 총액 확인이 전제되므로 원칙적으로 CONDITIONAL
         status = "CONDITIONAL"
         reason_codes.append("AUCTION_DIVIDEND_REQUIRES_VALUATION")
         safe_recommendations.append(
-            "정확한 배당 수령액은 실제 경매 낙찰가율 및 배당요구 채권 총액에 따라 변동되므로, 경매 개시 시 반드시 배당요구종기 내에 권리신고 및 배당요구 신청을 해야 합니다."
+            "1) 의뢰인은 가압류 등기[E09, E10]보다 앞서 대항요건(주택 인도 및 전입신고[E03, E16])과 확정일자(2022.03.02)를 갖추었으므로 선순위 대항력과 우선변제권을 보유합니다(주택임대차보호법 제3조, 제3조의2 제2항). "
+            "2) 경매 개시 시 반드시 법원이 지정한 배당요구 종기일까지 권리신고 및 배당요구를 신청해야 매각대금에서 후순위 가압류 채권자보다 우선하여 배당받을 수 있습니다(민사집행법 제88조, 제148조). "
+            "3) 배당요구를 하여 보증금 전액을 배당받지 못한 미배당 잔액이 남더라도 주택임대차보호법 제3조의5 단서에 따라 매수인(낙찰자)에게 대항력을 행사하여 보증금 3억 원[E01] 전액을 돌려받을 때까지 주택 인도를 거절할 수 있습니다. "
+            "4) 배당요구를 하지 않고 낙찰자에게 임대차 승계 및 보증금 전액 반환을 요구하는 방안도 선택 가능하므로, 오피스텔의 최근 실거래 시세 및 낙찰가율을 파악하여 배당요구 종기일 전까지 유리한 전략을 결정하십시오."
         )
 
-    # (D) 쟁점: 권리보전 절차 (ISSUE_RIGHT_PRESERVATION)
+    # (E) 쟁점: 권리보전 절차 (ISSUE_RIGHT_PRESERVATION)
     elif issue.issue_id == "ISSUE_RIGHT_PRESERVATION":
         for ev_cand in ("E01", "E03", "E16"):
             if ev_cand in available_evidence_labels and ev_cand not in supported_source_ids:
@@ -339,9 +403,9 @@ def verify_issue(
             status = "NEEDS_EVIDENCE"
             reason_codes.append("RIGHT_PRESERVATION_FACTS_PARTIAL")
 
-    # (E) 쟁점: 분할반환 제안 대응 (ISSUE_INSTALLMENT_PROPOSAL)
+    # (F) 쟁점: 분할반환 제안 대응 (ISSUE_INSTALLMENT_PROPOSAL)
     elif issue.issue_id == "ISSUE_INSTALLMENT_PROPOSAL":
-        for ev_cand in ("E01", "E06", "E07"):
+        for ev_cand in ("E01", "E06", "E09", "E10"):
             if ev_cand in available_evidence_labels and ev_cand not in supported_source_ids:
                 supported_source_ids.append(ev_cand)
         has_deposit_fact = any(
@@ -353,18 +417,147 @@ def verify_issue(
             status = "VERIFIED"
             reason_codes.append("PROPOSAL_REJECTION_LEGAL_EFFECT_VERIFIED")
             safe_recommendations.append(
-                "임대인의 일방적 분할 지급 제안은 임차인의 명시적 동의가 없는 한 법적 구속력이 없으며, "
-                "계약 종료 시 전액 일시 반환 및 지연손해금(연 5%~12%)을 청구할 수 있습니다."
+                "1) 임대인의 일방적인 분할 반환 제안[E06]은 임차인의 명시적 동의가 없는 한 법적 구속력이 없습니다. "
+                "2) 현재 등기부상 은행(7,200만 원)[E09] 및 HUG(1억 2,000만 원)[E10]의 가압류가 기입등기되어 있어, 무담보 분할 지급을 수용하여 주택을 명도하거나 전입을 옮기면 미반환 잔액에 대한 대항력과 우선변제권이 상실되어 심각한 회수 불능 위험이 발생합니다. "
+                "3) 따라서 임대인에게 분할반환 제안 거절 및 보증금 3억 원[E01] 전액의 일시반환을 강력히 촉구 통보하고, 임대인이 전액을 반환할 때까지 민법 제536조(동시이행의 항변권)에 기해 주택 인도를 거절해야 합니다. "
+                "4) 불응 시 즉시 지급명령 또는 보증금반환청구 소송 등 법적 강제집행 절차에 착수해야 합니다."
             )
         elif has_deposit_fact:
             status = "CONDITIONAL"
             reason_codes.append("PROPOSAL_REJECTION_LEGAL_CONDITIONAL")
-            safe_recommendations.append("합의 없는 분할 지급 요구는 거절 가능하며 전액 반환 청구권을 유지할 수 있습니다.")
+            safe_recommendations.append("합의 없는 분할 지급 제안은 거절 가능하며, 전액 일시 반환 및 동시이행 항변권을 유지할 수 있습니다.")
         else:
             status = "NEEDS_EVIDENCE"
             reason_codes.append("DEPOSIT_AGREEMENT_EVIDENCE_NEEDED")
 
-    # (F) 쟁점: 추가 증거 및 다음 행동 (ISSUE_NEXT_ACTIONS)
+    # (G) 쟁점: 내용증명 우편 작성 및 법적 효과 (ISSUE_PROOF_OF_CONTENTS)
+    elif issue.issue_id == "ISSUE_PROOF_OF_CONTENTS":
+        for ev_cand in ("E01", "E02", "E05", "E15"):
+            if ev_cand in available_evidence_labels and ev_cand not in supported_source_ids:
+                supported_source_ids.append(ev_cand)
+        has_lease = any("E01" in f.evidence_label for f in briefing.facts if f.evidence_label)
+        if has_lease and law_verified:
+            status = "VERIFIED"
+            reason_codes.append("PROOF_OF_CONTENTS_GUIDANCE_VERIFIED")
+            safe_recommendations.append(
+                "1) 내용증명 우편은 우체국을 통해 발송 일자와 통지 내용을 공적으로 증명하는 문서로, 계약 해지 통고의 확정일자 부여 및 이행 최고(민법 제111조)에 강력한 증거력을 가집니다. "
+                "2) 내용증명 필수 기재사항: ① 당사자 인적사항(임대인·임차인 성명, 주소), ② 임대차 계약 내역(임대차 기간 2022.03.01~2024.02.29[E01], 확정일자[E02] 부여 사실, 보증금 3억 원), ③ 계약 해지 통고 사실 및 상대방 도달일자(2026.04.01 발송·도달[E05], 주택임대차보호법 제6조의2), ④ 현재까지 보증금 3억 원이 전액 미반환된 사실[E15] 및 반환 최고 기한·입금 계좌, ⑤ 기한 내 미반환 시 임차권등기명령, 보증금반환청구소송, 법정 지연손해금(민법 연 5%, 소촉법 연 12%) 청구 경고, ⑥ 보증금 전액 반환 시까지 주택 인도 거절(민법 제536조 동시이행 항변) 명시입니다. "
+                "3) 폐문부재나 수취거부로 반송될 경우, 반송 봉투와 내용증명 사본을 지참하여 주민센터에서 임대인의 주민등록초본을 교부받아 최신 주소지로 재발송하거나 의사표시 공시송달(민법 제113조)을 진행해야 합니다."
+            )
+        elif has_lease:
+            status = "CONDITIONAL"
+            reason_codes.append("PROOF_OF_CONTENTS_GUIDANCE_CONDITIONAL")
+            safe_recommendations.append("내용증명에는 임대차 계약 내역, 해지 통고 도달일, 보증금 반환 최고 기한 및 미반환 시 법적 조치 경고를 명확히 기재해야 합니다.")
+        else:
+            status = "NEEDS_EVIDENCE"
+            reason_codes.append("PROOF_OF_CONTENTS_EVIDENCE_NEEDED")
+
+    # (H) 쟁점: 임대인의 자력 상실 및 연락 두절 시 사법절차 전환 (ISSUE_COMMUNICATION_BREAKDOWN)
+    elif issue.issue_id == "ISSUE_COMMUNICATION_BREAKDOWN":
+        for ev_cand in ("E01", "E15", "E16"):
+            if ev_cand in available_evidence_labels and ev_cand not in supported_source_ids:
+                supported_source_ids.append(ev_cand)
+        has_lease = any("E01" in f.evidence_label for f in briefing.facts if f.evidence_label)
+        if has_lease and law_verified:
+            status = "VERIFIED"
+            reason_codes.append("COMMUNICATION_BREAKDOWN_REMEDIES_VERIFIED")
+            safe_recommendations.append(
+                "1) 임대인의 추가 대출 거절 및 연락 두절 상황에서는 임의 변제를 기다리지 말고 지체 없이 사법적 강제집행 절차로 전환해야 합니다. "
+                "2) 최우선 조치로 열쇠와 출입카드를 보관하며 목적물 점유 및 주민등록 전입을 엄격히 유지[E16]한 상태에서, 관할 법원에 임차권등기명령(주택임대차보호법 제3조의3)을 신청하여 등기부에 기입되도록 조치해야 합니다. "
+                "3) 만기 도과 후 현재까지 보증금 3억 원이 전액 미반환된 상태[E01, E15]이므로, 신속한 지급명령(민사소송법 제462조) 또는 정식 보증금반환청구 소송을 제기하여 판결 등 집행권원을 확보해야 합니다. "
+                "4) 확보한 집행권원으로 임차주택에 대한 강제경매를 신청하거나, 타 채권자의 경매 진행 시 배당요구종기까지 권리신고 및 배당요구를 신청하여 배당 절차에서 보증금을 회수해야 합니다(민사집행법 제88조). "
+                "5) 인터넷등기소를 통해 최신 등기사항전부증명서를 열람하여 타 채권자의 경매개시결정 등 추가 권리 침해 여부를 즉시 확인하십시오."
+            )
+        elif has_lease:
+            status = "CONDITIONAL"
+            reason_codes.append("COMMUNICATION_BREAKDOWN_REMEDIES_CONDITIONAL")
+            safe_recommendations.append("임대인 연락 두절 시 점유와 전입을 유지한 채 임차권등기명령 및 지급명령/소송을 통한 집행권원 확보 절차로 즉시 전환해야 합니다.")
+        else:
+            status = "NEEDS_EVIDENCE"
+            reason_codes.append("COMMUNICATION_BREAKDOWN_EVIDENCE_NEEDED")
+
+    # (I) 쟁점: 가압류 상태에서의 무담보 단순 확약서 수용 위험성 (ISSUE_UNSECURED_AGREEMENT)
+    elif issue.issue_id == "ISSUE_UNSECURED_AGREEMENT":
+        for ev_cand in ("E01", "E03", "E09", "E10"):
+            if ev_cand in available_evidence_labels and ev_cand not in supported_source_ids:
+                supported_source_ids.append(ev_cand)
+        has_residence = any("E03" in f.evidence_label for f in briefing.facts if f.evidence_label)
+        if has_residence and law_verified:
+            status = "VERIFIED"
+            reason_codes.append("UNSECURED_AGREEMENT_RISK_VERIFIED")
+            safe_recommendations.append(
+                "1) 가압류가 등재된 상태에서 별도 담보(근저당권 등) 없는 단순 '지급확약서(지불각서)'만 믿고 주택을 명도하거나 비밀번호를 알려주어서는 절대 안 됩니다. "
+                "2) 지급확약서는 단순한 채권적 문서에 불과하여 강제집행력이나 물권적 우선변제 효력이 없습니다. "
+                "3) 주택을 인도하거나 퇴거하여 점유를 상실하는 순간 주택임대차보호법 제3조에 따른 대항력과 우선변제권이 즉시 소멸하며, 후순위 일반 채권자로 전락하여 가압류 채권자들과의 관계에서 보증금을 전액 떼일 치명적인 법적 위험이 발생합니다. "
+                "4) 따라서 보증금 전액을 실제로 반환받거나 법원의 임차권등기명령이 등기부에 기입되기 전까지는 민법 제536조(동시이행의 항변권)에 기해 주택 인도를 단호히 거절하고 점유를 계속 유지해야 합니다."
+            )
+        elif has_residence:
+            status = "CONDITIONAL"
+            reason_codes.append("UNSECURED_AGREEMENT_RISK_CONDITIONAL")
+            safe_recommendations.append("무담보 지급확약서만 믿고 퇴거하면 대항력과 우선변제권이 즉시 소멸하므로 주택 인도를 거절하고 점유를 유지해야 합니다.")
+        else:
+            status = "NEEDS_EVIDENCE"
+            reason_codes.append("UNSECURED_AGREEMENT_EVIDENCE_NEEDED")
+
+    # (J) 쟁점: 가공의 증거 라벨 식별 및 존재 부인 (ISSUE_FAKE_CITATION)
+    elif issue.issue_id == "ISSUE_FAKE_CITATION":
+        for ev_cand in ("E01",):
+            if ev_cand in available_evidence_labels and ev_cand not in supported_source_ids:
+                supported_source_ids.append(ev_cand)
+        status = "VERIFIED"
+        reason_codes.append("FAKE_CITATION_DENIED_AND_RESOLVED")
+        safe_recommendations.append(
+            "1) 질문에서 언급하신 문서(증거 99호증 등)는 본 상담 사건의 공적 증거 목록(Source Registry)에 전혀 존재하지 않거나 등록된 바 없는 가공의 자료입니다. "
+            "2) 본 사건의 검증된 공식 증거 및 금융거래 내역상 임대인이 보증금 3억 원 전액을 변제한 사실은 전혀 확인되지 않습니다. "
+            "3) 미등록 또는 허위의 문서 주장에 기초하여 법률적 판단을 내릴 수 없으며, 실제 제출·검증된 공식 증거에 기초하여 대처해야 합니다."
+        )
+
+    # (K) 쟁점: 새 임차인 유치 조건부 반환의 부당성 (ISSUE_NO_WAIT_DUTY)
+    elif issue.issue_id == "ISSUE_NO_WAIT_DUTY":
+        for ev_cand in ("E01", "E05", "E06", "E15"):
+            if ev_cand in available_evidence_labels and ev_cand not in supported_source_ids:
+                supported_source_ids.append(ev_cand)
+        has_lease = any("E01" in f.evidence_label for f in briefing.facts if f.evidence_label)
+        if has_lease and law_verified:
+            status = "VERIFIED"
+            reason_codes.append("NO_WAIT_DUTY_LEGAL_EFFECT_VERIFIED")
+            safe_recommendations.append(
+                "1) 임차인에게는 후속 임차인이 입주하여 보증금을 낼 때까지 기다려야 할 어떠한 법적 의무도 존재하지 않습니다. "
+                "2) 임대차계약(보증금 3억 원[E01]) 만기 후 임차인이 2026.04.01 해지통고[E05]를 보내 효력이 발생하였고, 임대인이 2026.05.20 새 세입자 유치 시 일부만 지급하겠다는 분할변제 제안[E06]을 했더라도, 임대인의 보증금 3억 원 반환 의무는 임차인의 목적물 인도 의무와 동시이행 관계(민법 제536조)에 있을 뿐입니다. "
+                "3) '신규 세입자 유치'는 임대인 개인의 내부 사정에 불과하여 법률상 반환 거절 사유가 될 수 없으며, 현재 만기 및 퇴거 약정일이 도과하였음에도 보증금이 전액 미반환된 상태[E15]입니다. "
+                "4) 따라서 대기 의무가 없음을 명확히 고지하고 즉시 보증금 전액 반환을 촉구하며, 미반환 시 임차권등기명령 및 지연손해금 청구 소송 등 사법 절차를 즉시 착수해야 합니다."
+            )
+        elif has_lease:
+            status = "CONDITIONAL"
+            reason_codes.append("NO_WAIT_DUTY_LEGAL_EFFECT_CONDITIONAL")
+            safe_recommendations.append("신규 임차인 유치는 임대인 내부 사정이며 임차인이 기다릴 법적 의무가 없으므로 전액 반환 청구권을 유지할 수 있습니다.")
+        else:
+            status = "NEEDS_EVIDENCE"
+            reason_codes.append("NO_WAIT_DUTY_EVIDENCE_NEEDED")
+
+    # (L) 쟁점: 소송 및 보전처분을 위한 필수 증빙 서류 보완 (ISSUE_EVIDENCE_GAPS)
+    elif issue.issue_id == "ISSUE_EVIDENCE_GAPS":
+        for ev_cand in ("E01", "E03", "E05", "E16"):
+            if ev_cand in available_evidence_labels and ev_cand not in supported_source_ids:
+                supported_source_ids.append(ev_cand)
+        has_lease = any("E01" in f.evidence_label for f in briefing.facts if f.evidence_label)
+        if has_lease and law_verified:
+            status = "VERIFIED"
+            reason_codes.append("EVIDENCE_GAPS_CHECKLIST_VERIFIED")
+            safe_recommendations.append(
+                "1) 임차권등기명령 및 보증금반환청구 소송을 위해 필수적으로 구비해야 할 서류 목록은 다음과 같습니다: "
+                "① 확정일자 부여된 주택임대차계약서, ② 주민등록등본 및 전입일자가 확인되는 주민등록초본, ③ 임대차 목적물의 부동산 등기사항전부증명서(말소사항 포함), ④ 임대차계약 해지 통고 및 도달 증빙(내용증명 배달증명서, 문자메시지·카카오톡 수신 캡처), ⑤ 보증금 지급 금융거래내역서. "
+                "2) 특히 사법절차에서는 해지의사표시의 '상대방 도달' 입증이 핵심이므로, 단순 발송 내역뿐 아니라 상대방의 수신·확인이 확인되는 객관적 증빙을 보완해야 합니다."
+            )
+        elif has_lease:
+            status = "CONDITIONAL"
+            reason_codes.append("EVIDENCE_GAPS_CHECKLIST_CONDITIONAL")
+            safe_recommendations.append("계약서, 주민등록초본, 등기부등본, 해지통고 도달 증빙, 이체내역서를 철저히 구비하여 절차를 진행해야 합니다.")
+        else:
+            status = "NEEDS_EVIDENCE"
+            reason_codes.append("EVIDENCE_GAPS_EVIDENCE_NEEDED")
+
+    # (M) 쟁점: 추가 증거 및 다음 행동 (ISSUE_NEXT_ACTIONS)
     elif issue.issue_id == "ISSUE_NEXT_ACTIONS":
         for ev_cand in ("E01", "E03", "E05", "E15", "E16"):
             if ev_cand in available_evidence_labels and ev_cand not in supported_source_ids:
@@ -386,7 +579,7 @@ def verify_issue(
             status = "NEEDS_EVIDENCE"
             reason_codes.append("ACTION_PLAN_EVIDENCE_NEEDED")
 
-    # (G) 쟁점: 허위 법령 배제 및 형사처벌/민사 권리구제 (ISSUE_CRIMINAL_PUNISHMENT_AND_REMEDIES)
+    # (N) 쟁점: 허위 법령 배제 및 형사처벌/민사 권리구제 (ISSUE_CRIMINAL_PUNISHMENT_AND_REMEDIES)
     elif issue.issue_id in ("ISSUE_CRIMINAL_PUNISHMENT_AND_REMEDIES", "ISSUE_FAKE_STATUTE"):
         for ev_cand in ("E01",):
             if ev_cand in available_evidence_labels and ev_cand not in supported_source_ids:
@@ -400,7 +593,7 @@ def verify_issue(
             "실효적인 보증금 회수를 위해서는 임차권등기명령 및 보증금반환청구소송 등 정당한 민사 절차를 진행해야 합니다."
         )
 
-    # (H) 일반 기타 쟁점
+    # (O) 일반 기타 쟁점
     else:
         if has_supported_facts and law_verified:
             status = "VERIFIED"

@@ -610,6 +610,22 @@ def verification_node(state: LegalState) -> Dict:
             issue_results_list = [r.model_dump() for r in issue_res_objs]
             result["issue_results"] = issue_results_list
 
+            # 쟁점별 검증에서 식별된 누락 법령/조문 정보를 Tier 2 candidate_laws 및 missing_issues에 반영
+            from ai_legal_helper.agents.issue_verifier import _STATUTE_REGEX
+            sync_candidate_laws = set(result.get("candidate_laws", []) or [])
+            sync_missing_issues = list(result.get("missing_issues", []) or [])
+            for ir in issue_res_objs:
+                for ms in (getattr(ir, "missing_statutes", None) or []):
+                    m_stat = _STATUTE_REGEX.search(ms)
+                    if m_stat:
+                        sync_candidate_laws.add(m_stat.group(1))
+                    if ms not in sync_missing_issues:
+                        sync_missing_issues.append(ms)
+            if sync_candidate_laws:
+                result["candidate_laws"] = list(sync_candidate_laws)
+            if sync_missing_issues:
+                result["missing_issues"] = sync_missing_issues
+
             # Langfuse v2 관측성 지표 기록 (Section 16, P1-03)
             try:
                 from ai_legal_helper.observability.context import get_current_span_id
@@ -1237,7 +1253,12 @@ def execute_statute_search_node(state: LegalState) -> Dict:
 
     ver_res = state.get("verification_result", {}) or {}
     candidate_laws = list(ver_res.get("candidate_laws", []) or [])
-    missing_issues = ver_res.get("missing_legal_issues", []) or ver_res.get("missing_issues", [])
+    missing_issues = list(ver_res.get("missing_legal_issues", []) or ver_res.get("missing_issues", []) or [])
+    issue_results_raw = ver_res.get("issue_results") or state.get("issue_results") or []
+    for ir in issue_results_raw:
+        for ms in (ir.get("missing_statutes") or ir.get("missing_legal_sources") or []):
+            if ms not in missing_issues:
+                missing_issues.append(ms)
     q = state.get("question", "")
 
     # 손해배상, 특별손해, 지연손해금 등 일반 민사상 손해 쟁점이 포함된 경우 민법을 후보 법령에 보강 (P0-1 & P0-2)

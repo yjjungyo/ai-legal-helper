@@ -261,6 +261,12 @@ def search_official_statutes(
                 # 동적 적합도 점수 산정
                 score = 0.0
 
+                # 3.0 조문 번호(예: "제536조", "제6조의2")가 누락 쟁점 및 질의 텍스트에 직접 언급된 경우 최우선 부스팅
+                if missing_text and (article_label in missing_text or f"제{art_no_raw}조" in missing_text):
+                    score += 50.0
+                elif article_label in full_query_text or f"제{art_no_raw}조" in full_query_text:
+                    score += 20.0
+
                 # 3.1 조문 제목 기반 쟁점 매칭 (가장 높은 판별력)
                 title_words = [
                     w for w in re.findall(r'[가-힣]{2,}', art_title)
