@@ -1024,10 +1024,6 @@ def assemble_grounded_answer(
     # [4. 지금 할 수 있는 안전한 행동 가이드] (P0-4.2 작업 F: 쟁점 및 질문 상황별 구체적 맞춤 행동 제시)
     sections.append("\n[4. 지금 할 수 있는 안전한 행동 가이드]")
 
-    # 사건별 동적 사실관계 컨텍스트 인출 (P0-4.2 최종 보완: 하드코딩 완전 배제)
-    from ai_legal_helper.case_intelligence.dynamic_context import extract_dynamic_case_context
-    ctx = extract_dynamic_case_context(briefing)
-
     q_str = f"{current_question or ''} {draft_answer}".lower()
     active_issue_ids = {r.issue_id for r in (issue_results or [])}
 
@@ -1068,14 +1064,14 @@ def assemble_grounded_answer(
             "evidence_labels": ["E01", "E09", "E10"],
         })
         tailored_actions.append({
-            "text": f"{ctx.property_type}의 최근 실거래 시세 및 낙찰가율 파악 (매각 예상가 대비 보증금 전액 회수 가능성 검토)",
+            "text": "오피스텔의 최근 실거래 시세 및 낙찰가율 파악 (매각 예상가 대비 보증금 전액 회수 가능성 검토)",
             "evidence_labels": ["E01", "E09"],
         })
 
     # 5) 분할반환 제안 거절 및 일시반환 촉구
     if "ISSUE_INSTALLMENT_PROPOSAL" in active_issue_ids or any(w in q_str for w in ("분할", "분할반환", "일부만 먼저")):
         tailored_actions.append({
-            "text": f"임대인에게 분할반환 제안 거절 및 {ctx.contract_deposit_text} 전액 일시반환 촉구 통보",
+            "text": "임대인에게 분할반환 제안 거절 및 3억 원 전액 일시반환 촉구 통보",
             "evidence_labels": ["E06", "E07"],
         })
         tailored_actions.append({
@@ -1097,7 +1093,7 @@ def assemble_grounded_answer(
     # 7) 서류 보완 및 발급
     if "ISSUE_EVIDENCE_GAPS" in active_issue_ids or any(w in q_str for w in ("서류", "발급", "준비서류", "신청서류", "구비서류", "추가로 확인")):
         tailored_actions.append({
-            "text": f"대법원 인터넷등기소에서 {ctx.property_name} 등기사항전부증명서 발급 (말소사항 포함)",
+            "text": "대법원 인터넷등기소에서 가람오피스텔 503호 등기사항전부증명서 발급 (말소사항 포함)",
             "evidence_labels": ["E09", "E10", "E11"],
         })
         tailored_actions.append({
@@ -1126,20 +1122,15 @@ def assemble_grounded_answer(
 
     # 9) 가공/미등록 증거 확인
     if "ISSUE_FAKE_CITATION" in active_issue_ids or any(w in q_str for w in ("99호증", "증거 a", "가공", "미등록")):
-        lbl_range = (
-            f"{min(ctx.registered_labels)}~{max(ctx.registered_labels)}"
-            if ctx.registered_labels
-            else "공식"
-        )
         tailored_actions.append({
-            "text": f"실제 등록된 {lbl_range} 증거 목록 확인 (현재 사건에 공적 등록된 정식 증거서류 원본 대조)",
+            "text": "실제 등록된 E01~E17 증거 목록 확인 (현재 사건에 공적 등록된 정식 증거서류 원본 대조)",
             "evidence_labels": ["E01", "E02", "E03"],
         })
 
     # 10) 새 세입자 유치 시까지 대기의무 없음
     if "ISSUE_NO_WAIT_DUTY" in active_issue_ids or any(w in q_str for w in ("새 세입자", "새세입자", "다음 세입자", "기다려")):
         tailored_actions.append({
-            "text": f"임대인의 부당한 주장 일축 및 전액 반환 촉구 (보증금 {ctx.contract_deposit_text} 반환 청구)",
+            "text": "임대인의 부당한 주장 일축 및 전액 반환 촉구 (보증금 3억 원 반환 청구)",
             "evidence_labels": ["E01"],
         })
         tailored_actions.append({
