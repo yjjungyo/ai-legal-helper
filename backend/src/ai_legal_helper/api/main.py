@@ -132,7 +132,20 @@ async def trace_context_middleware(request: Request, call_next):
     # Langfuse 최상위 Root Trace 시작
     from ai_legal_helper.observability.langfuse_client import start_trace, end_trace, get_system_name
     path = request.url.path
-    is_noise = path.endswith("/health/live") or request.method == "OPTIONS"
+
+    # 헬스체크, CORS 사전 요청(OPTIONS), 프론트엔드 단주기 상담 상태 폴링(GET /consultations/{id})을 노이즈로 분류
+    # -> 무의미한 빈 Langfuse Root Trace 누적 방지 및 터미널 반복 로그 스팸 차단
+    is_health_or_options = (
+        path.endswith("/health/live")
+        or path.endswith("/health")
+        or request.method == "OPTIONS"
+    )
+    is_consultation_polling = (
+        request.method == "GET"
+        and "/api/v1/consultations/" in path
+    )
+    is_noise = is_health_or_options or is_consultation_polling
+
     if not is_noise:
         sys_name = get_system_name()
         start_trace(
@@ -155,10 +168,16 @@ async def trace_context_middleware(request: Request, call_next):
         response.headers["X-Trace-Id"] = trace_id
         response.headers["X-Request-Id"] = request_id
 
-        # CORS OPTIONS 및 주기적 헬스체크 폴링을 제외한 모든 HTTP 요청에 대해 액세스 로그 기록
+        # 정상적인 단주기 폴링은 콘솔 노이즈 방지를 위해 DEBUG 레벨로 처리하고, 오류(4xx, 5xx) 발생 시에만 WARNING 로깅
         if not is_noise:
             client_ip = request.client.host if request.client else "-"
             logger.info(f'{client_ip} - "{request.method} {path}" {response.status_code} ({elapsed_ms:.1f}ms)')
+        elif response.status_code >= 400:
+            client_ip = request.client.host if request.client else "-"
+            logger.warning(f'{client_ip} - "{request.method} {path}" {response.status_code} ({elapsed_ms:.1f}ms)')
+        else:
+            client_ip = request.client.host if request.client else "-"
+            logger.debug(f'{client_ip} - "{request.method} {path}" {response.status_code} ({elapsed_ms:.1f}ms)')
 
         return response
     finally:
