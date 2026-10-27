@@ -887,8 +887,9 @@ def assemble_grounded_answer(
 
     # 5) 분할반환 제안 거절 및 일시반환 촉구
     if "ISSUE_INSTALLMENT_PROPOSAL" in active_issue_ids or any(w in q_str for w in ("분할", "분할반환", "일부만 먼저")):
+        demand_target = f"미반환 잔액 {balance_text}" if repaid_krw > 0 else f"{deposit_text} 전액"
         tailored_actions.append({
-            "text": f"임대인에게 분할반환 제안 거절 및 {deposit_text} 전액 일시반환 촉구 통보",
+            "text": f"임대인에게 분할반환 제안 거절 및 {demand_target} 일시반환 촉구 통보",
             "evidence_labels": list(set(notice_labels + lease_labels)),
         })
         tailored_actions.append({
@@ -1523,31 +1524,36 @@ def build_claim_citations(
                     explanation=f"{r.issue_title} ({r.status}) - 법률 출처 검증: {'완료' if all_statutes_supported else '미검증/조건부'}",
                 ))
 
-        # 4. [4. 지금 할 수 있는 안전한 행동 가이드] 5대 조치사항 접지
+        # 4. [4. 지금 할 수 있는 안전한 행동 가이드] 5대 조치사항 접지 (사건별 동적 증거 라벨 매핑)
+        dyn_lease_labels = find_evidence_labels_by_type(briefing, ["LEASE", "임대차", "계약서"])
+        dyn_notice_labels = find_evidence_labels_by_type(briefing, ["NOTICE", "통고", "통지", "문자", "카카오", "내용증명"])
+        dyn_residence_labels = find_evidence_labels_by_type(briefing, ["RESIDENCE", "주민등록", "전입", "초본", "등본"])
+        dyn_attachment_labels = find_evidence_labels_by_type(briefing, ["REGISTRY", "등기", "가압류", "압류", "근저당"])
+
         action_item_configs = [
             {
                 "text": "보증금 전액을 반환받거나 관할 법원의 임차권등기명령에 따른 등기가 등기부에 기재되기 전까지는 절대 주택의 점유를 상실(열쇠 인도, 비밀번호 공유, 임의 퇴거)하거나 전입을 옮기지 마십시오. (대항력 및 우선변제권 유지 필수)",
-                "evidence_labels": ["E01", "E03", "E16"],
+                "evidence_labels": list(set(dyn_lease_labels + dyn_residence_labels)),
                 "statute": "주택임대차보호법 제3조 제1항",
             },
             {
                 "text": "임대인에게 보증금 반환 최고 및 지연손해금(민법 연 5%, 소촉법 연 12%) 청구 내용증명을 발송하여 임대인의 이행지체 책임을 명확히 하십시오.",
-                "evidence_labels": ["E05", "E15"],
+                "evidence_labels": dyn_notice_labels or dyn_lease_labels,
                 "statute": "민법 제544조",
             },
             {
                 "text": "계약 종료 즉시 관할 법원에 임차권등기명령을 신청하여 향후 부득이하게 이사할 때에도 기존 대항력과 우선변제권이 온전히 유지·보전되도록 조치하십시오.",
-                "evidence_labels": ["E01", "E03"],
+                "evidence_labels": list(set(dyn_lease_labels + dyn_residence_labels)),
                 "statute": "주택임대차보호법 제3조의3",
             },
             {
                 "text": "대법원 인터넷등기소를 통해 목적물 부동산의 최신 말소사항 포함 등기사항전부증명서를 발급받아 가압류 외 다른 선순위 권리 변동 여부를 최종 대조하십시오.",
-                "evidence_labels": ["E09", "E10", "E11"],
+                "evidence_labels": dyn_attachment_labels or dyn_lease_labels,
                 "statute": "부동산등기법",
             },
             {
                 "text": "목적물에 관한 경매 절차가 개시될 경우, 선순위 대항력을 바탕으로 보증금 전액을 낙찰자에게 인수시킬지 또는 배당요구종기 내에 권리신고 및 배당요구 신청서를 관할 경매법원에 접수하여 우선배당받을지 신중히 선택하여 진행하십시오.",
-                "evidence_labels": ["E01", "E09", "E10"],
+                "evidence_labels": list(set(dyn_lease_labels + dyn_attachment_labels)),
                 "statute": "주택임대차보호법 제3조의2 제2항",
             },
         ]

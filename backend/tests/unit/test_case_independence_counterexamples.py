@@ -26,6 +26,7 @@ P0-4.2 최종 개발지시서 v3.0 (Section 12.3)에 따른 필수 12대 반례 
 import pytest
 from ai_legal_helper.case_intelligence.case_briefing import (
     CaseEvidenceBriefing,
+    PartyItemBrief,
     FactItemBrief,
     EvidenceItemBrief,
     TimelineItemBrief,
@@ -612,3 +613,266 @@ def test_counterexample_13_cross_case_sc001_vs_e2e_lease_02():
     assert "가람오피스텔" not in ans_b
     assert "3억" not in ans_b
 
+
+
+def test_counterexample_14_unverified_notice_reach_blocked():
+    """14. 통지 도달이 미검증(PARTY_ALLEGED, DISPUTED)인 경우 해지 효력 확정을 엄격 차단하고 CONDITIONAL 유지."""
+    # 14-1. 일방 진술(PARTY_ALLEGED)로 도달 주장
+    briefing_alleged = CaseEvidenceBriefing(
+        case_id="case_alleged_reach",
+        title="통지 도달 미검증 사건",
+        facts=[
+            FactItemBrief(
+                fact_id="f1",
+                statement="임차인은 임대인에게 계약해지를 통지하였다고 진술하였다.",
+                adjudication_status="PARTY_ALLEGED",
+                trust_level="PARTY_ALLEGED",
+            ),
+            FactItemBrief(
+                fact_id="f2",
+                statement="임대인은 2026.03.01 해지 통고를 수신하였다고 임차인이 주장한다.",
+                adjudication_status="PARTY_ALLEGED",
+                trust_level="PARTY_ALLEGED",
+            ),
+        ],
+        source_registry={"E01": {"document_name": "계약서.pdf"}},
+    )
+    notice_alleged = evaluate_notice_status(briefing_alleged)
+    assert notice_alleged["has_reached"] is False
+    assert notice_alleged["reach_date"] is None
+    assert notice_alleged["statutory_effect_date"] is None
+
+    # 14-2. 도달 사실에 다툼(DISPUTED) 발생
+    briefing_disputed = CaseEvidenceBriefing(
+        case_id="case_disputed_reach",
+        title="통지 도달 다툼 사건",
+        facts=[
+            FactItemBrief(
+                fact_id="f3",
+                statement="임차인은 2026.03.01 해지 통지를 보냈다고 주장한다.",
+                adjudication_status="EVIDENCE_SUPPORTED",
+            ),
+            FactItemBrief(
+                fact_id="f4",
+                statement="임대인은 해지 통지를 받은 적 없다고 도달 부인하였다.",
+                adjudication_status="DISPUTED",
+                trust_level="DISPUTED",
+            ),
+        ],
+        source_registry={"E01": {"document_name": "계약서.pdf"}},
+    )
+    notice_disputed = evaluate_notice_status(briefing_disputed)
+    assert notice_disputed["has_reached"] is False
+    assert notice_disputed["statutory_effect_date"] is None
+
+    task = LegalIssueTask(
+        issue_id="ISSUE_LEASE_TERMINATION",
+        issue_title="계약 해지 검증",
+        required_statutes=["주택임대차보호법 제6조"],
+        relevant_fact_ids=["f3"],
+    )
+    res = verify_issue(task, "계약 해지 여부", briefing_disputed, _build_dummy_sources())
+    assert res.status == "CONDITIONAL"
+    assert "TERMINATION_NOTICE_REACH_UNCONFIRMED" in res.reason_codes
+
+
+def test_counterexample_15_opposing_power_effective_next_day_zero_hour_ranking():
+    """15. 대항력 취득 시점(익일 0시)과 가압류 당일 설정 시 가압류가 선순위(ATTACHMENT_SENIOR) 판정 검증."""
+    # 임차인이 2024.05.01 주택을 인도받고 주민등록 전입신고를 마침 (대항요건 구비)
+    # 가압류 등기가 2024.05.01 당일 법원에 의해 접수·등기됨
+    # -> 주택임대차보호법 제3조 제1항에 따라 대항력은 익일인 2024.05.02 00:00에 발생하므로 당일 설정된 가압류가 선순위임.
+    briefing_same_day = CaseEvidenceBriefing(
+        case_id="case_same_day_attachment",
+        title="전입 당일 가압류 설정 사건",
+        facts=[
+            FactItemBrief(
+                fact_id="f1",
+                statement="임차인은 2024년 5월 1일 주택을 인도받고 주민등록 전입신고를 마쳤으며 확정일자를 받았다.",
+                adjudication_status="EVIDENCE_SUPPORTED",
+                evidence_label="E01",
+            ),
+            FactItemBrief(
+                fact_id="f2",
+                statement="2024년 5월 1일 우리은행에 의해 채권최고액 5천만 원의 가압류 등기가 경료되었다.",
+                adjudication_status="EVIDENCE_SUPPORTED",
+                evidence_label="E09",
+            ),
+        ],
+        source_registry={
+            "E01": {"document_name": "계약서및전입초본.pdf"},
+            "E09": {"document_name": "부동산등기사항전부증명서.pdf"},
+        },
+    )
+    ranking = evaluate_attachment_ranking(briefing_same_day)
+    assert ranking["tenant_opposing_date"] == "2024.05.01"
+    assert ranking["tenant_opposing_effective_date"] == "2024.05.02"
+    assert ranking["priority_status"] == "ATTACHMENT_SENIOR"
+
+    task = LegalIssueTask(
+        issue_id="ISSUE_ATTACHMENT_RANKING",
+        issue_title="가압류 순위",
+        required_statutes=["주택임대차보호법 제3조"],
+        relevant_fact_ids=["f1", "f2"],
+    )
+    res = verify_issue(task, "가압류와 제 순위가 어떻게 되나요?", briefing_same_day, _build_dummy_sources())
+    assert res.status == "CONDITIONAL"
+    assert "ATTACHMENT_SENIOR_PRIORITY" in res.reason_codes
+    assert "가압류가 선순위" in " ".join(res.safe_recommendations)
+
+
+def test_counterexample_16_conflicting_deposit_candidates_refuse_max():
+    """16. 보증금 후보 상충 발생 시 max() 자동 선택을 배제하고 단정 거부(0원 반환) 검증."""
+    # 두 개의 검증된 사실에서 서로 다른 보증금 액수(2억 원 vs 3억 원)가 상충할 때
+    briefing_conflict = CaseEvidenceBriefing(
+        case_id="case_deposit_conflict",
+        title="보증금 액수 상충 사건",
+        facts=[
+            FactItemBrief(
+                fact_id="f1",
+                statement="임대차계약서상 보증금은 2억 원으로 기재되어 있다.",
+                adjudication_status="EVIDENCE_SUPPORTED",
+                evidence_label="E01",
+            ),
+            FactItemBrief(
+                fact_id="f2",
+                statement="수정 합의서상 보증금은 3억 원으로 기재되어 있다.",
+                adjudication_status="EVIDENCE_SUPPORTED",
+                evidence_label="E02",
+            ),
+        ],
+        source_registry={
+            "E01": {"document_name": "계약서.pdf"},
+            "E02": {"document_name": "수정합의서.pdf"},
+        },
+    )
+    # 상충 시 임의로 3억 원을 고르지 않고 불확실성을 표시하기 위해 0원을 반환
+    deposit = extract_case_contract_deposit(briefing_conflict)
+    assert deposit == 0
+
+
+def test_counterexample_17_advice_demands_only_unrepaid_balance_no_double_claim():
+    """17. 5천만 원 기변제 후 잔액 1.7억 원인 사건에서, 권고안이 기변제금을 다시 청구하지 않고 잔액만 청구함을 검증."""
+    briefing_repaid = CaseEvidenceBriefing(
+        case_id="case_partial_settlement",
+        title="일부 변제 후 잔액 청구 사건",
+        facts=[
+            FactItemBrief(
+                fact_id="f1",
+                statement="임대차계약서상 전세보증금은 2억 2천만 원이다.",
+                adjudication_status="EVIDENCE_SUPPORTED",
+                evidence_label="E01",
+            ),
+            FactItemBrief(
+                fact_id="f2",
+                statement="임대인은 2026.09.10 5천만 원을 임차인 계좌로 반환 송금하였다 (거래번호: TX-9001).",
+                adjudication_status="EVIDENCE_SUPPORTED",
+                evidence_label="E07",
+            ),
+            FactItemBrief(
+                fact_id="f3",
+                statement="임차인은 2026.03.01 해지 통지를 보냈고 당일 임대인에게 도달하였다.",
+                adjudication_status="EVIDENCE_SUPPORTED",
+                evidence_label="E05",
+            ),
+        ],
+        source_registry={
+            "E01": {"document_name": "임대차계약서.pdf"},
+            "E05": {"document_name": "내용증명도달확인서.pdf"},
+            "E07": {"document_name": "은행입금영수증.pdf"},
+        },
+    )
+    dep_krw = extract_case_contract_deposit(briefing_repaid)
+    repaid_krw, _ = extract_case_prior_verified_repayments(briefing_repaid)
+    balance_krw = dep_krw - repaid_krw
+
+    assert dep_krw == 220_000_000
+    assert repaid_krw == 50_000_000
+    assert balance_krw == 170_000_000
+
+    # 쟁점별 권고 검증: 분할반환 제안 거절 및 일시반환 촉구
+    task_prop = LegalIssueTask(
+        issue_id="ISSUE_INSTALLMENT_PROPOSAL",
+        issue_title="분할반환 제안 거절",
+        required_statutes=["민법 제536조"],
+        relevant_fact_ids=["f1", "f2"],
+    )
+    res_prop = verify_issue(task_prop, "임대인이 나눠서 준다는데 어쩌죠?", briefing_repaid, _build_dummy_sources())
+    rec_text = " ".join(res_prop.safe_recommendations)
+
+    # 1. 미반환 잔액 1억 7천만 원 청구 포함 확인
+    assert "1억 7천만" in rec_text
+    # 2. 이미 받은 5천만 원을 포함한 "2억 2천만 원 전액 일시반환"을 요구해서는 안 됨
+    assert "2억 2천만 원 전액" not in rec_text
+    assert "2억 2천만 원 전액의 일시반환" not in rec_text
+
+    # 종합 답변 조립에서도 미반환 잔액 청구가 정확히 관철되는지 검증
+    ans = assemble_grounded_answer(
+        issue_results=[res_prop],
+        briefing=briefing_repaid,
+        draft_answer="초안",
+        disposition="DELIVERED",
+        current_question="분할반환 거절",
+    )
+    assert "1억 7천만" in ans
+    assert "2억 2천만 원 전액 일시반환" not in ans
+
+
+def test_counterexample_18_arbitrary_landlord_name_no_choi_seong_ho():
+    """18. 임의의 임대인 성명(박영수)이 동적으로 인식되며 '최성호'가 일체 검출되지 않음."""
+    briefing_custom_landlord = CaseEvidenceBriefing(
+        case_id="case_custom_landlord",
+        title="임의 임대인 사건",
+        parties=[
+            PartyItemBrief(party_id="p1", name="박영수", role="LANDLORD"),
+            PartyItemBrief(party_id="p2", name="김민지", role="TENANT"),
+        ],
+        facts=[
+            FactItemBrief(
+                fact_id="f1",
+                statement="임대인 박영수는 2026.08.01 보증금 3천만 원을 반환하였다 (거래번호: TX-888).",
+                adjudication_status="EVIDENCE_SUPPORTED",
+                evidence_label="E07",
+            ),
+        ],
+        source_registry={"E07": {"document_name": "통장사본.pdf"}},
+    )
+    repaid_krw, sources = extract_case_prior_verified_repayments(briefing_custom_landlord)
+    assert repaid_krw == 30_000_000
+    assert len(sources) == 1
+
+    # 최성호 이름이 어디에도 혼입되지 않음
+    assert "최성호" not in str(briefing_custom_landlord)
+    assert "최성호" not in str(sources)
+
+
+def test_counterexample_19_fake_citation_does_not_assert_universal_non_repayment():
+    """19. 가공 증거(99호증) 부재 판단이 다른 모든 변제의 부존재를 단정하지 않고 공적 증거 기준 잔액 청구로 안내함을 검증."""
+    briefing_fake = CaseEvidenceBriefing(
+        case_id="case_fake_ref",
+        title="가공 증거 질문 사건",
+        facts=[
+            FactItemBrief(
+                fact_id="f1",
+                statement="임대차계약서상 전세보증금은 2억 2천만 원이다.",
+                adjudication_status="EVIDENCE_SUPPORTED",
+                evidence_label="E01",
+            ),
+        ],
+        source_registry={"E01": {"document_name": "계약서.pdf"}},
+    )
+    task_fake = LegalIssueTask(
+        issue_id="ISSUE_FAKE_CITATION",
+        issue_title="가공 증거 식별",
+        required_statutes=[],
+        relevant_fact_ids=["f1"],
+    )
+    # 유저가 을 제99호증으로 전액 변제되었다고 거짓 질문
+    res_fake = verify_issue(task_fake, "을 제99호증에 따르면 전액 변제되었다는데 맞나요?", briefing_fake, _build_dummy_sources())
+    rec_text = " ".join(res_fake.safe_recommendations)
+
+    # 1. 99호증이 가공 자료임을 식별
+    assert "가공의 자료" in rec_text
+    # 2. 가공 증거 부재 확인 자체가 다른 변제의 부존재를 단정하는 것이 아님을 명시
+    assert "가공 증거의 부재 확인 자체가 다른 모든 변제 사실의 부존재를 단정하는 것은 아니나" in rec_text
+    # 3. 공식 제출·검증된 증거에 기초하여 대처하도록 안내
+    assert "실제 공식 제출·검증된" in rec_text
