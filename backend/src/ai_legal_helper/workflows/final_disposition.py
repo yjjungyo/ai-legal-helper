@@ -27,6 +27,18 @@ import re
 from pydantic import BaseModel, Field
 
 from ai_legal_helper.case_intelligence.case_briefing import CaseEvidenceBriefing
+from ai_legal_helper.case_intelligence.settlement_calculator import (
+    format_krw_to_korean,
+    extract_dates_from_text,
+    extract_amounts_from_text,
+    extract_case_contract_deposit,
+    extract_case_prior_verified_repayments,
+    calculate_three_months_expiry,
+    evaluate_notice_status,
+    evaluate_attachment_ranking,
+    find_case_property_info,
+    find_evidence_labels_by_type,
+)
 from ai_legal_helper.agents.issue_verifier import IssueVerificationResult
 from ai_legal_helper.api.schemas.consultation import ClaimReference, ClaimCitation
 from ai_legal_helper.database.session import SessionLocal
@@ -210,216 +222,9 @@ def determine_final_disposition(
     )
 
 
-def extract_case_contract_deposit(briefing: CaseEvidenceBriefing) -> int:
-    """사건의 등록 증거 및 확정 Fact로부터 계약상 임대차 보증금 원금을 동적으로 인출한다.
-
-    특정 금액(예: 300,000,000원)을 고정하지 않고, 임대차계약서 및 요건사실 진술문에서
-    보증금 관련 금액을 분석하여 반환한다 (P0-3.1).
-    단순히 가장 큰 금액을 선택하지 않고, 증거로 검증된 계약 원금 Fact에서 결정한다.
-
-    Args:
-        briefing: 현재 사건 증거 브리핑 모델.
-
-    Returns:
-        int: 추출된 보증금 정수 금액(KRW). 확인 불가 시 0.
-    """
-    deposit_candidates = []
-    # 1. 증거로 검증된 Fact 중에서 계약 보증금 Fact 우선 탐색
-    for f in (briefing.facts or []):
-        is_verified = (
-            f.adjudication_status in ("EVIDENCE_SUPPORTED", "CORROBORATED")
-            or getattr(f, "trust_level", "") == "EVIDENCE_SUPPORTED"
-            or getattr(f, "verification_status", "") in ("DOCUMENT_VERIFIED", "VERIFIED")
-        )
-        if not is_verified:
-            continue
-        stmt = f.statement or ""
-        # 보증금 계약 원금 관련 사실 탐색 (분할변제 제안, 가압류, 반환금 등 명백히 배제)
-        if ("보증금" in stmt or "전세금" in stmt) and not any(
-            w in stmt for w in ["일부", "반환", "변제", "가압류", "손해금", "위약금", "제안", "시세", "감정가", "경매", "근저당권"]
-        ):
-            # 계약 보증금 관련 명시 문구("보증금은 OOO원", "보증금 OOO원에 계약")
-            m = re.search(r"(?:보증금|전세금).*?(\d+(?:\s*억|\s*천만|\s*만|\s*원|,|\d)+)\s*원", stmt)
-            if not m:
-                m = re.search(r"(\d+(?:\s*억|\s*천만|\s*만|\s*원|,|\d)+)\s*원.*?(?:보증금|전세금)", stmt)
-            if m:
-                amts = extract_amounts_from_text(m.group(0))
-            else:
-                amts = extract_amounts_from_text(stmt)
-            if amts:
-                deposit_candidates.append(max(amts))
-
-    if deposit_candidates:
-        return deposit_candidates[0] if len(set(deposit_candidates)) == 1 else max(deposit_candidates)
-
-    # 2. 계약서 출처를 가진 Fact에서 계약 원금 재탐색
-    for f in (briefing.facts or []):
-        stmt = f.statement or ""
-        if any(w in stmt for w in ["임대차계약", "계약 체결", "체결일"]) and ("보증금" in stmt or "전세금" in stmt):
-            if not any(w in stmt for w in ["일부", "반환", "변제", "가압류", "손해금", "위약금"]):
-                amts = extract_amounts_from_text(stmt)
-                if amts:
-                    return max(amts)
-
-    return 0
-
-
-def extract_case_prior_verified_repayments(briefing: CaseEvidenceBriefing) -> Tuple[int, List[str]]:
-    """사건에 이미 공적으로 입증·확정된 임대인의 보증금 일부 반환(변제) 내역을 동적으로 합산한다.
-
-    최초 계약금·잔금 지급(임차인 -> 임대인)과 임대인의 보증금 반환(임대인 -> 임차인)을
-    엄격히 구분하고, 실제 반환 거래 단위(일자, 금액, 고유 거래번호, 계좌, 차수 등)로 식별하여
-    중복 사본은 차단하고, 동일 문서 내 복수 거래 및 식별자가 구분되는 동시/동액 거래는 각각 합산한다.
-    고유 거래 식별자가 없어 동일성이 불확실한 거래는 확정 집계를 보류하여 이중 차감을 방지한다 (P0-3.1).
-
-    Args:
-        briefing: 현재 사건 증거 브리핑 모델.
-
-    Returns:
-        Tuple[int, List[str]]: (합산된 반환액, 근거 출처 목록) 튜플.
-    """
-    total_repaid = 0
-    repaid_sources = []
-    accepted_txs: List[Dict[str, Any]] = []
-
-    for f in (briefing.facts or []):
-        is_verified = (
-            f.adjudication_status in ("EVIDENCE_SUPPORTED", "CORROBORATED")
-            or getattr(f, "trust_level", "") == "EVIDENCE_SUPPORTED"
-            or getattr(f, "verification_status", "") in ("DOCUMENT_VERIFIED", "VERIFIED")
-        )
-        if not is_verified:
-            continue
-        stmt = f.statement or ""
-        doc_name = f.document_name or f.evidence_label or ""
-
-        # 임차인의 최초 보증금 지급 내역은 임대인의 반환으로 오인 배제
-        if any(w in stmt for w in ["계약금", "잔금 지급", "전액 지급 완료", "임대인 계좌로", "임차인이 지급", "보증금을 지급"]):
-            continue
-
-        # 단일 진술문 내 복수 거래 행 분할 지원 (예: 은행거래내역서 복수 라인 추출)
-        raw_lines = [ln.strip() for ln in stmt.splitlines() if ln.strip()]
-        if not raw_lines:
-            raw_lines = [stmt]
-
-        for line_text in raw_lines:
-            combined_text = f"{line_text} {doc_name}"
-
-            # 임대인의 반환/입금/변제 진술 식별
-            if any(w in line_text for w in ["일부 변제", "일부 반환", "반환금", "보증금 중 일부", "입금 확인", "변제 확인", "일부 변제 입금", "일부 변제하여", "일부 반환하여"]):
-                # 변제/반환/입금된 금액만 정밀 추출 (남은 잔액 금액과 혼동 방지)
-                m = re.search(r"(\d+(?:\s*억|\s*천만|\s*만|\s*원|,|\d)+)\s*(?:원)?을?\s*(?:일부\s*)?(?:변제|반환|입금|돌려)", line_text)
-                if m:
-                    amts = extract_amounts_from_text(m.group(0))
-                else:
-                    amts = extract_amounts_from_text(line_text)
-                if not amts:
-                    continue
-                amt = min(amts) if len(amts) > 1 else max(amts)
-                if amt <= 0:
-                    continue
-
-                # 거래 단위 식별자 추출
-                dates = extract_dates_from_text(line_text)
-                tx_date = sorted(dates)[0] if dates else (str(getattr(f, "occurred_at", None) or ""))
-                doc_ref = f.source_evidence_id or f.evidence_label or f.document_name or ""
-
-                # 1. 거래번호 / 승인번호 / 일련번호 / 전문번호
-                m_txid = re.search(r"(?:거래번호|승인번호|전문번호|관리번호|일련번호|tx[-_]?id|txid)[\s:]*([A-Za-z0-9_-]+)", combined_text, re.IGNORECASE)
-                tx_id = m_txid.group(1).strip() if m_txid else None
-
-                # 2. 거래 시각 (시분초 또는 시분)
-                m_time = re.search(r"(\d{1,2}:\d{2}(?::\d{2})?)", combined_text)
-                if not m_time:
-                    m_time = re.search(r"(\d{1,2}시\s*\d{1,2}분(?:\s*\d{1,2}초)?)", combined_text)
-                tx_time = m_time.group(1).strip() if m_time else None
-
-                # 3. 차수 / 회차 (1차, 2차 등)
-                m_ord = re.search(r"(\d+)\s*(?:차|회|번째)\s*(?:입금|변제|지급|반환|이체)?", combined_text)
-                tx_ord = m_ord.group(1).strip() if m_ord else None
-
-                # 4. 계좌번호
-                m_acc = re.search(r"(?:계좌|계좌번호)[\s:]*([0-9-]+)", combined_text)
-                tx_acc = m_acc.group(1).strip() if m_acc else None
-
-                # 5. 사본 / 중복 표기 여부
-                is_copy = any(w in combined_text for w in ["사본", "중복", "재발급", "동일 거래", "copy"])
-
-                src = f.document_name or f.evidence_label or "확인된 증거"
-
-                # 기존 수락된 거래들과 비교하여 중복 / 별개 / 의심 식별
-                is_duplicate = False
-                is_ambiguous = False
-
-                for ex in accepted_txs:
-                    # 1. 고유 거래번호(TX-ID) 비교: 둘 다 거래번호가 존재하는 경우
-                    if tx_id and ex.get("tx_id"):
-                        if tx_id == ex["tx_id"]:
-                            # 동일 거래번호 -> 명백한 중복 (사본 또는 중복 추출)
-                            is_duplicate = True
-                            break
-                        else:
-                            # 서로 다른 거래번호 -> 동일 문서·동일 일자·동일 금액이라도 별개의 거래로 판별
-                            continue
-
-                    # 2. 명시적 사본 판정: 문맥/파일명에 사본 표기가 있고 금액 및 일자가 일치하는 경우
-                    if (is_copy or ex.get("is_copy")) and ex["amt"] == amt and (not tx_date or not ex.get("date") or ex["date"] == tx_date):
-                        is_duplicate = True
-                        break
-
-                    # 3. 금액 또는 일자가 상이한 경우 -> 별개의 거래
-                    if amt != ex["amt"]:
-                        continue
-                    if tx_date and ex.get("date") and tx_date != ex["date"]:
-                        continue
-
-                    # 4. 금액과 일자가 동일한 경우 (tx_id가 한쪽 또는 양쪽에 없는 상황)
-                    # 4-1. 보조 식별자(시간, 차수, 계좌) 중 하나라도 명확히 다르면 별개의 분할 거래
-                    if (tx_time and ex.get("tx_time") and tx_time != ex["tx_time"]) or \
-                       (tx_ord and ex.get("tx_ord") and tx_ord != ex["tx_ord"]) or \
-                       (tx_acc and ex.get("tx_acc") and tx_acc != ex["tx_acc"]):
-                        continue
-
-                    # 4-2. 보조 식별자조차 없는 동일 일자·동일 금액 거래:
-                    # 동일 문서 출처(doc_ref 동일)인 경우 동일 항목의 중복 추출로 판정하여 중복 차단
-                    if doc_ref and ex.get("doc_ref") and doc_ref == ex["doc_ref"]:
-                        is_duplicate = True
-                        break
-
-                    # 4-3. 서로 다른 문서인데 고유 식별자가 없고 동일성이 불확실한 경우:
-                    # 이중 차감을 방지하고 안전한 권리 행사를 위해 확정 합산을 보류하고 확인 필요 상태 유지
-                    is_ambiguous = True
-                    break
-
-                if is_duplicate:
-                    continue
-
-                if is_ambiguous:
-                    # 고유 거래 식별자가 없고 동일성이 불확실하면 확정 판단 보류
-                    repaid_sources.append(
-                        f"[보류] {amt:,}원 [{src}] (동일 일자·금액 거래 중복 의심 / 고유 거래번호 미확인으로 합산 보류)"
-                    )
-                    continue
-
-                # 신규 거래로 확정 집계
-                accepted_txs.append({
-                    "amt": amt,
-                    "date": tx_date,
-                    "tx_id": tx_id,
-                    "tx_time": tx_time,
-                    "tx_ord": tx_ord,
-                    "tx_acc": tx_acc,
-                    "doc_ref": doc_ref,
-                    "src": src,
-                    "is_copy": is_copy,
-                    "stmt": line_text,
-                })
-                total_repaid += amt
-                ord_prefix = f"{tx_ord}차 " if tx_ord else ""
-                id_suffix = f" (거래번호: {tx_id})" if tx_id else ""
-                repaid_sources.append(f"{ord_prefix}{amt:,}원 [{src}]{id_suffix}")
-
-    return total_repaid, repaid_sources
+# [P0-4.2 최종 보완 v3.0] 단일 원천 settlement_calculator 로직 재수출 (호환성 유지)
+# extract_case_contract_deposit 및 extract_case_prior_verified_repayments는
+# 모듈 상단에서 settlement_calculator로부터 직접 임포트되어 공유됩니다.
 
 
 def extract_case_attachment_info(briefing: CaseEvidenceBriefing) -> Tuple[bool, Optional[str], str, bool]:
@@ -1024,9 +829,17 @@ def assemble_grounded_answer(
     # [4. 지금 할 수 있는 안전한 행동 가이드] (P0-4.2 작업 F: 쟁점 및 질문 상황별 구체적 맞춤 행동 제시)
     sections.append("\n[4. 지금 할 수 있는 안전한 행동 가이드]")
 
-    # 사건별 동적 사실관계 컨텍스트 인출 (P0-4.2 최종 보완: 하드코딩 완전 배제)
-    from ai_legal_helper.case_intelligence.dynamic_context import extract_dynamic_case_context
-    ctx = extract_dynamic_case_context(briefing)
+    deposit_krw = extract_case_contract_deposit(briefing)
+    repaid_krw, _ = extract_case_prior_verified_repayments(briefing)
+    balance_krw = max(0, deposit_krw - repaid_krw) if deposit_krw > 0 else 0
+    deposit_text = format_krw_to_korean(deposit_krw) if deposit_krw > 0 else "보증금"
+    balance_text = format_krw_to_korean(balance_krw) if balance_krw > 0 else "미반환 보증금"
+    prop_name, prop_type = find_case_property_info(briefing)
+
+    lease_labels = find_evidence_labels_by_type(briefing, ["LEASE", "임대차", "계약서"])
+    notice_labels = find_evidence_labels_by_type(briefing, ["NOTICE", "통고", "통지", "문자", "카카오", "내용증명"])
+    residence_labels = find_evidence_labels_by_type(briefing, ["RESIDENCE", "주민등록", "전입", "초본", "등본"])
+    attachment_labels = find_evidence_labels_by_type(briefing, ["REGISTRY", "등기", "가압류", "압류", "근저당"])
 
     q_str = f"{current_question or ''} {draft_answer}".lower()
     active_issue_ids = {r.issue_id for r in (issue_results or [])}
@@ -1035,140 +848,136 @@ def assemble_grounded_answer(
 
     # 1) 기본 절대 안전 조치 (대항력 및 점유 유지) - 전세 상담의 근본 수칙
     tailored_actions.append({
-        "text": "보증금 전액을 반환받거나 관할 법원의 임차권등기명령에 따른 등기가 등기부에 기재되기 전까지는 절대 주택의 점유를 상실(열쇠 인도, 비밀번호 공유, 임의 퇴거)하거나 전입을 옮기지 마십시오. (대항력 및 우선변제권 유지 필수)",
-        "evidence_labels": ["E01", "E03", "E16"],
+        "text": f"보증금({balance_text if balance_krw > 0 else deposit_text}) 전액을 반환받거나 관할 법원의 임차권등기명령에 따른 등기가 등기부에 기재되기 전까지는 절대 {prop_type}의 점유를 상실(열쇠 인도, 비밀번호 공유, 임의 퇴거)하거나 전입을 옮기지 마십시오. (대항력 및 우선변제권 유지 필수)",
+        "evidence_labels": list(set(lease_labels + residence_labels)),
     })
 
     # 2) 문자/메시지 해지통고 증거 보존
     if "ISSUE_NOTICE_REACH" in active_issue_ids or (any(w in q_str for w in ("문자", "카톡", "메시지")) and any(w in q_str for w in ("해지", "도달", "효력", "퇴거", "요청"))):
         tailored_actions.append({
             "text": "문자 발신 내역 및 임대인 답장 캡처본을 증거로 영구 보관 (휴대폰 분실·기기변경에 대비하여 클라우드 백업 또는 출력본 확보)",
-            "evidence_labels": ["E04", "E05"],
+            "evidence_labels": notice_labels,
         })
         tailored_actions.append({
             "text": "도달을 더욱 확실히 하기 위한 우체국 내용증명 발송 병행",
-            "evidence_labels": ["E05"],
+            "evidence_labels": notice_labels,
         })
 
     # 3) 내용증명 작성 및 배달증명 수령 확인
     if "ISSUE_PROOF_OF_CONTENTS" in active_issue_ids or any(w in q_str for w in ("내용증명", "배달증명", "최고장")):
         tailored_actions.append({
             "text": "우체국 내용증명 양식 작성 후 3부 출력하여 발송",
-            "evidence_labels": ["E05"],
+            "evidence_labels": notice_labels,
         })
         tailored_actions.append({
             "text": "배달증명 서비스를 신청하여 상대방 실제 수령일 확인 (해지 통고 및 이행최고 도달 일자 객관적 입증)",
-            "evidence_labels": ["E05"],
+            "evidence_labels": notice_labels,
         })
 
     # 4) 경매 배당요구 종기 확인 및 시세 파악
     if "ISSUE_AUCTION_DIVIDEND_RISK" in active_issue_ids or any(w in q_str for w in ("경매", "배당", "낙찰")):
         tailored_actions.append({
             "text": "경매 개시 결정 시 배당요구 종기일을 확인하고 전략 결정 (배당요구 종기 도과 시 우선배당 수령 불가)",
-            "evidence_labels": ["E01", "E09", "E10"],
+            "evidence_labels": list(set(lease_labels + attachment_labels)),
         })
         tailored_actions.append({
-            "text": f"{ctx.property_type}의 최근 실거래 시세 및 낙찰가율 파악 (매각 예상가 대비 보증금 전액 회수 가능성 검토)",
-            "evidence_labels": ["E01", "E09"],
+            "text": f"{prop_type}의 최근 실거래 시세 및 낙찰가율 파악 (매각 예상가 대비 보증금 전액 회수 가능성 검토)",
+            "evidence_labels": list(set(lease_labels + attachment_labels)),
         })
 
     # 5) 분할반환 제안 거절 및 일시반환 촉구
     if "ISSUE_INSTALLMENT_PROPOSAL" in active_issue_ids or any(w in q_str for w in ("분할", "분할반환", "일부만 먼저")):
+        demand_target = f"미반환 잔액 {balance_text}" if repaid_krw > 0 else f"{deposit_text} 전액"
         tailored_actions.append({
-            "text": f"임대인에게 분할반환 제안 거절 및 {ctx.contract_deposit_text} 전액 일시반환 촉구 통보",
-            "evidence_labels": ["E06", "E07"],
+            "text": f"임대인에게 분할반환 제안 거절 및 {demand_target} 일시반환 촉구 통보",
+            "evidence_labels": list(set(notice_labels + lease_labels)),
         })
         tailored_actions.append({
             "text": "지급명령 또는 보증금반환청구 소송 등 법적 강제집행 절차 착수",
-            "evidence_labels": ["E01", "E03"],
+            "evidence_labels": list(set(lease_labels + residence_labels)),
         })
 
     # 6) 무담보 확약서 수용 거절
     if "ISSUE_UNSECURED_AGREEMENT" in active_issue_ids or any(w in q_str for w in ("확약서", "공증없이", "공증 없이", "합의하고 기다려")):
         tailored_actions.append({
             "text": "단순 확약 제안 거절 (공증·물적 담보 없는 확약서 수용 불가)",
-            "evidence_labels": ["E01"],
+            "evidence_labels": lease_labels,
         })
         tailored_actions.append({
             "text": "집행권원 확보를 위한 법적 절차 착수 (임차권등기명령 및 지급명령/소송)",
-            "evidence_labels": ["E01", "E03"],
+            "evidence_labels": list(set(lease_labels + residence_labels)),
         })
 
     # 7) 서류 보완 및 발급
     if "ISSUE_EVIDENCE_GAPS" in active_issue_ids or any(w in q_str for w in ("서류", "발급", "준비서류", "신청서류", "구비서류", "추가로 확인")):
         tailored_actions.append({
-            "text": f"대법원 인터넷등기소에서 {ctx.property_name} 등기사항전부증명서 발급 (말소사항 포함)",
-            "evidence_labels": ["E09", "E10", "E11"],
+            "text": f"대법원 인터넷등기소에서 {prop_name} 등기사항전부증명서 발급 (말소사항 포함)",
+            "evidence_labels": attachment_labels,
         })
         tailored_actions.append({
             "text": "거래은행 전세대출 담당자에게 반환보증 가입 여부 확인 공문/문서 요청",
-            "evidence_labels": ["E15"],
+            "evidence_labels": find_evidence_labels_by_type(briefing, ["INSURANCE", "보증보험", "HUG", "대출"]),
         })
         tailored_actions.append({
             "text": "임대차계약서 원본, 주민등록초본(전입변동이력 포함), 확정일자 부여현황 준비",
-            "evidence_labels": ["E01", "E03"],
+            "evidence_labels": list(set(lease_labels + residence_labels)),
         })
 
     # 8) 임대인 연락두절 및 자력상실 시 사법절차 전환
     if "ISSUE_COMMUNICATION_BREAKDOWN" in active_issue_ids or any(w in q_str for w in ("연락두절", "연락이 두절", "연락도 잘 안", "연락이 잘 안", "대출 거절", "파산")):
         tailored_actions.append({
             "text": "주택임차권등기명령 신청서 법원 제출",
-            "evidence_labels": ["E01", "E03"],
+            "evidence_labels": list(set(lease_labels + residence_labels)),
         })
         tailored_actions.append({
             "text": "보증금반환청구 지급명령 또는 정식 소송 제기 (조속한 집행권원 확보)",
-            "evidence_labels": ["E01"],
+            "evidence_labels": lease_labels,
         })
         tailored_actions.append({
             "text": "임대인의 다른 일반재산(다른 부동산, 예금 등) 가압류 검토",
-            "evidence_labels": ["E09", "E10"],
+            "evidence_labels": attachment_labels,
         })
 
     # 9) 가공/미등록 증거 확인
     if "ISSUE_FAKE_CITATION" in active_issue_ids or any(w in q_str for w in ("99호증", "증거 a", "가공", "미등록")):
-        lbl_range = (
-            f"{min(ctx.registered_labels)}~{max(ctx.registered_labels)}"
-            if ctx.registered_labels
-            else "공식"
-        )
         tailored_actions.append({
-            "text": f"실제 등록된 {lbl_range} 증거 목록 확인 (현재 사건에 공적 등록된 정식 증거서류 원본 대조)",
-            "evidence_labels": ["E01", "E02", "E03"],
+            "text": "실제 등록된 증거 목록 확인 (현재 사건에 공적 등록된 정식 증거서류 원본 대조)",
+            "evidence_labels": [ev.evidence_label for ev in (briefing.evidences or [])][:3],
         })
 
     # 10) 새 세입자 유치 시까지 대기의무 없음
     if "ISSUE_NO_WAIT_DUTY" in active_issue_ids or any(w in q_str for w in ("새 세입자", "새세입자", "다음 세입자", "기다려")):
         tailored_actions.append({
-            "text": f"임대인의 부당한 주장 일축 및 전액 반환 촉구 (보증금 {ctx.contract_deposit_text} 반환 청구)",
-            "evidence_labels": ["E01"],
+            "text": f"임대인의 부당한 주장 일축 및 전액 반환 촉구 (보증금 {deposit_text} 반환 청구)",
+            "evidence_labels": lease_labels,
         })
         tailored_actions.append({
             "text": "임차권등기명령 및 법적 강제집행 착수 (지급명령 또는 보증금반환소송)",
-            "evidence_labels": ["E01", "E03"],
+            "evidence_labels": list(set(lease_labels + residence_labels)),
         })
 
     # 맞춤 행동이 1개(기본 조치만)인 경우 표준 5대 권고를 사용
     if len(tailored_actions) <= 1:
         action_items_config = [
             {
-                "text": "보증금 전액을 반환받거나 관할 법원의 임차권등기명령에 따른 등기가 등기부에 기재되기 전까지는 절대 주택의 점유를 상실(열쇠 인도, 비밀번호 공유, 임의 퇴거)하거나 전입을 옮기지 마십시오. (대항력 및 우선변제권 유지 필수)",
-                "evidence_labels": ["E01", "E03", "E16"],
+                "text": f"보증금({balance_text if balance_krw > 0 else deposit_text}) 전액을 반환받거나 관할 법원의 임차권등기명령에 따른 등기가 등기부에 기재되기 전까지는 절대 {prop_type}의 점유를 상실(열쇠 인도, 비밀번호 공유, 임의 퇴거)하거나 전입을 옮기지 마십시오. (대항력 및 우선변제권 유지 필수)",
+                "evidence_labels": list(set(lease_labels + residence_labels)),
             },
             {
                 "text": "임대인에게 보증금 반환 최고 및 지연손해금(민법 연 5%, 소촉법 연 12%) 청구 내용증명을 발송하여 임대인의 이행지체 책임을 명확히 하십시오.",
-                "evidence_labels": ["E05", "E15"],
+                "evidence_labels": notice_labels,
             },
             {
                 "text": "계약 종료 즉시 관할 법원에 임차권등기명령을 신청하여 향후 부득이하게 이사할 때에도 기존 대항력과 우선변제권이 온전히 유지·보전되도록 조치하십시오.",
-                "evidence_labels": ["E01", "E03"],
+                "evidence_labels": list(set(lease_labels + residence_labels)),
             },
             {
-                "text": "대법원 인터넷등기소를 통해 목적물 부동산의 최신 말소사항 포함 등기사항전부증명서를 발급받아 가압류 외 다른 선순위 권리 변동 여부를 최종 대조하십시오.",
-                "evidence_labels": ["E09", "E10", "E11"],
+                "text": f"대법원 인터넷등기소를 통해 {prop_name}의 최신 말소사항 포함 등기사항전부증명서를 발급받아 가압류 외 다른 선순위 권리 변동 여부를 최종 대조하십시오.",
+                "evidence_labels": attachment_labels,
             },
             {
                 "text": "목적물에 관한 경매 절차가 개시될 경우, 선순위 대항력을 바탕으로 보증금 전액을 낙찰자에게 인수시킬지 또는 배당요구종기 내에 권리신고 및 배당요구 신청서를 관할 경매법원에 접수하여 우선배당받을지 신중히 선택하여 진행하십시오.",
-                "evidence_labels": ["E01", "E09", "E10"],
+                "evidence_labels": list(set(lease_labels + attachment_labels)),
             },
         ]
     else:
@@ -1288,55 +1097,7 @@ def extract_dates_from_text(text: str) -> Set[str]:
     return dates
 
 
-def extract_amounts_from_text(text: str) -> Set[int]:
-    """문자열에서 금액(원 단위 정수) 목록을 추출한다.
-
-    한국어 단위(억, 천만, 만) 및 콤마 표기 금액을 모두 정수(KRW)로 환산하여 반환한다.
-
-    Args:
-        text: 금액을 탐색할 원문 텍스트.
-
-    Returns:
-        Set[int]: 원(KRW) 단위의 정수 금액 집합.
-    """
-    amounts = set()
-    cleaned_text = text
-
-    # 1. 억 + (천만/만) 단위: e.g. 2억 7천만원, 2억 7000만원, 3억원
-    eok_pattern = re.compile(r"(\d+)\s*억(?:\s*(\d+(?:,\d{3})*|\d+)\s*(천\s*만|만))?\s*원?")
-    for m in eok_pattern.finditer(text):
-        eok = int(m.group(1)) * 100_000_000
-        rest = 0
-        if m.group(2):
-            raw_rest = int(m.group(2).replace(",", ""))
-            unit = m.group(3) or ""
-            if "천" in unit:
-                rest = raw_rest * 10_000_000
-            else:
-                rest = raw_rest * 10_000
-        amounts.add(eok + rest)
-    cleaned_text = eok_pattern.sub(" ", cleaned_text)
-
-    # 2. 천만원 단위: e.g. 3천만원, 7천만원
-    cheon_pattern = re.compile(r"(\d+)\s*천\s*만\s*원?")
-    for m in cheon_pattern.finditer(cleaned_text):
-        amounts.add(int(m.group(1)) * 10_000_000)
-    cleaned_text = cheon_pattern.sub(" ", cleaned_text)
-
-    # 3. 만원 단위: e.g. 3000만원, 7200만원, 3,000만원
-    man_pattern = re.compile(r"(\d+(?:,\d{3})*|\d+)\s*만\s*원?")
-    for m in man_pattern.finditer(cleaned_text):
-        raw = m.group(1).replace(",", "")
-        amounts.add(int(raw) * 10_000)
-    cleaned_text = man_pattern.sub(" ", cleaned_text)
-
-    # 4. 콤마 포함 원 단위: e.g. 30,000,000원, 72,000,000원
-    won_pattern = re.compile(r"(\d{1,3}(?:,\d{3})+)\s*원")
-    for m in won_pattern.finditer(cleaned_text):
-        raw = m.group(1).replace(",", "")
-        amounts.add(int(raw))
-
-    return amounts
+# extract_amounts_from_text는 settlement_calculator에서 임포트됨
 
 
 
@@ -1763,31 +1524,36 @@ def build_claim_citations(
                     explanation=f"{r.issue_title} ({r.status}) - 법률 출처 검증: {'완료' if all_statutes_supported else '미검증/조건부'}",
                 ))
 
-        # 4. [4. 지금 할 수 있는 안전한 행동 가이드] 5대 조치사항 접지
+        # 4. [4. 지금 할 수 있는 안전한 행동 가이드] 5대 조치사항 접지 (사건별 동적 증거 라벨 매핑)
+        dyn_lease_labels = find_evidence_labels_by_type(briefing, ["LEASE", "임대차", "계약서"])
+        dyn_notice_labels = find_evidence_labels_by_type(briefing, ["NOTICE", "통고", "통지", "문자", "카카오", "내용증명"])
+        dyn_residence_labels = find_evidence_labels_by_type(briefing, ["RESIDENCE", "주민등록", "전입", "초본", "등본"])
+        dyn_attachment_labels = find_evidence_labels_by_type(briefing, ["REGISTRY", "등기", "가압류", "압류", "근저당"])
+
         action_item_configs = [
             {
                 "text": "보증금 전액을 반환받거나 관할 법원의 임차권등기명령에 따른 등기가 등기부에 기재되기 전까지는 절대 주택의 점유를 상실(열쇠 인도, 비밀번호 공유, 임의 퇴거)하거나 전입을 옮기지 마십시오. (대항력 및 우선변제권 유지 필수)",
-                "evidence_labels": ["E01", "E03", "E16"],
+                "evidence_labels": list(set(dyn_lease_labels + dyn_residence_labels)),
                 "statute": "주택임대차보호법 제3조 제1항",
             },
             {
                 "text": "임대인에게 보증금 반환 최고 및 지연손해금(민법 연 5%, 소촉법 연 12%) 청구 내용증명을 발송하여 임대인의 이행지체 책임을 명확히 하십시오.",
-                "evidence_labels": ["E05", "E15"],
+                "evidence_labels": dyn_notice_labels or dyn_lease_labels,
                 "statute": "민법 제544조",
             },
             {
                 "text": "계약 종료 즉시 관할 법원에 임차권등기명령을 신청하여 향후 부득이하게 이사할 때에도 기존 대항력과 우선변제권이 온전히 유지·보전되도록 조치하십시오.",
-                "evidence_labels": ["E01", "E03"],
+                "evidence_labels": list(set(dyn_lease_labels + dyn_residence_labels)),
                 "statute": "주택임대차보호법 제3조의3",
             },
             {
                 "text": "대법원 인터넷등기소를 통해 목적물 부동산의 최신 말소사항 포함 등기사항전부증명서를 발급받아 가압류 외 다른 선순위 권리 변동 여부를 최종 대조하십시오.",
-                "evidence_labels": ["E09", "E10", "E11"],
+                "evidence_labels": dyn_attachment_labels or dyn_lease_labels,
                 "statute": "부동산등기법",
             },
             {
                 "text": "목적물에 관한 경매 절차가 개시될 경우, 선순위 대항력을 바탕으로 보증금 전액을 낙찰자에게 인수시킬지 또는 배당요구종기 내에 권리신고 및 배당요구 신청서를 관할 경매법원에 접수하여 우선배당받을지 신중히 선택하여 진행하십시오.",
-                "evidence_labels": ["E01", "E09", "E10"],
+                "evidence_labels": list(set(dyn_lease_labels + dyn_attachment_labels)),
                 "statute": "주택임대차보호법 제3조의2 제2항",
             },
         ]
