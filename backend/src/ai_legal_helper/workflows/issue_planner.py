@@ -18,6 +18,7 @@ import re
 from pydantic import BaseModel, Field, model_validator
 
 from ai_legal_helper.case_intelligence.case_briefing import CaseEvidenceBriefing
+from ai_legal_helper.case_intelligence.dynamic_context import extract_dynamic_case_context
 from ai_legal_helper.observability.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -176,9 +177,17 @@ def plan_legal_issues(
     q = question or ""
     q_compact = re.sub(r"\s+", "", q)
 
+    # 사건별 동적 사실관계 컨텍스트 인출 (P0-4.2 최종 보완)
+    ctx = extract_dynamic_case_context(briefing)
+
     # 0. 쟁점: 가공의 증거 라벨 식별 및 존재 부인 (P0-4.2 작업 B / SC01-V05 대응)
     unregistered_evs = detect_unregistered_evidence_references(q, briefing)
     if unregistered_evs:
+        lbl_range = (
+            f"{min(ctx.registered_labels)}~{max(ctx.registered_labels)}"
+            if ctx.registered_labels
+            else "공식"
+        )
         issues.append(
             LegalIssueTask(
                 issue_id="ISSUE_FAKE_CITATION",
@@ -192,7 +201,7 @@ def plan_legal_issues(
                 relevant_evidence_ids=[],
                 relevant_evidence_labels=[ev.evidence_label for ev in (briefing.evidences or [])][:5],
                 required_statutes=[],
-                missing_evidence=[f"실제 등록된 E01~E17 증거 목록 확인 ({', '.join(unregistered_evs)} 부존재)"],
+                missing_evidence=[f"실제 등록된 {lbl_range} 증거 목록 확인 ({', '.join(unregistered_evs)} 부존재)"],
                 priority="HIGH",
             )
         )
@@ -203,10 +212,7 @@ def plan_legal_issues(
         any(k in q_compact for k in ("상황", "대처", "어떻게", "분석", "종합", "전체", "법적으로", "알려"))
         and any(k in q_compact for k in ("보증금", "전세", "임대차", "임차"))
     )
-    has_attachment_evidence = (
-        any(lbl in briefing.source_registry for lbl in ("E09", "E10"))
-        or any("가압류" in f.statement for f in briefing.facts)
-    )
+    has_attachment_evidence = ctx.has_attachment
 
     # 1-1. 쟁점: 문자메시지에 의한 해지의사표시 도달 및 효력 (SC01-T03 대응)
     has_text_notice_mention = any(k in q_compact for k in ("문자", "카톡", "메시지", "메세지")) and any(k in q_compact for k in ("해지", "도달", "효력", "퇴거", "요청", "문자가"))
@@ -273,9 +279,10 @@ def plan_legal_issues(
         )
 
     # 2. 쟁점: 가압류 및 담보권과 임차인 대항력/우선변제권 권리 순위
-    if any(k in q_compact for k in ("가압류", "근저당", "동진은행", "HUG", "순위", "권리관계", "등기")) or (is_comprehensive and has_attachment_evidence):
+    cred_keys = tuple(ctx.attachment_creditors) if ctx.attachment_creditors else ()
+    if any(k in q_compact for k in ("가압류", "근저당", "담보", "순위", "권리관계", "등기", *cred_keys)) or (is_comprehensive and has_attachment_evidence):
         f_ids, e_ids, e_lbls = _match_facts_and_evidences(
-            ["가압류", "전입신고", "확정일자", "등기", "동진은행", "HUG", "주민등록"], briefing
+            ["가압류", "전입신고", "확정일자", "등기", "주민등록", *ctx.attachment_creditors], briefing
         )
         for ev in briefing.evidences:
             if any(k in (ev.document_name or "") for k in ("전입", "확정일자", "가압류", "등기", "열람")):
@@ -290,13 +297,14 @@ def plan_legal_issues(
             if g.gap_type in ("REGISTRY_CONFIRMATION_GAP", "HUG_INSURANCE_CONFIRMATION_GAP"):
                 missing.append(g.target_proposition)
 
+        att_desc = ctx.attachment_summary_text if ctx.has_attachment else "가압류 등 제한물권"
         issues.append(
             LegalIssueTask(
                 issue_id="ISSUE_ATTACHMENT_RANKING",
                 issue_title="가압류 등재와 임차인의 대항력·우선변제권 순위 관계",
                 legal_questions=[
                     "임차인의 대항력(전입+주택인도) 및 우선변제권(확정일자) 구비 시점은 언제인가?",
-                    "등재된 복수 가압류(은행, HUG)의 접수일자와 임차인의 우선변제권 발생일자의 선후 순위는 어떠한가?",
+                    f"등재된 {att_desc}의 접수일자와 임차인의 우선변제권 발생일자의 선후 순위는 어떠한가?",
                     "임차인이 선순위 대항력을 갖춘 경우 가압류 채권자에게 대항할 수 있는가?",
                 ],
                 required_fact_keys=["전입신고일", "주택인도일", "확정일자일", "가압류접수일", "청구금액"],
@@ -328,7 +336,7 @@ def plan_legal_issues(
                 legal_questions=[
                     "선순위 대항요건(주택 인도 및 전입신고)과 확정일자를 갖춘 임차인에게 배당요구권과 대항력 선택권이 모두 인정되는가?",
                     "경매 개시 결정 시 배당요구 종기 내 배당요구로 매각대금에서 우선배당받는 방안과, 배당요구 없이 대항력을 유지하여 낙찰자에게 전액 인수시키는 방안의 법률적 차이는 무엇인가?",
-                    "오피스텔의 최근 실거래 시세 및 예상 낙찰가율에 비추어 전액 배당 회수가 불확실한 경우 대항력 인수 전략이 안전한가?",
+                    f"{ctx.property_type}의 최근 실거래 시세 및 예상 낙찰가율에 비추어 전액 배당 회수가 불확실한 경우 대항력 인수 전략이 안전한가?",
                 ],
                 required_fact_keys=["대항요건구비일", "확정일자일", "배당요구종기", "선순위채권총액", "시세/낙찰가"],
                 relevant_fact_ids=f_ids,
@@ -511,7 +519,7 @@ def plan_legal_issues(
                 legal_questions=[
                     "임대차계약 종료 시 '새 세입자가 들어올 때까지 기다려야 한다'는 임대인의 주장에 법적 근거가 있는가?",
                     "임대인의 보증금 반환의무와 임차인의 목적물 인도의무가 동시이행 관계(민법 제536조)에 비추어 대기 의무가 부존재하는 이유는 무엇인가?",
-                    "임대인의 부당한 주장을 일축하고 보증금 3억 원 전액 반환 및 지연손해금을 청구할 수 있는가?",
+                    f"임대인의 부당한 주장을 일축하고 보증금 {ctx.contract_deposit_text} 전액 반환 및 지연손해금을 청구할 수 있는가?",
                 ],
                 required_fact_keys=["계약종료사실", "새세입자유치조건의부당성", "동시이행관계"],
                 relevant_fact_ids=f_ids,
