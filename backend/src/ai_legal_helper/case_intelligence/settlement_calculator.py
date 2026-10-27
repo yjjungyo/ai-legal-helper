@@ -37,8 +37,11 @@ logger = get_logger(__name__)
 def is_fact_strictly_verified(f: Any, briefing: Optional[CaseEvidenceBriefing] = None) -> bool:
     """FactItemBrief가 반대 주장·미확인·다툼 없이 엄격히 검증된 공적 사실인지 검사한다.
 
-    반대 주장(DISPUTED), 당사자 일방 진술(PARTY_ALLEGED), 증거 불충분(EVIDENCE_INCOMPLETE),
-    또는 briefing.genuinely_disputed 사실은 배제하여 미검증 사실이 확정 판단에 진입하지 못하도록 차단한다.
+    반대 주장(DISPUTED, GENUINELY_DISPUTED), 당사자 일방 진술(PARTY_ALLEGED), 증거 불충분(EVIDENCE_INCOMPLETE),
+    미검증(UNVERIFIED), 모순(CONTRADICTED) 또는 briefing.genuinely_disputed 사실은 배제하여
+    미검증 사실이 확정 판단에 진입하지 못하도록 엄격히 차단한다 (P0-05 보완).
+    반대 주장이 있거나 실질적 다툼이 존재하는 Fact는 긍정적 검증 상태(EVIDENCE_SUPPORTED)가
+    있더라도 절대 신뢰하지 않는다.
 
     Args:
         f: 검사할 사실 객체 (FactItemBrief 또는 유사 모델).
@@ -50,20 +53,24 @@ def is_fact_strictly_verified(f: Any, briefing: Optional[CaseEvidenceBriefing] =
     if not f:
         return False
     status = getattr(f, "adjudication_status", "")
-    if status in ("DISPUTED", "PARTY_ALLEGED", "EVIDENCE_INCOMPLETE", "UNVERIFIED", "CONTRADICTED"):
+    if status in ("DISPUTED", "GENUINELY_DISPUTED", "PARTY_ALLEGED", "EVIDENCE_INCOMPLETE", "UNVERIFIED", "CONTRADICTED"):
         return False
     trust = getattr(f, "trust_level", "")
-    if trust in ("DISPUTED", "SUPERSEDED", "UNTRUSTED", "PARTY_ALLEGED"):
+    if trust in ("DISPUTED", "GENUINELY_DISPUTED", "SUPERSEDED", "UNTRUSTED", "PARTY_ALLEGED"):
         return False
 
-    # 사건 전체 실질적 다툼 사실(genuinely_disputed) 대조
+    # 사건 전체 실질적 다툼 사실(genuinely_disputed) 대조: statement뿐만 아니라 opposing_statement도 대조
     if briefing and getattr(briefing, "genuinely_disputed", None):
         fid = getattr(f, "fact_id", "")
         stmt = getattr(f, "statement", "")
         for d in briefing.genuinely_disputed:
-            if hasattr(d, "fact_id") and d.fact_id == fid:
+            if hasattr(d, "fact_id") and d.fact_id and d.fact_id == fid:
                 return False
-            if hasattr(d, "statement") and d.statement == stmt:
+            if hasattr(d, "statement") and d.statement and d.statement == stmt:
+                return False
+            if hasattr(d, "opposing_statement") and d.opposing_statement and d.opposing_statement == stmt:
+                return False
+            if hasattr(d, "related_fact_ids") and d.related_fact_ids and fid in d.related_fact_ids:
                 return False
 
     return (
@@ -396,17 +403,119 @@ def calculate_three_months_expiry(reach_date_str: str) -> Optional[str]:
         return None
 
 
-def evaluate_notice_status(briefing: CaseEvidenceBriefing) -> Dict[str, Any]:
+def parse_notice_dates_semantically(stmt: str) -> Dict[str, List[str]]:
+    """문장 내에서 복수 일자가 존재할 때, 각 일자 주변의 결합 동사 및 문맥을 정밀 분석하여
+    발송일(sent), 도달일(reach), 임대인 회신일(ack), 퇴거일(move_out)을 의미론적으로 분리 추출한다 (P0-04).
+
+    Args:
+        stmt: 분석할 사실 기술 문장.
+
+    Returns:
+        Dict[str, List[str]]: 'sent_dates', 'reach_dates', 'ack_dates', 'move_out_dates' 목록 딕셔너리.
+    """
+    res: Dict[str, List[str]] = {
+        "sent_dates": [],
+        "reach_dates": [],
+        "ack_dates": [],
+        "move_out_dates": [],
+    }
+    if not stmt:
+        return res
+
+    # 날짜 매치 및 span 탐색
+    date_matches = list(re.finditer(r"(\d{4})[년\.\-\s]+(\d{1,2})[월\.\-\s]+(\d{1,2})(?:일|\b|\.|\s|$)", stmt))
+    if not date_matches:
+        return res
+
+    for i, m in enumerate(date_matches):
+        y, mm, dd = m.groups()
+        d_str = f"{y}.{int(mm):02d}.{int(dd):02d}"
+
+        # 해당 날짜의 문맥 윈도우: 날짜 시작 전 최대 25자부터 다음 날짜 시작 전(또는 문장 끝)까지
+        start_pos = max(0, m.start() - 25)
+        end_pos = date_matches[i + 1].start() if i + 1 < len(date_matches) else len(stmt)
+        ctx = stmt[start_pos:end_pos]
+
+        # 날짜 직후 구문 (날짜부터 다음 날짜 전까지)
+        post_ctx = stmt[m.end():end_pos]
+
+        # 부정적 문맥 (부인, 미확인, 미도달) 탐지
+        has_neg_reach = any(w in post_ctx for w in ["수신 확인이 되지", "수신되지", "도달하지", "받지 못", "수신 못", "도달 못", "확인 안", "도달 안", "확인되지"])
+        has_neg_ack = any(w in post_ctx for w in ["답변 없", "회신 없", "회신하지", "답변하지", "수신 확인이 되지", "확인되지"])
+
+        # 1. 퇴거 관련
+        if any(w in ctx for w in ["퇴거", "이사", "명도", "비워"]) and any(w in ctx for w in ["예정", "지정", "하기로", "하겠", "이사일"]):
+            if d_str not in res["move_out_dates"]:
+                res["move_out_dates"].append(d_str)
+
+        # 2. 임대인 회신/답변/제안
+        is_ack = (not has_neg_ack) and (
+            any(w in post_ctx for w in ["답변", "회신", "답장", "제안", "확인했다고 답", "알겠다고", "답신", "일부부터 돌려", "수신 확인"]) or \
+            (any(w in ctx for w in ["임대인이", "임대인은", "집주인이", "상대방이"]) and any(w in ctx for w in ["회신", "답변", "제안", "답", "확인"]))
+        )
+        if is_ack and d_str not in res["ack_dates"]:
+            res["ack_dates"].append(d_str)
+
+        # 3. 도달/수신/배달완료
+        is_reach = (not has_neg_reach) and (
+            any(w in post_ctx for w in ["도달", "수신", "배달완료", "배달증명", "받았", "열람", "도달하여", "도달하였"]) or \
+            (any(w in ctx for w in ["도달", "배달완료", "배달증명"]) and not any(w in post_ctx for w in ["발송", "발신", "보냈"]))
+        )
+        if is_reach and d_str not in res["reach_dates"]:
+            res["reach_dates"].append(d_str)
+
+        # 4. 발송/발신/전송/문자/내용증명 발송
+        is_sent = any(w in post_ctx for w in ["발송", "발신", "보냈", "전송", "문자", "통고를 발", "통지를 발", "발송하였", "발송했"]) or \
+                  (any(w in ctx for w in ["임차인이", "임차인은"]) and any(w in ctx for w in ["발송", "보냈", "전송", "통고", "통지"])) or \
+                  (not is_reach and not is_ack and any(w in ctx for w in ["발송", "발신", "전송", "보냈", "통지", "통고"]))
+        if is_sent and d_str not in res["sent_dates"]:
+            res["sent_dates"].append(d_str)
+
+    return res
+
+
+def evaluate_notice_status(
+    briefing: CaseEvidenceBriefing,
+    reference_date: Optional[Any] = None,
+) -> Dict[str, Any]:
     """사건 브리핑으로부터 엄격히 검증된 Fact만을 바탕으로 해지 통지의 발송, 도달, 묵시적 갱신 여부를 정밀 분석한다.
 
-    반대 주장이나 다툼(DISPUTED)이 있는 경우 도달 확정을 엄격히 차단한다.
+    1. 통지 발송일과 상대방 도달일을 의미론적으로 분리한다 (P0-04).
+    2. 도달일로부터 3개월 경과 효력 발생일과 상담 기준일(ref_date)을 정밀 비교하여
+       미래 일자인 경우 효력 발생 여부를 미도래(CONDITIONAL)로 정확히 표시한다 (P0-03).
+    3. 반대 주장이나 실질적 다툼(DISPUTED, GENUINELY_DISPUTED)이 있는 경우 도달 확정을 엄격히 차단한다 (P0-05).
 
     Args:
         briefing: 현재 사건 증거 브리핑 모델.
+        reference_date: 상담 기준일자 (문자열 또는 datetime.date, 미지정 시 briefing.as_of_date 또는 오늘).
 
     Returns:
         Dict[str, Any]: 통지 분석 딕셔너리.
     """
+    # 상담 기준일자 결정 (P0-03)
+    ref_d = None
+    if reference_date:
+        if isinstance(reference_date, datetime.date):
+            ref_d = reference_date
+        elif isinstance(reference_date, str):
+            clean_ref = reference_date.replace("-", ".").strip()
+            parts = clean_ref.split(".")
+            if len(parts) == 3:
+                try:
+                    ref_d = datetime.date(int(parts[0]), int(parts[1]), int(parts[2]))
+                except Exception:
+                    pass
+    if not ref_d and getattr(briefing, "as_of_date", None):
+        clean_ref = briefing.as_of_date.replace("-", ".").strip()
+        parts = clean_ref.split(".")
+        if len(parts) == 3:
+            try:
+                ref_d = datetime.date(int(parts[0]), int(parts[1]), int(parts[2]))
+            except Exception:
+                pass
+    if not ref_d:
+        ref_d = datetime.date.today()
+
     res: Dict[str, Any] = {
         "has_sent": False,
         "sent_date": None,
@@ -418,6 +527,9 @@ def evaluate_notice_status(briefing: CaseEvidenceBriefing) -> Dict[str, Any]:
         "landlord_ack_date": None,
         "is_implicit_renewal": False,
         "statutory_effect_date": None,
+        "is_effect_date_reached": False,
+        "is_effect_date_future": False,
+        "reference_date": ref_d.strftime("%Y.%m.%d"),
         "designated_move_out_date": None,
         "notice_method": "통지",
     }
@@ -430,22 +542,29 @@ def evaluate_notice_status(briefing: CaseEvidenceBriefing) -> Dict[str, Any]:
         if any(w in stmt for w in ["묵시적으로 갱신", "묵시적 갱신", "동일 조건으로 갱신", "별도 갱신거절 통지가 없어", "묵시적갱신"]):
             res["is_implicit_renewal"] = True
 
-    # 2. 통지 발송 사실 분석 (엄격히 검증된 사실만)
+    # 2. 다툼/반대 주장 존재 여부 검사 (P0-05)
+    has_disputed_reach = any(
+        any(w in (f.statement or "") for w in ["도달 부인", "받은 적 없다", "수신하지 못함", "통지 못 받음", "도달하지 않음"])
+        or (f.adjudication_status in ("DISPUTED", "GENUINELY_DISPUTED") and any(w in (f.statement or "") for w in ["도달", "수신", "문자", "통지"]))
+        for f in (briefing.facts or [])
+    )
+
+    # 3. 사실 문장 정밀 의미론적 분석 (P0-04)
+    all_sent_dates: List[str] = []
+    all_reach_dates: List[str] = []
+    all_ack_dates: List[str] = []
+    all_move_out_dates: List[str] = []
+
     for f in (briefing.facts or []):
         if not is_fact_strictly_verified(f, briefing):
             continue
         stmt = f.statement or ""
+
+        # 발송 문맥
         if (
             any(w in stmt for w in ["해지", "종료", "퇴거", "통지", "통고", "반환 요청", "반환 요구", "만기"])
             and any(w in stmt for w in ["발신", "통지", "통고", "요청", "전송", "보냈", "문자", "메시지", "내용증명", "카카오톡", "알리고"])
-            and not any(w in stmt for w in ["확인했다고", "수신 확인", "회신", "자금 준비"])
         ):
-            res["has_sent"] = True
-            dates = extract_dates_from_text(stmt)
-            if dates and not res["sent_date"]:
-                res["sent_date"] = dates[0]
-            if f.evidence_label and f.evidence_label not in res["sent_evidence_labels"]:
-                res["sent_evidence_labels"].append(f.evidence_label)
             if "문자" in stmt or "메시지" in stmt:
                 res["notice_method"] = "문자메시지"
             elif "카카오톡" in stmt:
@@ -453,66 +572,116 @@ def evaluate_notice_status(briefing: CaseEvidenceBriefing) -> Dict[str, Any]:
             elif "내용증명" in stmt:
                 res["notice_method"] = "내용증명 우편"
 
-    # 3. 도달 확인 및 임대인 수신 확인 분석 (다툼/반대 주장 존재 시 도달 확정 배제)
-    has_disputed_reach = any(
-        any(w in (f.statement or "") for w in ["도달 부인", "받은 적 없다", "수신하지 못함", "통지 못 받음", "도달하지 않음"])
-        or (f.adjudication_status == "DISPUTED" and any(w in (f.statement or "") for w in ["도달", "수신", "문자", "통지"]))
-        for f in (briefing.facts or [])
-    )
+        # 의미론적 일자 분리
+        parsed = parse_notice_dates_semantically(stmt)
+        if parsed["sent_dates"]:
+            res["has_sent"] = True
+            all_sent_dates.extend(parsed["sent_dates"])
+            if f.evidence_label and f.evidence_label not in res["sent_evidence_labels"]:
+                res["sent_evidence_labels"].append(f.evidence_label)
 
-    if not has_disputed_reach:
-        for f in (briefing.facts or []):
-            if not is_fact_strictly_verified(f, briefing):
-                continue
-            stmt = f.statement or ""
-            is_reach = any(
-                w in stmt
-                for w in [
-                    "도달", "수신", "확인했다고 답", "확인했습니다", "내용 봤습니다",
-                    "분할반환 제안", "일부부터 돌려", "수신 확인", "회신", "답변", "배달증명", "배달완료"
-                ]
-            )
-            if is_reach and any(w in stmt for w in ["해지", "종료", "통지", "통고", "문자", "메시지", "요청", "메시지를 발신하였다"]):
+        if not has_disputed_reach:
+            if parsed["reach_dates"]:
                 res["has_reached"] = True
-                dates = extract_dates_from_text(stmt)
-                if dates and not res["reach_date"]:
-                    res["reach_date"] = dates[0]
+                all_reach_dates.extend(parsed["reach_dates"])
                 if f.evidence_label and f.evidence_label not in res["reach_evidence_labels"]:
                     res["reach_evidence_labels"].append(f.evidence_label)
 
-                if any(w in stmt for w in ["답변", "답", "회신", "확인했습니다", "분할반환 제안", "일부부터 돌려"]):
-                    res["has_landlord_acknowledgement"] = True
-                    if dates and not res["landlord_ack_date"]:
-                        res["landlord_ack_date"] = dates[0]
+            if parsed["ack_dates"]:
+                res["has_landlord_acknowledgement"] = True
+                all_ack_dates.extend(parsed["ack_dates"])
+                if f.evidence_label and f.evidence_label not in res["reach_evidence_labels"]:
+                    res["reach_evidence_labels"].append(f.evidence_label)
 
-            if "퇴거" in stmt and any(w in stmt for w in ["지정", "예정", "이사"]):
-                dates = extract_dates_from_text(stmt)
-                if dates and not res["designated_move_out_date"]:
-                    res["designated_move_out_date"] = dates[-1]
+        if parsed["move_out_dates"]:
+            all_move_out_dates.extend(parsed["move_out_dates"])
 
-    # 도달 확인 사실이 명시된 경우에만 법정 해지 효력일 계산
+    if all_sent_dates:
+        res["sent_date"] = sorted(all_sent_dates)[0]
+    if all_reach_dates:
+        res["reach_date"] = sorted(all_reach_dates)[0]
+        res["has_reached"] = True
+    elif all_ack_dates and not has_disputed_reach:
+        # 도달일이 명시적으로 분리되지 않았으나 임대인 회신/수신확인 일자가 있는 경우 회신일을 도달일로 인정
+        res["reach_date"] = sorted(all_ack_dates)[0]
+        res["has_reached"] = True
+
+    if all_ack_dates:
+        res["landlord_ack_date"] = sorted(all_ack_dates)[0]
+        res["has_landlord_acknowledgement"] = True
+
+    if all_move_out_dates:
+        res["designated_move_out_date"] = sorted(all_move_out_dates)[0]
+
+    # 4. 도달 확인 사실이 명시된 경우에만 법정 해지 효력일 계산 및 기준일 비교 (P0-03)
     if res["is_implicit_renewal"] and res["has_reached"] and res["reach_date"]:
         res["statutory_effect_date"] = calculate_three_months_expiry(res["reach_date"])
+        if res["statutory_effect_date"]:
+            eff_parts = res["statutory_effect_date"].split(".")
+            try:
+                eff_d = datetime.date(int(eff_parts[0]), int(eff_parts[1]), int(eff_parts[2]))
+                if eff_d > ref_d:
+                    res["is_effect_date_future"] = True
+                    res["is_effect_date_reached"] = False
+                else:
+                    res["is_effect_date_future"] = False
+                    res["is_effect_date_reached"] = True
+            except Exception:
+                res["is_effect_date_future"] = False
+                res["is_effect_date_reached"] = False
 
     return res
 
 
-def evaluate_attachment_ranking(briefing: CaseEvidenceBriefing) -> Dict[str, Any]:
-    """임차인의 대항요건 취득일(익일 0시 효력)과 확정일자 부여일을 각각 구분하여 등기부상 가압류와 정밀 비교한다.
+def evaluate_attachment_ranking(
+    briefing: CaseEvidenceBriefing,
+    reference_date: Optional[Any] = None,
+) -> Dict[str, Any]:
+    """임차인의 대항요건 취득일(주택 인도 및 전입신고 구비 익일 0시)과 확정일자 부여일을 각각 구분하여
+    등기부상 가압류와 정밀 비교한다 (P0-01, P0-02, P0-05 보완).
 
-    대항요건(주택 인도 + 주민등록 전입)과 확정일자는 별개의 법률 요건이므로,
-    1. 대항요건 구비일: 전입일과 인도일 중 늦은 날
-    2. 대항력 효력 발생 시점: 대항요건 구비 '익일(다음 날) 0시'
-    3. 확정일자 부여일: 계약서 상 확정일자 부여일
-    4. 우선변제권 효력 발생 시점: 대항력 발생 시점(익일 0시)과 확정일자 부여일 중 늦은 시점
-    으로 구분하여 가압류 등기 접수일자와 대조한다. 미검증 Fact나 미확인 날짜는 확정에 반영하지 않는다.
+    1. 대항요건(주택 인도 + 주민등록 전입) 독립 검증 (P0-01):
+       - 주택 인도 사실과 주민등록 전입 사실이 '모두' 엄격히 검증된 경우에만 대항요건 구비일을 계산한다.
+       - 하나라도 결여된 경우 대항요건 충족 상태를 미확정(None)으로 유지하고 절대 선순위(TENANT_SENIOR)를 단정하지 않는다.
+    2. 타임라인 이벤트 검증 상태 및 날짜 연결 정밀화 (P0-02):
+       - TimelineItemBrief의 occurrence_status == 'ACTUAL'인 이벤트만 반영한다.
+       - related_fact_ids에 연결된 Fact 중 적어도 하나 이상이 is_fact_strictly_verified를 통과해야 한다.
+       - SCHEDULED, REQUESTED 또는 미검증 이벤트는 확정 날짜로 절대 사용하지 않는다.
+    3. 등기부 미등록 또는 오래된 등기부 검증 (P0-05):
+       - 등기사항증명서가 등록되어 있지 않은 경우 가압류 부존재를 단정하지 않고 UNCERTAIN으로 유지한다.
+       - 등기부 확인일자가 기준일 대비 오래된 경우(1개월 이상) 최신 등기부 확인 필요 상태로 유도한다.
 
     Args:
         briefing: 현재 사건 증거 브리핑 모델.
+        reference_date: 상담 기준일자 (선택).
 
     Returns:
         Dict[str, Any]: 권리순위 분석 딕셔너리.
     """
+    # 기준일자 산출
+    ref_d = None
+    if reference_date:
+        if isinstance(reference_date, datetime.date):
+            ref_d = reference_date
+        elif isinstance(reference_date, str):
+            clean_ref = reference_date.replace("-", ".").strip()
+            parts = clean_ref.split(".")
+            if len(parts) == 3:
+                try:
+                    ref_d = datetime.date(int(parts[0]), int(parts[1]), int(parts[2]))
+                except Exception:
+                    pass
+    if not ref_d and getattr(briefing, "as_of_date", None):
+        clean_ref = briefing.as_of_date.replace("-", ".").strip()
+        parts = clean_ref.split(".")
+        if len(parts) == 3:
+            try:
+                ref_d = datetime.date(int(parts[0]), int(parts[1]), int(parts[2]))
+            except Exception:
+                pass
+    if not ref_d:
+        ref_d = datetime.date.today()
+
     res: Dict[str, Any] = {
         "has_attachment": False,
         "creditors": [],
@@ -520,11 +689,16 @@ def evaluate_attachment_ranking(briefing: CaseEvidenceBriefing) -> Dict[str, Any
         "evidence_labels": [],
         "summary_text": "",
         "priority_status": "UNCERTAIN",  # "TENANT_SENIOR", "ATTACHMENT_SENIOR", "UNCERTAIN", "NO_ATTACHMENT"
+        "has_transfer": False,
+        "has_move_in": False,
+        "has_opposing_power": False,
+        "has_fixed_date": False,
         "tenant_opposing_date": None,           # 대항요건(전입/인도) 구비일
         "tenant_opposing_effective_date": None, # 대항력 발생 시점 (익일 0시)
         "tenant_fixed_date": None,              # 확정일자 부여일
         "tenant_priority_date": None,           # 우선변제권 효력 기준일
         "attachment_dates": [],
+        "reference_date": ref_d.strftime("%Y.%m.%d"),
     }
 
     # 1. 임차인 대항요건(인도+전입) 및 확정일자 일자 탐색 (엄격 검증된 사실만 반영)
@@ -537,40 +711,63 @@ def evaluate_attachment_ranking(briefing: CaseEvidenceBriefing) -> Dict[str, Any
             continue
         stmt = f.statement or ""
         dates = extract_dates_from_text(stmt)
-        if not dates:
-            continue
+
         # (a) 주민등록 전입신고
         if any(w in stmt for w in ["전입신고", "주민등록", "전입"]):
-            transfer_dates.extend(dates)
+            res["has_transfer"] = True
+            if dates:
+                transfer_dates.extend(dates)
         # (b) 주택 인도 (점유/입주/열쇠)
-        if any(w in stmt for w in ["주택 인도", "인도받", "점유", "입주", "거주 시작", "열쇠 수령"]):
-            move_in_dates.extend(dates)
+        if any(w in stmt for w in ["주택 인도", "인도받", "점유", "입주", "거주 시작", "열쇠 수령", "인도 완료", "주택인도"]):
+            res["has_move_in"] = True
+            if dates:
+                move_in_dates.extend(dates)
         # (c) 전입과 인도가 결합 서술된 경우
-        if any(w in stmt for w in ["입주 및 전입", "전입 및 입주", "전입과 주택인도", "인도와 전입"]):
-            transfer_dates.extend(dates)
-            move_in_dates.extend(dates)
+        if any(w in stmt for w in ["입주 및 전입", "전입 및 입주", "전입과 주택인도", "인도와 전입", "전입신고 및 주택 인도"]):
+            res["has_transfer"] = True
+            res["has_move_in"] = True
+            if dates:
+                transfer_dates.extend(dates)
+                move_in_dates.extend(dates)
         # (d) 확정일자 부여
         if "확정일자" in stmt:
-            fixed_dates.extend(dates)
+            res["has_fixed_date"] = True
+            if dates:
+                fixed_dates.extend(dates)
+
+    # 2. Timeline 이벤트 정밀 반영 (P0-02): ACTUAL 및 검증된 Fact 연결 필수
+    verified_fact_ids = {
+        f.fact_id for f in (briefing.facts or [])
+        if is_fact_strictly_verified(f, briefing)
+    }
 
     for ev in (briefing.timeline or []):
-        if getattr(ev, "verification_status", "") not in ("DOCUMENT_VERIFIED", "VERIFIED") and getattr(ev, "status", "") == "UNVERIFIED":
+        occ = getattr(ev, "occurrence_status", "ACTUAL")
+        if occ != "ACTUAL":
+            continue
+        related = getattr(ev, "related_fact_ids", [])
+        if not related or not any(fid in verified_fact_ids for fid in related):
             continue
         if ev.event_date:
             clean_d = ev.event_date.replace("-", ".")
             if any(w in ev.title for w in ["전입", "주민등록"]):
                 transfer_dates.append(clean_d)
+                res["has_transfer"] = True
             if any(w in ev.title for w in ["입주", "주택인도", "점유"]):
                 move_in_dates.append(clean_d)
+                res["has_move_in"] = True
             if "확정일자" in ev.title:
                 fixed_dates.append(clean_d)
+                res["has_fixed_date"] = True
 
-    # 대항요건(인도 + 전입): 둘 다 충족되어야 함
+    # 대항요건(인도 + 전입): 둘 다 충족되어야 함 (P0-01)
     opposing_satisfied_date = None
     if transfer_dates and move_in_dates:
         opposing_satisfied_date = max(sorted(transfer_dates)[0], sorted(move_in_dates)[0])
-    elif transfer_dates:
-        opposing_satisfied_date = sorted(transfer_dates)[0]
+        res["has_opposing_power"] = True
+    else:
+        opposing_satisfied_date = None
+        res["has_opposing_power"] = False
 
     res["tenant_opposing_date"] = opposing_satisfied_date
 
@@ -587,18 +784,18 @@ def evaluate_attachment_ranking(briefing: CaseEvidenceBriefing) -> Dict[str, Any
 
     if fixed_dates:
         res["tenant_fixed_date"] = sorted(fixed_dates)[0]
+        res["has_fixed_date"] = True
 
     # 우선변제권 효력 발생 시점: 대항력 발생 시점(익일 0시)과 확정일자 부여일 중 늦은 시점
     tenant_priority_date = None
     if res["tenant_opposing_effective_date"] and res["tenant_fixed_date"]:
         tenant_priority_date = max(res["tenant_opposing_effective_date"], res["tenant_fixed_date"])
-    elif res["tenant_opposing_effective_date"]:
-        # 확정일자가 없으면 우선변제권은 없고 대항력만 존재
+    else:
         tenant_priority_date = None
 
     res["tenant_priority_date"] = tenant_priority_date
 
-    # 2. 가압류 및 담보권 사실 확인 (엄격히 검증된 사실만)
+    # 3. 가압류 및 담보권 사실 확인 (엄격히 검증된 사실만)
     att_creditors = []
     att_amts = []
     att_dates = []
@@ -631,9 +828,65 @@ def evaluate_attachment_ranking(briefing: CaseEvidenceBriefing) -> Dict[str, Any
     res["evidence_labels"] = att_evs
     res["attachment_dates"] = sorted(att_dates)
 
+    # 4. 등기부 등록 여부 및 가압류 부존재 검증 (P0-05)
+    registry_labels = find_evidence_labels_by_type(
+        briefing,
+        ["REGISTRY", "등기사항전부증명서", "등기부", "등본", "부동산등기", "등기"]
+    )
+    has_registry_verified_fact = any(
+        is_fact_strictly_verified(f, briefing)
+        and (
+            f.evidence_label in registry_labels
+            or any(w in (f.document_name or "") for w in ["등기", "REGISTRY"])
+            or any(w in (f.statement or "") for w in ["등기사항전부증명서", "등기부", "등본 열람", "등기 열람"])
+        )
+        for f in (briefing.facts or [])
+    )
+    has_registry_doc = (len(registry_labels) > 0) or has_registry_verified_fact
+
     if not res["has_attachment"]:
+        if not has_registry_doc:
+            # 등기부 미등록: 가압류 부존재 단정 금지 (UNCERTAIN)
+            res["priority_status"] = "UNCERTAIN"
+            res["summary_text"] = "등기사항증명서 미제출로 제한물권 확인 불가 (최신 등기부 열람 확인 필수)"
+            return res
+
+        # 등기부가 등록된 경우: 등기부 열람/확인 일자의 최신성 점검
+        registry_dates: List[str] = []
+        for f in (briefing.facts or []):
+            if not is_fact_strictly_verified(f, briefing):
+                continue
+            stmt = f.statement or ""
+            doc_name = f.document_name or ""
+            lbl = f.evidence_label or ""
+            if (
+                lbl in registry_labels
+                or any(w in doc_name for w in ["등기", "REGISTRY"])
+                or any(w in stmt for w in ["등기사항전부증명서", "등기부", "등본 열람", "등기 열람"])
+            ):
+                dates = extract_dates_from_text(f"{stmt} {doc_name}")
+                registry_dates.extend(dates)
+
+        if registry_dates:
+            latest_reg_date = sorted(registry_dates)[-1]
+            try:
+                parts = latest_reg_date.split(".")
+                reg_d = datetime.date(int(parts[0]), int(parts[1]), int(parts[2]))
+                days_diff = (ref_d - reg_d).days
+                if days_diff > 30:
+                    # 오래된 등기부 (1개월 이상 경과) -> UNCERTAIN 유지
+                    res["priority_status"] = "UNCERTAIN"
+                    res["summary_text"] = f"제출된 등기사항증명서 열람일({latest_reg_date})이 상담 기준일({res['reference_date']}) 대비 1개월 이상 경과하여 현재 권리관계 미확정 (최신 등기부 확인 필요)"
+                    return res
+                else:
+                    res["priority_status"] = "NO_ATTACHMENT"
+                    res["summary_text"] = f"등기사항증명서({latest_reg_date} 열람 기준)상 확인된 가압류나 선순위 제한물권 없음"
+                    return res
+            except Exception:
+                pass
+
         res["priority_status"] = "NO_ATTACHMENT"
-        res["summary_text"] = "등기부상 확인된 가압류나 선순위 제한물권 없음"
+        res["summary_text"] = "등기부상 확인된 가압류나 선순위 제한물권 없음 (제출된 등기사항증명서 열람일 기준)"
         return res
 
     cred_desc = ", ".join(att_creditors) if att_creditors else "가압류 채권자"
@@ -641,6 +894,7 @@ def evaluate_attachment_ranking(briefing: CaseEvidenceBriefing) -> Dict[str, Any
     res["summary_text"] = f"{cred_desc} {amt_desc} 가압류".strip()
 
     # 선후관계 엄격 비교: 우선변제권 발생일(익일 0시 기준)과 가압류 등기 접수일자 대조
+    # 대항요건 미충족 시 tenant_priority_date는 None이므로 TENANT_SENIOR 반환 원천 차단 (P0-01)
     if not tenant_priority_date or not att_dates:
         res["priority_status"] = "UNCERTAIN"
     else:

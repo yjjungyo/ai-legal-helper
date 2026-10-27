@@ -958,6 +958,18 @@ def assemble_grounded_answer(
 
     # 맞춤 행동이 1개(기본 조치만)인 경우 표준 5대 권고를 사용
     if len(tailored_actions) <= 1:
+        ranking_info = evaluate_attachment_ranking(briefing)
+        priority_status = ranking_info.get("priority_status", "UNCERTAIN")
+
+        if priority_status == "TENANT_SENIOR":
+            auction_action_text = "목적물에 관한 경매 절차가 개시될 경우, 선순위 대항력을 바탕으로 보증금 전액을 낙찰자에게 인수시킬지 또는 배당요구종기 내에 권리신고 및 배당요구 신청서를 관할 경매법원에 접수하여 우선배당받을지 신중히 선택하여 진행하십시오."
+        elif priority_status == "ATTACHMENT_SENIOR":
+            auction_action_text = "목적물에 관한 경매 절차가 개시될 경우, 후순위 권리자로서 낙찰자에게 대항하기 어려우므로 반드시 배당요구종기 내에 권리신고 및 배당요구 신청서를 접수하여 매각대금에서 배당을 통해 보증금을 회수하십시오."
+        elif priority_status == "NO_ATTACHMENT":
+            auction_action_text = "목적물에 관한 향후 권리 변동 및 경매 발생에 대비하여, 등기사항전부증명서 변동 내역을 주기적으로 확인하고 임차권등기명령 등 권리보전 조치를 취하십시오."
+        else:
+            auction_action_text = "목적물에 관한 경매 절차가 개시될 경우, 대항력 및 배당 순위를 명확히 하기 위해 최신 등기부와 전입·인도 일자를 대조하고, 배당요구종기 내에 권리신고 및 배당요구 신청을 진행하십시오."
+
         action_items_config = [
             {
                 "text": f"보증금({balance_text if balance_krw > 0 else deposit_text}) 전액을 반환받거나 관할 법원의 임차권등기명령에 따른 등기가 등기부에 기재되기 전까지는 절대 {prop_type}의 점유를 상실(열쇠 인도, 비밀번호 공유, 임의 퇴거)하거나 전입을 옮기지 마십시오. (대항력 및 우선변제권 유지 필수)",
@@ -976,7 +988,7 @@ def assemble_grounded_answer(
                 "evidence_labels": attachment_labels,
             },
             {
-                "text": "목적물에 관한 경매 절차가 개시될 경우, 선순위 대항력을 바탕으로 보증금 전액을 낙찰자에게 인수시킬지 또는 배당요구종기 내에 권리신고 및 배당요구 신청서를 관할 경매법원에 접수하여 우선배당받을지 신중히 선택하여 진행하십시오.",
+                "text": auction_action_text,
                 "evidence_labels": list(set(lease_labels + attachment_labels)),
             },
         ]

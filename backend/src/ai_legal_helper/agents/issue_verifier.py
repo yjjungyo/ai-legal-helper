@@ -320,8 +320,9 @@ def verify_issue(
         claim_amount_text = f"보증금 {deposit_text} 전액"
         demand_summary_text = f"보증금 {deposit_text} 전액"
 
-    notice_info = evaluate_notice_status(briefing)
-    ranking_info = evaluate_attachment_ranking(briefing)
+    ref_date_str = getattr(briefing, "as_of_date", None)
+    notice_info = evaluate_notice_status(briefing, reference_date=ref_date_str)
+    ranking_info = evaluate_attachment_ranking(briefing, reference_date=ref_date_str)
     prop_name, prop_type = find_case_property_info(briefing)
 
     # 문서 유형에 따른 동적 증거 라벨 추출 (특정 증거번호 역할 고정 배제)
@@ -360,19 +361,28 @@ def verify_issue(
         # 묵시적 갱신 여부에 따른 해지 요건사실 분기
         if notice_info["is_implicit_renewal"]:
             if has_lease and has_reached and law_verified:
-                status = "VERIFIED"
-                reason_codes.append("TERMINATION_FACTS_AND_LAW_SUPPORTED")
-                rec_parts = [
-                    "최초 임대차 기간 만기 전후로 별도 갱신거절 통지가 없어 계약은 동일 조건으로 묵시적으로 갱신되어 임대차 기간이 연장된 상태였습니다. "
-                    f"이후 주택임대차보호법 제6조의2에 따라 묵시적 갱신 중 임차인의 해지통고는 임대인 도달일({reach_date})로부터 3개월이 지난 시점({effect_date or '3개월 경과 시점'})에 "
-                    "법정 해지 효력이 확정적으로 발생하였습니다."
-                ]
-                if move_out_date:
-                    rec_parts.append(f" 또한 의뢰인이 통지로 지정한 퇴거일({move_out_date}) 역시 이미 도과하여,")
-                rec_parts.append(
-                    f" 임대인의 보증금 {deposit_text}(기변제 공제 후 {demand_summary_text}) 반환 채무는 확정적으로 이행기에 도달하였습니다."
-                )
-                safe_recommendations.append("".join(rec_parts))
+                if notice_info.get("is_effect_date_future"):
+                    status = "CONDITIONAL"
+                    reason_codes.append("TERMINATION_EFFECT_DATE_FUTURE")
+                    safe_recommendations.append(
+                        f"주택임대차보호법 제6조의2 제2항에 따라 묵시적 갱신 중 임차인의 해지통고는 임대인 도달일({reach_date})로부터 3개월이 경과하는 {effect_date}에 해지 효력이 발생할 예정입니다. "
+                        f"현재 상담 기준 시점({notice_info['reference_date']})에서는 아직 법정 효력 발생일이 도래하지 않았으므로, "
+                        f"효력 발생일({effect_date}) 도래 시 임대인의 보증금 {deposit_text}(기변제 공제 후 {demand_summary_text}) 반환 채무가 이행기에 도달하게 됩니다."
+                    )
+                else:
+                    status = "VERIFIED"
+                    reason_codes.append("TERMINATION_FACTS_AND_LAW_SUPPORTED")
+                    rec_parts = [
+                        "최초 임대차 기간 만기 전후로 별도 갱신거절 통지가 없어 계약은 동일 조건으로 묵시적으로 갱신되어 임대차 기간이 연장된 상태였습니다. "
+                        f"이후 주택임대차보호법 제6조의2에 따라 묵시적 갱신 중 임차인의 해지통고는 임대인 도달일({reach_date})로부터 3개월이 지난 시점({effect_date or '3개월 경과 시점'})에 "
+                        "법정 해지 효력이 확정적으로 발생하였습니다."
+                    ]
+                    if move_out_date:
+                        rec_parts.append(f" 또한 의뢰인이 통지로 지정한 퇴거일({move_out_date}) 역시 이미 도과하여,")
+                    rec_parts.append(
+                        f" 임대인의 보증금 {deposit_text}(기변제 공제 후 {demand_summary_text}) 반환 채무는 확정적으로 이행기에 도달하였습니다."
+                    )
+                    safe_recommendations.append("".join(rec_parts))
             elif has_lease and has_sent and not has_reached:
                 status = "CONDITIONAL"
                 reason_codes.append("TERMINATION_NOTICE_REACH_UNCONFIRMED")
@@ -396,11 +406,42 @@ def verify_issue(
                 reason_codes.append("TERMINATION_EVIDENCE_LACKING")
         else:
             # 당초 계약 만기 만료 또는 일반 해지 (주택임대차보호법 제6조)
+            # 만기일이 상담 기준일보다 미래인지 확인 (P0-03)
+            expiry_dates = []
+            for f in briefing.facts:
+                if not is_fact_strictly_verified(f, briefing):
+                    continue
+                stmt = f.statement or ""
+                if any(w in stmt for w in ["만기", "만료", "계약기간", "종료"]):
+                    expiry_dates.extend(extract_dates_from_text(stmt))
+
+            is_future_expiry = False
+            contract_expiry_date = None
+            if expiry_dates:
+                latest_exp = sorted(expiry_dates)[-1]
+                contract_expiry_date = latest_exp
+                try:
+                    exp_parts = latest_exp.split(".")
+                    ref_parts = notice_info["reference_date"].split(".")
+                    exp_d = datetime.date(int(exp_parts[0]), int(exp_parts[1]), int(exp_parts[2]))
+                    ref_d = datetime.date(int(ref_parts[0]), int(ref_parts[1]), int(ref_parts[2]))
+                    if exp_d > ref_d:
+                        is_future_expiry = True
+                except Exception:
+                    pass
+
             is_expired_or_reached = (
                 has_reached
                 or any(any(w in f.statement for w in ("만료", "종료")) for f in briefing.facts if is_fact_strictly_verified(f, briefing))
             )
-            if has_lease and is_expired_or_reached and law_verified:
+            if has_lease and is_future_expiry:
+                status = "CONDITIONAL"
+                reason_codes.append("TERMINATION_EXPIRY_DATE_FUTURE")
+                safe_recommendations.append(
+                    f"임대차계약서상 계약 만기일({contract_expiry_date})이 현재 상담 기준일({notice_info['reference_date']})보다 미래이므로, "
+                    f"임대차기간 만료일({contract_expiry_date}) 도래 시 계약이 종료될 예정입니다. 만기 도래 전에는 보증금 반환 채무의 이행기가 아직 발생하지 않았습니다."
+                )
+            elif has_lease and is_expired_or_reached and law_verified:
                 status = "VERIFIED"
                 reason_codes.append("TERMINATION_FACTS_AND_LAW_SUPPORTED")
                 safe_recommendations.append(
@@ -437,35 +478,61 @@ def verify_issue(
         move_out_date = notice_info["designated_move_out_date"]
 
         if has_lease and has_reached and law_verified:
-            status = "VERIFIED"
-            reason_codes.append("NOTICE_REACH_FACTS_AND_LAW_SUPPORTED")
-            rec_parts = [
-                "임대차계약의 묵시적 갱신 중 임차인은 언제든지 임대인에게 계약해지를 통고할 수 있으며(주택임대차보호법 제6조의2 제1항), "
-                "상대방에게 도달한 날부터 3개월이 지나면 그 효력이 발생합니다(동조 제2항, 민법 제111조 제1항). "
-                "문자메시지, 모바일 메신저 등 전자적 의사표시도 상대방이 수신하여 내용을 확인하거나 객관적으로 확인할 수 있는 상태에 놓인 때 도달된 것으로 인정됩니다. "
-            ]
-            if sent_date and reach_date:
-                rec_parts.append(f"본 사안에서는 {sent_date} 발송한 해지 통고가 {reach_date} 임대인에게 도달하였고, ")
-            elif reach_date:
-                rec_parts.append(f"본 사안에서는 해지 통고가 {reach_date} 임대인에게 도달하였고, ")
+            if notice_info.get("is_effect_date_future"):
+                status = "CONDITIONAL"
+                reason_codes.append("NOTICE_EFFECT_PENDING_FUTURE")
+                rec_parts = [
+                    "임대차계약의 묵시적 갱신 중 임차인은 언제든지 임대인에게 계약해지를 통고할 수 있으며(주택임대차보호법 제6조의2 제1항), "
+                    "상대방에게 도달한 날부터 3개월이 지나면 그 효력이 발생합니다(동조 제2항, 민법 제111조 제1항). "
+                    "문자메시지, 모바일 메신저 등 전자적 의사표시도 상대방이 수신하여 내용을 확인하거나 객관적으로 확인할 수 있는 상태에 놓인 때 도달된 것으로 인정됩니다. "
+                ]
+                if sent_date and reach_date:
+                    rec_parts.append(f"본 사안에서는 {sent_date} 발송한 해지 통고가 {reach_date} 임대인에게 도달하였음이 확인되었습니다. ")
+                elif reach_date:
+                    rec_parts.append(f"본 사안에서는 해지 통고가 {reach_date} 임대인에게 도달하였음이 확인되었습니다. ")
+                else:
+                    rec_parts.append("본 사안에서는 해지 통고의 도달 사실이 확인되었습니다. ")
+
+                if notice_info["has_landlord_acknowledgement"]:
+                    ack_date = notice_info["landlord_ack_date"]
+                    date_prefix = f"{ack_date} " if ack_date else ""
+                    rec_parts.append(f"임대인이 {date_prefix}답변 또는 회신을 함으로써 해지 통고 수령 사실이 객관적으로 입증됩니다. ")
+
+                rec_parts.append(
+                    f"다만 법정 3개월 경과 효력 발생일({effect_date})이 현재 상담 기준일({notice_info['reference_date']})보다 미래이므로, "
+                    f"해당 효력 발생일({effect_date})이 도래해야 해지 효력 및 보증금({deposit_text}, 공제 후 {demand_summary_text}) 반환 채무의 이행기가 확정적으로 도달합니다."
+                )
+                safe_recommendations.append("".join(rec_parts))
             else:
-                rec_parts.append("본 사안에서는 해지 통고의 도달 사실이 확인되었고, ")
+                status = "VERIFIED"
+                reason_codes.append("NOTICE_REACH_FACTS_AND_LAW_SUPPORTED")
+                rec_parts = [
+                    "임대차계약의 묵시적 갱신 중 임차인은 언제든지 임대인에게 계약해지를 통고할 수 있으며(주택임대차보호법 제6조의2 제1항), "
+                    "상대방에게 도달한 날부터 3개월이 지나면 그 효력이 발생합니다(동조 제2항, 민법 제111조 제1항). "
+                    "문자메시지, 모바일 메신저 등 전자적 의사표시도 상대방이 수신하여 내용을 확인하거나 객관적으로 확인할 수 있는 상태에 놓인 때 도달된 것으로 인정됩니다. "
+                ]
+                if sent_date and reach_date:
+                    rec_parts.append(f"본 사안에서는 {sent_date} 발송한 해지 통고가 {reach_date} 임대인에게 도달하였고, ")
+                elif reach_date:
+                    rec_parts.append(f"본 사안에서는 해지 통고가 {reach_date} 임대인에게 도달하였고, ")
+                else:
+                    rec_parts.append("본 사안에서는 해지 통고의 도달 사실이 확인되었고, ")
 
-            if notice_info["has_landlord_acknowledgement"]:
-                ack_date = notice_info["landlord_ack_date"]
-                date_prefix = f"{ack_date} " if ack_date else ""
-                rec_parts.append(f"임대인이 {date_prefix}답변 또는 회신을 함으로써 해지 통고 수령 사실이 객관적으로 입증됩니다. ")
+                if notice_info["has_landlord_acknowledgement"]:
+                    ack_date = notice_info["landlord_ack_date"]
+                    date_prefix = f"{ack_date} " if ack_date else ""
+                    rec_parts.append(f"임대인이 {date_prefix}답변 또는 회신을 함으로써 해지 통고 수령 사실이 객관적으로 입증됩니다. ")
 
-            if effect_date:
-                rec_parts.append(f"따라서 해지통고 도달일({reach_date})로부터 3개월이 경과한 {effect_date} 법정 해지 효력이 확정 발생하였으며, ")
-            else:
-                rec_parts.append(f"따라서 해지통고 도달일({reach_date})로부터 3개월이 경과하여 법정 해지 효력이 확정 발생하였으며, ")
+                if effect_date:
+                    rec_parts.append(f"따라서 해지통고 도달일({reach_date})로부터 3개월이 경과한 {effect_date} 법정 해지 효력이 확정 발생하였으며, ")
+                else:
+                    rec_parts.append(f"따라서 해지통고 도달일({reach_date})로부터 3개월이 경과하여 법정 해지 효력이 확정 발생하였으며, ")
 
-            if move_out_date:
-                rec_parts.append(f"약정한 퇴거일({move_out_date}) 역시 이미 도과하여 ")
+                if move_out_date:
+                    rec_parts.append(f"약정한 퇴거일({move_out_date}) 역시 이미 도과하여 ")
 
-            rec_parts.append(f"임대인의 보증금 {deposit_text}(기변제 공제 후 {demand_summary_text}) 반환 채무는 확정적으로 이행기에 도달하였습니다.")
-            safe_recommendations.append("".join(rec_parts))
+                rec_parts.append(f"임대인의 보증금 {deposit_text}(기변제 공제 후 {demand_summary_text}) 반환 채무는 확정적으로 이행기에 도달하였습니다.")
+                safe_recommendations.append("".join(rec_parts))
         elif has_lease and has_sent and not has_reached:
             status = "CONDITIONAL"
             reason_codes.append("NOTICE_REACH_UNCONFIRMED")
@@ -490,7 +557,9 @@ def verify_issue(
             if ev_cand in available_evidence_labels and ev_cand not in supported_source_ids:
                 supported_source_ids.append(ev_cand)
 
-        has_residence = len(residence_labels) > 0 or ranking_info["tenant_opposing_date"] is not None
+        has_opposing_power = ranking_info.get("has_opposing_power", False)
+        has_transfer = ranking_info.get("has_transfer", False)
+        has_move_in = ranking_info.get("has_move_in", False)
         has_attachment = ranking_info["has_attachment"]
         priority_status = ranking_info["priority_status"]
         summary_text = ranking_info["summary_text"]
@@ -498,7 +567,31 @@ def verify_issue(
         fixed_date = ranking_info.get("tenant_fixed_date")
         prio_date = ranking_info.get("tenant_priority_date")
 
-        if has_residence and has_attachment:
+        # 1. 대항요건 미충족 (전입만 있거나 인도만 있는 경우) -> 대항요건 미확정 처리 (P0-01)
+        if not (has_transfer and has_move_in):
+            if has_transfer and not has_move_in:
+                status = "CONDITIONAL"
+                reason_codes.append("MOVE_IN_EVIDENCE_NEEDED")
+                safe_recommendations.append(
+                    "주택임대차보호법 제3조 제1항에 따른 대항요건은 주민등록 전입신고와 주택의 인도(점유)가 모두 구비되어야 합니다. "
+                    "현재 주민등록 전입신고 사실은 확인되나 주택의 실제 인도(점유·입주)에 관한 객관적 증빙이 결여되어 대항요건 구비 여부를 확정할 수 없습니다. "
+                    "가압류와의 권리 선후관계를 판단하기 위해 주택 인도 증빙(열쇠 수령증, 관리비 납부 내역 등)의 보완이 필수적입니다."
+                )
+            elif has_move_in and not has_transfer:
+                status = "CONDITIONAL"
+                reason_codes.append("TRANSFER_REGISTRATION_EVIDENCE_NEEDED")
+                safe_recommendations.append(
+                    "주택임대차보호법 제3조 제1항에 따른 대항요건은 주택의 인도와 주민등록 전입신고가 모두 구비되어야 합니다. "
+                    "현재 주택 인도(점유) 사실은 확인되나 주민등록 전입신고에 관한 객관적 증빙이 결여되어 대항요건 구비 여부를 확정할 수 없습니다. "
+                    "가압류와의 권리 선후관계를 판단하기 위해 주민등록초본(전입일자 확인) 증빙의 보완이 필수적입니다."
+                )
+            else:
+                status = "NEEDS_EVIDENCE"
+                reason_codes.append("RESIDENCE_REGISTRATION_EVIDENCE_NEEDED")
+                safe_recommendations.append(
+                    "임차인의 대항요건(주택 인도 및 주민등록 전입)에 관한 객관적 증거가 결여되어 권리관계를 확정할 수 없습니다."
+                )
+        elif has_attachment:
             status = "CONDITIONAL"
             if priority_status == "TENANT_SENIOR":
                 reason_codes.append("PRIORITY_CONDITIONAL_ON_REGISTRY_UPDATE")
@@ -525,15 +618,22 @@ def verify_issue(
                     "날짜 정보가 결여되었거나 권리관계가 불명확한 상태에서는 '선순위 우선변제권 인정'을 단정할 수 없으며, "
                     "최신 등기사항전부증명서(말소사항 포함)의 접수일자와 주민등록초본의 전입일자를 정밀 대조하여 선순위 여부를 확인해야 합니다."
                 )
-        elif has_residence:
-            status = "CONDITIONAL"
-            reason_codes.append("RESIDENCE_VERIFIED_ATTACHMENT_UNVERIFIED")
-            safe_recommendations.append(
-                "임차인의 대항요건은 확인되나 등기부상 가압류 등 제한물권 변동 여부를 확인하기 위해 최신 등기사항전부증명서 발급 열람이 권장됩니다."
-            )
         else:
-            status = "NEEDS_EVIDENCE"
-            reason_codes.append("RESIDENCE_REGISTRATION_EVIDENCE_NEEDED")
+            # 가압류가 없는 경우 (P0-05)
+            if priority_status == "NO_ATTACHMENT":
+                status = "CONDITIONAL"
+                reason_codes.append("NO_ATTACHMENT_VERIFIED_IN_REGISTRY")
+                safe_recommendations.append(
+                    f"제출된 등기사항증명서상 확인된 가압류나 선순위 제한물권은 없는 것으로 파악됩니다({summary_text}). "
+                    "다만 등기 열람 이후 권리 변동 가능성이 있으므로, 관할 등기소에서 최신 등기사항전부증명서(말소사항 포함)를 재발급받아 최종 대조하십시오."
+                )
+            else:
+                status = "NEEDS_EVIDENCE"
+                reason_codes.append("REGISTRY_EVIDENCE_NEEDED")
+                safe_recommendations.append(
+                    "등기사항증명서가 제출되지 않아 목적물 부동산의 선순위 제한물권(근저당권, 가압류 등) 부존재 여부를 확인할 수 없습니다. "
+                    "반드시 최신 부동산 등기사항전부증명서를 열람·발급하여 권리관계를 확인해야 합니다."
+                )
 
     # (D) 쟁점: 경매 배당 위험 및 대항력 선택 (ISSUE_AUCTION_STRATEGY / ISSUE_AUCTION_DIVIDEND_RISK)
     elif issue.issue_id in ("ISSUE_AUCTION_DIVIDEND_RISK", "ISSUE_AUCTION_STRATEGY"):

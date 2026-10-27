@@ -130,6 +130,7 @@ class CaseEvidenceBriefing(BaseModel):
     evidence_gaps: List[EvidenceGapBrief] = Field(default_factory=list, description="증거 공백 목록")
     genuinely_disputed: List[DisputedConflictBrief] = Field(default_factory=list, description="실제 상충 분쟁 목록")
     source_registry: Dict[str, Dict[str, Any]] = Field(default_factory=dict, description="증거 인용 레지스트리")
+    as_of_date: Optional[str] = Field(None, description="상담 기준일자 (YYYY.MM.DD 또는 YYYY-MM-DD)")
     formatted_summary: str = Field("", description="LLM Synthesizer/Agent 주입용 정돈된 브리핑 텍스트")
 
     def to_prompt_context(self) -> str:
