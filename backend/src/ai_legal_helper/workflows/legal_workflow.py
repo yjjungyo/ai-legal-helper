@@ -1656,9 +1656,9 @@ async def _execute_consultation(
 
     app = build_legal_graph(checkpointer=checkpointer)
     callbacks = []
-    lf_cb = get_langfuse_callback_handler()
-    if lf_cb:
-        callbacks.append(lf_cb)
+    # LangGraph 워크플로우 계측은 @trace 데코레이터와 TokenTrackingCallbackHandler가
+    # ContextVar 활성 Span 및 계층적 Generation 추적을 전담하므로,
+    # 중복 Generation 집계 방지를 위해 config callbacks에 기본 핸들러를 중복 추가하지 않는다.
 
     config = {
         "configurable": {"thread_id": thread_id},

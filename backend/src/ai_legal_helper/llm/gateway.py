@@ -47,16 +47,13 @@ def get_llm(
     """
     model_name = model_name or os.getenv("AZURE_OPENAI_DEPLOYMENT_CHAT", "gpt-4o")
 
+    sys_name = os.getenv("LANGFUSE_SYSTEM_NAME", "LegalAgent")
     cb_list: List[Any] = [TokenTrackingCallbackHandler()]
 
-    # LANGFUSE_CAPTURE_CONTENT=true일 때만 LangChain 원본 콜백 핸들러를 추가 등록한다.
-    # 기본값(false)에서는 TokenTrackingCallbackHandler가 마스킹 정책을 준수하며 단일 Generation을 기록하므로
-    # 중복 Generation 기록 및 상담 원문 노출을 동시에 방지한다.
-    if os.getenv("LANGFUSE_CAPTURE_CONTENT", "false").lower() == "true":
-        lf_handler = get_langfuse_callback_handler()
-        if lf_handler:
-            cb_list.append(lf_handler)
-
+    # TokenTrackingCallbackHandler가 활성 Span 하위에 단일 Generation을 전담 기록하며,
+    # LANGFUSE_CAPTURE_CONTENT 설정에 따른 마스킹 및 입출력 보존을 수행하므로
+    # 기본 콜백 목록에 Langfuse 기본 CallbackHandler를 중복 등록하지 않는다 (중복 Generation 방지).
+    # 단, 호출자가 명시적으로 전달한 추가 callbacks는 유지한다.
     if callbacks:
         cb_list.extend(callbacks)
 
@@ -65,6 +62,8 @@ def get_llm(
         temperature=temperature,
         api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
         callbacks=cb_list,
+        name=sys_name,
+        tags=[sys_name],
     )
     return llm
 

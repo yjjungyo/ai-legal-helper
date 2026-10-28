@@ -57,7 +57,7 @@ docker compose --env-file backend/.env -f docker-compose.yml -f docker-compose.l
 ## 5. 확인 사항
 
 1. **AI 상담(Consultation) 실행**: AI 상담을 진행하면 Langfuse 대시보드의 `Traces` 메뉴에서 `Workflow:run_legal_consultation` 항목이 생성되는지 확인합니다.
-2. **토큰 추적**: 생성된 Trace 내부의 `AzureOpenAI_Call` Generation에서 토큰 소모량이 기록되는지 확인합니다.
+2. **토큰 추적**: 생성된 Trace 내부의 `LegalAgent` Generation에서 토큰 소모량이 기록되는지 확인합니다.
 3. **개인정보 보호**: 프롬프트 및 응답 본문이 `[MASKED FOR PRIVACY]`로 블라인드 처리되어 표시되는지 확인합니다.
 
 ## 6. 서비스 중지

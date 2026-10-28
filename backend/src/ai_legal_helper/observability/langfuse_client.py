@@ -426,6 +426,8 @@ def log_generation(
     gen_metadata = dict(metadata or {})
     if sys_name and "system_name" not in gen_metadata:
         gen_metadata["system_name"] = sys_name
+    if sys_name and "tags" not in gen_metadata:
+        gen_metadata["tags"] = [sys_name]
 
     try:
         parent.generation(

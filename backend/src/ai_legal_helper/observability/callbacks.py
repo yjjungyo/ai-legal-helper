@@ -6,6 +6,7 @@
 LangChain LLM 호출의 시작·종료·오류 시점을 가로채어 토큰 사용량(LLMUsageRecord)을 집계하고,
 활성 Span(`get_current_span_id()`) 하위에 Langfuse Generation 레코드를 기록하는 콜백 핸들러 모듈이다.
 """
+import os
 import uuid
 import time
 from typing import Any, Dict, List
@@ -105,16 +106,18 @@ class TokenTrackingCallbackHandler(BaseCallbackHandler):
                 "output": output_tokens or 0,
                 "total": total_tokens or 0,
             }
+            LANGFUSE_SYSTEM_NAME = os.getenv("LANGFUSE_SYSTEM_NAME", "LegalAgent")
             log_generation(
                 trace_id=get_trace_id(),
                 parent_span_id=get_current_span_id() or get_node_name() or get_agent_name(),
-                name="AzureOpenAI_Call",
+                name=LANGFUSE_SYSTEM_NAME,
                 model=model_id,
                 start_time=start_time,
                 end_time=time.time(),
                 usage=usage_dict,
                 input=input_data,
                 output=output_text,
+                metadata={"system_name": LANGFUSE_SYSTEM_NAME, "tags": [LANGFUSE_SYSTEM_NAME]},
             )
         except Exception as e:
             logger.warning(f"Failed to log generation to Langfuse: {e}")
@@ -142,12 +145,13 @@ class TokenTrackingCallbackHandler(BaseCallbackHandler):
         global_token_tracker.add_record(record)
         logger.error(f"LLM Call Error: {str(error)}", extra=record.model_dump())
 
+        LANGFUSE_SYSTEM_NAME = os.getenv("LANGFUSE_SYSTEM_NAME", "LegalAgent")
         try:
             from ai_legal_helper.observability.langfuse_client import log_generation
             log_generation(
                 trace_id=get_trace_id(),
                 parent_span_id=get_current_span_id() or get_node_name() or get_agent_name(),
-                name="AzureOpenAI_Call",
+                name=LANGFUSE_SYSTEM_NAME,
                 model="unknown",
                 start_time=start_time,
                 end_time=time.time(),
@@ -155,6 +159,7 @@ class TokenTrackingCallbackHandler(BaseCallbackHandler):
                 status_message=str(error),
                 input=input_data,
                 output=f"ERROR: {str(error)}",
+                metadata={"system_name": LANGFUSE_SYSTEM_NAME, "tags": [LANGFUSE_SYSTEM_NAME]},
             )
         except Exception as e:
             logger.warning(f"Failed to log generation error to Langfuse: {e}")

@@ -52,3 +52,46 @@ def test_flush_langfuse_no_error():
     except Exception as e:
         pytest.fail(f"flush_langfuse() 실행 중 예외가 발생했습니다: {e}")
 
+
+def test_get_llm_sets_system_name_and_tags():
+    """get_llm() 생성 시 AzureChatOpenAI 인스턴스의 name과 tags가 LANGFUSE_SYSTEM_NAME(기본값: LegalAgent)으로 설정되는지 검증한다."""
+    with patch.dict(os.environ, {"LANGFUSE_SYSTEM_NAME": "LegalAgent"}):
+        llm = get_llm(model_name="aicore-gpt4o")
+        assert llm.name == "LegalAgent", f"Expected llm.name to be 'LegalAgent', got '{llm.name}'"
+        assert llm.tags == ["LegalAgent"], f"Expected llm.tags to be ['LegalAgent'], got '{llm.tags}'"
+
+
+def test_callback_handler_uses_legalagent_run_name_not_azurechatopenai():
+    """Langfuse CallbackHandler가 LLM 호출을 가로챌 때 run_name이 AzureChatOpenAI가 아닌 LegalAgent로 결정되는지 검증한다."""
+    from langfuse.callback import CallbackHandler
+    with patch.dict(os.environ, {"LANGFUSE_SYSTEM_NAME": "LegalAgent"}):
+        llm = get_llm(model_name="aicore-gpt4o")
+        handler = CallbackHandler(public_key="pk-test", secret_key="sk-test", host="http://localhost:3001")
+        serialized = llm.to_json()
+        run_name = handler.get_langchain_run_name(serialized)
+        assert run_name == "LegalAgent", f"Expected run_name to be 'LegalAgent', got '{run_name}' (AzureChatOpenAI 누출 방지)"
+
+
+def test_token_tracking_callback_handler_logs_legalagent_generation():
+    """TokenTrackingCallbackHandler가 on_llm_end 시 name='LegalAgent' 및 tag='LegalAgent'로 log_generation을 호출하는지 검증한다."""
+    from ai_legal_helper.observability.callbacks import TokenTrackingCallbackHandler
+    from langchain_core.outputs import LLMResult, Generation
+
+    handler = TokenTrackingCallbackHandler()
+    fake_result = LLMResult(
+        generations=[[Generation(text="계약 해지 효력이 발생했습니다.")]],
+        llm_output={"token_usage": {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150}},
+    )
+
+    with patch.dict(os.environ, {"LANGFUSE_SYSTEM_NAME": "LegalAgent"}):
+        with patch("ai_legal_helper.observability.langfuse_client.log_generation") as mock_log_gen:
+            handler.on_chat_model_start({}, [], run_id="test-run-123")
+            handler.on_llm_end(fake_result, run_id="test-run-123", invocation_params={"model_name": "gpt-4o"})
+
+            assert mock_log_gen.called
+            call_kwargs = mock_log_gen.call_args[1]
+            assert call_kwargs["name"] == "LegalAgent"
+            assert call_kwargs["metadata"]["system_name"] == "LegalAgent"
+            assert "LegalAgent" in call_kwargs["metadata"]["tags"]
+
+

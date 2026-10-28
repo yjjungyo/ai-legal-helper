@@ -117,21 +117,9 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
           <div className="chat-assistant-header">
             <div className="chat-assistant-title-group">
               <span className="chat-assistant-author">AI 법률 비서</span>
-              {message.intent && (
-                <span
-                  style={{
-                    fontSize: '0.74em',
-                    padding: '2px 6px',
-                    borderRadius: '4px',
-                    backgroundColor: '#f1f5f9',
-                    color: '#475569',
-                    fontWeight: 600,
-                  }}
-                >
-                  {message.intent}
-                </span>
-              )}
-              {renderDispositionBadge(message.final_disposition || message.answer_status)}
+              {/* 진행 중(IN_PROGRESS / APPROVAL_REQUIRED)이거나 오류 상태일 때는 최종 판정 배지를 노출하지 않으며,
+                  분석 및 검증이 최종 완료된 답변(SUCCESS)에 한해 판정 결과(✓ 검증 완료 / ⚠️ 조건부 안내 / 🛡️ 판단 유보)를 표시합니다. */}
+              {!isRunningOrApproval && !isFailed && renderDispositionBadge(message.final_disposition || message.answer_status)}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
