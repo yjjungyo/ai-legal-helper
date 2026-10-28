@@ -145,12 +145,18 @@ async def trace_context_middleware(request: Request, call_next):
         and "/api/v1/consultations/" in path
     )
     is_noise = is_health_or_options or is_consultation_polling
+    is_consultation_post = (
+        request.method == "POST"
+        and "/api/v1/consultations" in path
+    )
 
     if not is_noise:
         sys_name = get_system_name()
+        # 상담 파이프라인(POST)은 시작부터 'LegalConsultation'으로 명명하여 Langfuse 추적 명확성 확보 (P0-3)
+        trace_name = "LegalConsultation" if is_consultation_post else f"HTTP:{request.method}_{path}"
         start_trace(
             trace_id=trace_id,
-            name=f"HTTP:{request.method}_{path}",
+            name=trace_name,
             session_id=candidate_case_id,
             metadata={
                 "method": request.method,
@@ -181,7 +187,7 @@ async def trace_context_middleware(request: Request, call_next):
 
         return response
     finally:
-        if not is_noise:
+        if not is_noise and not is_consultation_post:
             end_trace(trace_id)
         reset_trace_id(t_token)
         reset_request_id(r_token)

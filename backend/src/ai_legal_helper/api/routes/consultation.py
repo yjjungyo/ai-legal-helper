@@ -35,7 +35,7 @@ from ai_legal_helper.observability.context import (
 )
 from ai_legal_helper.llm.usage import global_token_tracker
 from ai_legal_helper.workflows.legal_workflow import run_legal_consultation
-from ai_legal_helper.observability.langfuse_client import start_trace, flush_langfuse
+from ai_legal_helper.observability.langfuse_client import start_trace, end_trace, flush_langfuse, get_git_commit, get_system_name
 from ai_legal_helper.observability.logging_config import get_logger
 from ai_legal_helper.api.dependencies import get_current_user, get_case_for_user, AUTH_BYPASS
 
@@ -297,11 +297,22 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
     if req.case_id:
         c_token = set_case_id(req.case_id)
         
+    sys_name = get_system_name()
+    git_sha = get_git_commit()
     start_trace(
         trace_id=trace_id,
         name="LegalConsultation",
         session_id=req.case_id,
-        metadata={"question": req.question[:120], "request_id": request_id}
+        metadata={
+            "question": req.question[:120],
+            "request_id": request_id,
+            "case_id": req.case_id,
+            "session_id": req.case_id,
+            "run_id": request_id,
+            "git_commit": git_sha,
+            "system_name": sys_name,
+        },
+        tags=[sys_name],
     )
     start_time = time.time()
     try:
@@ -537,6 +548,7 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
         except Exception:
             pass
 
+        end_trace(trace_id)
         flush_langfuse()
         reset_trace_id(t_token)
         if c_token:
@@ -760,6 +772,23 @@ async def process_consultation_resume(
     """승인/거절 결정을 바탕으로 중단된 LangGraph 워크플로우를 재개(Resume)하는 백그라운드 태스크."""
     t_token = set_trace_id(trace_id)
     c_token = set_case_id(case_id) if case_id else None
+    sys_name = get_system_name()
+    git_sha = get_git_commit()
+    start_trace(
+        trace_id=trace_id,
+        name="LegalConsultation",
+        session_id=case_id,
+        metadata={
+            "request_id": request_id,
+            "case_id": case_id,
+            "session_id": case_id,
+            "run_id": request_id,
+            "git_commit": git_sha,
+            "system_name": sys_name,
+            "resumed": True,
+        },
+        tags=[sys_name],
+    )
     start_time = time.time()
 
     try:
@@ -941,6 +970,7 @@ async def process_consultation_resume(
         except Exception:
             pass
 
+        end_trace(trace_id)
         flush_langfuse()
         reset_trace_id(t_token)
         if c_token:

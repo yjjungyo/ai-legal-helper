@@ -56,12 +56,56 @@ except ImportError:
 
 _langfuse: Optional[Any] = None
 
-# 실행 중인 활성 Trace와 Span 인스턴스를 관리하는 딕셔너리
+# 실행 중인 활성 Trace와 Span 인스턴스를 관리하는 딕셔너리 (하위 호환성 유지)
 _active_traces: Dict[str, Any] = {}
 _active_spans: Dict[str, Any] = {}
 # 노드명/함수명 기반 부모 탐색 지원을 위한 이름 매핑 인덱스
 _active_spans_by_name: Dict[str, str] = {}
 _span_names: Dict[str, str] = {}
+
+# [P0-2 고도화] Trace별 활성 Span 격리 저장소
+_trace_spans: Dict[str, Dict[str, Any]] = {}
+_trace_spans_by_name: Dict[str, Dict[str, List[str]]] = {}
+_span_to_trace: Dict[str, str] = {}
+
+_git_commit_cache: Optional[str] = None
+
+
+def get_git_commit() -> str:
+    """현재 소스코드의 Git Commit SHA를 반환한다 (P0-3 표준 메타데이터).
+
+    환경변수 `GIT_COMMIT_SHA` 또는 `git rev-parse HEAD` 명령어를 통해 확인하며,
+    최초 조회 후 메모리에 캐싱하여 성능 저하 및 중복 서브프로세스 호출을 방지한다.
+
+    Returns:
+        str: Git Commit SHA 문자열 (확인 불가 시 'unknown').
+    """
+    global _git_commit_cache
+    if _git_commit_cache is not None:
+        return _git_commit_cache
+
+    env_sha = os.getenv("GIT_COMMIT_SHA") or os.getenv("GIT_COMMIT")
+    if env_sha:
+        _git_commit_cache = env_sha.strip()
+        return _git_commit_cache
+
+    try:
+        import subprocess
+        res = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+            check=False,
+        )
+        if res.returncode == 0 and res.stdout:
+            _git_commit_cache = res.stdout.strip()
+            return _git_commit_cache
+    except Exception:
+        pass
+
+    _git_commit_cache = "unknown"
+    return _git_commit_cache
 
 
 def get_system_name() -> str:
@@ -208,32 +252,37 @@ def start_trace(
     metadata: Optional[Dict] = None,
     tags: Optional[List[str]] = None,
 ):
-    """새로운 최상위 Trace를 시작하고 내부 활성 목록에 등록한다.
+    """새로운 최상위 Trace를 시작하거나 기존 Trace의 메타데이터 및 이름을 갱신한다.
 
-    시스템 식별자(LANGFUSE_SYSTEM_NAME, 기본값 'LegalAgent')를 기본 태그 및 메타데이터로 자동 주입하여,
-    다른 애플리케이션(LegalChat, LegalRAG 등)과 Langfuse 대시보드 상에서 비교 및 필터링할 수 있도록 지원한다.
+    시스템 식별자(LANGFUSE_SYSTEM_NAME, 기본값 'LegalAgent') 및 Git Commit SHA를
+    기본 태그와 메타데이터로 자동 주입한다. 이미 생성된 Trace가 있는 경우(예: HTTP 미들웨어에서
+    생성 후 비동기 태스크에서 'LegalConsultation'으로 구체화) 상태를 안전하게 업데이트한다 (P0-3).
 
     Args:
         trace_id: 고유 추적 ID
-        name: 워크플로우 또는 태스크 이름
-        session_id: 상담 세션 또는 사건 식별자
+        name: 워크플로우 또는 태스크 이름 (예: 'LegalConsultation')
+        session_id: 상담 세션 또는 사건 식별자 (case_id 등)
         metadata: 부가 메타데이터
         tags: 태그 목록 (선택사항)
     """
     lf = get_langfuse()
     if not lf:
         return
+
+    sys_name = get_system_name()
+    trace_tags = list(tags) if tags else []
+    if sys_name and sys_name not in trace_tags:
+        trace_tags.append(sys_name)
+
+    trace_metadata = dict(metadata or {})
+    if sys_name and "system_name" not in trace_metadata:
+        trace_metadata["system_name"] = sys_name
+    git_sha = get_git_commit()
+    if git_sha and "git_commit" not in trace_metadata:
+        trace_metadata["git_commit"] = git_sha
+
     if trace_id not in _active_traces:
         try:
-            sys_name = get_system_name()
-            trace_tags = list(tags) if tags else []
-            if sys_name and sys_name not in trace_tags:
-                trace_tags.append(sys_name)
-
-            trace_metadata = dict(metadata or {})
-            if sys_name and "system_name" not in trace_metadata:
-                trace_metadata["system_name"] = sys_name
-
             trace = lf.trace(
                 id=trace_id,
                 name=name,
@@ -244,14 +293,37 @@ def start_trace(
             _active_traces[trace_id] = trace
         except Exception:
             pass
+    else:
+        # P0-3: 이미 존재하는 Trace인 경우 (HTTP 레벨 생성 후 백그라운드 태스크에서 재명명/메타데이터 보강)
+        try:
+            trace = _active_traces[trace_id]
+            if trace and hasattr(trace, "update"):
+                trace.update(
+                    name=name,
+                    session_id=session_id,
+                    metadata=trace_metadata,
+                    tags=trace_tags,
+                )
+        except Exception:
+            pass
 
 
 def end_trace(trace_id: str):
-    """지정된 Trace를 종료 처리하고 활성 추적 캐시에서 제거한다."""
+    """지정된 Trace를 종료 처리하고 해당 Trace에 속한 모든 활성 Span 및 인덱스를 안전하게 정리한다 (P0-2)."""
     lf = get_langfuse()
     if not lf:
         return
+
     _active_traces.pop(trace_id, None)
+
+    # P0-2: trace_id에 속한 모든 Span 인스턴스 및 이름 스택 일괄 메모리 해제
+    trace_spans = _trace_spans.pop(trace_id, None) or {}
+    for sid in trace_spans:
+        _active_spans.pop(sid, None)
+        _span_names.pop(sid, None)
+        _span_to_trace.pop(sid, None)
+
+    _trace_spans_by_name.pop(trace_id, None)
 
 
 def start_span(
@@ -264,9 +336,13 @@ def start_span(
 ):
     """Trace 하위에 새로운 작업 구간(Span)을 생성하고 계층 트리(Tree)에 연결한다.
 
-    상위 Trace가 아직 시작되지 않은 경우 자동으로 생성(Lazy Creation)하며,
-    `parent_span_id`로 UUID뿐만 아니라 노드명/함수명 문자열이 전달되더라도 활성 스팬 인덱스를 통해
-    올바른 부모 Span 객체를 찾아 연결한다. 시스템 식별자(LANGFUSE_SYSTEM_NAME)를 메타데이터 및 태그에 반영한다.
+    [P0-2 개선사항]
+    1. trace_id별 격리 인덱스(_trace_spans, _trace_spans_by_name)를 우선 탐색하여,
+       동일한 노드/에이전트가 다른 사건에서 동시 실행되더라도 부모가 섞이지 않도록 격리한다.
+    2. ContextVar 기반의 UUID parent_span_id를 최우선 연결하고, 이름 기반 탐색 시에도
+       해당 trace_id 내부의 최근 활성 스팬 스택([-1])을 참조하여 정확한 중첩 관계를 형성한다.
+    3. 부모를 찾지 못할 경우 조용히 연결을 누락시키지 않고 경고 진단 로그를 기록한 후 Root Trace에 연결한다.
+    4. 시스템 식별자(LANGFUSE_SYSTEM_NAME) 및 Git Commit을 메타데이터에 기록한다.
 
     Args:
         trace_id: 소속 Trace ID
@@ -288,11 +364,12 @@ def start_span(
         try:
             from ai_legal_helper.observability.context import get_case_id
             session_id = get_case_id()
+            git_sha = get_git_commit()
             trace = lf.trace(
                 id=trace_id,
                 name=f"Workflow:{name}",
                 session_id=session_id,
-                metadata={"system_name": sys_name},
+                metadata={"system_name": sys_name, "git_commit": git_sha, "tags": [sys_name]},
                 tags=[sys_name],
             )
             _active_traces[trace_id] = trace
@@ -306,12 +383,33 @@ def start_span(
     if sys_name and "system_name" not in span_metadata:
         span_metadata["system_name"] = sys_name
 
-    # 부모 Span 탐색: 1) UUID 직접 매칭 -> 2) 노드명 매칭 -> 3) Root Trace
+    # P0-2 다단계 부모 탐색:
     parent = None
     if parent_span_id:
-        parent = _active_spans.get(parent_span_id)
+        # 1단계: trace_id 격리 저장소에서 UUID 직접 매칭
+        parent = _trace_spans.get(trace_id, {}).get(parent_span_id)
+        # 2단계: 전역 UUID 저장소 매칭 (하위 호환성)
+        if not parent:
+            parent = _active_spans.get(parent_span_id)
+        # 3단계: trace_id 격리 이름 스택에서 최신 스팬 매칭 (동일 이름 중첩 지원)
+        if not parent and trace_id in _trace_spans_by_name and parent_span_id in _trace_spans_by_name[trace_id]:
+            stack = _trace_spans_by_name[trace_id][parent_span_id]
+            if stack:
+                candidate_id = stack[-1]
+                parent = _trace_spans.get(trace_id, {}).get(candidate_id) or _active_spans.get(candidate_id)
+        # 4단계: 전역 이름 매칭 폴백
         if not parent and parent_span_id in _active_spans_by_name:
-            parent = _active_spans.get(_active_spans_by_name[parent_span_id])
+            candidate_id = _active_spans_by_name[parent_span_id]
+            parent = _active_spans.get(candidate_id)
+
+        # 부모를 찾지 못했을 때 진단 정보 로깅
+        if not parent:
+            import logging
+            logging.getLogger(__name__).warning(
+                f"[SPAN_PARENT_UNRESOLVED] trace_id={trace_id}, span={name}({span_id}): "
+                f"parent '{parent_span_id}' not found in active spans. Linking to root trace."
+            )
+
     if not parent:
         parent = trace
 
@@ -322,6 +420,20 @@ def start_span(
             input=safe_input,
             metadata=span_metadata,
         )
+        # Trace별 격리 인덱스 등록
+        if trace_id not in _trace_spans:
+            _trace_spans[trace_id] = {}
+        _trace_spans[trace_id][span_id] = span
+
+        if trace_id not in _trace_spans_by_name:
+            _trace_spans_by_name[trace_id] = {}
+        if name not in _trace_spans_by_name[trace_id]:
+            _trace_spans_by_name[trace_id][name] = []
+        _trace_spans_by_name[trace_id][name].append(span_id)
+
+        _span_to_trace[span_id] = trace_id
+
+        # 전역 인덱스 등록 (하위 호환성 유지)
         _active_spans[span_id] = span
         _active_spans_by_name[name] = span_id
         _span_names[span_id] = name
@@ -330,7 +442,7 @@ def start_span(
 
 
 def end_span(span_id: str, output: Any = None, level: str = "DEFAULT", status_message: str = ""):
-    """작업 구간(Span)을 완료하고 결과를 기록한 뒤 활성 구간 캐시에서 제거한다.
+    """작업 구간(Span)을 완료하고 결과를 기록한 뒤 활성 구간 캐시에서 안전하게 제거한다 (P0-2).
 
     Args:
         span_id: 완료할 구간 ID
@@ -341,8 +453,22 @@ def end_span(span_id: str, output: Any = None, level: str = "DEFAULT", status_me
     lf = get_langfuse()
     if not lf:
         return
-    span = _active_spans.pop(span_id, None)
+
+    # P0-2: Trace별 격리 인덱스 정리
+    trace_id = _span_to_trace.pop(span_id, None)
+    if trace_id and trace_id in _trace_spans:
+        _trace_spans[trace_id].pop(span_id, None)
+
     name = _span_names.pop(span_id, None)
+    if trace_id and name and trace_id in _trace_spans_by_name and name in _trace_spans_by_name[trace_id]:
+        stack = _trace_spans_by_name[trace_id][name]
+        if span_id in stack:
+            stack.remove(span_id)
+        if not stack:
+            _trace_spans_by_name[trace_id].pop(name, None)
+
+    # 전역 인덱스 정리
+    span = _active_spans.pop(span_id, None)
     if name and _active_spans_by_name.get(name) == span_id:
         _active_spans_by_name.pop(name, None)
 
@@ -356,19 +482,18 @@ def end_span(span_id: str, output: Any = None, level: str = "DEFAULT", status_me
 
 
 def update_span(span_id: str, metadata: Dict[str, Any]):
-    """작업 구간(Span)의 메타데이터를 갱신한다. UUID 또는 등록된 스팬 이름을 모두 지원한다."""
+    """작업 구간(Span)의 메타데이터를 갱신한다. UUID 또는 등록된 스팬 이름을 모두 지원한다 (P0-2)."""
     lf = get_langfuse()
     if not lf:
         return
 
-    target_span_id = span_id
-    if target_span_id not in _active_spans and target_span_id in _active_spans_by_name:
-        target_span_id = _active_spans_by_name[target_span_id]
+    target_span = _active_spans.get(span_id)
+    if not target_span and span_id in _active_spans_by_name:
+        target_span = _active_spans.get(_active_spans_by_name[span_id])
 
-    span = _active_spans.get(target_span_id)
-    if span:
+    if target_span:
         try:
-            span.update(metadata=metadata)
+            target_span.update(metadata=metadata)
         except Exception:
             pass
 
@@ -386,7 +511,7 @@ def log_generation(
     output: Any = None,
     metadata: Optional[Dict[str, Any]] = None,
 ):
-    """LLM 단독 호출 결과를 수동으로 기록한다."""
+    """LLM 단독 호출 결과를 수동으로 기록한다 (P0-1 단일 계측 기준)."""
     lf = get_langfuse()
     if not lf:
         return
@@ -398,21 +523,29 @@ def log_generation(
         try:
             from ai_legal_helper.observability.context import get_case_id
             session_id = get_case_id()
+            git_sha = get_git_commit()
             trace = lf.trace(
                 id=trace_id,
                 name="LLM_Trace",
                 session_id=session_id,
-                metadata={"system_name": sys_name},
+                metadata={"system_name": sys_name, "git_commit": git_sha, "tags": [sys_name]},
                 tags=[sys_name],
             )
             _active_traces[trace_id] = trace
         except Exception:
             return
 
-    # 부모 Span 탐색: UUID -> 노드명 -> Root Trace
+    # P0-2 다단계 부모 Span 탐색:
     parent = None
     if parent_span_id:
-        parent = _active_spans.get(parent_span_id)
+        parent = _trace_spans.get(trace_id, {}).get(parent_span_id)
+        if not parent:
+            parent = _active_spans.get(parent_span_id)
+        if not parent and trace_id in _trace_spans_by_name and parent_span_id in _trace_spans_by_name[trace_id]:
+            stack = _trace_spans_by_name[trace_id][parent_span_id]
+            if stack:
+                candidate_id = stack[-1]
+                parent = _trace_spans.get(trace_id, {}).get(candidate_id) or _active_spans.get(candidate_id)
         if not parent and parent_span_id in _active_spans_by_name:
             parent = _active_spans.get(_active_spans_by_name[parent_span_id])
     if not parent:
@@ -428,6 +561,9 @@ def log_generation(
         gen_metadata["system_name"] = sys_name
     if sys_name and "tags" not in gen_metadata:
         gen_metadata["tags"] = [sys_name]
+    git_sha = get_git_commit()
+    if git_sha and "git_commit" not in gen_metadata:
+        gen_metadata["git_commit"] = git_sha
 
     try:
         parent.generation(
