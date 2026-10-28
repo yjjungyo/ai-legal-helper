@@ -596,6 +596,20 @@ def evaluate_notice_status(
         if parsed["move_out_dates"]:
             all_move_out_dates.extend(parsed["move_out_dates"])
 
+        # [P0-02] 일자가 명시적으로 분리되지 않은 사실 문장이더라도, 엄격히 검증된 사실에서
+        # 임대인의 수신확인/회신/답변/반환곤란통보 사실이 확인된 경우 상대방 도달 및 임대인 확인 사실을 인정한다.
+        if not has_disputed_reach and any(
+            w in stmt for w in [
+                "확인했다는 회신", "확인했다고 답", "회신하였다", "답변하였다",
+                "반환 곤란 통보", "보증금 반환이 어렵다고 통보", "돌려주기 어렵다고 통보",
+                "수신을 확인", "문자를 확인", "통지를 확인", "종료를 확인"
+            ]
+        ):
+            res["has_landlord_acknowledgement"] = True
+            res["has_reached"] = True
+            if f.evidence_label and f.evidence_label not in res["reach_evidence_labels"]:
+                res["reach_evidence_labels"].append(f.evidence_label)
+
     if all_sent_dates:
         res["sent_date"] = sorted(all_sent_dates)[0]
     if all_reach_dates:
@@ -604,6 +618,10 @@ def evaluate_notice_status(
     elif all_ack_dates and not has_disputed_reach:
         # 도달일이 명시적으로 분리되지 않았으나 임대인 회신/수신확인 일자가 있는 경우 회신일을 도달일로 인정
         res["reach_date"] = sorted(all_ack_dates)[0]
+        res["has_reached"] = True
+    elif res["has_landlord_acknowledgement"] and not has_disputed_reach and res.get("sent_date"):
+        # [P0-02] 회신 일자가 별도 분리되지 않았으나 발송일과 임대인 확인 회신이 확인된 경우 발송일을 도달일로 연동
+        res["reach_date"] = res["sent_date"]
         res["has_reached"] = True
 
     if all_ack_dates:

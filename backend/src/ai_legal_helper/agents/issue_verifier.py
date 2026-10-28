@@ -430,8 +430,10 @@ def verify_issue(
                 except Exception:
                     pass
 
+            is_term_expired = bool(contract_expiry_date and not is_future_expiry)
             is_expired_or_reached = (
-                has_reached
+                is_term_expired
+                or has_reached
                 or any(any(w in f.statement for w in ("만료", "종료")) for f in briefing.facts if is_fact_strictly_verified(f, briefing))
             )
             if has_lease and is_future_expiry:
@@ -444,10 +446,17 @@ def verify_issue(
             elif has_lease and is_expired_or_reached and law_verified:
                 status = "VERIFIED"
                 reason_codes.append("TERMINATION_FACTS_AND_LAW_SUPPORTED")
-                safe_recommendations.append(
-                    f"임대차계약서 및 통지 증빙에 따라 임대차 기간이 만료되거나 적법하게 종료되었으므로, "
-                    f"주택임대차보호법 제6조에 근거하여 임대인의 보증금 {deposit_text}(기변제 공제 후 {demand_summary_text}) 반환 채무는 확정적으로 이행기에 도달하였습니다."
-                )
+                if is_term_expired:
+                    safe_recommendations.append(
+                        f"임대차계약서상 계약 만기일({contract_expiry_date})이 경과하였고, "
+                        "임차인의 갱신거절·해지 통지에 대한 임대인 확인 회신 또는 기간 만료 사실이 공적으로 확인되었으므로, "
+                        f"주택임대차보호법 제6조에 근거하여 임대인의 보증금 {deposit_text}(기변제 공제 후 {demand_summary_text}) 반환 채무는 확정적으로 이행기에 도달하였습니다."
+                    )
+                else:
+                    safe_recommendations.append(
+                        f"임대차계약서 및 통지 증빙에 따라 임대차 기간이 만료되거나 적법하게 종료되었으므로, "
+                        f"주택임대차보호법 제6조에 근거하여 임대인의 보증금 {deposit_text}(기변제 공제 후 {demand_summary_text}) 반환 채무는 확정적으로 이행기에 도달하였습니다."
+                    )
             elif has_lease and (has_notice or has_sent):
                 status = "CONDITIONAL"
                 reason_codes.append("TERMINATION_NOTICE_REACH_UNCONFIRMED")
@@ -478,7 +487,28 @@ def verify_issue(
         move_out_date = notice_info["designated_move_out_date"]
 
         if has_lease and has_reached and law_verified:
-            if notice_info.get("is_effect_date_future"):
+            # 묵시적 갱신이 아닌 계약 만기 갱신거절 사안에서는 3개월 경과 효력일이 아닌 만기일에 확정 종료 (P0-02)
+            if not notice_info["is_implicit_renewal"]:
+                status = "VERIFIED"
+                reason_codes.append("NOTICE_REACH_FACTS_AND_LAW_SUPPORTED")
+                rec_parts = [
+                    "주택임대차보호법 제6조에 따른 계약 종료 및 갱신거절 통지의 상대방 도달 사실이 임대인의 확인 회신 등을 통해 객관적으로 입증되었습니다. "
+                ]
+                if sent_date and reach_date:
+                    rec_parts.append(f"본 사안에서는 {sent_date} 발송한 통고가 {reach_date} 임대인에게 도달하였고, ")
+                elif reach_date:
+                    rec_parts.append(f"본 사안에서는 통고가 {reach_date} 임대인에게 도달하였고, ")
+                else:
+                    rec_parts.append("본 사안에서는 통고의 도달 사실이 확인되었고, ")
+
+                if notice_info["has_landlord_acknowledgement"]:
+                    ack_date = notice_info["landlord_ack_date"]
+                    date_prefix = f"{ack_date} " if ack_date else ""
+                    rec_parts.append(f"임대인이 {date_prefix}답변 또는 회신을 함으로써 통고 수령 사실이 객관적으로 입증됩니다. ")
+
+                rec_parts.append(f"따라서 계약기간 만료에 따라 임대인의 보증금 {deposit_text}(기변제 공제 후 {demand_summary_text}) 반환 채무는 확정적으로 이행기에 도달하였습니다.")
+                safe_recommendations.append("".join(rec_parts))
+            elif notice_info.get("is_effect_date_future"):
                 status = "CONDITIONAL"
                 reason_codes.append("NOTICE_EFFECT_PENDING_FUTURE")
                 rec_parts = [

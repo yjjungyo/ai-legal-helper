@@ -240,7 +240,8 @@ def extract_case_attachment_info(briefing: CaseEvidenceBriefing) -> Tuple[bool, 
 
     for f in (briefing.facts or []):
         stmt = f.statement or ""
-        if "가압류" in stmt or "압류" in stmt:
+        # 단, '가압류가 없다', '가압류 미설정', '가압류 부존재' 등 부인 문맥은 제외 (P0-01)
+        if ("가압류" in stmt or "압류" in stmt) and not any(w in stmt for w in ["없다", "미설정", "단독", "부존재", "설정되지 않", "없음"]):
             has_attachment = True
             fact_verified = (
                 f.adjudication_status in ("EVIDENCE_SUPPORTED", "CORROBORATED")
@@ -312,7 +313,7 @@ def find_case_attachment_evidence_name(briefing: CaseEvidenceBriefing) -> str:
             dname = reg.get("document_name") or ""
             if any(w in dname for w in ["등기", "을구", "가압류"]):
                 return dname
-    return "부동산등기사항전부증명서"
+    return ""
 
 
 def detect_case_delta(
@@ -571,19 +572,27 @@ def detect_case_delta(
             "확인한 후에 비로소 이사(점유 이전)할 것"
         )
 
-    # 3. 새로운 가압류 사실 추가 (S02 / P0-3.1 권리순위 검증 강화, P0-4.2 무관한 가압류 주입 차단)
-    # [P0-4.2 작업 A] 후속 턴이라는 이유만으로 가압류 델타를 자동 주입하지 않고,
-    # 사용자의 질문이나 작업 질의가 가압류, 압류, 강제집행, 경매, 배당, 권리순위에 직접 관련된 경우에만 활성화한다.
-    attachment_terms = ["가압류", "압류", "강제집행", "경매", "배당", "배당요구", "순위", "권리순위", "우선순위", "말소기준"]
+    # 3. 새로운 가압류 사실 추가 (S02 / P0-01 허위 Case Delta 생성 차단 및 가압류 무결성 검증)
+    # [P0-01 원칙]
+    # 질문이나 resolved_query에 우연히 '경매', '배당', '순위' 등의 단어가 포함되어 있다는 이유만으로
+    # 사건에 등록되지도 않은 가압류 사실을 날조 생성하는 것을 전면 차단한다.
+    # Case Delta는 실제 사건 Fact/Evidence에 가압류가 존재하거나, 의뢰인이 이번 질문에서 명시적으로
+    # 신규 가압류의 존재를 주장(USER_ALLEGED)한 경우에만 한정하여 평가한다.
     has_attachment_fact, attachment_date, att_doc_name, is_att_verified = extract_case_attachment_info(briefing)
 
-    if any(t in q_corpus for t in attachment_terms):
+    # 의뢰인이 질문에서 명시적으로 가압류를 신규 주장/문의하였는지 확인 (단순 일반 질문이나 '어떤 조치를 해야 하나요' 배제)
+    user_alleged_attachment = any(w in (current_question or "") for w in ["가압류가", "가압류를", "가압류 들어", "가압류 걸", "가압류 설정", "등기부에 가압류", "가압류 등기", "가압류 추가"])
+
+    # 가압류 Fact/증거가 존재하거나, 의뢰인이 신규 가압류를 명시적으로 주장한 경우에만 분기 진입
+    if has_attachment_fact or user_alleged_attachment:
         tenant_date = extract_case_opposing_power_date(briefing)
         prior_encumbrances = extract_case_prior_encumbrances(briefing, tenant_date)
 
         if not is_att_verified or not attachment_date:
             # 등기일자나 증거 검증이 없는 상태: '후순위', '1순위', '최우선 배당' 단정 전면 금지 (작업 3)
-            changed_facts.append(f"목적물 부동산에 대한 신규 가압류 언급/등기 사실 접수 (등기일자 미검증 / 권리순위 미확정) [{att_doc_name}]")
+            # 미등록 문서인 경우 가공의 등기부명을 날조하지 않고 증빙 미제출 표기
+            doc_label = f"[{att_doc_name}]" if att_doc_name else "[증빙 미제출 / USER_ALLEGED]"
+            changed_facts.append(f"목적물 부동산에 대한 신규 가압류 언급/등기 사실 접수 (등기일자 미검증 / 권리순위 미확정) {doc_label}".strip())
             impacted_determinations.append(
                 "가압류의 구체적 등기 접수일자 및 권리설정 내역이 공적 증거(등기사항전부증명서)로 검증되지 않아, "
                 "임차인의 대항요건·확정일자와의 권리 선후관계를 즉시 확정할 수 없음. "
@@ -598,7 +607,8 @@ def detect_case_delta(
             )
         elif prior_encumbrances:
             # 선순위 담보물권이 존재하는 경우: 1순위 최우선 배당 불가
-            changed_facts.append(f"목적물 부동산에 가압류 등기 사실 추가 확인 [{att_doc_name}]")
+            doc_label = f"[{att_doc_name}]" if att_doc_name else ""
+            changed_facts.append(f"목적물 부동산에 가압류 등기 사실 추가 확인 {doc_label}".strip())
             impacted_determinations.append(
                 f"목적물에 선순위 담보물권({prior_encumbrances[0]})이 존재하므로 1순위 최우선 배당이 불가하며, "
                 "선순위 채권최고액과 경매 낙찰가율에 따른 배당 순위 및 잔여 담보 가치를 면밀히 검토해야 함"
@@ -612,7 +622,8 @@ def detect_case_delta(
             )
         elif tenant_date and attachment_date and attachment_date > tenant_date:
             # 임차인의 대항요건/확정일자가 가압류 등기일보다 앞서는 것이 검증된 경우
-            changed_facts.append(f"목적물 부동산에 후순위 가압류 등기 사실 추가 확인 [{att_doc_name}]")
+            doc_label = f"[{att_doc_name}]" if att_doc_name else ""
+            changed_facts.append(f"목적물 부동산에 후순위 가압류 등기 사실 추가 확인 {doc_label}".strip())
             impacted_determinations.append(
                 f"[판단할 수 있는 사실]: 신규 가압류 채권자에 대해서는 임차인의 대항요건 및 확정일자({tenant_date})가 앞서므로 기존 우선순위 보존 및 대항력 유지. "
                 "[추가로 필요한 등기·법률정보]: 단, 등기사항전부증명서(을구) 상의 다른 선순위 제한물권(담보권)이나 조세채권(당해세 등 법정기일 우선채권)의 존재 및 변동 여부를 추가 확인해야 최종 경매 배당 순위가 확정되며, 공적 등기부 열람 전까지 절대적 1순위 또는 전액 최우선 배당을 단정할 수 없음"
@@ -626,7 +637,8 @@ def detect_case_delta(
             )
         else:
             # 가압류 등기일이 임차인 대항력보다 앞서거나 같은 경우
-            changed_facts.append(f"목적물 부동산에 선행/동순위 가압류 등기 사실 추가 확인 [{att_doc_name}]")
+            doc_label = f"[{att_doc_name}]" if att_doc_name else ""
+            changed_facts.append(f"목적물 부동산에 선행/동순위 가압류 등기 사실 추가 확인 {doc_label}".strip())
             impacted_determinations.append(
                 f"가압류 등기일({attachment_date})이 임차인의 대항요건 구비일({tenant_date or '미확인'})보다 앞서거나 같아 "
                 "임차인이 가압류 채권자에게 우선적 대항력을 주장하기 어려우며 동순위 안분배당 또는 열후할 수 있음"
@@ -799,6 +811,8 @@ def assemble_grounded_answer(
 
     # [3. 조건부 판단 및 미확인 사항] (조건부/보완필요 쟁점 및 전제 조건)
     sections.append("\n[3. 조건부 판단 및 미확인 사항]")
+    # [P0-02 교차 검증] 검증 완료 쟁점(VERIFIED)과 조건부 쟁점 간 법률 판단 모순 방지
+    has_verified_termination = any(r.issue_id == "ISSUE_LEASE_TERMINATION" and r.status == "VERIFIED" for r in verified_issues)
     if conditional_issues:
         for idx, r in enumerate(conditional_issues, 1):
             status_kr = {
@@ -809,7 +823,11 @@ def assemble_grounded_answer(
             }.get(r.status, "조건부 검토")
             sections.append(f"\n{idx}. '{r.issue_title}' ({status_kr})")
             for rec in r.safe_recommendations:
-                sections.append(f"  * 조건부 판단: {rec}")
+                clean_rec = rec
+                if has_verified_termination and ("계약 종료 여부" in rec or "계약해지 효력" in rec):
+                    clean_rec = clean_rec.replace("계약 종료 여부가 조건부 상태입니다", "계약 자체는 기간 만료로 종료 확정되었으나 세부 통지 입증자료 보강이 권장됩니다")
+                    clean_rec = clean_rec.replace("계약 종료 여부는 전혀 확인할 수 없습니다", "임대차계약은 이미 종료 확정되었습니다")
+                sections.append(f"  * 조건부 판단: {clean_rec}")
             if r.unresolved_facts:
                 unres_text = ", ".join(r.unresolved_facts[:2])
                 sections.append(f"  * 전제 조건 및 미확인 사실: {unres_text}")
