@@ -186,7 +186,7 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
 
 
 class HttpNoiseFilter(logging.Filter):
-    """디버깅 시 시야를 가리는 무의미한 CORS OPTIONS 프리플라이트 및 헬스체크 로그를 필터링한다."""
+    """디버깅 시 시야를 가리는 무의미한 CORS OPTIONS 프리플라이트, 헬스체크 및 1.5초 단주기 상담 폴링 로그를 필터링한다."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         msg = record.getMessage()
@@ -194,7 +194,10 @@ class HttpNoiseFilter(logging.Filter):
         if '"OPTIONS ' in msg or "OPTIONS /api/v1/" in msg:
             return False
         # 주기적 헬스체크 폴링 필터링
-        if "/api/v1/health/live" in msg:
+        if "/api/v1/health/live" in msg or "/api/v1/health" in msg:
+            return False
+        # 정상적인 상담 상태 단주기 폴링(GET ... 200) 콘솔 스팸 필터링 (오류는 보존)
+        if '"GET /api/v1/consultations/' in msg and " 200 " in msg:
             return False
         return True
 

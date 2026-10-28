@@ -174,16 +174,14 @@ async def trace_context_middleware(request: Request, call_next):
         response.headers["X-Trace-Id"] = trace_id
         response.headers["X-Request-Id"] = request_id
 
-        # 정상적인 단주기 폴링은 콘솔 노이즈 방지를 위해 DEBUG 레벨로 처리하고, 오류(4xx, 5xx) 발생 시에만 WARNING 로깅
+        # 정상적인 단주기 폴링(상담 상태 조회 등) 및 헬스체크(is_noise)는 콘솔 노이즈 방지를 위해
+        # 200 정상 응답 시 로깅을 완전히 생략하고, 오류(4xx, 5xx) 발생 시에만 WARNING 레벨로 로깅한다.
         if not is_noise:
             client_ip = request.client.host if request.client else "-"
             logger.info(f'{client_ip} - "{request.method} {path}" {response.status_code} ({elapsed_ms:.1f}ms)')
         elif response.status_code >= 400:
             client_ip = request.client.host if request.client else "-"
             logger.warning(f'{client_ip} - "{request.method} {path}" {response.status_code} ({elapsed_ms:.1f}ms)')
-        else:
-            client_ip = request.client.host if request.client else "-"
-            logger.debug(f'{client_ip} - "{request.method} {path}" {response.status_code} ({elapsed_ms:.1f}ms)')
 
         return response
     finally:
