@@ -1,13 +1,15 @@
 """Langfuse Observability 고도화 v2.0 (1차 정확성 확보: P0-1, P0-2, P0-3) 단위 테스트 모듈.
 
-본 모듈은 다음 5대 핵심 요구사항을 검증한다:
+본 모듈은 다음 6대 핵심 요구사항을 검증한다:
 - TC-01: 단일 워크플로우 실행 시 Trace 이름('LegalConsultation') 표준화 및 LLM 1회 호출당 Generation 1회 정확 기록 (P0-1, P0-3)
 - TC-02: 서로 다른 상담(Trace A, Trace B) 동시 실행 시 동일 노드명 Span의 상호 오염 차단 및 격리 검증 (P0-2)
 - TC-03: 동일 워크플로우 내 중첩·반복 에이전트 호출 시 Span 이름 스택(Stack) 정상 동작 및 부모 복원 (P0-2)
 - TC-04: Git Commit SHA 및 시스템 식별자('LegalAgent')의 Trace/Generation 메타데이터 자동 주입 검증 (P0-3)
 - TC-05: 워크플로우 종료 시 end_trace()에 의한 내부 활성 Span 및 Trace 인덱스 메모리 누수 방지 정리 (P0-2)
+- TC-06: Azure OpenAI 응답 모델명(예: 'gpt-5.4-2026-03-05') 정밀 추출을 통한 Langfuse 모델 식별 및 비용(Cost) 산출 보장 (P0-1)
 """
 
+import os
 import time
 from unittest.mock import MagicMock, patch
 import pytest
@@ -29,6 +31,7 @@ def clean_langfuse_state():
     langfuse_client._trace_spans.clear()
     langfuse_client._trace_spans_by_name.clear()
     langfuse_client._span_to_trace.clear()
+    langfuse_client._ended_traces.clear()
     yield
     langfuse_client._active_traces.clear()
     langfuse_client._active_spans.clear()
@@ -36,6 +39,7 @@ def clean_langfuse_state():
     langfuse_client._trace_spans.clear()
     langfuse_client._trace_spans_by_name.clear()
     langfuse_client._span_to_trace.clear()
+    langfuse_client._ended_traces.clear()
 
 
 def test_tc01_single_trace_and_generation_instrumentation():
@@ -87,7 +91,8 @@ def test_tc01_single_trace_and_generation_instrumentation():
                     "prompt_tokens": 120,
                     "completion_tokens": 80,
                     "total_tokens": 200,
-                }
+                },
+                "model_name": "gpt-4o",
             }
 
             handler.on_llm_end(mock_llm_res, run_id=run_id, invocation_params={"model_name": "gpt-4o"})
@@ -96,6 +101,7 @@ def test_tc01_single_trace_and_generation_instrumentation():
             mock_trace.generation.assert_called_once()
             _, gen_kwargs = mock_trace.generation.call_args
             assert gen_kwargs.get("name") == "LegalAgent"
+            assert gen_kwargs.get("model") == "gpt-4o"
             assert "LegalAgent" in gen_kwargs.get("metadata", {}).get("tags", [])
             assert gen_kwargs.get("usage", {}).get("total") == 200
             assert gen_kwargs.get("metadata", {}).get("git_commit") is not None
@@ -271,3 +277,274 @@ def test_tc05_end_trace_memory_cleanup():
         assert "s1" not in langfuse_client._span_to_trace
         assert "s2" not in langfuse_client._span_to_trace
 
+
+def test_tc06_model_name_extraction_for_cost_calculation():
+    """TC-06: Azure OpenAI 응답 모델명(예: 'gpt-5.4-2026-03-05') 추출 및 Langfuse Cost 계산 연계 검증.
+    
+    AzureChatOpenAI 호출 시 invocation_params에는 model_name이 없고 azure_deployment만 존재하며,
+    실제 세부 모델 버전(예: 'gpt-5.4-2026-03-05')은 response.llm_output['model_name']에 담겨 전달된다.
+    이를 정확히 추출하여 Langfuse Generation의 model 필드에 기록함으로써 비용(Cost)이 산출되도록 보장한다.
+    """
+    mock_lf = MagicMock()
+    mock_trace = MagicMock()
+    mock_lf.trace.return_value = mock_trace
+
+    with patch.object(langfuse_client, "get_langfuse", return_value=mock_lf):
+        trace_id = "trace-tc06"
+        langfuse_client.start_trace(trace_id=trace_id, name="LegalConsultation")
+
+        t_token = set_trace_id(trace_id)
+        try:
+            handler = TokenTrackingCallbackHandler()
+            run_id = "run-tc06-azure"
+
+            # 1. on_chat_model_start: Azure deployment 정보 수신
+            handler.on_chat_model_start(
+                serialized={"kwargs": {"azure_deployment": "gpt-5.4"}},
+                messages=[[MagicMock(type="human", content="사건 질의")]],
+                run_id=run_id,
+                invocation_params={"azure_deployment": "gpt-5.4", "temperature": 0.2},
+            )
+
+            # 2. on_llm_end: Azure OpenAI 실제 응답에 정밀 모델명('gpt-5.4-2026-03-05') 수신
+            mock_llm_res = MagicMock()
+            mock_gen_obj = MagicMock()
+            mock_gen_obj.text = "답변 텍스트"
+            mock_gen_obj.message = None
+            mock_llm_res.generations = [[mock_gen_obj]]
+            mock_llm_res.llm_output = {
+                "token_usage": {
+                    "prompt_tokens": 15950,
+                    "completion_tokens": 4966,
+                    "total_tokens": 20916,
+                },
+                "model_name": "gpt-5.4-2026-03-05",
+            }
+
+            handler.on_llm_end(
+                mock_llm_res,
+                run_id=run_id,
+                invocation_params={"azure_deployment": "gpt-5.4", "temperature": 0.2},
+            )
+
+            # 3. [검증] Langfuse Generation에 정밀 모델명 및 토큰 상세가 정확히 전달되었는지 확인
+            mock_trace.generation.assert_called_once()
+            _, gen_kwargs = mock_trace.generation.call_args
+            assert gen_kwargs.get("name") == "LegalAgent"
+            assert gen_kwargs.get("model") == "gpt-5.4-2026-03-05"  # 반드시 unknown이 아닌 실제 모델명이어야 함!
+            assert gen_kwargs.get("usage", {}).get("input") == 15950
+            assert gen_kwargs.get("usage", {}).get("output") == 4966
+            assert gen_kwargs.get("usage", {}).get("total") == 20916
+            assert gen_kwargs.get("usage_details", {}).get("input") == 15950
+            assert gen_kwargs.get("model_parameters", {}).get("temperature") == 0.2
+        finally:
+            reset_trace_id(t_token)
+
+
+def test_tc07_cross_trace_name_lookup_rejected():
+    """TC-P0-07: Trace A에만 존재하는 부모 이름을 Trace B에서 요청했을 때 교차 연결되지 않는지 검증.
+    
+    Trace A에 'agent_alpha'가 존재하더라도, Trace B에서 parent_span_id='agent_alpha'로 스팬을 시작하면
+    Trace A의 스팬에 절대로 연결되지 않고 Trace B의 Root Trace에 연결되어야 한다.
+    """
+    mock_lf = MagicMock()
+    trace_a_mock = MagicMock()
+    trace_b_mock = MagicMock()
+    span_a_alpha = MagicMock()
+    child_b_mock = MagicMock()
+
+    trace_a_mock.span.return_value = span_a_alpha
+    trace_b_mock.span.return_value = child_b_mock
+
+    def mock_trace_lookup(id, **kwargs):
+        return trace_a_mock if id == "trace-A" else trace_b_mock
+
+    mock_lf.trace.side_effect = mock_trace_lookup
+
+    with patch.object(langfuse_client, "get_langfuse", return_value=mock_lf):
+        langfuse_client.start_trace(trace_id="trace-A", name="LegalConsultation")
+        langfuse_client.start_trace(trace_id="trace-B", name="LegalConsultation")
+
+        # Trace A에서만 'agent_alpha' 생성
+        langfuse_client.start_span(trace_id="trace-A", span_id="span-A-alpha", name="agent_alpha")
+        assert "span-A-alpha" in langfuse_client._trace_spans["trace-A"]
+
+        # Trace B에서 존재하지 않는 부모명 'agent_alpha'로 스팬 생성 시도
+        langfuse_client.start_span(
+            trace_id="trace-B",
+            span_id="span-B-child",
+            name="tool_call",
+            parent_span_id="agent_alpha",
+        )
+
+        # [검증] Trace A의 span_a_alpha.span()은 호출되지 않아야 함 (교차 연결 차단)
+        span_a_alpha.span.assert_not_called()
+
+        # [검증] Trace B의 루트 트레이스에 직접 연결되어야 함
+        trace_b_mock.span.assert_called_once()
+        _, b_kwargs = trace_b_mock.span.call_args
+        assert b_kwargs.get("id") == "span-B-child"
+
+
+def test_tc08_concurrent_same_name_nested_agents():
+    """TC-P0-08: 서로 다른 Trace에서 동일 이름의 Agent가 동시에 중첩 실행되는 경우 확인.
+    
+    Trace A와 Trace B가 동시에 동일한 'lease_agent'를 실행하고,
+    Trace A에서만 중첩 호출이 발생하더라도 두 Trace의 이름 스택이 완전히 독립적으로 동작해야 한다.
+    """
+    mock_lf = MagicMock()
+    trace_a_mock = MagicMock()
+    trace_b_mock = MagicMock()
+    span_a_1 = MagicMock()
+    span_a_2 = MagicMock()
+    span_b_1 = MagicMock()
+
+    trace_a_mock.span.side_effect = [span_a_1, MagicMock()]
+    span_a_1.span.return_value = span_a_2
+    trace_b_mock.span.return_value = span_b_1
+
+    def mock_trace_lookup(id, **kwargs):
+        return trace_a_mock if id == "trace-A" else trace_b_mock
+
+    mock_lf.trace.side_effect = mock_trace_lookup
+
+    with patch.object(langfuse_client, "get_langfuse", return_value=mock_lf):
+        langfuse_client.start_trace(trace_id="trace-A", name="LegalConsultation")
+        langfuse_client.start_trace(trace_id="trace-B", name="LegalConsultation")
+
+        # 1. Trace A와 Trace B에서 각각 'lease_agent' 시작
+        langfuse_client.start_span(trace_id="trace-A", span_id="a-lease-1", name="lease_agent")
+        langfuse_client.start_span(trace_id="trace-B", span_id="b-lease-1", name="lease_agent")
+
+        # 2. Trace A에서만 중첩 'lease_agent' 시작
+        langfuse_client.start_span(
+            trace_id="trace-A",
+            span_id="a-lease-2",
+            name="lease_agent",
+            parent_span_id="lease_agent",
+        )
+        assert langfuse_client._trace_spans_by_name["trace-A"]["lease_agent"] == ["a-lease-1", "a-lease-2"]
+        assert langfuse_client._trace_spans_by_name["trace-B"]["lease_agent"] == ["b-lease-1"]
+
+        # 3. Trace A의 중첩 스팬 종료 -> Trace A 스택은 a-lease-1로 복원, Trace B는 불변
+        langfuse_client.end_span("a-lease-2")
+        assert langfuse_client._trace_spans_by_name["trace-A"]["lease_agent"] == ["a-lease-1"]
+        assert langfuse_client._trace_spans_by_name["trace-B"]["lease_agent"] == ["b-lease-1"]
+
+
+def test_tc09_cross_trace_uuid_parent_rejected():
+    """TC-P0-09: 다른 Trace의 UUID를 부모로 전달했을 때 연결이 거부되는지 확인.
+    
+    Trace A 소속인 Span UUID를 Trace B의 start_span(parent_span_id=...)으로 전달하면
+    교차 연결이 거부([SPAN_CROSS_TRACE_REJECTED])되고 Trace B의 Root Trace에 연결되어야 한다.
+    """
+    mock_lf = MagicMock()
+    trace_a_mock = MagicMock()
+    trace_b_mock = MagicMock()
+    span_a_uuid = MagicMock()
+    child_b = MagicMock()
+
+    trace_a_mock.span.return_value = span_a_uuid
+    trace_b_mock.span.return_value = child_b
+
+    def mock_trace_lookup(id, **kwargs):
+        return trace_a_mock if id == "trace-A" else trace_b_mock
+
+    mock_lf.trace.side_effect = mock_trace_lookup
+
+    with patch.object(langfuse_client, "get_langfuse", return_value=mock_lf):
+        langfuse_client.start_trace(trace_id="trace-A", name="LegalConsultation")
+        langfuse_client.start_trace(trace_id="trace-B", name="LegalConsultation")
+
+        # Trace A에서 스팬 생성 (UUID: 'span-A-secret-uuid')
+        langfuse_client.start_span(trace_id="trace-A", span_id="span-A-secret-uuid", name="node_a")
+
+        # Trace B에서 부모로 Trace A의 UUID를 직접 지정
+        langfuse_client.start_span(
+            trace_id="trace-B",
+            span_id="span-B-rogue-child",
+            name="node_b",
+            parent_span_id="span-A-secret-uuid",
+        )
+
+        # [검증] Trace A의 span_a_uuid.span()은 절대로 호출되어서는 안 됨
+        span_a_uuid.span.assert_not_called()
+
+        # [검증] Trace B의 루트 트레이스에 직접 격리 연결되어야 함
+        trace_b_mock.span.assert_called_once()
+        _, b_kwargs = trace_b_mock.span.call_args
+        assert b_kwargs.get("id") == "span-B-rogue-child"
+
+
+def test_tc10_delayed_callback_after_end_trace():
+    """TC-P0-10: 비동기 상담 종료 이후 지연된 Callback이 도착했을 때 새 Trace가 임의 생성되거나 잘못 연결되지 않는지 검증.
+    
+    end_trace(trace_id) 호출 이후 해당 trace_id로 start_span()이나 log_generation()이 도착하더라도,
+    Langfuse에 새로운 임의 Trace(예: 'Workflow:...' 또는 'LLM_Trace')가 생성되지 않고 안전하게 무시되어야 한다.
+    """
+    mock_lf = MagicMock()
+    mock_trace = MagicMock()
+    mock_lf.trace.return_value = mock_trace
+
+    with patch.object(langfuse_client, "get_langfuse", return_value=mock_lf):
+        trace_id = "trace-tc10-ended"
+        langfuse_client.start_trace(trace_id=trace_id, name="LegalConsultation")
+        assert mock_lf.trace.call_count == 1
+
+        # 상담 정상 종료
+        langfuse_client.end_trace(trace_id)
+        assert trace_id in langfuse_client._ended_traces
+        assert trace_id not in langfuse_client._active_traces
+
+        # 지연된 span 시작 시도
+        langfuse_client.start_span(
+            trace_id=trace_id,
+            span_id="delayed-span-id",
+            name="delayed_tool_execution",
+        )
+
+        # 지연된 generation 기록 시도
+        langfuse_client.log_generation(
+            trace_id=trace_id,
+            parent_span_id=None,
+            name="LegalAgent",
+            model="gpt-5.4",
+            start_time=time.time(),
+            end_time=time.time(),
+            usage={"input": 10, "output": 10, "total": 20},
+        )
+
+        # [검증] 추가적인 lf.trace() 호출이 전혀 발생하지 않았어야 함 (호출 횟수 그대로 1회 유지)
+        assert mock_lf.trace.call_count == 1
+        assert "delayed-span-id" not in langfuse_client._active_spans
+
+
+def test_tc11_privacy_masking_default_when_env_unset():
+    """TC-11: LANGFUSE_CAPTURE_CONTENT 환경변수 미설정 시 기본 마스킹 동작 검증 (개인정보 보호 원칙).
+    
+    환경변수가 전혀 설정되지 않은 기본 상태에서는 법률 상담 질문 및 답변 원문이
+    Langfuse에 평문으로 전송되지 않고 '[MASKED FOR PRIVACY]'로 마스킹되어야 한다.
+    """
+    mock_lf = MagicMock()
+    mock_trace = MagicMock()
+    mock_lf.trace.return_value = mock_trace
+
+    # LANGFUSE_CAPTURE_CONTENT 환경변수를 완전히 제거한 환경 시뮬레이션
+    env_clean = dict(os.environ)
+    env_clean.pop("LANGFUSE_CAPTURE_CONTENT", None)
+
+    with patch.dict(os.environ, env_clean, clear=True):
+        with patch.object(langfuse_client, "get_langfuse", return_value=mock_lf):
+            trace_id = "trace-tc11-privacy"
+            langfuse_client.start_trace(trace_id=trace_id, name="LegalConsultation")
+
+            langfuse_client.start_span(
+                trace_id=trace_id,
+                span_id="span-tc11",
+                name="user_query_node",
+                input={"client_ssn": "900101-1234567", "deposit": 50000000},
+            )
+
+            # [검증] 환경변수 미설정 시 기본값은 마스킹이어야 함
+            _, span_kwargs = mock_trace.span.call_args
+            assert span_kwargs.get("input") == "[MASKED FOR PRIVACY]"

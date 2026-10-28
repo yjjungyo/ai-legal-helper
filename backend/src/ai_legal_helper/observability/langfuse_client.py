@@ -21,7 +21,10 @@ import sys
 import types
 import uuid
 import re
+import logging
 from typing import Optional, Dict, Any, List
+
+logger = logging.getLogger(__name__)
 
 # LangChain 1.x 버전에서 langfuse 2.x SDK의 이전 import 경로 호환성 보장
 if "langchain.callbacks" not in sys.modules:
@@ -63,10 +66,11 @@ _active_spans: Dict[str, Any] = {}
 _active_spans_by_name: Dict[str, str] = {}
 _span_names: Dict[str, str] = {}
 
-# [P0-2 고도화] Trace별 활성 Span 격리 저장소
+# [P0-2 고도화] Trace별 활성 Span 격리 저장소 및 종료된 Trace 추적기
 _trace_spans: Dict[str, Dict[str, Any]] = {}
 _trace_spans_by_name: Dict[str, Dict[str, List[str]]] = {}
 _span_to_trace: Dict[str, str] = {}
+_ended_traces: set[str] = set()
 
 _git_commit_cache: Optional[str] = None
 
@@ -274,6 +278,9 @@ def start_trace(
     if sys_name and sys_name not in trace_tags:
         trace_tags.append(sys_name)
 
+    # 새 Trace 시작 또는 재개 시 종료된 Trace 집합에서 제거 (P0 잔여 결함 보완)
+    _ended_traces.discard(trace_id)
+
     trace_metadata = dict(metadata or {})
     if sys_name and "system_name" not in trace_metadata:
         trace_metadata["system_name"] = sys_name
@@ -314,6 +321,8 @@ def end_trace(trace_id: str):
     if not lf:
         return
 
+    # 종료된 Trace 식별자를 기록하여 지연 콜백에 의한 임의 생성/오염 차단 (TC-P0-10)
+    _ended_traces.add(trace_id)
     _active_traces.pop(trace_id, None)
 
     # P0-2: trace_id에 속한 모든 Span 인스턴스 및 이름 스택 일괄 메모리 해제
@@ -325,6 +334,64 @@ def end_trace(trace_id: str):
 
     _trace_spans_by_name.pop(trace_id, None)
 
+
+def _resolve_parent_span(
+    trace_id: str,
+    parent_span_id: Optional[str],
+    current_span_name: str,
+    current_span_id: str,
+) -> Optional[Any]:
+    """현재 trace_id에 엄격히 격리된 범위 내에서만 부모 Span을 탐색한다 (P0 잔여 결함 보완).
+
+    전역 이름 기반 조회를 원천 차단하며, 타 Trace 소속 Span에 대한 오염 연결을 거부한다.
+
+    Args:
+        trace_id: 현재 작업이 속한 Trace ID
+        parent_span_id: 상위 구간 ID(UUID) 또는 노드/함수명
+        current_span_name: 현재 생성할 구간명 (진단 로그용)
+        current_span_id: 현재 생성할 구간 ID (진단 로그용)
+
+    Returns:
+        Optional[Any]: 검증된 부모 Span 인스턴스 (미해결 시 None).
+    """
+    if not parent_span_id:
+        return None
+
+    # 1단계: 현재 trace_id 격리 저장소에서 UUID 직접 매칭
+    parent = _trace_spans.get(trace_id, {}).get(parent_span_id)
+    if parent:
+        return parent
+
+    # 2단계: 현재 trace_id 격리 이름 스택에서 최신 활성 스팬 매칭 (중첩 에이전트 지원)
+    if trace_id in _trace_spans_by_name and parent_span_id in _trace_spans_by_name[trace_id]:
+        stack = _trace_spans_by_name[trace_id][parent_span_id]
+        if stack:
+            cand_id = stack[-1]
+            parent = _trace_spans.get(trace_id, {}).get(cand_id)
+            if parent:
+                return parent
+
+    # 3단계: 전역 UUID 인덱스 검증 - 반드시 _span_to_trace[parent_span_id] == trace_id 인 경우에만 허용
+    if parent_span_id in _active_spans:
+        owner_trace = _span_to_trace.get(parent_span_id)
+        if owner_trace == trace_id:
+            return _active_spans[parent_span_id]
+        else:
+            logger.warning(
+                f"[SPAN_CROSS_TRACE_REJECTED] Rejected cross-trace parent '{parent_span_id}' "
+                f"(belongs to '{owner_trace}') from being linked into trace '{trace_id}' "
+                f"for span '{current_span_name}'({current_span_id})."
+            )
+            return None
+
+    # 전역 이름 매칭(_active_spans_by_name)은 원천 차단됨!
+
+    # 4단계: 부모 미해결 진단 로그 기록
+    logger.warning(
+        f"[SPAN_PARENT_UNRESOLVED] trace_id={trace_id}, span={current_span_name}({current_span_id}): "
+        f"parent '{parent_span_id}' not found in active spans of this trace. Linking to root trace."
+    )
+    return None
 
 def start_span(
     trace_id: str,
@@ -358,6 +425,13 @@ def start_span(
 
     sys_name = get_system_name()
 
+    # 비동기 종료 후 지연 콜백인 경우 새 Trace 생성 차단 (TC-P0-10)
+    if trace_id in _ended_traces:
+        logger.warning(
+            f"[DELAYED_CALLBACK_IGNORED] start_span rejected for ended trace_id={trace_id}, span={name}({span_id})"
+        )
+        return
+
     # Trace가 아직 생성되지 않은 경우 자동 지연 생성 (Lazy Trace Creation)
     trace = _active_traces.get(trace_id)
     if not trace:
@@ -376,40 +450,15 @@ def start_span(
         except Exception:
             return
 
-    capture_content = os.getenv("LANGFUSE_CAPTURE_CONTENT", "true").lower() == "true"
+    capture_content = os.getenv("LANGFUSE_CAPTURE_CONTENT", "false").lower() == "true"
     safe_input = input if capture_content else ("[MASKED FOR PRIVACY]" if input is not None else None)
 
     span_metadata = dict(metadata or {})
     if sys_name and "system_name" not in span_metadata:
         span_metadata["system_name"] = sys_name
 
-    # P0-2 다단계 부모 탐색:
-    parent = None
-    if parent_span_id:
-        # 1단계: trace_id 격리 저장소에서 UUID 직접 매칭
-        parent = _trace_spans.get(trace_id, {}).get(parent_span_id)
-        # 2단계: 전역 UUID 저장소 매칭 (하위 호환성)
-        if not parent:
-            parent = _active_spans.get(parent_span_id)
-        # 3단계: trace_id 격리 이름 스택에서 최신 스팬 매칭 (동일 이름 중첩 지원)
-        if not parent and trace_id in _trace_spans_by_name and parent_span_id in _trace_spans_by_name[trace_id]:
-            stack = _trace_spans_by_name[trace_id][parent_span_id]
-            if stack:
-                candidate_id = stack[-1]
-                parent = _trace_spans.get(trace_id, {}).get(candidate_id) or _active_spans.get(candidate_id)
-        # 4단계: 전역 이름 매칭 폴백
-        if not parent and parent_span_id in _active_spans_by_name:
-            candidate_id = _active_spans_by_name[parent_span_id]
-            parent = _active_spans.get(candidate_id)
-
-        # 부모를 찾지 못했을 때 진단 정보 로깅
-        if not parent:
-            import logging
-            logging.getLogger(__name__).warning(
-                f"[SPAN_PARENT_UNRESOLVED] trace_id={trace_id}, span={name}({span_id}): "
-                f"parent '{parent_span_id}' not found in active spans. Linking to root trace."
-            )
-
+    # 엄격한 trace_id 격리 부모 탐색 (전역 이름 탐색 제거)
+    parent = _resolve_parent_span(trace_id, parent_span_id, name, span_id)
     if not parent:
         parent = trace
 
@@ -473,7 +522,7 @@ def end_span(span_id: str, output: Any = None, level: str = "DEFAULT", status_me
         _active_spans_by_name.pop(name, None)
 
     if span:
-        capture_content = os.getenv("LANGFUSE_CAPTURE_CONTENT", "true").lower() == "true"
+        capture_content = os.getenv("LANGFUSE_CAPTURE_CONTENT", "false").lower() == "true"
         safe_output = output if capture_content else ("[MASKED FOR PRIVACY]" if output is not None else None)
         try:
             span.end(output=safe_output, level=level, status_message=status_message)
@@ -510,13 +559,26 @@ def log_generation(
     input: Any = None,
     output: Any = None,
     metadata: Optional[Dict[str, Any]] = None,
+    model_parameters: Optional[Dict[str, Any]] = None,
+    usage_details: Optional[Dict[str, int]] = None,
 ):
-    """LLM 단독 호출 결과를 수동으로 기록한다 (P0-1 단일 계측 기준)."""
+    """LLM 단독 호출 결과를 수동으로 기록한다 (P0-1 단일 계측 기준).
+
+    모델명(model)이 정확히 전달되어야 Langfuse에서 모델 단가 매칭을 통한 비용(Cost) 계산이 수행된다.
+    누락되거나 'unknown'인 경우 환경변수 배포 모델명으로 자동 보정한다.
+    """
     lf = get_langfuse()
     if not lf:
         return
 
     sys_name = get_system_name()
+
+        # 비동기 종료 후 지연 콜백인 경우 새 Trace 생성 차단 (TC-P0-10)
+    if trace_id in _ended_traces:
+        logger.warning(
+            f"[DELAYED_CALLBACK_IGNORED] log_generation rejected for ended trace_id={trace_id}, gen={name}"
+        )
+        return
 
     trace = _active_traces.get(trace_id)
     if not trace:
@@ -535,24 +597,13 @@ def log_generation(
         except Exception:
             return
 
-    # P0-2 다단계 부모 Span 탐색:
-    parent = None
-    if parent_span_id:
-        parent = _trace_spans.get(trace_id, {}).get(parent_span_id)
-        if not parent:
-            parent = _active_spans.get(parent_span_id)
-        if not parent and trace_id in _trace_spans_by_name and parent_span_id in _trace_spans_by_name[trace_id]:
-            stack = _trace_spans_by_name[trace_id][parent_span_id]
-            if stack:
-                candidate_id = stack[-1]
-                parent = _trace_spans.get(trace_id, {}).get(candidate_id) or _active_spans.get(candidate_id)
-        if not parent and parent_span_id in _active_spans_by_name:
-            parent = _active_spans.get(_active_spans_by_name[parent_span_id])
+    # 엄격한 trace_id 격리 부모 탐색 (전역 이름 탐색 제거)
+    parent = _resolve_parent_span(trace_id, parent_span_id, name, "generation")
     if not parent:
         parent = trace
 
     level = "ERROR" if status_message else "DEFAULT"
-    capture_content = os.getenv("LANGFUSE_CAPTURE_CONTENT", "true").lower() == "true"
+    capture_content = os.getenv("LANGFUSE_CAPTURE_CONTENT", "false").lower() == "true"
     safe_input = input if capture_content else ("[MASKED FOR PRIVACY]" if input is not None else None)
     safe_output = output if capture_content else ("[MASKED FOR PRIVACY]" if output is not None else None)
 
@@ -565,19 +616,29 @@ def log_generation(
     if git_sha and "git_commit" not in gen_metadata:
         gen_metadata["git_commit"] = git_sha
 
+    # 모델명이 누락되거나 'unknown'인 경우 환경변수 배포 모델명으로 안전하게 보정 (Langfuse Cost 집계 보장)
+    resolved_model = model
+    if not resolved_model or resolved_model == "unknown":
+        resolved_model = os.getenv("AZURE_OPENAI_DEPLOYMENT_CHAT", "gpt-4o")
+
     try:
-        parent.generation(
-            name=name,
-            model=model,
-            start_time=start_time,
-            end_time=end_time,
-            usage=usage,
-            input=safe_input,
-            output=safe_output,
-            level=level,
-            status_message=status_message,
-            metadata=gen_metadata,
-        )
+        gen_kwargs = {
+            "name": name,
+            "model": resolved_model,
+            "start_time": start_time,
+            "end_time": end_time,
+            "usage": usage,
+            "input": safe_input,
+            "output": safe_output,
+            "level": level,
+            "status_message": status_message,
+            "metadata": gen_metadata,
+        }
+        if model_parameters:
+            gen_kwargs["model_parameters"] = model_parameters
+        if usage_details:
+            gen_kwargs["usage_details"] = usage_details
+        parent.generation(**gen_kwargs)
     except Exception:
         pass
 

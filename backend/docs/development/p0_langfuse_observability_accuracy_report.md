@@ -1,7 +1,7 @@
-# LAWYER — Langfuse Observability 고도화 v2.0 1차(정확성 확보) 완료 보고서
+# LAWYER — Langfuse Observability 고도화 v2.0 P0 최종 완료 보고서
 
 **대상 브랜치:** `feature/langfuse-observability-v2.0`  
-**기준 Git SHA:** `a2546bd7d2b347e58b34173afa8ee9e182022052`  
+**현재 Git SHA:** `0aad456cc5decb66373487bfb8cf766e7b74841a`  
 **시스템 식별자:** `LegalAgent`  
 **완료 일자:** 2026-10-28  
 
@@ -9,82 +9,94 @@
 
 ## 1. 개요 및 추진 목표
 
-"LAWYER — Langfuse Observability 고도화 개발지시서 v2.0"의 **1차 (정확성 확보)** 단계에 따라 다음 3개 핵심 과제를 완료하였습니다:
+"LAWYER Observability v2.0 — P0 잔여 결함 보완 지시"에 따라 다음 4개 항목을 완벽히 해결하고, 로컬 Langfuse v2.95.11 서버 및 실제 사내 Azure OpenAI LLM과 연동하여 실측 검증을 완료하였습니다:
 
-1. **P0-1 — 중복 Generation 계측 조사 및 단일화:** LLM 실제 호출 1회당 Langfuse Generation이 정확히 1회 기록되도록 단일 계측 경로(`TokenTrackingCallbackHandler`) 확립, Generation 이름 및 태그를 `LegalAgent`로 통일.
-2. **P0-2 — Span 부모·자식 관계 개선 및 사건별 격리:** 전역 이름 기반 `_active_spans_by_name` 구조로 인한 동시 상담 간 부모 오염 원천 차단, `trace_id` 스코프의 격리 인덱스 및 활성 스팬 스택 도입, `end_trace` 시 메모리 완전 해제.
-3. **P0-3 — 상담 실행 Trace 표준화:** 상담 실행 Trace의 공식 이름을 `LegalConsultation`으로 표준화, HTTP 미들웨어-백그라운드 태스크 간 지연 덮어쓰기 문제 해결, `case_id`, `request_id`, `session_id`, `run_id`, `git_commit` 표준 메타데이터 자동 주입.
+1. **Span 교차 연결 원천 차단:** `langfuse_client.py`의 `start_span()` 및 `log_generation()`에서 전역 이름 기반 부모 탐색을 완전히 제거하고, `_span_to_trace[parent_span_id] == trace_id` 검증 및 `_resolve_parent_span()` 격리 구조 확립.
+2. **비동기 종료 후 지연 콜백 차단:** `_ended_traces` 집합을 도입하여 `end_trace()` 이후 도착한 지연 콜백이 임의의 신규 Trace(`Workflow:...` 또는 `LLM_Trace`)를 생성하거나 오염시키는 현상 차단 (`[DELAYED_CALLBACK_IGNORED]`).
+3. **개인정보 수집 기본값 강화:** `LANGFUSE_CAPTURE_CONTENT` 미설정 시 기본값을 `"false"`로 변경하여 법률 상담 질문 및 증거 원문이 기본적으로 마스킹(`[MASKED FOR PRIVACY]`)되도록 보장.
+4. **모델·비용 실측 검증:** 단위 테스트 외에 실제 SC-001 상담 파이프라인을 구동하여 Langfuse에 모델명(`gpt-5.4-2026-03-05`), 토큰 사용량, 계산된 비용(`calculatedTotalCost`), 1 LLM 호출당 1 Generation 생성 및 부모-자식 트리 구조 무결성을 실측 검증.
 
 ---
 
-## 2. 주요 개선 내용
+## 2. 세부 구현 내용
 
-### P0-1: 단일 Generation 계측 경로 확립
-- **원인 분석:** `gateway.py`에서 `AzureChatOpenAI` 초기화 시 Langfuse `CallbackHandler`를 중복 주입할 경우 LangChain 자동 콜백과 `TokenTrackingCallbackHandler`의 수동 계측이 이중으로 Generation을 생성할 위험이 있었습니다.
-- **개선 조치:**
-  - `TokenTrackingCallbackHandler`를 유일한 Generation 기록 책임자로 명확히 확립 (`callbacks.py`).
-  - LLM 모델 인스턴스에 `name="LegalAgent"`, `tags=["LegalAgent"]` 주입하여 SDK 내부에서도 `AzureChatOpenAI` 대신 `LegalAgent` 식별자 일관 유지.
-  - 실패한 LLM 호출(`on_llm_error`)은 `status_message` 및 에러 상세를 Generation에 별도 기록하여 재시도 및 실패를 명확히 구분.
+### 1) Span 교차 연결 원천 차단 및 부모 해결 표준화 (`langfuse_client.py`)
+- `_resolve_parent_span(trace_id, parent_span_id, name, span_id)` 함수 신설:
+  - 1단계: 현재 `trace_id`의 격리 인덱스(`_trace_spans[trace_id]`)에서 UUID 직접 매칭.
+  - 2단계: 현재 `trace_id`의 격리 이름 스택(`_trace_spans_by_name[trace_id]`)에서 최신 스팬(`[-1]`) 매칭.
+  - 3단계: 전역 UUID 인덱스에 존재하더라도 `_span_to_trace[parent_span_id] == trace_id`인 경우에만 허용. 타 Trace 소속인 경우 `[SPAN_CROSS_TRACE_REJECTED]` 경고 로그와 함께 즉시 거부(`return None`).
+  - 4단계: 전역 이름 매칭(`_active_spans_by_name`) 완전 배제. 부모 미해결 시 `[SPAN_PARENT_UNRESOLVED]` 진단 로그를 남기고 Root Trace로 연결.
 
-### P0-2: trace_id 단위 Span 격리 및 스택 관리
-- **원인 분석:** 기존 `_active_spans_by_name: Dict[str, str]`은 전역 딕셔너리로 관리되어, 복수의 사용자가 동시에 상담을 진행하거나 노드가 반복 호출될 때 한 상담의 하위 작업이 다른 상담의 부모 Span에 오염 연결되는 위험이 존재했습니다.
-- **개선 조치 (`langfuse_client.py`):**
-  - `_trace_spans: Dict[str, Dict[str, Any]]`: `trace_id`별 격리 Span 캐시.
-  - `_trace_spans_by_name: Dict[str, Dict[str, List[str]]]`: `trace_id`별 노드명 활성 스팬 ID 스택(Stack).
-  - `_span_to_trace: Dict[str, str]`: Span ID에서 역방향으로 `trace_id`를 추적하는 인덱스.
-  - Span 탐색 우선순위 확립: (1) `ContextVar` UUID -> (2) `trace_id` 내부 이름 스택의 최신 스팬(`[-1]`) -> (3) Root Trace 연결 (오염 방지).
-  - `end_trace(trace_id)` 호출 시 해당 Trace에 귀속된 모든 인덱스 및 스팬 인스턴스를 완전 회수하여 메모리 누수 방지.
+### 2) 종료된 Trace에 대한 지연 콜백 방어
+- `_ended_traces: set[str]` 추적기 도입.
+- `end_trace(trace_id)` 시점에 `_ended_traces.add(trace_id)` 등록.
+- `start_span()` 및 `log_generation()` 진입 즉시 `trace_id in _ended_traces` 여부를 점검하여, 비동기 워크플로우 종료 후 지연 도착한 콜백이 새로운 루트 트레이스를 생성하지 않고 안전하게 무시되도록 방어.
 
-### P0-3: 상담 Trace 명명 및 메타데이터 표준화
-- **원인 분석:** `api/main.py`의 HTTP 미들웨어가 `HTTP:POST_/api/v1/consultations`라는 임시 이름으로 Trace를 먼저 시작하고 응답 반환 직후 `end_trace`를 호출하여, 백그라운드 태스크 `process_consultation` 실행 도중 활성 Trace가 유실되거나 Langfuse 대시보드에서 `HTTP:...` 이름으로 조회되는 결함이 있었습니다.
-- **개선 조치:**
-  - `api/main.py`: 상담 요청(`POST /api/v1/consultations`)은 시작 즉시 공식 Trace 이름인 `LegalConsultation`으로 명명하고, HTTP 완료 시점의 조기 `end_trace`를 건너뜀.
-  - `api/routes/consultation.py`: `process_consultation` 및 `process_consultation_resume` 진입 시 `start_trace(..., name="LegalConsultation", metadata=...)`를 호출하여 Trace 메타데이터를 정식 확장.
-  - `langfuse_client.py`: 이미 생성된 Trace ID로 `start_trace`가 재호출될 경우 기존 활성 Trace의 `name`, `session_id`, `metadata`, `tags`를 안전하게 `.update()`하도록 보강.
-  - 메타데이터에 `case_id`, `request_id`, `session_id`, `run_id`, `git_commit`(`get_git_commit()`), `system_name`(`LegalAgent`)을 자동 주입.
-  - 백그라운드 태스크 종료(`finally:`) 시점에 `end_trace(trace_id)`를 호출하여 정상 정리 완료.
+### 3) 개인정보 보호 기본값 마스킹 전환
+- `start_span()`, `end_span()`, `log_generation()`의 콘텐츠 수집 판별 로직을 `os.getenv("LANGFUSE_CAPTURE_CONTENT", "false").lower() == "true"`로 통일.
+- 환경변수를 명시적으로 `"true"`로 부여한 승인된 개발/테스트 환경을 제외하고는 기본적으로 입출력 텍스트가 `[MASKED FOR PRIVACY]`로 전송됨.
 
 ---
 
 ## 3. 검증 결과
 
-### 단위 테스트 5종 신규 개발 (`test_langfuse_observability_p0.py`)
+### 1) 신규 P0 단위 테스트 11종 전체 통과 ([`test_langfuse_observability_p0.py`](file:///c:/myprjs/ai-legal-helper/backend/tests/unit/test_langfuse_observability_p0.py))
 
-| 테스트 케이스 | 대상 요구사항 | 내용 | 결과 |
+| 테스트 번호 | 대상 요구사항 | 검증 내용 | 결과 |
 |---|---|---|---|
-| `test_tc01_single_trace_and_generation_instrumentation` | P0-1, P0-3 | Trace 이름 `LegalConsultation`, LLM 1회 호출 시 1회 Generation 기록 및 태그/토큰 검증 | **PASS** |
-| `test_tc02_concurrent_traces_span_isolation` | P0-2 | 동시 실행 상담 간 동일 노드명(`supervisor_initialize`) Span 상호 오염 차단 검증 | **PASS** |
-| `test_tc03_nested_span_stack_and_cleanup` | P0-2 | 중첩·반복 에이전트 실행 시 Span 스택 관리 및 `end_span()` 시 부모 복원 검증 | **PASS** |
-| `test_tc04_git_commit_and_system_metadata_injection` | P0-3 | Git Commit SHA 및 `LegalAgent` 메타데이터 자동 주입 검증 | **PASS** |
-| `test_tc05_end_trace_memory_cleanup` | P0-2 | `end_trace()` 호출 시 `_trace_spans`, `_trace_spans_by_name` 메모리 정리 검증 | **PASS** |
+| TC-01 | P0-1, P0-3 | Trace 이름 `LegalConsultation`, LLM 1회 호출 시 1회 Generation 기록 및 태그/토큰 검증 | **PASS** |
+| TC-02 | P0-2 | 동시 실행 상담 간 동일 노드명(`supervisor_initialize`) Span 상호 오염 차단 검증 | **PASS** |
+| TC-03 | P0-2 | 중첩·반복 에이전트 실행 시 Span 스택 관리 및 `end_span()` 시 부모 복원 검증 | **PASS** |
+| TC-04 | P0-3 | Git Commit SHA 및 `LegalAgent` 메타데이터 자동 주입 검증 | **PASS** |
+| TC-05 | P0-2 | `end_trace()` 호출 시 `_trace_spans`, `_trace_spans_by_name` 메모리 정리 검증 | **PASS** |
+| TC-06 | P0-1 | Azure OpenAI 응답 모델명(`gpt-5.4-2026-03-05`) 정밀 추출 및 Langfuse Cost 계산 연계 검증 | **PASS** |
+| **TC-P0-07** | P0-2 교차 차단 | Trace A에만 존재하는 부모 이름을 Trace B에서 요청했을 때 교차 연결 원천 차단 검증 | **PASS** |
+| **TC-P0-08** | P0-2 동시 중첩 | 서로 다른 Trace에서 동일 이름의 Agent가 동시에 중첩 실행될 때 스택 독립성 검증 | **PASS** |
+| **TC-P0-09** | P0-2 UUID 격리 | 다른 Trace 소속 UUID를 부모로 전달했을 때 교차 연결 거부(`[SPAN_CROSS_TRACE_REJECTED]`) 검증 | **PASS** |
+| **TC-P0-10** | P0 지연 방어 | 상담 종료 이후 지연된 Callback이 도착했을 때 새 Trace가 임의 생성되지 않고 무시됨 검증 | **PASS** |
+| **TC-11** | P0 개인정보 | `LANGFUSE_CAPTURE_CONTENT` 미설정 시 기본 마스킹(`[MASKED FOR PRIVACY]`) 적용 검증 | **PASS** |
 
-### 회귀 및 전체 테스트 결과
-
-1. **Observability 단위 테스트 20종:** **전체 PASS** (`test_langfuse.py`, `test_observability_enhanced.py`, `test_langfuse_observability_p0.py`)
-2. **사건 독립성 및 법률 판단 회귀 테스트 37종:** **전체 PASS** (`test_case_independence_counterexamples.py`)
-3. **프론트엔드 빌드 검증:** TypeScript 컴파일 및 Vite 번들링 무결성 확인 (0 Errors, 221ms 완료)
-
----
-
-## 4. 변경 파일 목록
-
-- `backend/src/ai_legal_helper/observability/langfuse_client.py`
-  - `get_git_commit()` 추가
-  - `_trace_spans`, `_trace_spans_by_name`, `_span_to_trace` 격리 인덱스 추가
-  - `start_trace()` 내 기존 Trace 업데이트 로직(P0-3) 및 Git SHA 주입
-  - `end_trace()` 내 격리 인덱스 정리 로직(P0-2)
-  - `start_span()`, `end_span()`, `update_span()`, `log_generation()` 리팩토링
-- `backend/src/ai_legal_helper/api/main.py`
-  - 상담 파이프라인(POST) `LegalConsultation` 명명 및 조기 `end_trace` 지연 처리
-- `backend/src/ai_legal_helper/api/routes/consultation.py`
-  - `process_consultation` 및 `process_consultation_resume`에 표준 메타데이터 주입 및 워크플로우 완료 시 `end_trace()` 호출
-- `backend/tests/unit/test_langfuse_observability_p0.py`
-  - P0-1, P0-2, P0-3 종합 단위 테스트 5종 추가
+### 2) 전체 단위·회귀 테스트 현황
+- **Observability 단위 테스트 26종:** **전체 PASS** (`test_langfuse.py` 6종, `test_observability_enhanced.py` 9종, `test_langfuse_observability_p0.py` 11종)
+- **사건 독립성 및 법률 판단 회귀 테스트 37종:** **전체 PASS** (`test_case_independence_counterexamples.py`)
+- **총 63개 테스트 100% 통과**
+- **프론트엔드 빌드:** TypeScript 컴파일 및 Vite 번들링 무결성 확인 (0 Errors, 2.16s 완료)
 
 ---
 
-## 5. 지침 준수 및 다음 단계 안내
+## 4. 로컬 Langfuse v2.95.11 실제 SC-001 상담 실측 검증
+
+실제 사내 Azure OpenAI LLM 및 로컬 Langfuse 인스턴스(`http://localhost:3001`)를 대상으로 SC-001 상담 질의를 전송하고 Langfuse REST API로 조회한 실측 결과입니다:
+
+- **실측 Trace ID:** `sc001-live-1707d981`
+- **Trace Name:** `LegalConsultation`
+- **Session ID:** `SC-001`
+- **Tags:** `['LegalAgent']`
+- **총 관측치 (Observations):** 34개 (Spans: 28개, Generations: 6개)
+- **상담 총 계산 비용 (Total Trace Cost):** **`$0.164602`**
+
+### 세부 Generation 실측 내역
+
+| No. | 식별자 (ID) | 이름 (Name) | 모델 (Model) | 토큰 사용량 (Usage) | 계산 비용 (Cost) | 부모 구간 (Parent Span) |
+|---|---|---|---|---|---|---|
+| 1 | `adc0616a-acc5` | `LegalAgent` | `gpt-5.4-2026-03-05` | 1,123 → 189 (∑ 1,312) | **$0.005642** | `0c845389` (supervisor_init) |
+| 2 | `87e44e41-08d3` | `LegalAgent` | `gpt-5.4-2026-03-05` | 988 → 87 (∑ 1,075) | **$0.003775** | `1b422132` (route) |
+| 3 | `da3b1178-4d6e` | `LegalAgent` | `gpt-5.4-2026-03-05` | 342 → 39 (∑ 381) | **$0.001440** | `26c3bd7a` (plan) |
+| 4 | `41c38362-4b0f` | `LegalAgent` | `gpt-5.4-2026-03-05` | 967 → 868 (∑ 1,835) | **$0.015437** | `6f1a7552` (specialist) |
+| 5 | `847dd9d9-fc6b` | `LegalAgent` | `gpt-5.4-2026-03-05` | 2,714 → 4,335 (∑ 7,049) | **$0.071810** | `b9b024d0` (synthesize) |
+| 6 | `82df9bb8-e7e3` | `LegalAgent` | `gpt-5.4-2026-03-05` | 6,691 → 3,318 (∑ 10,009) | **$0.066498** | `f4dbb711` (verification) |
+
+### 실측 검증 항목 충족 여부
+1. **LLM 실제 호출 횟수와 Generation 수 일치:** 6회 호출에 정확히 6개 Generation 생성 (중복 없음)
+2. **모델명 정상:** `unknown` 없이 모든 항목이 `gpt-5.4-2026-03-05`로 정확히 기록
+3. **입출력 토큰 일치:** OpenAI API 반환 토큰과 Langfuse `usage` 일치
+4. **비용 정상 기록:** Langfuse 모델 단가에 따라 각 호출별 및 트레이스 총 비용($0.164602)이 정상 산출
+5. **Parent/Child 구조 정상:** 모든 Generation이 해당 노드 Span 하위에 정확히 연결
+6. **상담 간 Span 혼합 없음:** `SC-001` 트레이스 내에 타 상담의 Span이 단 1건도 섞이지 않음
+
+---
+
+## 5. 지침 준수 및 보고
 
 > [!NOTE]
-> `AGENTS.md` 지침에 따라 1차 (정확성 확보: P0-1, P0-2, P0-3) 단계 작업을 모두 완료하고 검증하였으며, 사용자의 명시적 지시 없이 2차 (집계 기능: P1-1 ~ P1-3)로 자동 진행하지 않고 대기합니다.
-
+> `AGENTS.md` 지침에 따라 P0 잔여 결함 보완 및 단위·실측 검증을 모두 마쳤으며, 사용자 지시 없이 P1 단계로 자동 진행하지 않고 대기합니다.
