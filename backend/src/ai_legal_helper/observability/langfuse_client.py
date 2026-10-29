@@ -213,7 +213,7 @@ def get_langfuse_callback_handler(
     try:
         active_trace = _active_traces.get(trace_id) if trace_id else None
         if active_trace:
-            return CallbackHandler(
+            handler = CallbackHandler(
                 public_key=pub_key,
                 secret_key=sec_key,
                 host=host,
@@ -221,17 +221,27 @@ def get_langfuse_callback_handler(
                 metadata=combined_metadata,
                 tags=combined_tags,
             )
+        else:
+            handler = CallbackHandler(
+                public_key=pub_key,
+                secret_key=sec_key,
+                host=host,
+                session_id=session_id,
+                user_id=user_id,
+                trace_name=trace_name,
+                metadata=combined_metadata,
+                tags=combined_tags,
+            )
 
-        return CallbackHandler(
-            public_key=pub_key,
-            secret_key=sec_key,
-            host=host,
-            session_id=session_id,
-            user_id=user_id,
-            trace_name=trace_name,
-            metadata=combined_metadata,
-            tags=combined_tags,
-        )
+        # Langfuse 대시보드 Generation 목록에서 LLM 클래스명(AzureChatOpenAI) 대신 시스템명(LegalAgent)이 표기되도록 강제
+        _orig_run_name = handler.get_langchain_run_name
+        def _resolved_run_name(serialized=None, **kwargs):
+            run_name = _orig_run_name(serialized, **kwargs)
+            if run_name in ('AzureChatOpenAI', 'ChatOpenAI', '<unknown>'):
+                return sys_name
+            return run_name
+        handler.get_langchain_run_name = _resolved_run_name
+        return handler
     except Exception:
         return None
 
@@ -621,9 +631,14 @@ def log_generation(
     if not resolved_model or resolved_model == "unknown":
         resolved_model = os.getenv("AZURE_OPENAI_DEPLOYMENT_CHAT", "gpt-4o")
 
+    # Generation의 이름이 없거나 AzureChatOpenAI 등 모델 클래스명인 경우 sys_name(LegalAgent)으로 보정
+    final_name = name
+    if not final_name or final_name in ('AzureChatOpenAI', 'ChatOpenAI', '<unknown>'):
+        final_name = sys_name
+
     try:
         gen_kwargs = {
-            "name": name,
+            "name": final_name,
             "model": resolved_model,
             "start_time": start_time,
             "end_time": end_time,

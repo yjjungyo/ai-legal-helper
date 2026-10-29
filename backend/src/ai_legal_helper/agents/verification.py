@@ -37,9 +37,10 @@ CITATION_PATTERN = re.compile(
     r"\(+\s*([^\n,]+?\.(?:pdf|docx|txt))\s*,\s*p\.?\s*([0-9\-~]+|\?)\s*\)+",
     re.IGNORECASE,
 )
-# 공식 법령 조문 인용 패턴 (예: (주택임대차보호법 제6조의2), (민법 제623조))
+# 공식 법령 조문 인용 패턴 (예: (주택임대차보호법 제6조의2), (민법 제623조), 민법 제6조)
+# [P0-VER-01] 괄호 유무 및 조사 접미사와 관계없이 실제 본문에서 언급·인용된 법령 조문이 누락 없이 검색 출처와 매칭되도록 보강한다.
 STATUTE_CITATION_PATTERN = re.compile(
-    r"\(+\s*([가-힣]+(?:법률|법|시행령|시행규칙))\s+(제\s*\d+\s*조(?:\s*의\s*\d+)?)\s*\)+",
+    r"(?:\(+\s*|(?<![가-힣]))([가-힣]+(?:법률|법|시행령|시행규칙))\s+(제\s*\d+\s*조(?:\s*의\s*\d+)?)(?:\s*\)+|(?=[은는이가의을를에로서와과,.:\-\)\s\n]|\Z))",
     re.IGNORECASE,
 )
 # [GRAPH:id] 또는 [VECTOR:id] 형태의 증거 인용 패턴
@@ -60,6 +61,7 @@ _STOPWORDS = {
     "있으며", "있습니다", "합니다", "입니다", "경우", "따라", "의거", "관한", "대한",
     "법률", "규정", "조항", "문서", "근거", "출처", "참고", "가능", "필요", "해당",
     "인정", "청구", "발생", "의무", "권리", "판단", "검토", "위해", "통해", "대한",
+    "관련", "법령", "조문", "참조", "적용",
 }
 
 
@@ -168,6 +170,11 @@ VERIFICATION_PROMPT = """당신은 법률검증 Agent(Legal Verification Agent)�
      * EVIDENCE_NEEDED: 향후 입증을 위해 추가 확보가 필요한 자료
    - 의뢰인의 진술(USER_STATEMENT)을 마치 독립 증거로 증명된 사실(VERIFIED_FACT)인 것처럼 단정해서는 안 됩니다.
    - 실제 사건 증거 목록에 등록되지 않은 임의의 증거 번호(예: '증거 1', '증거 2', '증거 7호' 등)가 답변에 사용된 경우, 반드시 CITATION_INVALID 및 REVISE로 판정하고 수정 지침에 '임의 증거번호 제거 및 사용자 진술/확보 필요 자료로 정제'를 명시하세요.
+
+9. 사건 사실관계가 없는 일반 법령/조문 질의(General Statute Interpretation Query) 검증 특칙:
+   - 사건 증거, 계약서, 분쟁 사실이 등록되지 않은 일반 법령·조문 직접 해석 질의(예: "~할 수 있나요?", "~의 요건은 무엇인가요?")의 경우, 답변의 법률 규범(LEGAL_RULE) 및 핵심 결론이 [검색된 출처 목록]의 법조문 본문에 부합하면 반드시 PASS로 판정하세요.
+   - 사건 사실관계 증빙 부재, 개별 사안의 허락/동의 범위 입증 필요성, 상대방의 항변 가능성 등 변호사로서의 실무상 유의사항(Legal Caution)이나 추가 확인 필요성을 언급했다는 이유로 REVISE 또는 INSUFFICIENT(CASE_EVIDENCE_MISSING, ANSWER_REVISION_REQUIRED 등)로 판정해서는 절대 안 됩니다.
+   - 질문에 필요한 핵심 법조문이 이미 [검색된 출처 목록]에 포함되어 있다면, 불필요하게 다른 법령을 candidate_laws에 기재하거나 LEGAL_SOURCE_MISSING / LEGAL_SOURCE_INSUFFICIENT로 판정하지 마세요.
 
 [출력 형식 (반드시 순수 JSON만 출력)]
 {{
@@ -289,11 +296,18 @@ def _check_claim_supported_by_source(
         return False, f"LEGAL_EFFECT_CONTRADICTION(기간조건 {period_in_source.group(1)} vs {immediate_in_claim.group(1)})"
 
     # 3. 주장 문장과 출처 본문 간 핵심 어휘 중첩도 확인
+    # [P0-VER-01] 법령 조문 인용의 경우 조문 번호(제N조)가 출처의 조문과 정확히 일치하고
+    # 단순 법령 열거/참조 라인(예: "관련 법령: (민법 제6조)")인 경우 어휘 중첩 부족으로 오기각되지 않도록 보완한다.
     claim_tokens = _extract_meaningful_tokens(claim_segment, exclude_filename=raw_file)
     source_tokens = _extract_meaningful_tokens(combined_content)
     if claim_tokens and source_tokens:
         overlap = claim_tokens.intersection(source_tokens)
         if len(overlap) == 0:
+            is_statute_source = any(s.get("source_type") == "STATUTE" or s.get("statute_name") or s.get("article") for s in matched_sources)
+            has_matching_article = bool(claimed_articles and source_articles and claimed_articles.intersection(source_articles))
+            is_short_reference = len(claim_tokens) <= 3 or any(k in claim_segment for k in ("관련 법령", "관련법령", "근거 법조문", "근거법령", "법령 및 증거", "참조", "조문"))
+            if is_statute_source and has_matching_article and is_short_reference:
+                return True, None
             return False, "UNSUPPORTED_BY_SOURCE_CONTENT"
 
     return True, None
@@ -885,6 +899,27 @@ def run_verification(
         if result.status == "PASS" and result.reason_code != "NONE":
             result.status = "REVISE"
             result.recommended_action = "REVISE_DRAFT"
+
+        # E) [P0-VER-01] 모든 핵심 법률 주장이 검색 출처에 의해 100% 뒷받침되고 결함이 없는 경우 객관적 PASS 확정
+        # 검증 LLM이 모든 주장을 SUPPORTED로 판정하고도 단문 질의의 사실관계 증빙 부재 등을 이유로 REVISE 또는 LEGAL_SOURCE_INSUFFICIENT를 반환하는 오판정 차단
+        has_supported_core_claims = any(
+            c.grounding_status == "SUPPORTED" and c.claim_type in ("LEGAL_RULE", "LEGAL_APPLICATION")
+            for c in result.claims
+        )
+        has_no_defects = (
+            not unsupported_core_claims
+            and not uncertain_core_claims
+            and not unverified_citations
+            and not unsupported_citations
+            and not result.contradictions
+            and not unregistered_evidences
+        )
+        if has_supported_core_claims and has_no_defects and result.status == "REVISE":
+            if result.reason_code in ("LEGAL_SOURCE_INSUFFICIENT", "ANSWER_REVISION_REQUIRED", "CASE_EVIDENCE_MISSING", "NONE"):
+                logger.info("[VERIFICATION] 모든 핵심 주장이 검색 출처에 의해 온전히 뒷받침(SUPPORTED 100%)되므로 PASS로 확정합니다.")
+                result.status = "PASS"
+                result.reason_code = "NONE"
+                result.recommended_action = "FINALIZE"
 
         result.citation_audit = audit
 

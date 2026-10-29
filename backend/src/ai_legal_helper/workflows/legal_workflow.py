@@ -650,9 +650,14 @@ def verification_node(state: LegalState) -> Dict:
         except Exception as e:
             logger.warning(f"[VERIFICATION] 쟁점별 검증 중 예외 발생: {e}")
 
+    # [P0-VER-01] 검색된 원본 출처(combined_sources)가 본문 인용 매칭 실패 등으로 유실되지 않도록 보존한다.
+    # retrieved_sources는 검색된 전체 출처를 유지하고, 본문에서 검증된 인용 출처는 verified_sources로 분리 관리한다.
+    preserved_retrieved_sources = combined_sources if combined_sources else verified_sources
+
     return {
         "verification_result": result,
-        "retrieved_sources": verified_sources,
+        "retrieved_sources": preserved_retrieved_sources,
+        "verified_sources": verified_sources,
         "issue_results": issue_results_list,
     }
 
@@ -697,8 +702,19 @@ def verification_condition(state: LegalState) -> str:
             for ir in issue_res_objs
         )
         if not hilt_executed and candidate_laws and (any_statute_missing or reason_code in ("LEGAL_SOURCE_MISSING", "LEGAL_SOURCE_INSUFFICIENT")):
-            logger.info(f"[DISPOSITION] 후보 법령({candidate_laws}) 검증을 위해 HILT 법령 검색 승인 요청 노드로 분기합니다.")
-            return "statute_search_approval"
+            # [P0-VER-01] 이미 검색된 출처(retrieved_sources)에 후보 법령이 확보되어 있는지 검증하여 불필요한 외부 검색 차단
+            retrieved_statute_names = {
+                s.get("statute_name") or s.get("title") or ""
+                for s in state.get("retrieved_sources", [])
+                if isinstance(s, dict)
+            }
+            truly_missing_laws = [
+                law for law in candidate_laws
+                if not any(law in r_name for r_name in retrieved_statute_names if r_name)
+            ]
+            if truly_missing_laws:
+                logger.info(f"[DISPOSITION] 미확보 후보 법령({truly_missing_laws}) 검증을 위해 HILT 법령 검색 승인 요청 노드로 분기합니다.")
+                return "statute_search_approval"
 
         if disposition in ("DELIVERED", "CAUTIONARY"):
             return "finalize"
@@ -714,8 +730,19 @@ def verification_condition(state: LegalState) -> str:
 
     # 2. 법률 근거 부족(LEGAL_SOURCE_MISSING / LEGAL_SOURCE_INSUFFICIENT)이 원인이고 후보 법령이 식별된 경우에만 HILT 법령 검색 승인 요청 (1회 한정)
     #    주의: CASE_EVIDENCE_MISSING, EVIDENCE_CONFLICT 등 사실관계 문제는 법령 검색으로 오분기 금지
+    #    [P0-VER-01] 이미 검색된 출처(retrieved_sources)에 후보 법령이 이미 확보되어 있다면 외부 추가 검색 불필요
     if not hilt_executed and candidate_laws and reason_code in ("LEGAL_SOURCE_MISSING", "LEGAL_SOURCE_INSUFFICIENT"):
-        return "statute_search_approval"
+        retrieved_statute_names = {
+            s.get("statute_name") or s.get("title") or ""
+            for s in state.get("retrieved_sources", [])
+            if isinstance(s, dict)
+        }
+        truly_missing_laws = [
+            law for law in candidate_laws
+            if not any(law in r_name for r_name in retrieved_statute_names if r_name)
+        ]
+        if truly_missing_laws:
+            return "statute_search_approval"
 
     # 3. 최초 검증 실패 시(REVISE 또는 일반 작성오류) 1회에 한해 적응형 보강 검색(revise) 시도
     #    단, 핵심 증거 상충(EVIDENCE_CONFLICT)이 존재하더라도 초안이 이미 상충을 명시하고 조건부 답변을 작성한 경우에는
@@ -934,9 +961,20 @@ def insufficient_node(state: LegalState) -> Dict:
 
     # 2. 사실관계 및 입증 리스크 동적 안내 (사건 분야별 맞춤형 서류 안내)
     parts.append("[2. 사실관계 및 입증 리스크 안내]")
-    is_housing = any(k in q_text or k in case_ctx_text for k in ["전세", "보증금", "임대", "임차", "월세"])
-    is_labor = any(k in q_text or k in case_ctx_text for k in ["근로", "해고", "임금", "퇴직금", "노동", "출근"])
-    is_contract = any(k in q_text or k in case_ctx_text for k in ["계약", "대금", "채무", "빌려", "손해배상", "차용"])
+    # [P0-VER-01] 질문 텍스트(q_text)의 도메인을 최우선으로 고려한다.
+    # 질문에 특정 도메인(임대차/노동/계약 등) 키워드가 없는데 이전 사건 세션의 case_ctx_text에만 존재하는 경우,
+    # 이전 사건 컨텍스트로 인해 현재 질문과 무관한 안내문(예: 미성년자 질문에 임대차 안내)이 출력되는 오염을 방지한다.
+    q_housing = any(k in q_text for k in ["전세", "보증금", "임대", "임차", "월세"])
+    q_labor = any(k in q_text for k in ["근로", "해고", "임금", "퇴직금", "노동", "출근"])
+    q_contract = any(k in q_text for k in ["계약", "대금", "채무", "빌려", "손해배상", "차용"])
+
+    ctx_housing = any(k in case_ctx_text for k in ["전세", "보증금", "임대", "임차", "월세"])
+    ctx_labor = any(k in case_ctx_text for k in ["근로", "해고", "임금", "퇴직금", "노동", "출근"])
+    ctx_contract = any(k in case_ctx_text for k in ["계약", "대금", "채무", "빌려", "손해배상", "차용"])
+
+    is_housing = q_housing or (ctx_housing and not (q_labor or q_contract) and any(k in q_text for k in ["부동산", "집", "방", "이사"]))
+    is_labor = q_labor or (ctx_labor and not (q_housing or q_contract) and any(k in q_text for k in ["회사", "직장", "사장"]))
+    is_contract = q_contract or (ctx_contract and not (q_housing or q_labor))
 
     if is_housing:
         parts.append("- 법률상 권리 주장은 임대차계약서, 보증금 이체 영수증, 계약 해지 또는 갱신 거절 통지 도달 증빙(내용증명, 문자/카카오톡 등)에 기초해야 합니다.")
@@ -958,7 +996,14 @@ def insufficient_node(state: LegalState) -> Dict:
     briefing_raw = state.get("case_evidence_briefing")
     issue_results_raw = ver_res.get("issue_results") or state.get("issue_results") or []
 
-    if briefing_raw:
+    # [P0-VER-01] 현재 질문(q_text)이 사건 브리핑과 실질적으로 연관된 경우에만 사건 브리핑 기반 동적 안내를 수행한다.
+    # 사건과 무관한 일반 법령 질문(예: 미성년자 재산 처분 등)인 경우 이전 사건의 임대차 증거/쟁점 템플릿으로 오염되지 않도록 차단한다.
+    is_question_related_to_case = bool(
+        q_housing or q_labor or q_contract or not briefing_raw or
+        any(k in q_text for k in ["사건", "내 사건", "증거", "서류", "진행", "소송"])
+    )
+
+    if briefing_raw and is_question_related_to_case and issue_results_raw:
         from ai_legal_helper.case_intelligence.case_briefing import CaseEvidenceBriefing
         from ai_legal_helper.agents.issue_verifier import IssueVerificationResult
         from ai_legal_helper.workflows.final_disposition import build_dynamic_withheld_answer

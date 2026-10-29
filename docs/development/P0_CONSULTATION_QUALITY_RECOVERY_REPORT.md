@@ -151,3 +151,4 @@ backend/tests/unit/test_p0_recovery_gate3.py ....                        [100%]
 4. **지속 모니터링 방안**:
    - 로컬 Langfuse 대시보드(OSS v2.95.11)를 통해 `LegalAgent` 태그가 부착된 모든 상담의 `Total Token`, `Latency`, `verification_status` 점수를 모니터링합니다.
    - 신규 사건이나 증거가 추가될 때마다 단위 회귀 테스트 23종(R01~R22) 및 90종의 기본 테스트를 자동 실행하여 회귀를 방지합니다.
+
