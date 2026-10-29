@@ -427,7 +427,9 @@ async def run_agents_node(state: LegalState) -> Dict:
     async def _run_agent_with_ctx(c: str) -> tuple[str, str, list]:
         return await asyncio.to_thread(run_specialist_agent, c, q, brief)
 
-    tasks = [_run_agent_with_ctx(c) for c in cats]
+    # [P0-05/Gate 3] 전문 에이전트 다중 호출 병목 최적화: 핵심 최대 2개 전문 에이전트로 집중
+    selected_cats = cats[:2] if len(cats) > 2 else cats
+    tasks = [_run_agent_with_ctx(c) for c in selected_cats]
     responses = await asyncio.gather(*tasks)
     
     for cat, text, sources in responses:

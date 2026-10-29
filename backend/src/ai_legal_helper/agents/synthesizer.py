@@ -193,14 +193,15 @@ def synthesize(
 
     chat_brief = _brief_history(messages)
     question = _extract_last_question(messages)
-    findings = _format_findings(results, per_cat_limit=2400)
+    # [P0-05/Gate 3] 프롬프트 토큰 최적화: per_cat_limit 1500자, briefing 2500자 제한
+    findings = _format_findings(results, per_cat_limit=1500)
 
     # 사건 증거 브리핑 텍스트 구성 (P0-01, P0-02, P0-07)
     briefing_text = "(등록된 사건 증거 정보 없음)"
     if case_evidence_briefing:
         b_summary = case_evidence_briefing.get("formatted_summary", "")
-        if len(b_summary) > 4000:
-            briefing_text = b_summary[:4000] + "\n...(후략)"
+        if len(b_summary) > 2500:
+            briefing_text = b_summary[:2500] + "\n...(후략)"
         else:
             briefing_text = b_summary or "(등록된 사건 증거 정보 없음)"
 

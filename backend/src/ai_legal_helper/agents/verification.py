@@ -739,16 +739,17 @@ def run_verification(
     valid_source_id_set = set(audit["retrieval_source_ids"])
     rejected_id_set = set(audit["rejected_citation_ids"])
 
-    # 2. 검증 LLM용 출처 목록 포맷팅 (검색된 전체 출처를 제공하여 초안의 주장이 뒷받침되는지 검증)
+    # 2. 검증 LLM용 출처 목록 포맷팅 (P0-05/Gate 3: 상위 6개 핵심 출처 제한 및 청크 길이 400자 최적화로 토큰/지연시간 대폭 절감)
     formatted_sources = ""
-    for s in (retrieved_sources or []):
+    for s in (retrieved_sources or [])[:6]:
         fname = s.get("filename") or s.get("file_name") or s.get("source_id") or "UNKNOWN"
         page = s.get("page") or "1"
         stype = s.get("source_type") or "DOCUMENT"
-        method = s.get("retrieval_method") or "CHROMA_VECTOR"
+        cnt = str(s.get("content") or "").strip()
+        cnt_short = cnt[:400] + "..." if len(cnt) > 400 else cnt
         formatted_sources += (
-            f"- ID: {s.get('source_id')} | Type: {stype} | Method: {method} | File: {fname} (p.{page})\n"
-            f"  Content: {s.get('content')}\n\n"
+            f"- ID: {s.get('source_id')} | Type: {stype} | File: {fname} (p.{page})\n"
+            f"  Content: {cnt_short}\n\n"
         )
 
     if not formatted_sources.strip():
