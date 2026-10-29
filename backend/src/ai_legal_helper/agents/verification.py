@@ -305,8 +305,16 @@ def _check_claim_supported_by_source(
         if len(overlap) == 0:
             is_statute_source = any(s.get("source_type") == "STATUTE" or s.get("statute_name") or s.get("article") for s in matched_sources)
             has_matching_article = bool(claimed_articles and source_articles and claimed_articles.intersection(source_articles))
+            is_statute_intro = any(k in claim_segment for k in (
+                "규정", "명시", "따라", "의거", "판단", "관련", "참조", "조문", "법령", "근거", "해석", "적용", "인정", "원칙", "예외", "종합",
+                "관계", "기초", "내용", "바탕", "정리", "분석", "결론", "사안", "취지"
+            ))
             is_short_reference = len(claim_tokens) <= 3 or any(k in claim_segment for k in ("관련 법령", "관련법령", "근거 법조문", "근거법령", "법령 및 증거", "참조", "조문"))
-            if is_statute_source and has_matching_article and is_short_reference:
+            # [P0-VER-01] 법령 출처이고 조문 번호가 일치하면(Check 1의 조문 불일치가 없었으므로), 해당 조문 인용은 유효하게 뒷받침됨
+            if is_statute_source and has_matching_article:
+                return True, None
+            # 법령 문서(PDF) 자체 참조이거나 조문 도입/참조 문맥인 경우 허용
+            if is_statute_source and (is_short_reference or is_statute_intro) and not claimed_articles:
                 return True, None
             return False, "UNSUPPORTED_BY_SOURCE_CONTENT"
 
@@ -367,7 +375,9 @@ def audit_citations_and_claims(
             by_statute_article.setdefault((sname, clean_art), []).append(src)
         elif sid and "_" in sid:
             parts = sid.split("_", 1)
-            by_statute_article.setdefault((parts[0].strip(), re.sub(r"\s+", "", parts[1])), []).append(src)
+            s_art_match = ARTICLE_PATTERN.search(parts[1])
+            clean_art = re.sub(r"\s+", "", s_art_match.group(0)) if s_art_match else re.sub(r"\s+", "", parts[1])
+            by_statute_article.setdefault((parts[0].strip(), clean_art), []).append(src)
 
         if src.get("case_number"):
             known_case_numbers.add(re.sub(r"\s+", "", str(src["case_number"])))
@@ -927,6 +937,11 @@ def run_verification(
             f"[VERIFICATION] status={result.status}, claims={len(result.claims)}, "
             f"unverified={len(unverified_citations)}, unsupported={len(unsupported_citations)}"
         )
+        if unsupported_citations or unverified_citations:
+            logger.info(
+                f"[VERIFICATION_CITATIONS] unsupported={unsupported_citations}, "
+                f"unverified={unverified_citations}, reasons={rejection_reasons}"
+            )
 
         try:
             unsupported_total = sum(1 for c in result.claims if c.grounding_status != "SUPPORTED")

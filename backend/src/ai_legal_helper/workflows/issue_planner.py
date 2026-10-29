@@ -399,7 +399,12 @@ def plan_legal_issues(
         )
 
     # 5. 쟁점: 임대인의 분할반환 제안의 법적 의미 및 대응 (임대인의 일방적 분할변제 제안의 구속력 및 위험성)
-    has_installment_mention = any(k in q_compact for k in ("분할", "제안", "일부반환", "1년뒤", "합의", "동의", "일부만먼저"))
+    # [P0-VER-01] "처분할", "구분할", "배분할" 등 동사 활용형에 의한 "분할" 오탐 방지 및 분할변제 문맥 확인
+    has_installment_mention = (
+        any(k in q_compact for k in ("분할반환", "분할변제", "분할지급", "분할상환", "일부반환", "1년뒤", "일부만먼저", "나누어서"))
+        or (bool(re.search(r"(?<!처)(?<!구)(?<!배)분할", q_compact)) and any(k in q_compact for k in ("반환", "변제", "지급", "보증금", "돈", "제안", "합의", "동의")))
+        or (any(k in q_compact for k in ("제안", "합의", "동의")) and any(k in q_compact for k in ("보증금", "반환", "1년", "나중", "임대인", "집주인")))
+    )
     if has_installment_mention:
         f_ids, e_ids, e_lbls = _match_facts_and_evidences(
             ["분할", "제안", "거절", "일부반환", "문자"], briefing

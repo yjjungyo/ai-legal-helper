@@ -128,3 +128,29 @@ def test_insufficient_node_no_housing_pollution():
     assert "임대차계약서" not in final_answer, "질문과 무관한 임대차계약서 문구가 출력되지 않아야 함"
     assert "보증금 이체 영수증" not in final_answer, "질문과 무관한 보증금 영수증 문구가 출력되지 않아야 함"
 
+
+def test_no_installment_proposal_leak_for_minor_property():
+    """사용자 실측 재현 검증: '처분할' 동사에서 '분할'이 오탐되어 특례법 쟁점이 도출되는 결함 원천 차단."""
+    from ai_legal_helper.workflows.issue_planner import plan_legal_issues
+    from ai_legal_helper.case_intelligence.case_briefing import CaseEvidenceBriefing, EvidenceItemBrief, FactItemBrief
+
+    question = "법정대리인이 범위를 정하여 처분을 허락한 재산은 미성년자가 임의로 처분할 수 있나요?"
+    mock_briefing = CaseEvidenceBriefing(
+        case_id="case_001",
+        title="전세보증금 반환 청구",
+        case_type="주택임대차",
+        evidences=[
+            EvidenceItemBrief(evidence_id="ev_01", evidence_label="E01", document_name="주택임대차계약서.pdf"),
+            EvidenceItemBrief(evidence_id="ev_02", evidence_label="E02", document_name="보증금_지급_이체내역.pdf"),
+        ],
+        facts=[
+            FactItemBrief(fact_id="f_01", statement="임대차계약 체결 및 보증금 3억 지급", adjudication_status="EVIDENCE_SUPPORTED"),
+        ],
+    )
+    issues = plan_legal_issues(question, mock_briefing)
+    issue_ids = [it.issue_id for it in issues]
+    assert "ISSUE_INSTALLMENT_PROPOSAL" not in issue_ids, "미성년자 재산 처분 질의에 분할변제 쟁점이 도출되지 않아야 함"
+    for it in issues:
+        assert "소송촉진 등에 관한 특례법 제3조" not in it.required_statutes, "소송촉진법이 요구되지 않아야 함"
+        assert "소송촉진 등에 관한 특례법 제3조" not in it.candidate_statutes, "소송촉진법이 후보 법령에 포함되지 않아야 함"
+

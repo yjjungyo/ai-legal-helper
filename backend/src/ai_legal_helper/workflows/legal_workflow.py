@@ -719,6 +719,31 @@ def verification_condition(state: LegalState) -> str:
         if disposition in ("DELIVERED", "CAUTIONARY"):
             return "finalize"
         elif disposition == "WITHHELD":
+            # [P0-VER-01] 전체 법률 검증(status)이 이미 PASS이거나,
+            # 핵심 법률 주장이 검색 출처에 의해 온전히 뒷받침되고 결함(허위/미검증 인용 등)이 없는 경우:
+            # 사건 사실관계가 없는 일반 법령 질의이므로 사건 증거 부재를 이유로 답변을 폐기하지 않고 finalize로 라우팅한다.
+            audit = ver_res.get("citation_audit", {}) or {}
+            claims = ver_res.get("claims", []) or []
+            has_unsupported_core = any(
+                c.get("grounding_status") == "UNSUPPORTED" and c.get("claim_type") in ("LEGAL_RULE", "LEGAL_APPLICATION")
+                for c in claims
+            )
+            has_supported_core = any(
+                c.get("grounding_status") == "SUPPORTED" and c.get("claim_type") in ("LEGAL_RULE", "LEGAL_APPLICATION")
+                for c in claims
+            )
+            is_legally_sound = (
+                status == "PASS" or (
+                    has_supported_core
+                    and not has_unsupported_core
+                    and not audit.get("unverified_citations")
+                    and not audit.get("unsupported_citations")
+                    and reason_code not in ("LEGAL_SOURCE_MISSING", "CITATION_INVALID", "EVIDENCE_CONFLICT", "VERIFICATION_ERROR")
+                )
+            )
+            if is_legally_sound:
+                logger.info("[DISPOSITION] 쟁점 사실관계 증거는 미확보(NEEDS_EVIDENCE)이나 핵심 법리가 출처에 의해 정상 뒷받침되므로 finalize로 확정합니다.")
+                return "finalize"
             # 1회 재검토 가능하면 revise 시도
             if revision_count < 1 and not hilt_executed:
                 return "revise"
@@ -1060,7 +1085,18 @@ def finalize_node(state: LegalState) -> Dict:
     issue_results_raw = ver_res.get("issue_results") or state.get("issue_results") or []
     case_delta = None
 
-    if briefing_raw and issue_results_raw:
+    # [P0-VER-01] 질문이 사건 브리핑과 실질적으로 연관된 경우에만 assemble_grounded_answer로 사건 쟁점을 조립한다.
+    # 사건과 무관한 일반 법령 질문(미성년자 재산처분 등)은 draft_answer의 정제본을 그대로 사용하여 사건 오염을 방지한다.
+    q_text = state.get("question", "")
+    q_housing = any(k in q_text for k in ["전세", "보증금", "임대", "임차", "월세"])
+    q_labor = any(k in q_text for k in ["근로", "해고", "임금", "퇴직금", "노동", "출근"])
+    q_contract = any(k in q_text for k in ["계약", "대금", "채무", "빌려", "손해배상", "차용"])
+    is_case_relevant = bool(
+        q_housing or q_labor or q_contract or not briefing_raw or
+        any(k in q_text for k in ["사건", "내 사건", "증거", "서류", "진행", "소송"])
+    )
+
+    if briefing_raw and issue_results_raw and is_case_relevant:
         from ai_legal_helper.case_intelligence.case_briefing import CaseEvidenceBriefing
         from ai_legal_helper.agents.issue_verifier import IssueVerificationResult
         from ai_legal_helper.workflows.final_disposition import (
@@ -1072,7 +1108,7 @@ def finalize_node(state: LegalState) -> Dict:
         briefing_obj = CaseEvidenceBriefing(**briefing_raw)
         issue_res_objs = [IssueVerificationResult(**ir) for ir in issue_results_raw]
         calc_disp, _ = determine_final_disposition(issue_res_objs)
-        final_disp = calc_disp
+        final_disp = "DELIVERED" if ver_status == "PASS" else calc_disp
 
         case_delta = detect_case_delta(
             briefing=briefing_obj,
@@ -1108,9 +1144,10 @@ def finalize_node(state: LegalState) -> Dict:
 
     # Case Evidence Sources 중 최종 확정된 답변 본문(final)에 실제로 인용된 증거만 선별 (P0-10)
     claim_citations_data = []
-    if briefing_raw:
+    if briefing_raw and is_case_relevant:
+        from ai_legal_helper.case_intelligence.case_briefing import CaseEvidenceBriefing
         briefing_obj = CaseEvidenceBriefing(**briefing_raw)
-        if issue_results_raw:
+        if issue_results_raw and "issue_res_objs" in locals():
             from ai_legal_helper.workflows.final_disposition import build_claim_citations
             claim_citations_data = build_claim_citations(
                 issue_results=issue_res_objs,
