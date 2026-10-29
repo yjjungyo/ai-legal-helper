@@ -665,37 +665,50 @@ def sanitize_unverified_citations(
     unsupported = set(audit.get("unsupported_citations", []))
     bad_labels = unverified.union(unsupported)
 
-    if not bad_labels:
-        return answer
-
     cleaned = answer
-    # 미등록 가상 증거번호 우선 정제 (T05)
-    for label in bad_labels:
-        if "증거" in label or "증 제" in label:
-            cleaned = cleaned.replace(label, "[미등록 증거번호 제거]")
-    cleaned = re.sub(r"\[미등록 증거번호 제거\]\s*:\s*", "(확보 필요) ", cleaned)
-    cleaned = re.sub(r"\[미등록 증거번호 제거\]\s*", "", cleaned)
+    if bad_labels:
+        # 미등록 가상 증거번호 우선 정제 (T05)
+        for label in bad_labels:
+            if "증거" in label or "증 제" in label:
+                cleaned = cleaned.replace(label, "[미등록 증거번호 제거]")
+        cleaned = re.sub(r"\[미등록 증거번호 제거\]\s*:\s*", "(확보 필요) ", cleaned)
+        cleaned = re.sub(r"\[미등록 증거번호 제거\]\s*", "", cleaned)
 
-    for label in bad_labels:
-        if label.startswith("(") and label.endswith(")"):
-            # 미검증 (파일명.pdf, p.페이지) 인용 제거 및 이중 괄호 변형 정화
-            cleaned = cleaned.replace(label, "[근거 미확인]")
-            if label.startswith("((") and label.endswith("))"):
-                inner = label[1:-1]
-                cleaned = cleaned.replace(inner, "[근거 미확인]")
-        elif label.startswith("[") and label.endswith("]"):
-            cleaned = cleaned.replace(label, "")
-        else:
-            # 미검증 판례 사건번호 마스킹
-            cleaned = cleaned.replace(label, "[사건번호 미확인]")
+        for label in bad_labels:
+            if label.startswith("(") and label.endswith(")"):
+                # 미검증 (파일명.pdf, p.페이지) 인용 제거 및 이중 괄호 변형 정화
+                cleaned = cleaned.replace(label, "[근거 미확인]")
+                if label.startswith("((") and label.endswith("))"):
+                    inner = label[1:-1]
+                    cleaned = cleaned.replace(inner, "[근거 미확인]")
+            elif label.startswith("[") and label.endswith("]"):
+                cleaned = cleaned.replace(label, "")
+            else:
+                # 미검증 판례 사건번호 마스킹
+                cleaned = cleaned.replace(label, "[사건번호 미확인]")
 
-    # 괄호 중복 등으로 남은 패턴 정리 (예: ([근거 미확인]) 또는 [근거 미확인]) -> [근거 미확인])
-    cleaned = re.sub(r"\(+\[근거 미확인\]\)+", "[근거 미확인]", cleaned)
-    cleaned = re.sub(r"\[근거 미확인\]\)+", "[근거 미확인]", cleaned)
-    cleaned = re.sub(r"\(+\[근거 미확인\]", "[근거 미확인]", cleaned)
+        # 괄호 중복 등으로 남은 패턴 정리 (예: ([근거 미확인]) 또는 [근거 미확인]) -> [근거 미확인])
+        cleaned = re.sub(r"\(+\[근거 미확인\]\)+", "[근거 미확인]", cleaned)
+        cleaned = re.sub(r"\[근거 미확인\]\)+", "[근거 미확인]", cleaned)
+        cleaned = re.sub(r"\(+\[근거 미확인\]", "[근거 미확인]", cleaned)
 
-    # 불필요한 중복 공백 정리
+    # [P0-03/Gate 2] 빈 인용 및 연속 쉼표(', , , ,') 원천 제거 정규화
+    # 1. 빈 대괄호 제거
+    cleaned = re.sub(r"\[\s*\]", "", cleaned)
+    # 2. 연속 쉼표 정규화 (예: ", , , " -> ", ")
+    cleaned = re.sub(r",\s*(?:,\s*)+", ", ", cleaned)
+    # 3. 콜론 바로 뒤 쉼표 제거 (예: ": , " -> ": ")
+    cleaned = re.sub(r":\s*,+\s*", ": ", cleaned)
+    # 4. 줄 끝 또는 괄호/대괄호 끝의 잔여 쉼표 제거 (예: "[E01, ]" -> "[E01]")
+    cleaned = re.sub(r",\s*(?=\n|$|\)|\])", "", cleaned)
+    # 5. 줄 시작의 잔여 쉼표 제거
+    cleaned = re.sub(r"^\s*,\s*", "", cleaned, flags=re.MULTILINE)
+    # 6. 관련 증거 라인이 비어있거나 쉼표만 남은 경우 해당 라인 완전 삭제
+    cleaned = re.sub(r"^\s*[*•\-]?\s*관련\s*증거\s*:\s*(?:,\s*)*$", "", cleaned, flags=re.MULTILINE)
+
+    # 불필요한 중복 공백 및 연속 빈 줄 정리
     cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     return cleaned.strip()
 
 

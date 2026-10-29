@@ -82,13 +82,12 @@ export const ConsultationProgress: React.FC<ConsultationProgressProps> = ({
   isActionLoading = false,
   isCompleted = false,
 }) => {
-  // 최종 답변 완료 후에도 진행과정을 확인할 수 있도록 기본 펼침 상태 유지
-  const [isExpanded, setIsExpanded] = useState(true);
+  const completedMode = isCompleted || status === 'SUCCESS';
+  // [P0-04/Gate 2] 상담 완료 시 6단계 검증 카드는 한 줄 요약 카드로 기본 자동 접기, 진행 중일 때는 펼침
+  const [isExpanded, setIsExpanded] = useState(!completedMode);
 
   // 서버로부터 전달받은 단계 목록이 있으면 사용하고, 없으면 기본 목록에 상태 보정
   let steps = progress?.steps && progress.steps.length > 0 ? progress.steps : DEFAULT_STEPS;
-
-  const completedMode = isCompleted || status === 'SUCCESS';
 
   if (completedMode) {
     // 최종 완료 상태에서는 모든 단계가 완료된 상태로 단정하게 보이도록 보정

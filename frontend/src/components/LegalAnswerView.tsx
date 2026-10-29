@@ -38,7 +38,10 @@ interface SectionCategoryConfig {
 function classifySectionTitle(title: string): SectionCategoryConfig {
   const t = title.toLowerCase();
 
-  // 특수 시스템 배너 및 경고
+  // 특수 시스템 배너 및 사건 변동
+  if (t.includes('사건 변동') || t.includes('변동 사항')) {
+    return { icon: '🔄', theme: 'banner' };
+  }
   if (t.includes('insufficient') || t.includes('근거 불충분') || t.includes('검증 안내') || t.includes('판단 유보') || t.includes('withheld') || t.includes('안내:')) {
     return { icon: '🛡️', theme: 'banner' };
   }
@@ -46,25 +49,30 @@ function classifySectionTitle(title: string): SectionCategoryConfig {
     return { icon: '⚠️', theme: 'warning' };
   }
 
-  // 1. 핵심 결론
+  // 1. 핵심 결론 (P0-03)
   if (t.includes('핵심 결론') || t.includes('사건 요약') || t.includes('상담 요약') || t.includes('개요')) {
     return { icon: '📋', theme: 'summary' };
   }
-  // 2. 사건 사실관계 및 증거
-  if (t.includes('사실관계') || t.includes('확인된 사실') || t.includes('사건 사실') || t.includes('증거 자료') || t.includes('기초 사실')) {
+  // 2. 사건 사실관계 및 판단 근거 (P0-03)
+  if (t.includes('판단 근거') || t.includes('사실관계') || t.includes('확인된 사실') || t.includes('사건 사실') || t.includes('증거 자료') || t.includes('기초 사실')) {
     return { icon: '🔍', theme: 'facts' };
   }
-  // 3. 쟁점별 법률 분석
-  if (t.includes('쟁점별 법률 분석') || t.includes('법률 분석') || t.includes('법적 근거 및 심층 분석') || t.includes('법률 쟁점') || t.includes('주요 쟁점') || t.includes('쟁점')) {
+  // 3. 쟁점별 법률 분석 / 상세 법률 분석 (P0-03)
+  if (t.includes('상세 법률 분석') || t.includes('쟁점별 법률 분석') || t.includes('법률 분석') || t.includes('법적 근거 및 심층 분석') || t.includes('법률 쟁점') || t.includes('주요 쟁점') || t.includes('쟁점')) {
     return { icon: '⚖️', theme: 'issues' };
   }
-  // 4. 우선순위별 다음 행동
-  if (t.includes('우선순위') || t.includes('다음 행동') || t.includes('action plan') || t.includes('조치 사항') || t.includes('대응 방안') || t.includes('행동 가이드')) {
+  // 4. 우선순위별 다음 행동 / 우선 행동 가이드 (P0-04)
+  if (t.includes('행동 가이드') || t.includes('우선순위') || t.includes('다음 행동') || t.includes('action plan') || t.includes('조치 사항') || t.includes('대응 방안')) {
     return { icon: '🚀', theme: 'action' };
   }
-  // 5. 추가 확인사항
-  if (t.includes('추가 확인') || t.includes('확인사항') || t.includes('유의사항') || t.includes('입증 필요') || t.includes('불확실')) {
+  // 5. 미확인 사항 및 주의사항
+  if (t.includes('미확인') || t.includes('추가 확인') || t.includes('확인사항') || t.includes('유의사항') || t.includes('입증 필요') || t.includes('불확실')) {
     return { icon: '⚠️', theme: 'uncertain' };
+  }
+
+  // 6. 참고 법률 및 증거 출처 (P0-03)
+  if (t.includes('참고 법률') || t.includes('증거 출처') || t.includes('검증된 출처') || t.includes('참고 자료') || t.includes('출처 목록')) {
+    return { icon: '📚', theme: 'sources' };
   }
 
   // 보조 분류 (기존 호환성)
@@ -73,9 +81,6 @@ function classifySectionTitle(title: string): SectionCategoryConfig {
   }
   if (t.includes('분석 결과') || t.includes('법률 검토') || t.includes('종합 의견') || t.includes('판단 결과')) {
     return { icon: '💡', theme: 'analysis' };
-  }
-  if (t.includes('검증된 출처') || t.includes('참고 자료') || t.includes('출처 목록')) {
-    return { icon: '📚', theme: 'sources' };
   }
 
   return { icon: '▪', theme: 'normal' };
@@ -95,9 +100,15 @@ export function renderInlineMarkdown(
 ): React.ReactNode[] {
   if (!text) return [];
 
+  // [P0-03/Gate 2] 텍스트 내 연속 쉼표(', , ,') 및 빈 괄호 사전 정규화
+  const sanitizedText = text
+    .replace(/,\s*(?:,\s*)+/g, ', ')
+    .replace(/:\s*,+\s*/g, ': ')
+    .replace(/\[\s*\]/g, '');
+
   // 토큰 분할 정규식: **볼드**, `인라인코드`, *이탤릭*, [증거파일명], [E01] 등
-  const tokenRegex = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*|\[(?:E\d{1,3}[^\]]*|[^\]]+\.(?:pdf|docx|txt|png|jpg|jpeg))\]|\[E\d{1,3}\])/gi;
-  const parts = text.split(tokenRegex);
+  const tokenRegex = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*|\[(?:E\d{1,3}[^\]]*|[^\]+\.(?:pdf|docx|txt|png|jpg|jpeg)|[^\]\n]+)\])/gi;
+  const parts = sanitizedText.split(tokenRegex);
 
   return parts.map((part, index) => {
     if (!part) return null;
@@ -109,6 +120,10 @@ export function renderInlineMarkdown(
 
     if (evMatch) {
       const rawLabel = evMatch[1].trim();
+      // 일반 시스템 태그(예: [잠정], [1. 핵심 결론], [검증 완료], 빈 라벨 등)는 버튼이 아닌 일반 텍스트로 처리
+      if (!rawLabel || /^(잠정|\d+\.|\*|■|근거|법률|필수|권장|검증|조건부|유보)/.test(rawLabel) || rawLabel.replace(/[,\s]/g, '') === '') {
+        return <span key={index}>{part}</span>;
+      }
       let meta: CitationMeta | undefined;
       let resolvedDocName = rawLabel;
 
@@ -476,9 +491,9 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
           );
         }
 
-        // 3-1. 쟁점별 심층 법률 분석 (접기/펼치기 아코디언 지원 - Phase 4)
+        // 3-1. 쟁점별 심층 법률 분석 (접기/펼치기 아코디언 지원 - P0-03/Gate 2 기본 접힘 제공)
         if (sec.type === 'issues') {
-          const isCollapsed = !!collapsedSections[idx];
+          const isCollapsed = collapsedSections[idx] !== undefined ? collapsedSections[idx] : true;
           return (
             <div
               key={idx}

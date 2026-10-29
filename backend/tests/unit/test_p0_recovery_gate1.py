@@ -329,3 +329,4 @@ def test_r10_verified_facts_and_determinations_eliminate_contradictions(base_sc0
     assert "계약 종료 여부는 전혀 확인할 수 없습니다" not in answer
     # 확정된 기간 만료 종료 사실과 정합하게 정돈되어 사용자에게 전달됨
     assert "보증금 2억 2천만 원 반환 채무는 확정적으로 이행기" in answer
+

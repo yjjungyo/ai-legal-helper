@@ -151,8 +151,8 @@ def extract_amounts_from_text(text: str) -> Set[int]:
         amounts.add(int(raw) * 10_000)
     cleaned_text = man_pattern.sub(" ", cleaned_text)
 
-    # 4. 콤마 포함 원 단위
-    won_pattern = re.compile(r"(\d{1,3}(?:,\d{3})+)\s*원")
+    # 4. 콤마 포함 원 단위 및 5자리 이상 순수 숫자 원 단위 (P0-03/Gate 2)
+    won_pattern = re.compile(r"(\d{1,3}(?:,\d{3})+|\d{5,})\s*원")
     for m in won_pattern.finditer(cleaned_text):
         raw = m.group(1).replace(",", "")
         amounts.add(int(raw))
