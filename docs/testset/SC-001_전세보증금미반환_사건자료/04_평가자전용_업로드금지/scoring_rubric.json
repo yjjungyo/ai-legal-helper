@@ -1,0 +1,26 @@
+{
+  "total": 100,
+  "weights": {
+    "fact_extraction": 25,
+    "timeline": 15,
+    "evidence_linking": 15,
+    "conflict_and_unknowns": 15,
+    "legal_grounding": 20,
+    "next_actions": 10
+  },
+  "automatic": [
+    "fact_extraction",
+    "timeline",
+    "evidence_linking"
+  ],
+  "human_review": [
+    "conflict_and_unknowns",
+    "legal_grounding",
+    "next_actions"
+  ],
+  "fatal_errors": [
+    "허위 판례 인용",
+    "미확인 금액·기한의 확정",
+    "근거 없는 경매 전액회수 보장"
+  ]
+}
