@@ -1249,7 +1249,9 @@ def verify_claim_match(
     best_span = candidate_spans[0]
     best_span_overlap = -1
     for s in candidate_spans:
-        s_text = s.get("text_excerpt", "")
+        if not isinstance(s, dict):
+            continue
+        s_text = str(s.get("text_excerpt") or "")
         s_words = set(re.findall(r"[가-힣0-9]{2,}", s_text))
         s_overlap = len(t_words.intersection(s_words))
         if s_overlap > best_span_overlap:
@@ -1276,6 +1278,10 @@ def verify_legal_source_reference(
         Tuple[Optional[str], str, Optional[str], str, str]:
             (실제 source_id, 법령명, 조문 번호, 접지 상태, 검증 설명)
     """
+    statute_str = str(statute_str or "").strip()
+    if not statute_str:
+        return None, "", None, "UNVERIFIED_SOURCE", "조문 문자열 부재"
+
     if "제" in statute_str:
         stat_name = statute_str.split("제")[0].strip()
         art = "제" + statute_str.split("제")[1].strip()
@@ -1291,16 +1297,19 @@ def verify_legal_source_reference(
     target_art_num = art_num_match.group(1) if art_num_match else ""
 
     for s in retrieved_sources:
-        s_id = s.get("source_id", "")
-        s_title = s.get("title", "")
-        s_stat_name = s.get("statute_name", "")
-        s_art = s.get("article", "")
-        s_content = s.get("content", "")
+        if not isinstance(s, dict):
+            continue
+        # 출처 딕셔너리 내 필드가 None일 경우(예: statute_name=None) TypeError 방지를 위한 str 캐스팅
+        s_id = str(s.get("source_id") or "")
+        s_title = str(s.get("title") or "")
+        s_stat_name = str(s.get("statute_name") or "")
+        s_art = str(s.get("article") or "")
+        s_content = str(s.get("content") or "")
 
         name_match = (
-            stat_name in s_stat_name
-            or stat_name in s_title
-            or stat_name in s_id
+            (bool(stat_name) and stat_name in s_stat_name)
+            or (bool(stat_name) and stat_name in s_title)
+            or (bool(stat_name) and stat_name in s_id)
         )
         if not name_match:
             continue
@@ -1661,7 +1670,7 @@ def build_claim_citations(
                     ))
 
             # 법령 출처 검증
-            stat = act["statute"]
+            stat = act.get("statute") or ""
             source_id, stat_name, art, stat_status, stat_exp = verify_legal_source_reference(stat, retrieved_sources)
             leg_refs = [{
                 "source_id": source_id,

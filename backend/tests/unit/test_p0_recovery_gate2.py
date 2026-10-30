@@ -378,3 +378,35 @@ def test_r19_case_switching_guarantees_strict_fact_and_source_isolation(base_sce
     assert "래미안_임대차계약서.pdf" in ans_b
     assert "2억 2천" not in ans_b
     assert "E01_주택임대차계약서.pdf" not in ans_b
+
+
+def test_verify_legal_source_reference_handles_none_fields():
+    """출처 메타데이터 내 statute_name, title, article 등이 None이어도 TypeError 없이 정상 처리되는지 검증."""
+    from ai_legal_helper.workflows.final_disposition import verify_legal_source_reference
+
+    sources_with_none = [
+        {
+            "source_id": "test_src_1",
+            "statute_name": None,
+            "title": None,
+            "article": None,
+            "content": None,
+        },
+        {
+            "source_id": "민법_제6조_c1",
+            "statute_name": "민법",
+            "title": "민법 제6조",
+            "article": "제6조",
+            "content": "[민법] 제6조 처분을 허락한 재산",
+        },
+    ]
+
+    # 1. statute_name=None 인 출처가 포함되어 있어도 오류 없이 판정되어야 함
+    s_id, s_name, art, status, exp = verify_legal_source_reference("민법 제6조", sources_with_none)
+    assert status == "SUPPORTED"
+    assert s_id == "민법_제6조_c1"
+
+    # 2. statute_str 자체가 None 또는 빈 값이어도 TypeError 없이 정상 반환되어야 함
+    s_id, s_name, art, status, exp = verify_legal_source_reference(None, sources_with_none)
+    assert status == "UNVERIFIED_SOURCE"
+
