@@ -762,6 +762,7 @@ def run_verification(
     unsupported_citations = audit["unsupported_citations"]
     valid_source_id_set = set(audit["retrieval_source_ids"])
     rejected_id_set = set(audit["rejected_citation_ids"])
+    rejection_reasons = audit.get("rejection_reasons", {})
 
     # 2. 검증 LLM용 출처 목록 포맷팅 (P0-05/Gate 3: 상위 6개 핵심 출처 제한 및 청크 길이 400자 최적화로 토큰/지연시간 대폭 절감)
     formatted_sources = ""

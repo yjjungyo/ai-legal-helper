@@ -154,3 +154,56 @@ def test_no_installment_proposal_leak_for_minor_property():
         assert "소송촉진 등에 관한 특례법 제3조" not in it.required_statutes, "소송촉진법이 요구되지 않아야 함"
         assert "소송촉진 등에 관한 특례법 제3조" not in it.candidate_statutes, "소송촉진법이 후보 법령에 포함되지 않아야 함"
 
+
+def test_rejection_reasons_defined_during_verification_logging(monkeypatch):
+    """결정론적 인용 오류(unsupported/unverified) 발생 시 rejection_reasons NameError 발생 차단 검증."""
+    from unittest.mock import MagicMock
+    from ai_legal_helper.agents.verification import run_verification
+
+    # 검증 LLM Mock 응답 설정
+    mock_llm_response = MagicMock()
+    mock_llm_response.content = """{
+        "status": "PASS",
+        "reason_code": "NONE",
+        "explanation": "테스트 검증",
+        "claims": [
+            {
+                "claim": "임의의 가짜 인용 주장입니다.",
+                "claim_type": "LEGAL_RULE",
+                "fact_status": "VERIFIED_FACT",
+                "source_ids": [],
+                "grounding_status": "SUPPORTED",
+                "reason": "검증 완료"
+            }
+        ],
+        "missing_issues": [],
+        "contradictions": [],
+        "revision_instructions": [],
+        "warnings": []
+    }"""
+
+    mock_llm = MagicMock()
+    mock_llm.invoke.return_value = mock_llm_response
+
+    import ai_legal_helper.llm.gateway
+    monkeypatch.setattr(ai_legal_helper.llm.gateway, "get_llm", lambda **kwargs: mock_llm)
+
+    # 존재하지 않는 가짜 출처 (unverified_citations 유발)가 포함된 답변
+    draft_answer = "임대인은 보증금을 즉시 반환해야 합니다 (가짜법률 제999조). [GRAPH:fake_claim_999]"
+    retrieved_sources = [
+        {
+            "source_id": "민법_제6조_c1",
+            "statute_name": "민법",
+            "article": "제6조",
+            "content": "[민법] 제6조 처분을 허락한 재산",
+        }
+    ]
+
+    # NameError가 발생하지 않고 정상적으로 딕셔너리가 반환되어야 함
+    result = run_verification("테스트 질문", draft_answer, retrieved_sources)
+    assert result is not None
+    assert "explanation" in result
+    assert "rejection_reasons" not in result.get("explanation", ""), "rejection_reasons NameError가 발생하지 않아야 함"
+    assert result.get("reason_code") != "VERIFICATION_ERROR", "검증 시스템 오류가 아닌 정상 인용 검증 결과여야 함"
+
+
