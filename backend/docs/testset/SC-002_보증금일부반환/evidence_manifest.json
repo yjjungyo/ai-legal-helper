@@ -1,0 +1,62 @@
+{
+  "scenario_id": "E2E-LEASE-02",
+  "name": "계약 종료·분할반환·이체증 중복·임차권등기 신청 사건",
+  "as_of_date": "2026-10-26",
+  "case_type": "HOUSING_LEASE",
+  "lease_deposit_krw": 220000000,
+  "parties": {
+    "tenant": "김차인",
+    "landlord": "김대인"
+  },
+  "tenant_occupancy": "LIVING",
+  "source_documents": [
+    {
+      "filename": "01_주택임대차계약_주요내용.txt",
+      "phase": "A",
+      "sha256": "9e32ceec1bdaf0272b7c7e7fef6a8430f57771980a2b3d992bf1fbd7f814af55"
+    },
+    {
+      "filename": "02_전입신고_확정일자_입주확인.txt",
+      "phase": "A",
+      "sha256": "2904027ebc5acb02bdc993583d09777d8b0b1261f8bc6e624823cb0db57d65c2"
+    },
+    {
+      "filename": "03_계약종료_통지_문자대화_202606.txt",
+      "phase": "A",
+      "sha256": "2f346617785ec3fe5d7f92f470cfff4dfc46007c7054f0a2bafac4be2cfa0f23"
+    },
+    {
+      "filename": "04_최초보증금_임차인송금내역.txt",
+      "phase": "A",
+      "sha256": "9e9345cc166bc2f1f8cc24f6ce5d2561f0e98066f38e9151a0d505b0cbf4dfcd"
+    },
+    {
+      "filename": "05_1차반환_이체확인내용_20260920.txt",
+      "phase": "C",
+      "sha256": "b25205fb910c37844b3e0b4feacd5ae86f342aee84447db065c8a58696469b92"
+    },
+    {
+      "filename": "06_은행거래내역_반환2건_20261010.txt",
+      "phase": "E",
+      "sha256": "2b97394dddeba1d09925b09dcf299d729867e537f3f69a98f9fc2a776ddec2f0"
+    },
+    {
+      "filename": "07_임차권등기명령_신청접수기록_20261019.txt",
+      "phase": "F",
+      "sha256": "097e9e6896762cdf07000f41a246beb3a3927b1c96be4bb2664ec4cdb9d5d9eb"
+    },
+    {
+      "filename": "08_등기열람_확인기록_20261024.txt",
+      "phase": "G",
+      "sha256": "4b55851e57b815257ac882421a076675def96b36e0733a6ea97042d03bde278f"
+    },
+    {
+      "filename": "09_임대인_추가반환주장_문자_20261025.txt",
+      "phase": "H",
+      "sha256": "ab2850437e45306ddde37ea8012b32b472b8bb7c2f1a1ddfc11765bf6610e173"
+    }
+  ],
+  "total_expected_verified_repayments_krw_after_stage_E": 50000000,
+  "remaining_principal_krw_after_stage_E_if_all_paid_to_principal": 170000000,
+  "frozen_gold_modification": false
+}

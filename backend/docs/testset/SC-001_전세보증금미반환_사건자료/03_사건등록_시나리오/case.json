@@ -1,0 +1,49 @@
+{
+  "case_id": "SC-001",
+  "case_title": "오피스텔 전세보증금 미반환 및 후순위 가압류 분쟁",
+  "perspective": "tenant",
+  "claimant": "이수현",
+  "respondent": "박정훈",
+  "contract": {
+    "lease_start": "2022-03-01",
+    "lease_end_initial": "2024-02-28",
+    "deposit_krw": 300000000,
+    "renewal": "묵시적 갱신 주장"
+  },
+  "facts_known": {
+    "move_in": "2022-03-01",
+    "registration": "2022-03-02",
+    "fixed_date": "2022-02-22",
+    "notice": "2026-04-01",
+    "requested_move_out": "2026-09-30",
+    "occupancy_at_2026_10_15": true
+  },
+  "disputed_or_unverified": [
+    "해지 효력 발생일 및 9월30일 종료 합의 여부",
+    "2022년 이전 권리 및 공과금·조세채권 존재 여부",
+    "반환보증 가입 여부",
+    "정확한 경매 권리분석 및 배당예상액",
+    "가압류 결정문 및 피보전채권",
+    "보증금 지급·잔액에 관한 원본 대조"
+  ],
+  "evidence_ids": [
+    "E01",
+    "E02",
+    "E03",
+    "E04",
+    "E05",
+    "E06",
+    "E07",
+    "E08",
+    "E09",
+    "E10",
+    "E11",
+    "E12",
+    "E13",
+    "E14",
+    "E15",
+    "E16",
+    "E17",
+    "E18"
+  ]
+}

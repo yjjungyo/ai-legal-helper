@@ -1,0 +1,126 @@
+{
+  "dataset_id": "SC-002",
+  "type": "evidence_based_rubric",
+  "confirmed_in_documents": [
+    {
+      "id": "F01",
+      "claim": "계약금액 80,000,000원",
+      "source": [
+        "E01"
+      ]
+    },
+    {
+      "id": "F02",
+      "claim": "지급금액 합계 60,000,000원",
+      "source": [
+        "E02"
+      ],
+      "caution": "계좌 원본 진위 별도 확인"
+    },
+    {
+      "id": "F03",
+      "claim": "준공 약정일 2026-06-30",
+      "source": [
+        "E01"
+      ]
+    },
+    {
+      "id": "F04",
+      "claim": "시공업체는 공정률 85% 주장",
+      "source": [
+        "E06",
+        "E17"
+      ]
+    },
+    {
+      "id": "F05",
+      "claim": "발주자 측 점검은 공정률 65% 추정",
+      "source": [
+        "E07"
+      ]
+    },
+    {
+      "id": "F06",
+      "claim": "추가공사 15,000,000원 청구 주장",
+      "source": [
+        "E04",
+        "E05"
+      ]
+    },
+    {
+      "id": "F07",
+      "claim": "2026-06-16 작업 중단 통보",
+      "source": [
+        "E09",
+        "E17",
+        "E18"
+      ]
+    }
+  ],
+  "conflicts": [
+    {
+      "id": "C01",
+      "issue": "추가공사 승인",
+      "sources_for": [
+        "E04",
+        "E18"
+      ],
+      "sources_against": [
+        "E16",
+        "E04"
+      ],
+      "required": "전자적 진행 승인과 금액 확정 승인을 구별; 통화 원본 미제출 명시"
+    },
+    {
+      "id": "C02",
+      "issue": "기성 공정률",
+      "sources_for": [
+        "E06",
+        "E13"
+      ],
+      "sources_against": [
+        "E07"
+      ],
+      "required": "65 또는 85 확정 금지; 감정·공종별 원가 필요"
+    },
+    {
+      "id": "C03",
+      "issue": "공사 중단 귀책",
+      "sources_for": [
+        "E09",
+        "E13",
+        "E17"
+      ],
+      "sources_against": [
+        "E01",
+        "E18"
+      ],
+      "required": "계약·미지급·추가공사 합의·중단 사유 종합"
+    }
+  ],
+  "unknowns": [
+    "계약해제 통지의 상대방 도달",
+    "최종 공종별 기성고",
+    "원음과 메신저 원본의 완전성",
+    "추가공사 견적 중 원계약 포함 범위",
+    "하자 수리원인과 객관 감정",
+    "실제 영업손실 발생·금액 및 예견가능성"
+  ],
+  "forbidden_conclusions": [
+    "공정률을 75%로 평균해 확정",
+    "시공업체의 85%가 확정이라고 단정",
+    "추가공사 1500만원 승인 사실 확정",
+    "영업손실 전액 자동 인정",
+    "통화 녹취록이 원음으로 확인되었다고 표현"
+  ],
+  "scoring": {
+    "fact_extraction": 25,
+    "timeline": 10,
+    "conflict_detection": 20,
+    "citation_grounding": 15,
+    "legal_reasoning": 15,
+    "uncertainty": 10,
+    "actionability": 5
+  },
+  "grading_notes": "문서 내용과 법률 판단을 구분. 법률평가 부분은 최신 법령과 정확한 판례 원문을 검토한 전문가 감수 전 잠정 기준이다."
+}

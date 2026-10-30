@@ -1,0 +1,27 @@
+{
+  "case_id": "SC-002",
+  "previous_case_id": "SC-008",
+  "case_name": "상가 인테리어 공사 중단·추가공사비·손해배상 분쟁",
+  "perspective": "발주자",
+  "claimant": "김서윤",
+  "opponent": "주식회사 한빛인테리어(대표 박도현)",
+  "contract_price_krw": 80000000,
+  "paid_krw": 60000000,
+  "additional_work_claim_krw": 15000000,
+  "planned_completion": "2026-06-30",
+  "work_stoppage": "2026-06-16",
+  "contested_progress": [
+    65,
+    85
+  ],
+  "evidence_count": 18,
+  "case_status": "계약해제 주장·공사대금 및 손해배상 분쟁",
+  "missing_items": [
+    "원음 파일",
+    "현장 사진 원본",
+    "계약해제 통지 도달증명",
+    "독립 감정 및 공종별 원가 자료",
+    "영업손실 실현자료"
+  ],
+  "evidence_source": "01_증거PDF"
+}

@@ -1,0 +1,118 @@
+{
+  "id": "SC-001",
+  "fact_gold": [
+    {
+      "key": "deposit",
+      "value": 300000000,
+      "evidence": [
+        "E01",
+        "E02"
+      ]
+    },
+    {
+      "key": "initial_lease_end",
+      "value": "2024-02-28",
+      "evidence": [
+        "E01"
+      ]
+    },
+    {
+      "key": "move_in",
+      "value": "2022-03-01",
+      "evidence": [
+        "E03"
+      ]
+    },
+    {
+      "key": "registration_date",
+      "value": "2022-03-02",
+      "evidence": [
+        "E03"
+      ]
+    },
+    {
+      "key": "fixed_date",
+      "value": "2022-02-22",
+      "evidence": [
+        "E03"
+      ]
+    },
+    {
+      "key": "termination_notice_date",
+      "value": "2026-04-01",
+      "evidence": [
+        "E05"
+      ]
+    },
+    {
+      "key": "requested_moveout",
+      "value": "2026-09-30",
+      "evidence": [
+        "E05"
+      ]
+    },
+    {
+      "key": "bank_provisional_seizure",
+      "value": 72000000,
+      "evidence": [
+        "E09"
+      ]
+    },
+    {
+      "key": "hug_provisional_seizure",
+      "value": 120000000,
+      "evidence": [
+        "E10"
+      ]
+    },
+    {
+      "key": "still_occupying",
+      "value": true,
+      "evidence": [
+        "E16"
+      ]
+    }
+  ],
+  "claim_disagreements": [
+    {
+      "claim": "잔액을 1년 뒤 지급하겠다는 분할 제안",
+      "support": [
+        "E06",
+        "E07",
+        "E14"
+      ],
+      "opposition": [
+        "E06",
+        "E13",
+        "E14"
+      ],
+      "expected": "합의 성립 단정 금지"
+    },
+    {
+      "claim": "기존 권리가 모두 없어 경매에서 전액 손실",
+      "support": [
+        "E11"
+      ],
+      "opposition": [],
+      "expected": "대항력·선순위 여부 미확인으로 단정 금지"
+    }
+  ],
+  "mandatory_unknowns": [
+    "전입·확정일자 원본 확인",
+    "임대인 통지 도달 및 종료 합의",
+    "말소사항 포함 전체 등기부",
+    "우선권 있는 조세 및 다른 권리",
+    "매각 조건과 배당 절차",
+    "전세보증금반환보증 증서"
+  ],
+  "do_not_assert": [
+    "가압류가 근저당권과 동일하다",
+    "가압류 채권자에게 임차인이 무조건 후순위다",
+    "낙찰자는 언제나 전액을 인수한다",
+    "HUG 가압류가 곧 임차인 보증가입을 뜻한다",
+    "분할변제 합의가 이미 체결되었다",
+    "공증 없으면 소송할 수 없다",
+    "2026-09-30의 계약 종료가 확정됐다"
+  ],
+  "legal_rubric_status": "expert_review_required"
+}
