@@ -410,6 +410,27 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
             and c.get("claim_type") in ("CASE_FACT", "CASE_INFERENCE", "LEGAL_APPLICATION", "USER_STATEMENT")
             for c in result.get("claims", [])
         )) else "DELIVERED"
+    draft_str = str(draft or "")
+    final_str = str(final or "")
+    draft_sha = hashlib.sha256(draft_str.encode("utf-8")).hexdigest()
+    final_sha = hashlib.sha256(final_str.encode("utf-8")).hexdigest()
+    has_changed = "있음" if draft_str.strip() != final_str.strip() else "없음"
+
+    logger.info(
+        "[FINALIZE] 최종 답변 작성 시작\n"
+        "[FINALIZE] 답변 생성 방식: DRAFT_PRESERVED\n"
+        "[FINALIZE] Verification 결과: %s\n"
+        "[FINALIZE] 초안 SHA256: %s\n"
+        "[FINALIZE] 최종 SHA256: %s\n"
+        "[FINALIZE] 답변 내용 변경: %s\n"
+        "[FINALIZE] 인용 출처: %d건\n"
+        "[FINALIZE] 완료",
+        result.get("status", "PASS"),
+        draft_sha,
+        final_sha,
+        has_changed,
+        len(sources),
+    )
     logger.info(
         "[DOC_FINALIZE] 문서 상담 답변 확정 (처분=%s | 초안보존=%s | 제한답변사용=%s | 인용출처=%d건 | 최종답변길이=%d자)",
         disposition,

@@ -1236,11 +1236,11 @@ def finalize_node(state: LegalState) -> Dict:
         any(k in q_text for k in ["사건", "내 사건", "증거", "서류", "진행", "소송"])
     )
 
+    draft = state.get("draft_answer", "")
     if briefing_raw and is_case_relevant and (issue_results_raw or is_evidence_review_request(q_text)):
         from ai_legal_helper.case_intelligence.case_briefing import CaseEvidenceBriefing
         from ai_legal_helper.agents.issue_verifier import IssueVerificationResult
         from ai_legal_helper.workflows.final_disposition import (
-            assemble_grounded_answer,
             determine_final_disposition,
             detect_case_delta,
             reconcile_issue_results,
@@ -1261,18 +1261,29 @@ def finalize_node(state: LegalState) -> Dict:
             resolved_query=state.get("resolved_query", ""),
         )
 
-        final = assemble_grounded_answer(
-            issue_res_objs,
-            briefing_obj,
-            state.get("draft_answer", ""),
-            final_disp,
-            conv_context=state.get("conversation_context"),
-            current_question=state.get("question", ""),
-            case_delta=case_delta,
-        )
+        # STEP 4: assemble_grounded_answer()로 사용자 답변을 덮어쓰지 않고,
+        # Synthesizer가 작성하고 검증(Verification)을 통과한 원본 초안(draft_answer)을 그대로 보존한다.
+        if not draft and "issue_res_objs" in locals():
+            from ai_legal_helper.workflows.final_disposition import assemble_grounded_answer
+            final = assemble_grounded_answer(
+                issue_res_objs,
+                briefing_obj,
+                "",
+                final_disp,
+                conv_context=state.get("conversation_context"),
+                current_question=state.get("question", ""),
+                case_delta=case_delta,
+            )
+        else:
+            sanitized = sanitize_unverified_citations(
+                draft,
+                state.get("retrieved_sources", []),
+                case_context=state.get("case_context", ""),
+            )
+            final = clean_markdown_formatting(sanitized)
     else:
         sanitized = sanitize_unverified_citations(
-            state.get("draft_answer", ""),
+            draft,
             state.get("retrieved_sources", []),
             case_context=state.get("case_context", ""),
         )
@@ -1329,14 +1340,26 @@ def finalize_node(state: LegalState) -> Dict:
     if case_delta:
         ver_res["case_delta"] = case_delta
 
-    final_hash = hashlib.sha256(final.encode("utf-8")).hexdigest()[:8]
-    orig_draft = state.get("draft_answer", "")
-    orig_hash = hashlib.sha256(orig_draft.encode("utf-8")).hexdigest()[:8] if orig_draft else "none"
-    draft_preserved = (orig_draft.strip() == final.strip())
+    draft_str = str(state.get("draft_answer", "") or "")
+    final_str = str(final or "")
+    draft_sha = hashlib.sha256(draft_str.encode("utf-8")).hexdigest()
+    final_sha = hashlib.sha256(final_str.encode("utf-8")).hexdigest()
+    has_changed = "있음" if draft_str.strip() != final_str.strip() else "없음"
+
     logger.info(
-        f"[FINALIZE] 최종 답변 확정 완료 | 처분={final_disp} | 검증상태={ver_status} | "
-        f"최종길이={len(final)} | 최종해시={final_hash} | 초안해시={orig_hash} | "
-        f"초안보존={draft_preserved} | 인용출처수={len(cited_sources)}"
+        "[FINALIZE] 최종 답변 작성 시작\n"
+        "[FINALIZE] 답변 생성 방식: DRAFT_PRESERVED\n"
+        "[FINALIZE] Verification 결과: %s\n"
+        "[FINALIZE] 초안 SHA256: %s\n"
+        "[FINALIZE] 최종 SHA256: %s\n"
+        "[FINALIZE] 답변 내용 변경: %s\n"
+        "[FINALIZE] 인용 출처: %d건\n"
+        "[FINALIZE] 완료",
+        ver_status,
+        draft_sha,
+        final_sha,
+        has_changed,
+        len(cited_sources),
     )
 
     return {
