@@ -985,6 +985,32 @@ def revise_node(state: LegalState) -> Dict:
     merged_sources = list(state.get("retrieved_sources", []) or [])
     existing_ids = {s.get("source_id") for s in merged_sources if s.get("source_id")}
 
+    repair_targets_raw = ver_res.get("repair_targets") or []
+    preserved_points = ver_res.get("preserved_points") or []
+
+    # STEP 5: 결함이 있는 특정 문장만 핀포인트로 교체하고 정상 문장과 판단은 100% 보존한다.
+    if repair_targets_raw:
+        from ai_legal_helper.agents.qa_checker import repair_draft_answer, RepairTarget
+        target_objs = [RepairTarget(**rt) if isinstance(rt, dict) else rt for rt in repair_targets_raw]
+        repaired_draft, repair_meta = repair_draft_answer(
+            draft_answer=draft,
+            repair_targets=target_objs,
+            preserved_points=preserved_points,
+            case_context=case_ctx,
+            retrieved_sources=merged_sources,
+        )
+        rev_hash = hashlib.sha256(repaired_draft.encode("utf-8")).hexdigest()[:8]
+        logger.info(
+            f"[REVISE] 부분 교정(Targeted Repair) 완료 | 길이={len(repaired_draft)} | 해시={rev_hash} | "
+            f"수정문장={repair_meta.get('replaced_count')}/{len(target_objs)}건 | revision_count={state.get('revision_count', 0) + 1}"
+        )
+        return {
+            "draft_answer": repaired_draft,
+            "retrieved_sources": merged_sources,
+            "revision_count": state.get("revision_count", 0) + 1,
+            "revision_method": "TARGETED_REPAIR",
+        }
+
     # 1. Adaptive Re-Retrieval (보강 검색 질의 생성 및 추가 RAG 검색 수행)
     re_query_parts = [question] + list(missing_issues) + list(instructions)
     re_query = " ".join([p for p in re_query_parts if p]).strip()

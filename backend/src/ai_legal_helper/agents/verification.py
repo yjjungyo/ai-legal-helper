@@ -187,6 +187,8 @@ class VerificationOutput(BaseModel):
     citation_audit: Dict[str, Any] = Field(default_factory=dict, description="결정론적 인용 검증 및 Langfuse 추적 메트릭")
     question_coverage: List[Dict[str, Any]] = Field(default_factory=list, description="현재 질문의 각 요청에 대한 question, answered(bool), reason 목록")
     consistency_checks: Dict[str, Dict[str, Any]] = Field(default_factory=dict, description="시간 순서·의사표시 내용·증명 수준의 passed(bool), reason, source_ids 점검")
+    repair_targets: List[Dict[str, Any]] = Field(default_factory=list, description="부분 교정 대상 특정 문장 및 지침")
+    qa_summary: Dict[str, Any] = Field(default_factory=dict, description="경량 QA 검사 종합 결과")
 
     @field_validator("status", mode="before")
     @classmethod
@@ -938,6 +940,38 @@ def run_verification(
     rejected_id_set = set(audit["rejected_citation_ids"])
     rejection_reasons = audit.get("rejection_reasons", {})
 
+    # STEP 5: 결정론적 경량 QA 검사 1차 실행 (출처·날짜·금액·질문충족·법률위험)
+    from ai_legal_helper.agents.qa_checker import check_deterministic_qa
+    qa_check = check_deterministic_qa(
+        question=question,
+        draft_answer=draft_answer,
+        retrieved_sources=retrieved_sources,
+        case_context=case_context,
+    )
+
+    # 단순 법령 질의이면서 결정론적 검사 ALL PASS인 경우: 불필요한 LLM 호출을 건너뛰고 조기 PASS 확정
+    if not qa_check.requires_llm_eval and qa_check.status == "PASS":
+        logger.info("[VERIFICATION] 경량 검사 ALL PASS: LLM 검증 생략 및 초안 즉시 확정")
+        from ai_legal_helper.rag.grounding_context import format_grounding_sources
+        _, source_manifest = format_grounding_sources(retrieved_sources)
+        return {
+            "status": "PASS",
+            "reason_code": "NONE",
+            "citation_audit": qa_check.citation_audit,
+            "preserved_points": qa_check.preserved_points,
+            "repair_targets": [],
+            "qa_summary": qa_check.model_dump(),
+            "claims": [],
+            "warnings": [],
+            "missing_issues": [],
+            "contradictions": [],
+            "revision_instructions": [],
+            "candidate_laws": [],
+            "legal_search_requests": [],
+            "recommended_action": "FINALIZE",
+            "source_manifest": source_manifest,
+        }
+
     # 검색 순서 때문에 뒤에 추가된 공식 법령이 사라지지 않도록 전체 본문을 전달한다.
     from ai_legal_helper.rag.grounding_context import format_grounding_sources
     from ai_legal_helper.agents.document_verification_prompt import DOCUMENT_VERIFICATION_PROMPT
@@ -1487,7 +1521,12 @@ def run_verification(
             })
         except Exception:
             pass
-        return {**result.model_dump(), "source_manifest": source_manifest}
+        out_dict = result.model_dump()
+        # STEP 5: 경량 QA 검사 결과(repair_targets 및 qa_summary) 결합
+        if qa_check.repair_targets and not out_dict.get("repair_targets"):
+            out_dict["repair_targets"] = [rt.model_dump() for rt in qa_check.repair_targets]
+        out_dict["qa_summary"] = qa_check.model_dump()
+        return {**out_dict, "source_manifest": source_manifest}
 
     except Exception as e:
         if not error_type:
