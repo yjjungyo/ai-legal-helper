@@ -1513,7 +1513,7 @@ def reconcile_case_conflicts(
             .join(EvidenceDocument, EvidenceLink.evidence_id == EvidenceDocument.id)
             .filter(
                 EvidenceDocument.case_id == cid,
-                EvidenceLink.link_type.in_(["CONTRADICTS", "POTENTIAL_CONFLICT"]),
+                EvidenceLink.link_type.in_(["CONTRADICTS", "CONTRADICTION", "POTENTIAL_CONFLICT"]),
             )
             .all()
         )
@@ -1563,7 +1563,18 @@ def reconcile_case_conflicts(
                     claim_id=claim.id,
                     enable_llm_verification=False,
                 )
-                if decision.status != link.link_type:
+                # 판정 상태명(CONTRADICTION)과 DB 관계명(CONTRADICTS)은 별도 규약이다.
+                # 두 값을 직접 비교하면 이미 올바른 링크도 매번 변경 대상으로 처리되고,
+                # DB에 미지원 타입(CONTRADICTION)을 기록하여 Neo4j 동기화에서 유실될 수 있다.
+                desired_link_type = (
+                    "CONTRADICTS" if decision.status == "CONTRADICTION" else decision.status
+                )
+                logger.debug(
+                    "[CONFLICT_RECONCILE] claim=%s fact=%s stored_link=%s detected=%s reason=%s expected_link=%s",
+                    claim.id, target_fact.id, link.link_type, decision.status,
+                    decision.reason_code, desired_link_type,
+                )
+                if desired_link_type != link.link_type:
                     if decision.status == "CONTRADICTION":
                         changes.append({
                             "entity": "EvidenceLink",
@@ -1572,7 +1583,7 @@ def reconcile_case_conflicts(
                             "after": "CONTRADICTION",
                             "reason_code": decision.reason_code,
                         })
-                        link.link_type = "CONTRADICTION"
+                        link.link_type = "CONTRADICTS"
                         case_changed = True
                     elif decision.status == "POTENTIAL_CONFLICT":
                         changes.append({
@@ -1705,6 +1716,7 @@ def reconcile_case_conflicts(
         db.flush()
 
         # 3. 더 이상 승인된 CONTRADICTS 링크가 남아 있지 않은 DISPUTED Fact 복원
+        restored_fact_ids: Set[str] = set()
         for fact in case_facts:
             if fact.verification_status == "DISPUTED":
                 remaining_contra = (
@@ -1731,8 +1743,44 @@ def reconcile_case_conflicts(
                         "after": new_ver_status,
                     })
                     fact.verification_status = new_ver_status
+                    restored_fact_ids.add(fact.id)
                     restored_facts += 1
                     case_changed = True
+
+        # 오탐 링크를 제거했는데 FactAdjudication만 '실제 상충'으로 남으면
+        # 법률 상담 브리핑이 잘못된 분쟁 사실을 계속 주입한다.
+        # 이번 복구에서 실제로 DISPUTED가 해제된 Fact에 한해 심리 상태를 함께 복원한다.
+        if restored_fact_ids:
+            from ai_legal_helper.database.models import FactAdjudication
+            for adj in db.query(FactAdjudication).filter(
+                FactAdjudication.case_id == cid,
+                FactAdjudication.fact_id.in_(restored_fact_ids),
+                FactAdjudication.adjudication_status == "GENUINELY_DISPUTED",
+            ).all():
+                restored_fact = fact_map.get(adj.fact_id)
+                if not restored_fact:
+                    continue
+                if restored_fact.source_type in ("DOCUMENT_SUPPORTED", "EVIDENCE_DERIVED"):
+                    restored_adj_status = "EVIDENCE_SUPPORTED"
+                elif restored_fact.source_type == "PARTY_ALLEGATION":
+                    restored_adj_status = "PARTY_ALLEGED"
+                else:
+                    restored_adj_status = "EVIDENCE_INCOMPLETE"
+                changes.append({
+                    "entity": "FactAdjudication",
+                    "id": adj.id,
+                    "before": "GENUINELY_DISPUTED",
+                    "after": restored_adj_status,
+                    "reason_code": "FALSE_CONTRADICTION_LINK_REMOVED",
+                })
+                adj.adjudication_status = restored_adj_status
+                adj.primary_relation = "DIFFERENT_CONTEXT"
+                adj.contradicting_evidence_ids = []
+                adj.adjudication_basis = (
+                    "재검증에서 기존 상충 관계가 기각되어 분쟁 상태를 복원했습니다. "
+                    "확정 여부는 해당 사실의 원래 증거 신뢰 수준을 따릅니다."
+                )
+                case_changed = True
 
         if case_changed:
             affected_cases.append(cid)

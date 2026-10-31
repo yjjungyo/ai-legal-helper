@@ -34,6 +34,45 @@ from ai_legal_helper.api.dependencies import get_current_user, get_case_for_user
 router = APIRouter(tags=["graph"])
 
 
+def _validated_graph_contradictions(case: Case, db: Session) -> list[dict]:
+    """PostgreSQL 원본과 현재 상충 판정기를 대조한 실제 Fact 상충만 그래프 UI에 전달한다.
+
+    오래된 Neo4j CONTRADICTS 엣지나 과거 오탐 EvidenceLink를 그대로 신뢰하지 않는다.
+    검증된 쌍만 반환하므로 패널과 연결선이 같은 판정 결과를 공유한다.
+    """
+    from ai_legal_helper.api.routes.evidence import get_evidence_conflicts
+    from ai_legal_helper.observability.logging_config import get_logger
+
+    logger = get_logger(__name__)
+    verified = get_evidence_conflicts(case=case, db=db).get("contradictions", [])
+    items = []
+    for conflict in verified:
+        # EVENT/LEGAL_ISSUE 등은 현재 Fact 비교 엔진으로 검증되지 않으므로
+        # 기존 링크 타입만으로 확정 상충으로 표시하지 않는다.
+        if str(conflict.get("target_type", "")).upper() != "FACT":
+            continue
+        claim_id = conflict.get("claim_id")
+        fact_id = conflict.get("target_id")
+        if not claim_id or not fact_id:
+            continue
+        items.append({
+            "target_type": "Fact",
+            "target_id": fact_id,
+            "target_content": conflict.get("target_description") or "",
+            "contradicting_id": claim_id,
+            "contradicting_type": "EvidenceClaim",
+            "contradicting_statement": conflict.get("claim_statement") or "",
+            "supporting_claim_ids": [],
+            "reason_code": conflict.get("reason_code"),
+            "explanation": conflict.get("explanation"),
+        })
+    logger.info(
+        "[GRAPH_CONFLICT_AUDIT] 사건 상충 그래프 재검증: 조회=%d건, 실제 Fact 모순=%d건, 제외=%d건",
+        len(verified), len(items), len(verified) - len(items),
+    )
+    return items
+
+
 @router.get("/graph/health")
 def graph_health():
     """Neo4j 연결 가능 여부를 반환한다."""
@@ -79,7 +118,16 @@ def get_graph(
     driver = get_neo4j_driver()
     if driver is None:
         return {"available": False, "case_id": case.id, "nodes": [], "edges": []}
-    return {"available": True, **GraphRAGRetriever(driver).get_case_graph(case.id, include_pending)}
+    graph = GraphRAGRetriever(driver).get_case_graph(case.id, include_pending)
+    confirmed = _validated_graph_contradictions(case, db)
+    confirmed_pairs = {(item["contradicting_id"], item["target_id"]) for item in confirmed}
+    # 시각화용 엣지 역시 현재 원본 사실과 재대조해야 한다.
+    graph["edges"] = [
+        edge for edge in graph.get("edges", [])
+        if edge.get("type") != "CONTRADICTS"
+        or (edge.get("source"), edge.get("target")) in confirmed_pairs
+    ]
+    return {"available": True, **graph}
 
 
 @router.get("/cases/{case_id}/graph/search")
@@ -139,11 +187,12 @@ def analyze_graph(case: Case = Depends(get_case_for_user), db: Session = Depends
     """증거 공백(승인 증거 미연결 사실/쟁점)과 상충 증거를 반환한다."""
     driver = get_neo4j_driver()
     r = GraphRAGRetriever(driver)
+    confirmed = _validated_graph_contradictions(case, db)
     if driver is None:
-        pg_gaps, pg_contra = r._find_pg_gaps_and_contradictions(db, case.id)
-        return {"available": False, "evidence_gaps": pg_gaps, "contradictions": pg_contra}
+        pg_gaps, _ = r._find_pg_gaps_and_contradictions(db, case.id)
+        return {"available": False, "evidence_gaps": pg_gaps, "contradictions": confirmed}
     return {
         "available": True,
         "evidence_gaps": r.find_evidence_gaps(case.id),
-        "contradictions": r.find_contradictions(case.id),
+        "contradictions": confirmed,
     }
