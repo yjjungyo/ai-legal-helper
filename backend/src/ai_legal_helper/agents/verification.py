@@ -1186,6 +1186,13 @@ def run_verification(
                 "확정되었다.", "확정되었습니다.", "소멸하였다.", "소멸하였습니다.",
                 "해지되었다.", "해지되었습니다.", "무효이다.", "무효입니다.",
             )
+            # 계약서 원문 조항 및 약정에 직접 기초한 권리·의무 주장 판별용 키워드
+            _CONTRACT_TERMS_KEYWORDS = (
+                "계약서상", "계약상", "약정에 따라", "계약에 따라", "계약서 제", "계약서 내용",
+                "계약 조항", "계약의 내용", "특약", "계약서에 따라", "약정한 바에", "계약에 명시",
+                "계약서 기준", "계약서 약정", "약정상", "계약 종료 시", "계약종료 시", "계약서 기재",
+                "반환 약정", "반환의무 약정", "명도 약정", "차임 약정", "보증금 약정", "특약사항",
+            )
 
             def _is_case_risk_inference_claim(c_obj: ClaimVerification, norm_draft_text: str) -> bool:
                 """사건 증거에 기반한 회수 위험·자금사정 추론인지(단정적 법률효과 주장과 구별) 판별한다."""
@@ -1202,6 +1209,14 @@ def run_verification(
                 has_risk_marker = any(marker in c_text for marker in _INFERENCE_RISK_MARKERS)
                 return has_limit_in_draft or has_risk_marker
 
+            def _is_contract_terms_claim(c_obj: ClaimVerification) -> bool:
+                """계약서 원문 약정 및 조항에 직접 기초한 권리·의무 주장인지(법령 효과와 구별되는 계약사실) 판별한다."""
+                if not case_evidence_ids.intersection(c_obj.source_ids):
+                    return False
+                c_text = (c_obj.claim or "").strip()
+                reason_text = (c_obj.reason or "").strip()
+                return any(kw in c_text or kw in reason_text for kw in _CONTRACT_TERMS_KEYWORDS)
+
             for claim_obj in result.claims:
                 # 계약서·당사자 메모를 법령 근거로 표시한 검증 응답도 그대로 신뢰하지 않는다.
                 # 단, 사건 증거에 기반한 회수 위험·자금사정 정황 추론(fact_status=INFERENCE)을
@@ -1217,6 +1232,13 @@ def run_verification(
                             claim_obj.inference_basis = claim_obj.reason.strip() or "등록된 사건 자료 기반 위험·정황 추론"
                         if not claim_obj.inference_limit.strip() or _norm_quote(claim_obj.inference_limit) not in norm_draft:
                             claim_obj.inference_limit = claim_obj.claim.strip()
+                    elif (claim_obj.grounding_status in ("SUPPORTED", "UNCERTAIN")
+                          and _is_contract_terms_claim(claim_obj)):
+                        # 계약서 원문 약정 및 조항에 직접 기초한 주장은 계약서(CASE_EVIDENCE)로 뒷받침되는 처분문서 약정 사실이다.
+                        # LLM 검증기가 LEGAL_APPLICATION/LEGAL_RULE로 분류했더라도 CASE_FACT로 정규화하여 허위 결함 강등을 방지한다.
+                        claim_obj.claim_type = "CASE_FACT"
+                        claim_obj.fact_status = "VERIFIED_FACT"
+                        claim_obj.grounding_status = "SUPPORTED"
                     elif claim_obj.grounding_status == "SUPPORTED":
                         claim_obj.grounding_status = "UNSUPPORTED"
                         claim_obj.reason = (

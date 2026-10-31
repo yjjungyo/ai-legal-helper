@@ -404,7 +404,9 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
         final = draft
         cited_ids = {sid for claim in result.get("claims", [])
                      if claim.get("grounding_status") == "SUPPORTED" for sid in claim.get("source_ids", [])}
-        sources = [s for s in sources_list if s.get("source_id") in cited_ids]
+        sources = [s for s in sources_list if s.get("source_id") in cited_ids] or [
+            s for s in sources_list if s.get("source_id") in draft or str(s.get("filename", "")) in draft
+        ]
         disposition = "CAUTIONARY" if (limited_used or any(
             c.get("fact_status") in ("CONFLICTED", "EVIDENCE_NEEDED", "INFERENCE", "USER_STATEMENT")
             and c.get("claim_type") in ("CASE_FACT", "CASE_INFERENCE", "LEGAL_APPLICATION", "USER_STATEMENT")
