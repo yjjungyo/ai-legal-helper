@@ -361,10 +361,6 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
             agent_usage=agent_usage,
         )
         
-        logger.info(
-            f"[상담 분석 완료] 6단계 분석 및 검증 완료 (요청: {request_id[:8]} | 소요: {elapsed_ms:.1f}ms | "
-            f"처분: {resp.answer_status} | 검증: {resp.verification_status} | 인용출처: {len(resp.sources)}건)"
-        )
         resp = _consultations[request_id]
         if hasattr(result, "get"):
             if result.get("conversation_id"):
@@ -466,6 +462,11 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
             for c in (result.get("claim_citations") or (resp.verification_result or {}).get("claim_citations") or [])
         ]
         resp.case_delta = result.get("case_delta") or (resp.verification_result or {}).get("case_delta")
+
+        logger.info(
+            f"[상담 분석 완료] 6단계 분석 및 검증 완료 (요청: {request_id[:8]} | 소요: {elapsed_ms:.1f}ms | "
+            f"처분: {resp.answer_status} | 검증: {resp.verification_status} | 인용출처: {len(resp.sources)}건)"
+        )
 
         # 요구사항 5: Langfuse 루트 Span/Trace에 최종 출처·검증·실행시간·토큰 요약 기록 (P2-02)
         try:

@@ -153,3 +153,89 @@ def test_case_memory_in_conversation_context():
     assert "확정사실 12건" in prompt_text
     assert "최신 Fact 및 등록 증거가 과거 답변과 충돌할 경우 최신 증거가 항상 우선합니다" in prompt_text
 
+
+@pytest.mark.asyncio
+async def test_process_consultation_completion_logging(monkeypatch):
+    """process_consultation 정상 종료 시 UnboundLocalError 없이 로그가 기록되고 응답이 매핑되는지 검증한다."""
+    from unittest.mock import AsyncMock, MagicMock
+    from ai_legal_helper.api.routes.consultation import process_consultation
+    from ai_legal_helper.api.schemas.consultation import ConsultationRequest
+
+    req_id = "req-test-resp-unbound"
+    user = MagicMock()
+    user.id = "user-123"
+
+    req = ConsultationRequest(
+        question="임대차 보증금 반환 기한은 언제인가요?",
+        case_id="case-test-123",
+    )
+
+    conv_context = ConversationContext(
+        conversation_id="conv-test-123",
+        case_id="case-test-123",
+        current_question=req.question,
+        turn_index=1,
+    )
+
+    init_resp = ConsultationResponse(
+        request_id=req_id,
+        conversation_id="conv-test-123",
+        turn_index=1,
+        trace_id="trace-test-123",
+        status="IN_PROGRESS",
+        execution_status="IN_PROGRESS",
+        verification_status="UNVERIFIED",
+        answer_status="WITHHELD",
+        routing_status=None,
+        question=req.question,
+        case_id=req.case_id,
+        created_at="2026-10-31T19:00:00Z",
+        progress=create_initial_progress(req_id, "2026-10-31T19:00:00Z"),
+    )
+    _consultations[req_id] = init_resp
+
+    mock_result = {
+        "status": "SUCCESS",
+        "answer": "계약 만료 시 즉시 반환해야 합니다.",
+        "final_disposition": "DELIVERED",
+        "verification_result": {"status": "PASS"},
+        "cited_sources": [
+            {
+                "source_type": "STATUTE",
+                "statute_name": "주택임대차보호법",
+                "article": "제3조",
+                "title": "대항력 등",
+                "source_id": "STATUTE-001",
+            }
+        ],
+    }
+
+    monkeypatch.setattr(
+        "ai_legal_helper.api.routes.consultation.run_legal_consultation",
+        AsyncMock(return_value=mock_result),
+    )
+    mock_db = MagicMock()
+    mock_db.query.return_value.filter.return_value.first.return_value = MagicMock()
+    mock_session_ctx = MagicMock()
+    mock_session_ctx.__enter__.return_value = mock_db
+    monkeypatch.setattr(
+        "ai_legal_helper.api.routes.consultation.SessionLocal",
+        MagicMock(return_value=mock_session_ctx),
+    )
+
+    # 실행: UnboundLocalError가 발생하지 않고 온전히 통과해야 함
+    await process_consultation(
+        request_id=req_id,
+        trace_id="trace-test-123",
+        req=req,
+        conv_context=conv_context,
+    )
+
+    saved_resp = _consultations[req_id]
+    assert saved_resp.status == "SUCCESS"
+    assert saved_resp.answer_status == "DELIVERED"
+    assert saved_resp.verification_status == "PASS"
+    assert len(saved_resp.sources) == 1
+    assert saved_resp.sources[0].statute_name == "주택임대차보호법"
+
+
