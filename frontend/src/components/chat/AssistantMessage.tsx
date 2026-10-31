@@ -45,6 +45,45 @@ function formatTime(isoString?: string): string {
 }
 
 /**
+ * 최종 검증 판정 배지 렌더러 (VERIFIED, CAUTIONARY, WITHHELD)
+ */
+function renderDispositionBadge(disposition?: string) {
+  if (!disposition) return null;
+  switch (disposition) {
+    case 'VERIFIED':
+    case 'DELIVERED':
+      return (
+        <span
+          className="badge"
+          style={{ backgroundColor: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', fontSize: '0.76em', fontWeight: 600 }}
+        >
+          ✓ 검증 완료
+        </span>
+      );
+    case 'CAUTIONARY':
+      return (
+        <span
+          className="badge"
+          style={{ backgroundColor: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', fontSize: '0.76em', fontWeight: 600 }}
+        >
+          ⚠️ 조건부 안내
+        </span>
+      );
+    case 'WITHHELD':
+      return (
+        <span
+          className="badge"
+          style={{ backgroundColor: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', fontSize: '0.76em', fontWeight: 600 }}
+        >
+          🛡️ 판단 유보
+        </span>
+      );
+    default:
+      return null;
+  }
+}
+
+/**
  * 법률 비서 답변 메시지 컴포넌트
  */
 export const AssistantMessage: React.FC<AssistantMessageProps> = ({
@@ -93,7 +132,7 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
           <div className="chat-assistant-header">
             <div className="chat-assistant-title-group">
               <span className="chat-assistant-author">AI 법률 비서</span>
-              {/* STEP 6 지시서 6.4 A: 내부 검증 완료/조건부/판단유보 배지는 기본 화면에서 제거하고 본문 문장으로 자연스럽게 설명 */}
+              {!isRunningOrApproval && !isFailed && renderDispositionBadge(message.final_disposition || message.answer_status)}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -116,8 +155,8 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
             </div>
           </div>
 
-          {/* 콘텐츠 영역: 진행 중일 때만 간결한 진행 안내 카드 표시 (지시서 6.4 B) */}
-          {isRunningOrApproval && !isFailed && (
+          {/* 콘텐츠 영역: 6단계 진행과정 추적 카드 (진행 중일 때는 실시간 단계별 진행 표시, 완료 시 접기/펼치기 카드로 보존) */}
+          {(isRunningOrApproval || message.progress || message.status === 'SUCCESS' || message.answer) && !isFailed && (
             <ConsultationProgress
               progress={message.progress}
               status={message.status}
@@ -126,7 +165,7 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
               onReject={onReject}
               requestId={message.request_id}
               isActionLoading={isActionLoading}
-              isCompleted={false}
+              isCompleted={!isRunningOrApproval && !isFailed}
             />
           )}
 
