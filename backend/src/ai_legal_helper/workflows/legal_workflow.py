@@ -312,10 +312,15 @@ def _collect_graph_evidence(db, case_id: str, question: str) -> Dict[str, Any]:
             format_graph_context,
             graph_paths_to_sources,
             evidence_hits_to_sources,
+            filter_verified_graph_contradictions,
         )
         driver = get_neo4j_driver()
         # Neo4j 드라이버가 None이더라도 search_hybrid 내부에서 PostgreSQL 구조화 증거 폴백을 수행한다.
         result = GraphRAGRetriever(driver).search_hybrid(case_id, question, db=db)
+        # 검색 인덱스나 과거 그래프의 CONTRADICTS 관계를 법률 상담 근거로 그대로 사용하지 않는다.
+        result["contradictions"] = filter_verified_graph_contradictions(
+            db, case_id, result.get("contradictions", []),
+        )
         checked = (
             validate_graph_paths(db, case_id, result.get("traversal_paths", []))
             if result.get("traversal_paths")

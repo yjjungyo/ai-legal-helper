@@ -6,6 +6,8 @@
 FastAPI BackgroundTasks를 사용하여 텍스트/AI 추출 작업이 메인 스레드를 블로킹하지 않도록 한다.
 """
 
+import logging
+
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 from typing import Any, Dict, List, Optional
@@ -48,6 +50,8 @@ from ai_legal_helper.case_intelligence.conflict_detector import (
     evaluate_claim_conflicts,
 )
 from ai_legal_helper.database.graph_sync import safe_sync_case
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/cases/{case_id}/evidence", tags=["evidence"])
 
@@ -242,6 +246,11 @@ def get_evidence_conflicts(
                     fact_doc_name=target_doc_name,
                     claim_id=claim.id,
                     enable_llm_verification=False,
+                )
+                logger.info(
+                    "[EVIDENCE_CONFLICT_CHECK] link=%s claim=%s fact=%s stored=%s evaluated=%s reason=%s",
+                    link.id, claim.id, fact.id, link.link_type,
+                    decision.status, decision.reason_code,
                 )
                 if decision.status not in ("CONTRADICTION", "POTENTIAL_CONFLICT"):
                     continue

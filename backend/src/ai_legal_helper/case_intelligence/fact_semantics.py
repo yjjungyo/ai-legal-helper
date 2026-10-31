@@ -622,6 +622,15 @@ def extract_semantic_fact(
             temporal_type = "OCCURRED_AT" if primary_date else "NONE"
             occurrence_status = "ACTUAL"
 
+        # 지급·반환의 '제안'은 실제 지급행위가 아니라 앞으로의 이행방식에 대한 의사표시이다.
+        # 반환하지 않고 분할 반환을 제안했다는 문장을 실제 미반환/반환 완료와 동일한 행위로 비교하지 않는다.
+        if any(kw in compact for kw in ("제안하", "제안했다", "제안함", "방안을제시", "분할반환을제시")) and not any(
+            kw in compact for kw in ("제안하지않", "제안한적없", "제안을거절")
+        ):
+            occurrence_status = "PROPOSED"
+            sem_category = "EVENT"
+            temporal_type = "REPORTED_AT" if primary_date else "NONE"
+
     # (F) RESIDENCE / OCCUPANCY / DELIVERY / MOVEOUT
     elif any(kw in compact for kw in (
         "전입신고", "전입유지", "전입", "주민등록", "확정일자", "입주", "거주", "인도", "퇴거", "이사", "명도", "점유", "출입카드", "열쇠"
@@ -1047,6 +1056,43 @@ def check_proposition_comparability(
             mismatched_dimensions=mismatched,
             predicate_match_basis="Proposal responds to Rejection",
         )
+
+    # 3-0. 분할 지급·반환 제안과 즉시 이행 곤란 진술은 서로 설명 가능한 별개 사실이다.
+    # 두 진술 모두 실제 지급 여부를 확정하지 않으므로 상충 및 교차 입증(SUPPORTS)으로 승격하지 않는다.
+    # 특정 사건/인물/금액이 아니라 화행, 행위 대상, 지급 능력 표현으로 판정한다.
+    proposals = [p for p in (pa, pb) if p.speech_act == "PROPOSAL"]
+    if len(proposals) == 1:
+        proposal = proposals[0]
+        other = pb if proposal is pa else pa
+        proposal_text = proposal.statement or ""
+        other_text = other.statement or ""
+        payment_actions = ("반환", "지급", "상환", "변제", "돌려")
+        difficulty_terms = ("어렵", "곤란", "불가능", "힘들", "자금부족", "여의치않")
+        same_actor = not (
+            proposal.subject_key and other.subject_key
+            and proposal.subject_key != other.subject_key
+        )
+        if (
+            same_actor
+            and proposal.event_type in ("PAYMENT", "LOAN", "PAYMENT_OBLIGATION")
+            and other.event_type in ("PAYMENT", "LOAN", "PAYMENT_OBLIGATION")
+            and other.speech_act not in ("REJECTION", "ACCEPTANCE")
+            and any(word in proposal_text and word in other_text for word in payment_actions)
+            and any(term in other_text.replace(" ", "") for term in difficulty_terms)
+        ):
+            return ComparabilityResult(
+                is_comparable=False,
+                status="DIFFERENT_CONTEXT",
+                identity_status="COMPATIBLE",
+                reason_code="PAYMENT_PROPOSAL_VS_CAPACITY_STATEMENT",
+                explanation=(
+                    "분할 지급·반환 방안을 제안한 사실과 즉시 전액 이행이 어렵다는 진술은 "
+                    "동시에 참일 수 있는 별개의 의사표시이며 실제 지급 여부를 증명하지 않습니다."
+                ),
+                matched_dimensions=["PAYMENT_CONTEXT", "COMPATIBLE_SPEECH_ACT"],
+                mismatched_dimensions=["PROPOSAL_VS_CAPACITY_STATEMENT"],
+                predicate_match_basis="Proposal speech act vs reported ability to perform",
+            )
 
     # 3-1. 화행(Speech Act) 분리: 의사표시/해지 통지(NOTICE) vs 이행/퇴거 예정일(STATEMENT/SCHEDULE)
     # 설명: 임차인이 임대인에게 퇴거 의사를 통지한 행위(통지일)와 실제 퇴거 예정일(목표일)은 서로 다른 시점 차원의 양립 가능한 사실이다.
