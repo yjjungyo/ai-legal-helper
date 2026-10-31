@@ -1513,7 +1513,7 @@ def reconcile_case_conflicts(
             .join(EvidenceDocument, EvidenceLink.evidence_id == EvidenceDocument.id)
             .filter(
                 EvidenceDocument.case_id == cid,
-                EvidenceLink.link_type.in_(["CONTRADICTS", "POTENTIAL_CONFLICT"]),
+                EvidenceLink.link_type.in_(["CONTRADICTS", "CONTRADICTION", "POTENTIAL_CONFLICT"]),
             )
             .all()
         )
@@ -1568,6 +1568,11 @@ def reconcile_case_conflicts(
                 # DB에 미지원 타입(CONTRADICTION)을 기록하여 Neo4j 동기화에서 유실될 수 있다.
                 desired_link_type = (
                     "CONTRADICTS" if decision.status == "CONTRADICTION" else decision.status
+                )
+                logger.debug(
+                    "[CONFLICT_RECONCILE] claim=%s fact=%s stored_link=%s detected=%s reason=%s expected_link=%s",
+                    claim.id, target_fact.id, link.link_type, decision.status,
+                    decision.reason_code, desired_link_type,
                 )
                 if desired_link_type != link.link_type:
                     if decision.status == "CONTRADICTION":
