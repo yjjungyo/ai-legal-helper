@@ -23,6 +23,7 @@ from pythonjsonlogger import jsonlogger
 
 from ai_legal_helper.observability.context import get_context_dict
 from ai_legal_helper.utils.datetime_utils import KST
+from ai_legal_helper.observability.pii_masker import mask_pii
 
 
 try:
@@ -246,8 +247,8 @@ class LoguruStyleFormatter(logging.Formatter):
                 ctx_items.append(f"{label}:{val_short}")
         ctx_suffix = f" [{', '.join(ctx_items)}]" if ctx_items else ""
 
-        # 7. 본문 메시지 (저수준 영문 네트워크 트레이스 등을 한국어로 자동 변환)
-        msg = _translate_log_message(record.getMessage())
+        # 7. 본문 메시지 (저수준 영문 네트워크 트레이스 등을 한국어로 자동 변환 및 PII 자동 마스킹)
+        msg = mask_pii(_translate_log_message(record.getMessage()))
 
         # 8. 색상 적용 (콘솔 vs 파일 분기)
         if self.colorize:
@@ -280,7 +281,8 @@ class LoguruStyleFormatter(logging.Formatter):
             if not record.exc_text:
                 record.exc_text = self.formatException(record.exc_info)
             if record.exc_text:
-                err_text = f"{_RED}{record.exc_text}{_RESET}" if self.colorize else record.exc_text
+                safe_exc_text = mask_pii(record.exc_text)
+                err_text = f"{_RED}{safe_exc_text}{_RESET}" if self.colorize else safe_exc_text
                 base_log = f"{base_log}\n{err_text}"
 
         if record.stack_info:
@@ -309,6 +311,9 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
         log_record['lineno'] = record.lineno
         log_record['module'] = record.module
         log_record['funcName'] = record.funcName
+
+        if 'message' in log_record and isinstance(log_record['message'], str):
+            log_record['message'] = mask_pii(log_record['message'])
 
 
 class HttpNoiseFilter(logging.Filter):

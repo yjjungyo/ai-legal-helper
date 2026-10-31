@@ -114,6 +114,12 @@ def generate_answer(
         list(state.get("preserved_points") or [])
         + list(ver_res.get("preserved_points") or [])
     ))
+    logger.info(
+        "[DOC_CONSULTATION] 답변 생성 시작 (모드=%s | 출처=%d건 | 이전초안길이=%d자)",
+        "수정보강(repair)" if repair else "최초초안(initial)",
+        len(sources),
+        len(state.get("draft_answer", "")),
+    )
     try:
         written = write_document_answer(
             state.get("question", ""), sources, user_history=history[-4:],
@@ -123,6 +129,12 @@ def generate_answer(
             preserved_points=preserved if repair else None,
         )
         result.update(written)
+        draft_out = result.get("draft_answer", "")
+        logger.info(
+            "[DOC_CONSULTATION] 답변 생성 완료 (초안길이=%d자 | 해시=%s)",
+            len(draft_out),
+            hashlib.sha256(draft_out.encode("utf-8")).hexdigest()[:16] if draft_out else "None",
+        )
     except Exception as exc:
         # 모델 오류나 원문 누락을 성공 답변으로 바꾸지 않으며 상담 원문/예외 본문은 기록하지 않는다.
         logger.warning("문서 답변 작성 실패: %s", type(exc).__name__)
@@ -173,6 +185,11 @@ def verify_answer(state: Dict[str, Any]) -> Dict[str, Any]:
 
     sources = document_sources(state)
     draft = state.get("draft_answer", "")
+    logger.info(
+        "[DOC_CONSULTATION] 원문 근거 검증 시작 (검증 대상 초안: %d자 | 참조 출처: %d건)",
+        len(draft),
+        len(sources),
+    )
     try:
         if state.get("answer_generation_error") or not draft.strip():
             raise ValueError("ANSWER_GENERATION_FAILED")
@@ -203,6 +220,18 @@ def verify_answer(state: Dict[str, Any]) -> Dict[str, Any]:
         if role_note not in preserved:
             preserved.append(role_note)
     result["preserved_points"] = preserved
+    claims_list = result.get("claims") or []
+    sup_count = sum(1 for c in claims_list if c.get("grounding_status") == "SUPPORTED")
+    unsup_count = sum(1 for c in claims_list if c.get("grounding_status") in ("UNSUPPORTED", "UNCERTAIN"))
+    logger.info(
+        "[DOC_CONSULTATION] 원문 근거 검증 완료 (판정=%s | 사유=%s | 주장=%d건[지지=%d, 미흡=%d] | 후보법령=%s)",
+        result.get("status"),
+        result.get("reason_code"),
+        len(claims_list),
+        sup_count,
+        unsup_count,
+        result.get("candidate_laws", []),
+    )
     return {"verification_result": result, "retrieved_sources": sources, "issue_results": [],
             "preserved_points": preserved,
             "verified_sources": result.get("citation_audit", {}).get("verified_sources", [])}
@@ -218,8 +247,45 @@ def next_verification_step(state: Dict[str, Any]) -> str:
         finalize, statute_search_approval, execute_statute_search, revise 또는 insufficient 노드 이름.
     """
     result = state.get("verification_result") or {}
+    target_node = "insufficient"
+    route_reason = "기본 보류 종료"
+
     if state.get("answer_generation_error") or result.get("reason_code") == "VERIFICATION_ERROR":
-        return "insufficient"
+        target_node = "insufficient"
+        route_reason = "답변 생성 오류 또는 검증 기술 오류"
+    elif result.get("status") == "PASS":
+        target_node = "finalize"
+        route_reason = "검증 통과(PASS)"
+    else:
+        requests = pending_searches(state)
+        search_count = state.get("statute_search_count") or 0
+        branched_statute = False
+        if requests and search_count < 2:
+            if search_is_approved(state, requests):
+                target_node = "execute_statute_search"
+                route_reason = f"승인된 신규 법령 요청({len(requests)}건) 즉시 검색"
+                branched_statute = True
+            elif not state.get("hilt_executed"):
+                target_node = "statute_search_approval"
+                route_reason = f"신규 법령({len(requests)}건) 사용자 승인(HILT) 요청"
+                branched_statute = True
+
+        if not branched_statute:
+            if result.get("status") in ("REVISE", "INSUFFICIENT") and (state.get("revision_count") or 0) < 3:
+                target_node = "revise"
+                route_reason = f"답변 보강 재작성 ({state.get('revision_count', 0) + 1}/3회)"
+            else:
+                target_node = "insufficient"
+                route_reason = f"재작성 한도 초과 또는 추가 근거 부재 ({result.get('status')}/{result.get('reason_code')})"
+
+    logger.info(
+        "[DOC_ROUTING] 검증 후 다음 실행 노드 결정: %s (사유: %s | 재작성=%d회 | 법령검색=%d회)",
+        target_node,
+        route_reason,
+        state.get("revision_count", 0),
+        state.get("statute_search_count", 0),
+    )
+    return target_node
     if result.get("status") == "PASS":
         return "finalize"
     requests = pending_searches(state)
@@ -344,6 +410,14 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
             and c.get("claim_type") in ("CASE_FACT", "CASE_INFERENCE", "LEGAL_APPLICATION", "USER_STATEMENT")
             for c in result.get("claims", [])
         )) else "DELIVERED"
+    logger.info(
+        "[DOC_FINALIZE] 문서 상담 답변 확정 (처분=%s | 초안보존=%s | 제한답변사용=%s | 인용출처=%d건 | 최종답변길이=%d자)",
+        disposition,
+        valid and not limited_used,
+        limited_used,
+        len(sources),
+        len(final),
+    )
     return {"final_answer": final, "answer": final, "messages": [AIMessage(content=final)],
             "sources": sources, "cited_sources": sources, "claim_citations": [], "case_delta": None,
             "final_disposition": disposition, "verification_result": result,

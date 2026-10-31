@@ -9,6 +9,9 @@ import json
 from typing import Any
 
 from ai_legal_helper.tools.official_statute_search import _prepare_search_targets, _article_references
+from ai_legal_helper.observability.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def law_names(references: list[str]) -> list[str]:
@@ -114,7 +117,19 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
     from ai_legal_helper.tools.official_statute_search import search_official_statutes
 
     requests = pending_searches(state)
-    if not search_is_approved(state, requests) or (state.get("statute_search_count") or 0) >= 2:
+    approved = search_is_approved(state, requests)
+    curr_count = state.get("statute_search_count") or 0
+    logger.info(
+        "[DOCUMENT_SEARCH] 법령 검색 계획 평가 (대기 요청: %d건 | 사용자 승인: %s | 이전 검색횟수: %d회)",
+        len(requests),
+        approved,
+        curr_count,
+    )
+    if not approved or curr_count >= 2:
+        if not approved:
+            logger.info("[DOCUMENT_SEARCH] 검색 요청이 승인 범위를 벗어났거나 미승인 상태이므로 건너뜁니다.")
+        if curr_count >= 2:
+            logger.warning("[DOCUMENT_SEARCH] 최대 법령 검색 횟수(2회)에 도달하여 추가 검색을 중단합니다.")
         return {"statute_search_results": []}
     grouped: dict[str, list[dict]] = {}
     for request in requests:
@@ -134,6 +149,11 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
         if source.get("source_id") not in seen:
             merged.append(source)
             seen.add(source.get("source_id"))
+    logger.info(
+        "[DOCUMENT_SEARCH] 법령 원문 검색 완료 (신규 확보 조문: %d건 | 총 출처: %d건)",
+        len(found),
+        len(merged),
+    )
     return {"statute_search_results": found, "retrieved_sources": merged,
             "statute_search_count": (state.get("statute_search_count") or 0) + 1,
             "statute_search_history": list(dict.fromkeys(

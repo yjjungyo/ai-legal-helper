@@ -24,6 +24,7 @@ from ai_legal_helper.observability.context import (
     set_current_span_id, get_current_span_id, reset_current_span_id
 )
 from ai_legal_helper.observability.telemetry import get_tracer
+from ai_legal_helper.observability.pii_masker import mask_pii
 from ai_legal_helper.observability.langfuse_client import start_trace, start_span, end_span, end_trace, flush_langfuse
 from opentelemetry.trace import Status, StatusCode
 
@@ -260,7 +261,7 @@ def trace(func: Callable) -> Callable:
             text = re.sub(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', r'***@***.***', text)
             text = re.sub(r'\b010-\d{3,4}-\d{4}\b', '010-****-****', text)
             text = re.sub(r'\b\d{6}-[1-4]\d{6}\b', '******-*******', text)
-            return text
+            return mask_pii(text)
 
         raw_stack_trace = "".join(traceback.format_exception(type(e), e, e.__traceback__))
         stack_trace = scrub_sensitive_info(raw_stack_trace)
@@ -315,8 +316,8 @@ def trace(func: Callable) -> Callable:
             input_payload = None
             if args or kwargs:
                 input_payload = {
-                    "args": [repr(a)[:500] for a in args],
-                    "kwargs": {k: repr(v)[:500] for k, v in kwargs.items()},
+                    "args": [mask_pii(repr(a)[:500]) for a in args],
+                    "kwargs": {k: mask_pii(repr(v)[:500]) for k, v in kwargs.items()},
                 }
             log_entry(start_time, current_trace_id, current_span_id, is_new_trace, parent_agent, parent_node, prev_span_id, input_data=input_payload)
 
@@ -376,8 +377,8 @@ def trace(func: Callable) -> Callable:
             input_payload = None
             if args or kwargs:
                 input_payload = {
-                    "args": [repr(a)[:500] for a in args],
-                    "kwargs": {k: repr(v)[:500] for k, v in kwargs.items()},
+                    "args": [mask_pii(repr(a)[:500]) for a in args],
+                    "kwargs": {k: mask_pii(repr(v)[:500]) for k, v in kwargs.items()},
                 }
             log_entry(start_time, current_trace_id, current_span_id, is_new_trace, parent_agent, parent_node, prev_span_id, input_data=input_payload)
 

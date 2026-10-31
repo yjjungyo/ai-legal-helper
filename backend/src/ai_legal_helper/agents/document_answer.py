@@ -11,7 +11,11 @@ from typing import Any, Dict, List
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from ai_legal_helper.llm.gateway import get_llm
+import hashlib
 from ai_legal_helper.rag.grounding_context import format_grounding_sources
+from ai_legal_helper.observability.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 DOCUMENT_ANSWER_SYSTEM = """당신은 등록 자료를 읽고 사용자의 현재 질문에 답하는 법률 상담 도우미입니다.
@@ -102,6 +106,12 @@ def write_document_answer(
     Raises:
         ValueError: 원문 예산 초과, 출처 충돌 또는 빈 응답인 경우.
     """
+    logger.info(
+        "[DOCUMENT_ANSWER] 답변 초안 작성 시작 (출처: %d건 | 제한모드=%s | 재작성=%s)",
+        len(sources),
+        limited,
+        bool(previous_draft),
+    )
     context, manifest = format_grounding_sources(sources)
     # 감사 레지스트리의 본문을 수정 지적으로 다시 넣으면 원문이 중복되고 예산이 무의미해진다.
     # 작성자는 오류·누락 지적만 읽고 사실 판단은 항상 아래 공통 원문에서 다시 수행한다.
@@ -131,6 +141,15 @@ def write_document_answer(
     ])
     answer = response.content
     if not isinstance(answer, str) or not answer.strip():
+        logger.error("[DOCUMENT_ANSWER] LLM 답변 생성 결과가 비어 있습니다 (EMPTY_DOCUMENT_ANSWER)")
         raise ValueError("EMPTY_DOCUMENT_ANSWER")
-    return {"draft_answer": answer.strip(), "answer_source_manifest": manifest,
+    answer_text = answer.strip()
+    draft_hash = hashlib.sha256(answer_text.encode("utf-8")).hexdigest()[:16]
+    logger.info(
+        "[DOCUMENT_ANSWER] 답변 초안 작성 완료 (길이: %d자 | 해시: %s | 제한모드=%s)",
+        len(answer_text),
+        draft_hash,
+        limited,
+    )
+    return {"draft_answer": answer_text, "answer_source_manifest": manifest,
             "answer_generation_error": None}

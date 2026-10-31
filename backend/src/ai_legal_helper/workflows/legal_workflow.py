@@ -43,6 +43,7 @@ from typing import Dict, List, Any, Optional
 from ai_legal_helper.agents.intent_analyzer import analyze_consultation_intent, ConsultationIntent
 import os
 import uuid
+import hashlib
 import sys
 import asyncio
 import re
@@ -69,6 +70,7 @@ from ai_legal_helper.agents.synthesizer import synthesize
 from ai_legal_helper.llm.gateway import get_llm
 from ai_legal_helper.observability.decorators import trace
 from ai_legal_helper.observability.logging_config import get_logger
+from ai_legal_helper.observability.pii_masker import mask_pii, sanitize_diagnostic_text
 from ai_legal_helper.observability.context import set_node_name
 
 logger = get_logger(__name__)
@@ -236,6 +238,14 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
         except Exception as e:
             logger.warning(f"[INIT] 대화 맥락 포맷팅 중 예외: {e}")
 
+    ans_mode = DOCUMENT_MODE if briefing_dict and briefing_dict.get("source_documents") else "STANDARD"
+    logger.info(
+        f"[SUPERVISOR_INIT] 초기화 완료 | 답변모드={ans_mode} | case_id={case_id or '(없음)'} | "
+        f"등록문서수={len(briefing_dict.get('source_documents', [])) if briefing_dict else 0} | "
+        f"단위쟁점수={len(issue_tasks_dict)} | 사건증거출처수={len(case_evidence_sources)} | "
+        f"컨텍스트길이={len(case_context)} | graph_ev_mode={graph_evidence.get('search_mode')}"
+    )
+
     return {
         "request_id": req_id,
         "trace_id": trace_id,
@@ -350,8 +360,10 @@ def route_node(state: LegalState) -> Dict:
     case_ctx = ((state.get("case_evidence_briefing") or {}).get("case_type") or "") if state.get("answer_mode") == DOCUMENT_MODE else (state.get("case_context") or "")
     decision = route_categories_detailed(question=q, case_context=case_ctx)
 
-    logger.debug(
-        f"[분야 판별 결과] 상태={decision.status.value}, 선정 분야={decision.categories}, 사유={decision.reason}"
+    logger.info(
+        f"[ROUTE] 분야 판별 완료 | 상태={decision.status.value} | 분야={decision.categories} | "
+        f"사유={sanitize_diagnostic_text(decision.reason, max_len=150)} | "
+        f"답변모드={state.get('answer_mode') or 'STANDARD'}"
     )
     return {
         "categories": decision.categories,
@@ -412,6 +424,11 @@ def routing_exit_node(state: LegalState) -> Dict:
         final_answer = f"[안내: 추가 정보 필요]\n\n{clarification_msg}"
         warnings = []
 
+    logger.info(
+        f"[ROUTING_EXIT] 분류 미흡 종료 | 상태={r_status} | final_disposition=WITHHELD | "
+        f"안내문길이={len(final_answer)}"
+    )
+
     return {
         "final_answer": final_answer,
         "answer": final_answer,
@@ -432,7 +449,9 @@ def plan_node(state: LegalState) -> Dict:
     set_node_name("plan")
     cats = state.get("categories", [])
     plan = plan_tools(cats)
-    logger.debug(f"[쟁점 계획 결과] 선정 도구={plan}")
+    logger.info(
+        f"[PLAN] 실행 계획 수립 완료 | 선정도구={plan} | categories={cats}"
+    )
     return {"plan": plan, "analysis_plan": plan}
 
 @trace
@@ -465,6 +484,10 @@ async def run_agents_node(state: LegalState) -> Dict:
             except Exception as exc:
                 logger.warning("문서 상담 법률 검색 실패: %s", type(exc).__name__)
                 retrieval_warnings.append("관련 법률 자료 검색을 완료하지 못했습니다.")
+        logger.info(
+            f"[RUN_AGENTS] 문서상담 Vector RAG 검색 완료 | 분야={state.get('categories')} | "
+            f"수집된문서수={len(sources)} | 경고수={len(retrieval_warnings)}"
+        )
         return {"results": {}, "agent_results": {}, "retrieved_sources": sources,
                 "warnings": list(dict.fromkeys((state.get("warnings") or []) + retrieval_warnings))}
     cats = state.get("categories", [])
@@ -493,7 +516,10 @@ async def run_agents_node(state: LegalState) -> Dict:
         results[cat] = text
         all_sources.extend(sources)
 
-    logger.debug(f"[전문 에이전트 분석 완료] 분석 완료 분야={list(results.keys())}")
+    logger.info(
+        f"[RUN_AGENTS] 전문 에이전트 분석 완료 | 대상분야={selected_cats} | "
+        f"완료분야={list(results.keys())} | 수집출처수={len(all_sources)}"
+    )
     return {"results": results, "agent_results": results, "retrieved_sources": all_sources}
 
 @trace
@@ -519,6 +545,11 @@ def synthesize_node(state: LegalState) -> Dict:
         source_registry={s.get("evidence_label", s.get("source_id")): s for s in (state.get("case_evidence_sources") or []) if s},
     )
     draft = msgs[-1].content
+    d_hash = hashlib.sha256(draft.encode("utf-8")).hexdigest()[:8]
+    logger.info(
+        f"[SYNTHESIZE] 초안 작성 완료 | 길이={len(draft)} | 해시={d_hash} | "
+        f"전문분석결과수={len(state.get('results', {}))} | intent={intent_val}"
+    )
     # don't append to messages yet, just save to draft_answer
     return {"draft_answer": draft}
 
@@ -723,6 +754,13 @@ def verification_node(state: LegalState) -> Dict:
     # retrieved_sources는 검색된 전체 출처를 유지하고, 본문에서 검증된 인용 출처는 verified_sources로 분리 관리한다.
     preserved_retrieved_sources = combined_sources if combined_sources else verified_sources
 
+    d_hash = hashlib.sha256(draft.encode("utf-8")).hexdigest()[:8] if draft else "none"
+    logger.info(
+        f"[VERIFICATION] 초안 검증 완료 | 판정={result.get('status')} | 사유코드={result.get('reason_code')} | "
+        f"후보법령={result.get('candidate_laws', [])} | 검증출처수={len(verified_sources)} | "
+        f"쟁점결과수={len(issue_results_list)} | 초안해시={d_hash}"
+    )
+
     return {
         "verification_result": result,
         "retrieved_sources": preserved_retrieved_sources,
@@ -787,10 +825,11 @@ def verification_condition(state: LegalState) -> str:
                 if not any(law in r_name for r_name in retrieved_statute_names if r_name)
             ]
             if truly_missing_laws:
-                logger.info(f"[DISPOSITION] 미확보 후보 법령({truly_missing_laws}) 검증을 위해 HILT 법령 검색 승인 요청 노드로 분기합니다.")
+                logger.info(f"[VERIFY_ROUTING] 미확보 후보 법령({truly_missing_laws}) 검증을 위해 HILT 법령 검색 승인 요청 노드로 분기합니다.")
                 return "statute_search_approval"
 
         if disposition in ("DELIVERED", "CAUTIONARY"):
+            logger.info(f"[VERIFY_ROUTING] 쟁점 기반 처분 확정 분기 -> finalize (처분={disposition}, 사유={disp_reason})")
             return "finalize"
         elif disposition == "WITHHELD":
             # [P0-VER-01] 전체 법률 검증(status)이 이미 PASS이거나,
@@ -816,15 +855,18 @@ def verification_condition(state: LegalState) -> str:
                 )
             )
             if is_legally_sound:
-                logger.info("[DISPOSITION] 쟁점 사실관계 증거는 미확보(NEEDS_EVIDENCE)이나 핵심 법리가 출처에 의해 정상 뒷받침되므로 finalize로 확정합니다.")
+                logger.info("[VERIFY_ROUTING] 쟁점 사실관계 증거는 미확보(NEEDS_EVIDENCE)이나 핵심 법리가 출처에 의해 정상 뒷받침되므로 finalize 확정 분기")
                 return "finalize"
             # 1회 재검토 가능하면 revise 시도
             if revision_count < 1 and not hilt_executed:
+                logger.info(f"[VERIFY_ROUTING] 쟁점 처분 WITHHELD 재검토 분기 -> revise (revision_count={revision_count})")
                 return "revise"
+            logger.info(f"[VERIFY_ROUTING] 쟁점 처분 WITHHELD 한도 도달 분기 -> insufficient (revision_count={revision_count})")
             return "insufficient"
 
     # 1. 모든 필수 검증을 통과했다면 최종 확정 (HILT 여부와 무관하게 PASS일 때만 확정)
     if status == "PASS":
+        logger.info(f"[VERIFY_ROUTING] 검증 통과(PASS) 분기 -> finalize (revision_count={revision_count})")
         return "finalize"
 
     # 2. 법률 근거 부족(LEGAL_SOURCE_MISSING / LEGAL_SOURCE_INSUFFICIENT)이 원인이고 후보 법령이 식별된 경우에만 HILT 법령 검색 승인 요청 (1회 한정)
@@ -841,16 +883,19 @@ def verification_condition(state: LegalState) -> str:
             if not any(law in r_name for r_name in retrieved_statute_names if r_name)
         ]
         if truly_missing_laws:
+            logger.info(f"[VERIFY_ROUTING] 법령 근거 부족 및 미확보 후보법령({truly_missing_laws}) 분기 -> statute_search_approval")
             return "statute_search_approval"
 
     # 3. 최초 검증 실패 시(REVISE 또는 일반 작성오류) 1회에 한해 적응형 보강 검색(revise) 시도
     #    단, 핵심 증거 상충(EVIDENCE_CONFLICT)이 존재하더라도 초안이 이미 상충을 명시하고 조건부 답변을 작성한 경우에는
     #    불필요한 재작성 없이 즉시 조건부 확정(finalize -> CAUTIONARY)으로 라우팅한다.
     if reason_code == "EVIDENCE_CONFLICT" and ver_res.get("conflict_acknowledged") and status == "REVISE":
+        logger.info("[VERIFY_ROUTING] 핵심 증거 상충 초안 반영 조건부 확정 분기 -> finalize (CAUTIONARY)")
         return "finalize"
 
     if revision_count < 1 and not hilt_executed:
         if status == "REVISE" or (status == "INSUFFICIENT" and reason_code in ("ANSWER_REVISION_REQUIRED", "NONE")):
+            logger.info(f"[VERIFY_ROUTING] 최초 검증 실패 재검토 분기 -> revise (status={status}, reason_code={reason_code})")
             return "revise"
 
     # 4. HILT 실행 후 또는 재검토 한도(1회) 도달 후:
@@ -863,7 +908,7 @@ def verification_condition(state: LegalState) -> str:
         # 1. 허위/미검증 인용 라벨 잔존 시 전달 차단 (Section 7, Section 12)
         audit = ver_res.get("citation_audit", {}) or {}
         if audit.get("unverified_citations"):
-            logger.info("[GATING] REVISE 상태이나 허위/미검증 인용 감지로 finalize 차단 -> insufficient(WITHHELD)")
+            logger.info("[VERIFY_ROUTING] REVISE 상태이나 허위/미검증 인용 감지로 finalize 차단 -> insufficient(WITHHELD)")
             return "insufficient"
 
         # 2. 쟁점 기반 부분 답변(Issue-Level Partial Answer) 평가 (P0-1)
@@ -877,7 +922,7 @@ def verification_condition(state: LegalState) -> str:
 
         if (verified_count > 0 or conditional_count > 0) and briefing_raw:
             logger.info(
-                f"[GATING] REVISE 상태이나 검증된 쟁점(VERIFIED={verified_count}, CONDITIONAL={conditional_count}) 존재 "
+                f"[VERIFY_ROUTING] REVISE 상태이나 검증된 쟁점(VERIFIED={verified_count}, CONDITIONAL={conditional_count}) 존재 "
                 f"-> assemble_grounded_answer 부분 답변 생성을 위해 finalize_node로 라우팅 (P0-1)"
             )
             return "finalize"
@@ -885,7 +930,7 @@ def verification_condition(state: LegalState) -> str:
         # 3. 사건 브리핑이 없거나 검증 가능한 쟁점이 전무한 일반 상담의 경우 안전 게이팅 적용
         # A) 중대 결함 사유(법령 미확보, 증거 상충, 시스템 오류) 존재 시 전달 차단
         if reason_code in ("LEGAL_SOURCE_MISSING", "CITATION_INVALID", "EVIDENCE_CONFLICT", "VERIFICATION_ERROR"):
-            logger.info(f"[GATING] REVISE 상태이나 중대 결함({reason_code})으로 finalize 차단 -> insufficient(WITHHELD)")
+            logger.info(f"[VERIFY_ROUTING] REVISE 상태이나 중대 결함({reason_code})으로 finalize 차단 -> insufficient(WITHHELD)")
             return "insufficient"
 
         # B) 핵심 법률 주장 중 미뒷받침(UNSUPPORTED) 주장 존재 시 전달 차단
@@ -895,12 +940,14 @@ def verification_condition(state: LegalState) -> str:
             if c.get("grounding_status") == "UNSUPPORTED" and c.get("claim_type") in ("LEGAL_RULE", "LEGAL_APPLICATION")
         ]
         if unsupported_legal_claims:
-            logger.info(f"[GATING] REVISE 상태이나 미뒷받침 법률 주장 {len(unsupported_legal_claims)}건 존재로 finalize 차단 -> insufficient(WITHHELD)")
+            logger.info(f"[VERIFY_ROUTING] REVISE 상태이나 미뒷받침 법률 주장 {len(unsupported_legal_claims)}건 존재로 finalize 차단 -> insufficient(WITHHELD)")
             return "insufficient"
 
         # D) 핵심 법리는 확보되었고 사실관계 입증 주의(CASE_EVIDENCE_MISSING) 또는 경미한 문구 보완인 경우에만 조건부 확정(CAUTIONARY)
+        logger.info(f"[VERIFY_ROUTING] 핵심 법리 확보 및 경미 보완 조건부 확정 분기 -> finalize (CAUTIONARY, reason_code={reason_code})")
         return "finalize"
 
+    logger.info(f"[VERIFY_ROUTING] 기본 안전 게이팅 분기 -> insufficient (status={status}, reason_code={reason_code})")
     return "insufficient" 
 
 
@@ -996,6 +1043,12 @@ def revise_node(state: LegalState) -> Dict:
     from ai_legal_helper.utils.text_formatter import clean_markdown_formatting
     raw_content = res.content if hasattr(res, "content") else str(res)
     cleaned_draft = clean_markdown_formatting(raw_content)
+
+    rev_hash = hashlib.sha256(cleaned_draft.encode("utf-8")).hexdigest()[:8]
+    logger.info(
+        f"[REVISE] 초안 수정 완료 | 길이={len(cleaned_draft)} | 해시={rev_hash} | "
+        f"보강출처수={len(merged_sources)} | revision_count={state.get('revision_count', 0) + 1}"
+    )
 
     return {
         "draft_answer": cleaned_draft,
@@ -1126,6 +1179,13 @@ def insufficient_node(state: LegalState) -> Dict:
         preserved_sources = []
 
     warnings = list(state.get("warnings", []) or []) + ["답변의 근거가 부족하여 INSUFFICIENT(WITHHELD) 처리되었습니다."]
+
+    f_hash = hashlib.sha256(final.encode("utf-8")).hexdigest()[:8]
+    logger.info(
+        f"[INSUFFICIENT] 판단 유보 안내 확정 완료 | 처분=WITHHELD | 사유코드={reason_code} | "
+        f"안내문길이={len(final)} | 안내문해시={f_hash} | 누락법령={missing_laws} | "
+        f"누락쟁점수={len(missing_issues)}"
+    )
 
     return {
         "final_answer": final,
@@ -1269,6 +1329,16 @@ def finalize_node(state: LegalState) -> Dict:
     if case_delta:
         ver_res["case_delta"] = case_delta
 
+    final_hash = hashlib.sha256(final.encode("utf-8")).hexdigest()[:8]
+    orig_draft = state.get("draft_answer", "")
+    orig_hash = hashlib.sha256(orig_draft.encode("utf-8")).hexdigest()[:8] if orig_draft else "none"
+    draft_preserved = (orig_draft.strip() == final.strip())
+    logger.info(
+        f"[FINALIZE] 최종 답변 확정 완료 | 처분={final_disp} | 검증상태={ver_status} | "
+        f"최종길이={len(final)} | 최종해시={final_hash} | 초안해시={orig_hash} | "
+        f"초안보존={draft_preserved} | 인용출처수={len(cited_sources)}"
+    )
+
     return {
         "final_answer": final,
         "answer": final,
@@ -1389,7 +1459,11 @@ def statute_search_approval_node(state: LegalState) -> Dict:
     ]
     approved_laws = law_names(raw_law_refs) if approved else []
 
-    logger.info(f"[공식 법령 검색 승인 결과] 승인여부={approved}, 사유={user_reason}")
+    safe_user_reason = sanitize_diagnostic_text(user_reason, max_len=100) if user_reason else "(없음)"
+    logger.info(
+        f"[STATUTE_APPROVAL] 사용자 법령검색 승인 결과 | 승인여부={approved} | "
+        f"승인법령={approved_laws} | 사유={safe_user_reason} | req_id={approval_req_id}"
+    )
     return {
         "approval_request": approval_payload,
         "approval_status": "APPROVED" if approved else "REJECTED",
@@ -1483,6 +1557,11 @@ def execute_statute_search_node(state: LegalState) -> Dict:
     warnings = list(state.get("warnings", []) or [])
     if not statute_sources:
         warnings.append("공식 법령 원문 검색 시스템에서 요청하신 법령의 해당 조문을 찾지 못했습니다.")
+
+    logger.info(
+        f"[STATUTE_SEARCH] 공식 법령 검색 완료 | 조회조문수={len(statute_sources)} | "
+        f"누적출처수={len(merged_sources)} | 후보법령={candidate_laws}"
+    )
 
     return {
         "statute_search_results": statute_sources,
@@ -1593,6 +1672,12 @@ def re_analyze_node(state: LegalState) -> Dict:
     res = llm.invoke(formatted_prompt)
     raw_content = str(res.content) if hasattr(res, "content") else str(res)
 
+    re_hash = hashlib.sha256(raw_content.strip().encode("utf-8")).hexdigest()[:8]
+    logger.info(
+        f"[RE_ANALYZE] 법령 검색 후 재분석 완료 | 길이={len(raw_content.strip())} | "
+        f"해시={re_hash} | 확보조문수={len(statute_results)} | revision_count={state.get('revision_count', 0) + 1}"
+    )
+
     return {
         "draft_answer": raw_content.strip(),
         "revision_count": state.get("revision_count", 0) + 1,
@@ -1619,6 +1704,10 @@ def intent_analysis_node(state: LegalState) -> Dict:
             state.get("question", "").strip(),
         )
         intent = ConsultationIntent.GENERAL_CONVERSATION if pure_greeting else ConsultationIntent.NEW_LEGAL_ANALYSIS
+        logger.info(
+            f"[INTENT_ANALYSIS] 문서상담 빠른판정 | 의도={intent.value} | "
+            f"순수인사여부={bool(pure_greeting)} | 질의길이={len(state.get('question', ''))}"
+        )
         return {"intent": intent.value,
                 "resolved_query": state.get("question", ""), "intent_decision": {}}
     q = state.get("question", "")
@@ -1634,8 +1723,11 @@ def intent_analysis_node(state: LegalState) -> Dict:
             c_obj = None
 
     decision = analyze_consultation_intent(question=q, conversation_context=c_obj, case_context=case_ctx)
-    # 의도와 길이만 기록하여 재작성된 상담 원문을 로그에 노출하지 않는다.
-    logger.info(f"[의도 분석 완료] 판정 의도={decision.intent.value}, 복원 질의 길이={len(decision.resolved_query)}자")
+    # 의도와 길이 및 정제 사유만 기록하여 원문 개인정보를 보호한다.
+    logger.info(
+        f"[INTENT_ANALYSIS] 표준상담 의도분석 완료 | 판정의도={decision.intent.value} | "
+        f"복원질의길이={len(decision.resolved_query)} | 사유={sanitize_diagnostic_text(decision.reason, max_len=100)}"
+    )
 
     updates: Dict[str, Any] = {
         "intent": decision.intent.value,
@@ -1695,6 +1787,10 @@ def general_conversation_node(state: LegalState) -> Dict:
         answer = "도움이 되어 기쁩니다. 사건 관련하여 추가로 궁금하신 쟁점이나 절차상 확인이 필요한 사항이 있으시면 언제든지 질문해 주시기 바랍니다."
     else:
         answer = "안녕하세요! 의뢰인님의 법률 문제를 신속하고 정확하게 도와드리는 AI Legal Helper입니다. 현재 사안에 대해 궁금하신 점이나 조언이 필요한 부분을 편하게 말씀해 주세요."
+
+    logger.info(
+        f"[GENERAL_CONV] 일상 대화 응답 완료 | 질의={sanitize_diagnostic_text(q, max_len=60)} | 길이={len(answer)}"
+    )
 
     return {
         "final_answer": answer,

@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field, model_validator
 from ai_legal_helper.case_intelligence.case_briefing import CaseEvidenceBriefing
 from ai_legal_helper.case_intelligence.settlement_calculator import find_case_property_info
 from ai_legal_helper.observability.logging_config import get_logger
+from ai_legal_helper.observability.pii_masker import sanitize_diagnostic_text
 
 logger = get_logger(__name__)
 
@@ -634,5 +635,25 @@ def plan_legal_issues(
             )
         )
 
-    logger.info(f"[ISSUE_PLANNER] 질문 분석 결과 {len(issues)}개 단위 쟁점 도출 완료")
+    issue_lines = []
+    for index, issue in enumerate(issues, start=1):
+        issue_lines.extend([
+            f"{index}. [{issue.issue_id}] {issue.issue_title}",
+            f"   우선순위: {issue.priority}",
+            f"   검토 질문: {' | '.join(issue.legal_questions) or '없음'}",
+            f"   필요한 사실: {', '.join(issue.required_fact_keys) or '없음'}",
+            f"   관련 법령: {', '.join(issue.required_statutes) or '없음'}",
+            f"   관련 증거: {', '.join(issue.relevant_evidence_labels) or '없음'}",
+            f"   보완 자료: {', '.join(issue.missing_evidence) or '없음'}",
+        ])
+
+    logger.info(
+        "[ISSUE_PLANNER] 질문 분석 결과 %d개 단위 쟁점 도출 완료",
+        len(issues),
+    )
+    details_str = "\n".join(issue_lines) if issue_lines else "(없음)"
+    logger.info(
+        "[ISSUE_PLANNER] 단위 쟁점 상세:\n%s",
+        sanitize_diagnostic_text(details_str),
+    )
     return issues

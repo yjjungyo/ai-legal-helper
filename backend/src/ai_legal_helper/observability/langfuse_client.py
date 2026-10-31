@@ -718,34 +718,8 @@ def log_score(
         pass
 
 
-# PII 및 민감정보 마스킹 패턴 (P2-02)
-_RRN_PATTERN = re.compile(r"\b(\d{6})[- ]?([1-4]\d{6})\b")
-_PHONE_PATTERN = re.compile(r"\b(01[016789]|02|0[3-6]\d)[- ]?(\d{3,4})[- ]?(\d{4})\b")
-_API_KEY_PATTERN = re.compile(r"\b(sk-[A-Za-z0-9_\-]{20,}|OC=[A-Za-z0-9_\-]+|bearer\s+[A-Za-z0-9_\-\.]{20,})\b", re.IGNORECASE)
-
-
-def mask_pii(text: Optional[str]) -> str:
-    """텍스트 내 주민등록번호, 전화번호, API 키 등 민감정보(PII)를 자동으로 마스킹한다 (P2-02).
-
-    Args:
-        text: 원본 문자열.
-
-    Returns:
-        str: 민감정보가 안전하게 대체된 문자열.
-    """
-    if not text:
-        return ""
-
-    # 1. 주민등록번호 (생년월일 6자리 유지, 뒷자리 마스킹)
-    cleaned = _RRN_PATTERN.sub(r"\1-*******", text)
-
-    # 2. 전화번호/휴대전화 (국번 가운데 마스킹)
-    cleaned = _PHONE_PATTERN.sub(r"\1-****-\3", cleaned)
-
-    # 3. API 키 마스킹
-    cleaned = _API_KEY_PATTERN.sub("[MASKED_API_KEY]", cleaned)
-
-    return cleaned
+# PII 및 민감정보 마스킹 (중앙 pii_masker 모듈 위임 및 하위 호환성 유지)
+from ai_legal_helper.observability.pii_masker import mask_pii
 
 
 def build_consultation_trace_summary(

@@ -37,6 +37,7 @@ from ai_legal_helper.llm.usage import global_token_tracker
 from ai_legal_helper.workflows.legal_workflow import run_legal_consultation
 from ai_legal_helper.observability.langfuse_client import start_trace, end_trace, flush_langfuse, get_git_commit, get_system_name
 from ai_legal_helper.observability.logging_config import get_logger
+from ai_legal_helper.observability.pii_masker import mask_pii
 from ai_legal_helper.api.dependencies import get_current_user, get_case_for_user, AUTH_BYPASS
 
 logger = get_logger(__name__)
@@ -304,7 +305,7 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
         name="LegalConsultation",
         session_id=req.case_id,
         metadata={
-            "question": req.question[:120],
+            "question": mask_pii(req.question[:120]),
             "request_id": request_id,
             "case_id": req.case_id,
             "session_id": req.case_id,
@@ -361,7 +362,8 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
         )
         
         logger.info(
-            f"[상담 분석 완료] 6단계 분석 및 검증 완료 (소요시간: {elapsed_ms:.1f}ms)"
+            f"[상담 분석 완료] 6단계 분석 및 검증 완료 (요청: {request_id[:8]} | 소요: {elapsed_ms:.1f}ms | "
+            f"처분: {resp.answer_status} | 검증: {resp.verification_status} | 인용출처: {len(resp.sources)}건)"
         )
         resp = _consultations[request_id]
         if hasattr(result, "get"):
@@ -470,6 +472,9 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
             from ai_legal_helper.observability.context import get_current_span_id
             from ai_legal_helper.observability.langfuse_client import update_span, build_consultation_trace_summary
             audit_meta = (resp.verification_result or {}).get("citation_audit", {})
+            import hashlib
+            draft_txt = (result.get("draft_answer") or "") if isinstance(result, dict) else ""
+            final_txt = (result.get("answer") or "") if isinstance(result, dict) else ""
             summary_dict = build_consultation_trace_summary(
                 request_id=request_id,
                 case_id=req.case_id,
@@ -501,6 +506,16 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
                 intent=getattr(resp, "intent", None),
                 resolved_query=getattr(resp, "resolved_query", None),
             )
+            # STEP 1.7 Langfuse 품질 메타데이터 추가
+            summary_dict.update({
+                "draft_hash": hashlib.sha256(draft_txt.encode("utf-8")).hexdigest()[:16] if draft_txt else None,
+                "final_answer_hash": hashlib.sha256(final_txt.encode("utf-8")).hexdigest()[:16] if final_txt else None,
+                "draft_preserved": bool(draft_txt and draft_txt == final_txt),
+                "final_disposition": resp.answer_status,
+                "revision_reason": (resp.verification_result or {}).get("reason_code"),
+                "llm_call_count": usage_summary.total_calls,
+                "total_duration_ms": round(elapsed_ms, 2),
+            })
             update_span(get_current_span_id(), summary_dict)
 
             # Langfuse Scores/Evaluation 탭에 정량 평가 점수 기록
@@ -518,6 +533,10 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
         
     except Exception as e:
         elapsed_ms = (time.time() - start_time) * 1000
+        logger.exception(
+            f"[상담 처리 실패] 백그라운드 워크플로우 실행 중 치명적 예외 발생 "
+            f"(요청: {request_id[:8]}, 사건: {req.case_id or '단독상담'}, 경과: {elapsed_ms:.1f}ms): {e}"
+        )
         resp = _consultations[request_id]
         resp.status = "ERROR"
         resp.execution_status = "ERROR"
@@ -552,8 +571,8 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
                     if getattr(resp, "turn_index", None):
                         rec.turn_index = resp.turn_index
                     db_session.commit()
-        except Exception:
-            pass
+        except Exception as db_err:
+            logger.error(f"[상담 DB 저장 실패] 상담 결과 데이터베이스 커밋 실패 (요청: {request_id[:8]}): {db_err}")
 
         end_trace(trace_id)
         flush_langfuse()
@@ -976,8 +995,8 @@ async def process_consultation_resume(
                     if getattr(resp, "progress", None):
                         rec.progress = resp.progress.model_dump()
                     db_session.commit()
-        except Exception:
-            pass
+        except Exception as db_err:
+            logger.error(f"[상담 재개 DB 저장 실패] 상담 재개 결과 DB 커밋 실패 (요청: {request_id[:8]}): {db_err}")
 
         end_trace(trace_id)
         flush_langfuse()
