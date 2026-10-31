@@ -41,6 +41,39 @@ KST = timezone(timedelta(hours=9))
 _ARTICLE_REFERENCE = re.compile(r"제\s*(\d+)\s*조(?:\s*의\s*(\d+))?")
 _LAW_ENDING = r"(?:법률|법|령|규칙|규정)"
 
+_KOREAN_STOPWORDS = {
+    "경우", "등의", "따른", "관한", "의한", "위한", "대한", "통한",
+    "따라", "대해", "위해", "통해", "인한", "인해", "관련", "관련된",
+    "해당", "모든", "기타", "일반", "어떻게", "있나요", "인가요", "언제",
+    "시점", "여부", "내용", "확인", "필요", "질문",
+}
+_KOREAN_PARTICLES = re.compile(
+    r"(?:에서|상의|으로|에게|부터|까지|에는|로는|의|에|을|를|은|는|이|가|와|과|도|로|상)$"
+)
+
+
+def extract_substantive_tokens(text: str) -> list[str]:
+    """조사 및 기능어를 제거하고 법률적으로 유의미한 실질 명사/단어 토큰 목록을 추출한다.
+
+    Args:
+        text: 자연어 문장 또는 쟁점 설명 문구.
+
+    Returns:
+        list[str]: 정규화된 2글자 이상 실질 토큰 리스트.
+    """
+    words = re.findall(r"[가-힣]{2,}|[A-Za-z0-9]{2,}", text or "")
+    cleaned = []
+    for w in words:
+        if w in _KOREAN_STOPWORDS:
+            continue
+        stem = _KOREAN_PARTICLES.sub("", w)
+        if len(stem) >= 2 and stem not in _KOREAN_STOPWORDS:
+            cleaned.append(stem)
+        elif len(w) >= 2 and w not in _KOREAN_STOPWORDS:
+            cleaned.append(w)
+    return list(dict.fromkeys(cleaned))
+
+
 
 @dataclass
 class StatuteSearchTarget:
@@ -248,10 +281,13 @@ def search_official_statutes(
     for target in _prepare_search_targets(candidate_laws):
         law_name = clean_law_name = target.law_name
         requested_articles = set(target.articles)
+        all_explicit = bool(requested_articles) and not any(not _article_references(ref) for ref in target.references)
         # 후보에 붙은 조문·제목은 외부 법령명 쿼리에서 제외하되 내부 검색 목적은 보존한다.
         target_query_text = " ".join([full_query_text, *target.references]).strip()
         missing_article_ids = set(_article_references(missing_text))
         query_article_ids = set(_article_references(target_query_text))
+
+        start_time = time.perf_counter()
 
         try:
             # 1단계: 법제처 법령 목록 검색 (MST 획득, HTTPS 강제)
@@ -325,27 +361,45 @@ def search_official_statutes(
                 logger.warning(f"[OFFICIAL_STATUTE] '{official_law_name}'의 세부 조문이 없습니다.")
                 continue
 
-            # 3단계: 동적 IR 가중치 기반 매칭 및 조문 수집
+            # 3단계: 동적 IR 가중치 및 원천 조문 분석 기반 매칭 및 조문 수집 (STEP 3)
+            # Section 3.5 검색 계획 생성 구조화 로그
+            plan_issues = missing_issues or ([query] if query else ["없음"])
+            plan_issues_str = ", ".join(plan_issues)
+            plan_explicit_str = ", ".join(sorted(requested_articles)) if requested_articles else "없음"
+            logger.info(
+                "[STATUTE_SEARCH] 검색 계획 생성\n"
+                "  - 법령: %s\n"
+                "  - 쟁점: %s\n"
+                "  - 명시 요청 조문: %s",
+                official_law_name,
+                plan_issues_str,
+                plan_explicit_str,
+            )
+
             # 법령명 자체에 포함된 2글자 이상 부분 문자열을 동적 불용어로 산출 (IDF 감쇄)
             law_subwords = {
                 clean_law_name[i:j]
                 for i in range(len(clean_law_name))
                 for j in range(i + 2, len(clean_law_name) + 1)
             }
+            query_substantive_tokens = extract_substantive_tokens(target_query_text)
+            missing_substantive_tokens = extract_substantive_tokens(missing_text)
 
-            matched_articles: List[Dict[str, Any]] = []
+            candidate_articles: Dict[str, Dict[str, Any]] = {}
 
             for node in article_nodes:
                 art_no_raw = node.findtext("조문번호") or ""
                 art_title = (node.findtext("조문제목") or "").strip()
                 art_content = (node.findtext("조문내용") or "").strip()
-                
+
                 # 조문 식별자 생성 (예: "제6조의2" 또는 "제6조")
                 branch_no = node.findtext("조문가지번호") or ""
                 article_label = f"제{art_no_raw}조"
                 if branch_no and branch_no != "0":
                     article_label += f"의{branch_no}"
-                if requested_articles and article_label not in requested_articles:
+
+                # 모든 요청이 명시 조문인 경우에만 해당 조문 외 배제
+                if all_explicit and article_label not in requested_articles:
                     continue
 
                 # 항, 호 텍스트 취합
@@ -364,53 +418,89 @@ def search_official_statutes(
                     full_article_text += "\n" + "\n".join(sub_parts)
 
                 # 동적 적합도 점수 산정
-                score = 0.0
-
-                # 3.0 조문 번호(예: "제536조", "제6조의2")가 누락 쟁점 및 질의 텍스트에 직접 언급된 경우 최우선 부스팅
+                explicit_score = 0.0
+                reasons: List[str] = []
                 if article_label in requested_articles:
-                    score += 100.0
+                    explicit_score = 100.0
+                    reasons.append("명시적 요청 조문(+100.0)")
                 elif article_label in missing_article_ids:
-                    score += 50.0
+                    explicit_score = 50.0
+                    reasons.append("누락 쟁점 명시 조문(+50.0)")
                 elif article_label in query_article_ids:
-                    score += 20.0
+                    explicit_score = 20.0
+                    reasons.append("질의 언급 조문(+20.0)")
 
-                # 3.1 조문 제목 기반 쟁점 매칭 (가장 높은 판별력)
-                title_words = [
-                    w for w in re.findall(r'[가-힣]{2,}', art_title)
-                    if w not in {"경우", "등의", "따른", "관한"}
-                ]
-                for tw in title_words:
+                # 3.1 조문 제목 기반 쟁점 매칭 (실질 토큰 기준)
+                title_score = 0.0
+                title_tokens = extract_substantive_tokens(art_title)
+                for tw in title_tokens:
                     is_law_term = tw in law_subwords or any(sw in tw for sw in law_subwords if len(sw) >= 3)
                     weight = 0.3 if is_law_term else 1.0
-                    if missing_text and tw in missing_text:
-                        score += 15.0 * weight  # 누락 쟁점에 조문 제목 단어가 일치 시 매우 높은 부스팅
-                    elif tw in target_query_text:
-                        score += 5.0 * weight
+                    if tw in missing_substantive_tokens:
+                        pts = 15.0 * weight
+                        title_score += pts
+                        reasons.append(f"제목 일치('{tw}', +{pts:.1f})")
+                    elif tw in query_substantive_tokens:
+                        pts = 5.0 * weight
+                        title_score += pts
+                        reasons.append(f"제목 일치('{tw}', +{pts:.1f})")
 
                 # 3.2 조문 본문 내 누락 쟁점 및 질문 키워드 매칭
-                search_tokens = [
-                    t for t in re.findall(r'[가-힣]{2,}|[A-Za-z0-9]{2,}', target_query_text)
-                    if t not in {"경우", "따라", "관한", "대한", "질문", "관련", "어떻게", "있나요", "인가요", "언제", "시점", "여부", "내용", "확인", "필요"}
-                ]
-                for tok in search_tokens:
+                body_score = 0.0
+                for tok in query_substantive_tokens:
                     is_law_term = tok in law_subwords or any(sw in tok for sw in law_subwords if len(sw) >= 3)
-                    weight = 0.2 if is_law_term else (2.0 if missing_text and tok in missing_text else 1.0)
+                    weight = 0.2 if is_law_term else (2.0 if tok in missing_substantive_tokens else 1.0)
                     if tok in full_article_text:
-                        score += 1.0 * weight
+                        pts = 1.0 * weight
+                        body_score += pts
+                        reasons.append(f"본문 일치('{tok}', +{pts:.1f})")
 
-                # 쿼리 키워드가 1개 이상 매칭되거나, 쿼리가 너무 짧을 경우 고려
-                if score > 0 or not target_query_text:
-                    matched_articles.append({
-                        "score": score,
-                        "article_label": article_label,
-                        "article_title": art_title,
-                        "content": full_article_text,
-                    })
+                article_references = _article_references(full_article_text)
 
-            # 점수 내림차순 정렬 후 상위 k개 선택 (score > 0 우선)
-            matched_articles.sort(key=lambda x: x["score"], reverse=True)
-            positive_scored = [a for a in matched_articles if a["score"] > 0]
-            selected_articles = (positive_scored if positive_scored else matched_articles)[:max_articles_per_law]
+                candidate_articles[article_label] = {
+                    "article_label": article_label,
+                    "article_title": art_title,
+                    "content": full_article_text,
+                    "explicit_score": explicit_score,
+                    "title_score": title_score,
+                    "body_score": body_score,
+                    "foundational_boost": 0.0,
+                    "total_score": explicit_score + title_score + body_score,
+                    "references": article_references,
+                    "reasons": reasons,
+                }
+
+            # 3.3 원천 조문 상호 참조 분석 및 보강 (STEP 3 핵심)
+            # 높은 점수를 받은 쟁점 조문(예: 제3조의3 임차권등기명령)이 본문에서 직접 참조하는
+            # 다른 조문(예: 제3조 대항력, 제3조의2 우선변제권)을 식별하여 원천 조문 가중치를 부여한다.
+            for label, item in list(candidate_articles.items()):
+                direct_score = item["title_score"] + item["body_score"]
+                if direct_score >= 10.0 and item["references"]:
+                    for ref_label in item["references"]:
+                        if ref_label in candidate_articles and ref_label != label:
+                            ref_item = candidate_articles[ref_label]
+                            f_boost = min(direct_score * 0.75, 25.0)
+                            ref_item["foundational_boost"] += f_boost
+                            ref_item["reasons"].append(
+                                f"'{label}'({item['article_title']})이 참조하는 원천 조문(+{f_boost:.1f})"
+                            )
+
+            for item in candidate_articles.values():
+                item["total_score"] = (
+                    item["explicit_score"]
+                    + item["title_score"]
+                    + item["body_score"]
+                    + item["foundational_boost"]
+                )
+
+            # 점수 내림차순 정렬
+            sorted_candidates = sorted(
+                candidate_articles.values(),
+                key=lambda x: x["total_score"],
+                reverse=True,
+            )
+            positive_scored = [a for a in sorted_candidates if a["total_score"] > 0]
+            selected_articles = (positive_scored if positive_scored else sorted_candidates)[:max_articles_per_law]
 
             # 만약 키워드 매칭이 전혀 없더라도 주요 총칙/기본 조문 2개라도 포함
             if not selected_articles and article_nodes and not requested_articles:
@@ -419,18 +509,40 @@ def search_official_statutes(
                 first_label = f"제{first_no}조"
                 first_content = (first_node.findtext("조문내용") or "").strip()
                 selected_articles = [{
-                    "score": 0,
+                    "total_score": 0.0,
                     "article_label": first_label,
                     "article_title": first_node.findtext("조문제목") or "",
                     "content": first_content,
+                    "reasons": ["기본 조문(총칙) 기본값"],
                 }]
 
             if requested_articles:
                 missing_requested = requested_articles - {item["article_label"] for item in selected_articles}
                 if missing_requested:
-                    # 요청한 조문이 없을 때 총칙 등 다른 조문을 성공 결과처럼 대신 반환하지 않는다.
-                    logger.warning("[OFFICIAL_STATUTE] '%s' 요청 조문 미확보: %s",
-                                   official_law_name, ", ".join(sorted(missing_requested)))
+                    logger.warning(
+                        "[OFFICIAL_STATUTE] '%s' 요청 조문 미확보: %s",
+                        official_law_name,
+                        ", ".join(sorted(missing_requested)),
+                    )
+
+            # Section 3.5 구조화 로그 기록
+            eval_lines = []
+            for item in sorted_candidates[:max(len(selected_articles) + 2, 6)]:
+                eval_reason = "; ".join(item["reasons"][:2]) or f"점수={item['total_score']:.1f}"
+                eval_lines.append(f"  - {item['article_label']}: {item['article_title']} ({eval_reason})")
+            logger.info("[STATUTE_SEARCH] 후보 조문 평가\n" + "\n".join(eval_lines))
+
+            sel_lines = [f"  - {item['article_label']}: {item['article_title']}" for item in selected_articles]
+            logger.info("[STATUTE_SEARCH] 최종 선택 조문\n" + "\n".join(sel_lines))
+
+            missing_essential = []
+            if requested_articles:
+                missing_essential.extend(sorted(requested_articles - {x['article_label'] for x in selected_articles}))
+            missing_str = ", ".join(missing_essential) if missing_essential else "없음"
+            logger.info("[STATUTE_SEARCH] 누락 필수 조문: %s", missing_str)
+
+            elapsed_ms = (time.perf_counter() - start_time) * 1000
+            logger.info("[STATUTE_SEARCH] 검색 시간: %.1fms", elapsed_ms)
 
             # 4단계: 표준 Source 스키마 형태로 변환 (조문 제목·공포번호·시행일·법령구분 등 전체 상세 정보 반영)
             for item in selected_articles:

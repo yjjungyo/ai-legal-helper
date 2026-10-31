@@ -26,6 +26,30 @@ def law_names(references: list[str]) -> list[str]:
     return [target.law_name for target in _prepare_search_targets(references)]
 
 
+def _is_safe_question_match(part: str, question: str) -> bool:
+    """question_part가 질문 원문의 부분 문자열이거나 질문과 직접 관련된 핵심 쟁점인지 안전하게 검증한다.
+
+    Args:
+        part: 검증기나 계획기가 반환한 질문 부분(question_part).
+        question: 사용자 질문 원문.
+
+    Returns:
+        bool: 안전하게 부합할 경우 True, 무관한 외부 검색일 경우 False.
+    """
+    if not part or not question:
+        return False
+    norm_p = " ".join(part.split())
+    norm_q = " ".join(question.split())
+    if norm_p in norm_q or norm_q in norm_p:
+        return True
+    from ai_legal_helper.tools.official_statute_search import extract_substantive_tokens
+    part_tokens = extract_substantive_tokens(norm_p)
+    if not part_tokens:
+        return False
+    q_tokens = set(extract_substantive_tokens(norm_q))
+    matched = [t for t in part_tokens if t in q_tokens or any(t in qt or qt in t for qt in q_tokens)]
+    return len(matched) >= max(1, len(part_tokens) // 2)
+
 def pending_searches(state: dict[str, Any]) -> list[dict[str, Any]]:
     """질문에 연결된 새 검색만 선택하며 이미 확보·시도한 조문을 제외한다.
 
@@ -74,14 +98,19 @@ def pending_searches(state: dict[str, Any]) -> list[dict[str, Any]]:
         articles_raw = request.get("articles", [])
         norm_part = " ".join(str(part or "").split()) if isinstance(part, str) else ""
         if (not names or not norm_part
-                or norm_part not in norm_question
+                or not _is_safe_question_match(norm_part, norm_question)
                 or not isinstance(issue, str) or not issue.strip()
                 or not isinstance(articles_raw, list) or not all(isinstance(a, str) for a in articles_raw)):
             continue
         articles = _article_references(" ".join(articles_raw))[:10]
         # 한 요청에 확보된 조문과 미확보 조문이 섞여도 새 조문만 다시 조회한다.
+        # 조문 번호가 없는 쟁점 기반 요청의 경우 서로 다른 쟁점이 동일 법령이라는 이유로 탈락하지 않도록 쟁점명을 키에 반영한다.
         for article in articles or [""]:
-            key = hashlib.sha256(json.dumps([names[0], article], ensure_ascii=False).encode()).hexdigest()
+            if article:
+                key = hashlib.sha256(json.dumps([names[0], article], ensure_ascii=False).encode()).hexdigest()
+            else:
+                norm_iss = " ".join(issue.split())
+                key = hashlib.sha256(json.dumps([names[0], "", norm_iss], ensure_ascii=False).encode()).hexdigest()
             if key in history or (article and (names[0], article) in known):
                 continue
             history.add(key)
@@ -137,7 +166,10 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
     found = []
     for name, items in grouped.items():
         articles = list(dict.fromkeys(a for r in items for a in r["articles"]))
-        references = [f"{name} {a}" for a in articles] or [name]
+        has_unnumbered = any(not r.get("articles") for r in items)
+        references = [f"{name} {a}" for a in articles]
+        if has_unnumbered or not references:
+            references.append(name)
         # 쟁점별 검색으로 다른 법·인물·일반 질문 어휘가 관련성 점수를 오염시키지 않게 한다.
         found.extend(search_official_statutes(
             query=" ".join(r["issue"] for r in items), candidate_laws=references,
