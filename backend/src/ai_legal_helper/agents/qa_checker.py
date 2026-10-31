@@ -41,7 +41,7 @@ UNCONFIRMED_TERMINATION_PATTERNS = [
         r"(\d{4}[년\.\-]\s*\d{1,2}[월\.\-]\s*\d{1,2}일?)(?:에|자로)?\s*(?:[가-힣A-Za-z0-9_]+\s*)*(?:완전히|확정적으로)?\s*(?:종료됩니다|해지됩니다|소멸합니다|끝납니다)",
         re.IGNORECASE,
     ),
-    re.compile(r"(?:즉시|무조건|당연히)\s*(?:[가-힣A-Za-z0-9_]+\s*)*(?:종료|반환받을\s*수\s*있|승소)", re.IGNORECASE),
+    re.compile(r"(?:즉시|무조건|당연히|바로)\s*(?:[가-힣A-Za-z0-9_]+\s*)*(?:종료|해지|효력|반환받을\s*수\s*있|반환|승소)", re.IGNORECASE),
 ]
 
 # 브래킷 출처 ID 패턴 (예: [E01], [E99], [STATUTE-001])
@@ -324,10 +324,19 @@ def check_deterministic_qa(
     complex_legal_kws = ("가압류", "압류", "경매", "배당", "우선순위", "우선변제", "소멸", "손해배상", "불법행위", "상계")
     has_complex_rights = any(kw in question or kw in draft_answer for kw in complex_legal_kws)
 
+    # 단순 법령 질의는 법률 조문 규정 내용이나 법정 기간/기준을 묻는 질문이어야 하며,
+    # 당사자 간의 구체적 사실행위(전화, 문자, 통지, 배우자 대리 등) 효력 다툼이나 분쟁 상담은 제외되어야 함
+    statute_inquiry_kws = ("내용", "조문", "규정", "법조문", "기준", "몇 년", "몇 개월", "언제까지", "법률상", "법에서", "법령")
+    is_statute_inquiry = any(kw in question for kw in statute_inquiry_kws)
+    dispute_action_kws = ("배우자", "통지하면", "알린", "보낸", "전화", "문자", "카톡", "합의", "소송", "돌려받지", "보증금을 안", "집주인이", "임대인이")
+    has_dispute_action = any(kw in question for kw in dispute_action_kws)
+
     is_pure_statute_query = (
         (not case_context or case_context.strip() in ("(사건 맥락 없음)", "(사건 정보 없음)"))
         and not has_case_evidence_source
         and has_statute_source
+        and is_statute_inquiry
+        and not has_dispute_action
         and not has_complex_rights
         and len(audit.get("retrieval_source_ids", [])) > 0
         and source_check_passed

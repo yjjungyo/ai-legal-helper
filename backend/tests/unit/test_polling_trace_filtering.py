@@ -22,6 +22,12 @@ from ai_legal_helper.api.schemas.consultation import ConsultationResponse
 from ai_legal_helper.api.routes.consultation import _consultations
 
 
+from ai_legal_helper.api.dependencies import get_current_user
+from ai_legal_helper.database.models import User
+
+mock_user = User(id='test-user-id', email='test@example.com', display_name='testuser')
+app.dependency_overrides[get_current_user] = lambda: mock_user
+
 client = TestClient(app)
 
 

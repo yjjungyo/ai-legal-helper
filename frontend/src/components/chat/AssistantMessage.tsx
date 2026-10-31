@@ -1,88 +1,51 @@
 /**
- * @fileoverview 법률 비서(Assistant) 응답 메시지 렌더러 컴포넌트
- * 진행 중(IN_PROGRESS / APPROVAL_REQUIRED)인 경우 ConsultationProgress 6단계 체크리스트를
- * 동일 위치에서 즉시 렌더링하고, 완료 시 LegalAnswerView 구조화 답변으로 부드럽게 인플레이스 전이합니다.
+ * @fileoverview 법률 비서(Assistant) 메시지 렌더링 컴포넌트 (STEP 6)
+ *
+ * [주요 변경]
+ * 1. 완료 상태 배지(✓ 검증 완료, ⚠️ 조건부 안내, 🛡️ 판단 유보) 기본 헤더에서 제거 (지시서 6.4 A).
+ * 2. 6단계 검증 완료 카드는 상담 완료 후 숨기고, 진행 중일 때만 친절한 상태로 표시 (지시서 6.4 B).
+ * 3. [ANSWER_UI] 진단 로그 출력 (지시서 6.6 - 민감 답변 전문 제외).
+ * 4. 증거 원문 Drawer 상호작용 및 출처 중복 최소화 보존.
  */
 
-import React, { useState } from 'react';
-import type { ConsultationResponse } from '../../types/consultation';
-import { LegalAnswerView, type CitationMeta } from '../LegalAnswerView';
+import React, { useState, useEffect } from 'react';
+import type { ConsultationResponse, Source } from '../../types/consultation';
+import { LegalAnswerView } from '../LegalAnswerView';
 import { ConsultationProgress } from './ConsultationProgress';
 
 export interface AssistantMessageProps {
-  /** 상담 응답 전체 데이터 객체 */
+  /** 렌더링할 어시스턴트 메시지 데이터 */
   message: ConsultationResponse;
-  /** 증거 번호 [E01] 클릭 핸들러 */
-  onEvidenceClick: (label: string, meta?: CitationMeta) => void;
-  /** HILT 법령 검색 승인 핸들러 */
+  /** 증거 태그/출처 클릭 콜백 (사이드바 원문 Drawer 열기) */
+  onEvidenceClick: (label: string, meta?: any) => void;
+  /** HILT 외부 법령 검색 승인 콜백 */
   onApprove: (requestId: string) => void;
-  /** HILT 법령 검색 거절 핸들러 */
+  /** HILT 외부 법령 검색 거절 콜백 */
   onReject: (requestId: string) => void;
-  /** HILT 액션 처리 진행 중 여부 */
+  /** HILT 버튼 처리 중 여부 */
   isActionLoading?: boolean;
 }
 
 /**
- * 시간 표기 헬퍼
+ * ISO 시간 문자열을 읽기 쉬운 오전/오후 형식으로 포맷팅
  */
-function formatTime(dateStr?: string): string {
-  if (!dateStr) return '';
+function formatTime(isoString?: string): string {
+  if (!isoString) return '';
   try {
-    const d = new Date(dateStr);
+    const d = new Date(isoString);
     if (isNaN(d.getTime())) return '';
-    return new Intl.DateTimeFormat('ko-KR', {
-      hour: 'numeric',
-      minute: 'numeric',
+    return d.toLocaleTimeString('ko-KR', {
+      hour: '2-digit',
+      minute: '2-digit',
       hour12: true,
-    }).format(d);
+    });
   } catch {
     return '';
   }
 }
 
 /**
- * 최종 검증 판정 배지 렌더러 (VERIFIED, CAUTIONARY, WITHHELD)
- */
-function renderDispositionBadge(disposition?: string) {
-  if (!disposition) return null;
-  switch (disposition) {
-    case 'VERIFIED':
-    case 'DELIVERED':
-      return (
-        <span
-          className="badge"
-          style={{ backgroundColor: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', fontSize: '0.76em', fontWeight: 600 }}
-        >
-          ✓ 검증 완료
-        </span>
-      );
-    case 'CAUTIONARY':
-      return (
-        <span
-          className="badge"
-          style={{ backgroundColor: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', fontSize: '0.76em', fontWeight: 600 }}
-        >
-          ⚠️ 조건부 안내
-        </span>
-      );
-    case 'WITHHELD':
-      return (
-        <span
-          className="badge"
-          style={{ backgroundColor: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', fontSize: '0.76em', fontWeight: 600 }}
-        >
-          🛡️ 판단 유보
-        </span>
-      );
-    default:
-      return null;
-  }
-}
-
-/**
  * 법률 비서 답변 메시지 컴포넌트
- * @param props 메시지 및 상호작용 콜백
- * @returns 좌측 정렬 어시스턴트 메시지 컨테이너 JSX
  */
 export const AssistantMessage: React.FC<AssistantMessageProps> = ({
   message,
@@ -95,6 +58,19 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
   const isRunningOrApproval = message.status === 'IN_PROGRESS' || message.status === 'APPROVAL_REQUIRED';
   const isFailed = message.status === 'ERROR';
   const timeLabel = formatTime(message.created_at);
+
+  // STEP 6: UI 진단 로그 (지시서 6.6 - 민감한 답변 전문은 제외하고 진단 메타데이터만 기록)
+  useEffect(() => {
+    if (message.answer && !isRunningOrApproval && !isFailed) {
+      console.info('[ANSWER_UI] 최종 답변 수신', {
+        requestId: message.request_id?.slice(0, 8),
+        sourcesCount: message.sources?.length || 0,
+        answerLength: message.answer.length,
+        hasCitations: (message.claim_citations?.length || 0) > 0,
+        mode: message.answer_mode || 'STANDARD_CONSULTATION',
+      });
+    }
+  }, [message.request_id, message.answer, isRunningOrApproval, isFailed, message.sources, message.claim_citations, message.answer_mode]);
 
   const handleCopy = () => {
     if (!message.answer) return;
@@ -117,9 +93,7 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
           <div className="chat-assistant-header">
             <div className="chat-assistant-title-group">
               <span className="chat-assistant-author">AI 법률 비서</span>
-              {/* 진행 중(IN_PROGRESS / APPROVAL_REQUIRED)이거나 오류 상태일 때는 최종 판정 배지를 노출하지 않으며,
-                  분석 및 검증이 최종 완료된 답변(SUCCESS)에 한해 판정 결과(✓ 검증 완료 / ⚠️ 조건부 안내 / 🛡️ 판단 유보)를 표시합니다. */}
-              {!isRunningOrApproval && !isFailed && renderDispositionBadge(message.final_disposition || message.answer_status)}
+              {/* STEP 6 지시서 6.4 A: 내부 검증 완료/조건부/판단유보 배지는 기본 화면에서 제거하고 본문 문장으로 자연스럽게 설명 */}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -142,9 +116,8 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
             </div>
           </div>
 
-          {/* 콘텐츠 영역: 6단계 진행과정 보존 및 답변 렌더링 */}
-          {/* 1. 진행 상태 추적 카드 (진행 중이거나 완료된 경우 항상 보존하여 상단에 렌더링) */}
-          {(isRunningOrApproval || message.progress || message.status === 'SUCCESS' || message.answer) && !isFailed && (
+          {/* 콘텐츠 영역: 진행 중일 때만 간결한 진행 안내 카드 표시 (지시서 6.4 B) */}
+          {isRunningOrApproval && !isFailed && (
             <ConsultationProgress
               progress={message.progress}
               status={message.status}
@@ -153,11 +126,11 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
               onReject={onReject}
               requestId={message.request_id}
               isActionLoading={isActionLoading}
-              isCompleted={!isRunningOrApproval && !isFailed}
+              isCompleted={false}
             />
           )}
 
-          {/* 2. 상태별 세부 결과 (오류 알림 또는 최종 완성된 법률의견서 카드) */}
+          {/* 상태별 세부 결과 (오류 알림 또는 최종 완성된 법률 상담 답변) */}
           {isFailed ? (
             <div
               style={{
@@ -170,21 +143,21 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
               }}
             >
               <div style={{ fontWeight: 700, marginBottom: '4px' }}>
-                ⚠️ 상담 분석 중 오류가 발생했습니다.
+                ⚠️ 상담 분석 중 일시적인 오류가 발생했습니다.
               </div>
               <p style={{ margin: 0, fontSize: '0.86em', color: '#b91c1c' }}>
                 {message.detail || message.answer || '서버와의 통신이 원활하지 않습니다. 잠시 후 다시 질문해주세요.'}
               </p>
             </div>
           ) : message.answer ? (
-            <div className="chat-assistant-card">
+            <div className="chat-assistant-card" style={{ padding: '4px 0' }}>
               <LegalAnswerView
                 content={message.answer || ''}
                 onEvidenceClick={onEvidenceClick}
                 claimCitations={message.claim_citations || (message.verification_result as any)?.claim_citations}
               />
 
-              {/* 하단 인용 출처 목록 배지 */}
+              {/* 하단 인용 출처 목록 배지 (중복 최소화 및 자연스러운 표시) */}
               {message.sources && message.sources.length > 0 && (
                 <div
                   style={{
@@ -202,7 +175,7 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
                   </span>
                   {(() => {
                     const seenDisplays = new Set<string>();
-                    return message.sources.map((s, idx) => {
+                    return message.sources.map((s: Source, idx: number) => {
                       const sid = s.source_id || s.document_id || s.file || `SRC-${idx + 1}`;
                       const rawDocName = s.original_filename || s.document_name || s.filename || s.file_name || s.file || '';
                       const isEv =
@@ -223,55 +196,26 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
                         const artStr = (s.article || (artMatch ? artMatch[1] : '')).replace(/\s+/g, '');
                         const titleMatch = (s.article_title || s.title || s.content || '').match(/제\s*\d+\s*조(?:\s*의\s*\d+)?\s*\(([^)\n]{1,50})\)/);
                         const artTitle = (s.article_title || (titleMatch ? titleMatch[1] : '')).trim();
-                        const paraNo = s.paragraph_no && s.paragraph_no !== '본문' ? s.paragraph_no.trim() : '';
 
                         let artDisplay = artStr;
                         if (artStr && artTitle && !artStr.includes('(')) {
                           artDisplay = `${artStr}(${artTitle})`;
                         }
-                        if (paraNo && artDisplay && !artDisplay.includes(paraNo)) {
-                          artDisplay = `${artDisplay} ${paraNo}`;
-                        }
 
-                        const head = artDisplay && !lawName.includes(artStr) ? `${lawName} ${artDisplay}` : lawName;
-                        const promNo = s.promulgation_number
-                          ? (String(s.promulgation_number).startsWith('제') ? s.promulgation_number : `제${s.promulgation_number}호`)
-                          : '';
-                        const effDate = s.effective_date || s.version_date || '';
-                        const pageStr = s.page && s.page !== '?' ? `p.${s.page}` : '';
-
-                        if (s.retrieval_method === 'OFFICIAL_STATUTE_SEARCH') {
-                          const openLawMeta = [
-                            promNo,
-                            effDate ? `시행 ${effDate}` : '',
-                            rawDocName && rawDocName !== `${lawName}.pdf` ? rawDocName : '국가법령정보센터',
-                          ].filter(Boolean).join(' · ');
-                          displayName = openLawMeta ? `${head} [${openLawMeta}]` : head;
-                        } else {
-                          const ragMeta = [
-                            rawDocName || '',
-                            pageStr,
-                            !rawDocName && effDate ? `시행 ${effDate}` : '',
-                          ].filter(Boolean).join(', ');
-                          displayName = ragMeta && !head.includes(rawDocName) ? `${head} [${ragMeta}]` : head;
-                        }
+                        // STEP 6: 긴 공포번호 나열 대신 간결한 법령명 + 조문명으로 표시
+                        displayName = artDisplay && !lawName.includes(artStr) ? `${lawName} ${artDisplay}` : lawName;
                       } else if (!isEv && (s.source_type === 'PRECEDENT' || s.case_number)) {
                         displayName = [s.court, s.case_number].filter(Boolean).join(' ') || displayName;
                       }
 
-                      // 동일한 법령·조문 또는 증거 표시명의 중복 배지 렌더링 방지
+                      // 동일한 법령·조문 또는 증거 표시명의 중복 배지 렌더링 방지 (지시서 6.4 E)
                       const dedupKey = `${isEv ? 'EV' : 'LAW'}:${displayName}`;
                       if (seenDisplays.has(dedupKey)) return null;
                       seenDisplays.add(dedupKey);
 
-                      const hierarchy = [s.part, s.chapter, s.section].filter(Boolean).join(' > ');
                       const tooltipLines = isEv
                         ? [`증거 문서: ${displayName}`]
-                        : [
-                            displayName,
-                            hierarchy ? `편·장·절: ${hierarchy}` : '',
-                            s.content ? s.content.slice(0, 240) : '',
-                          ].filter(Boolean);
+                        : [`참고 법령: ${displayName}`, s.content ? s.content.slice(0, 200) : ''].filter(Boolean);
 
                       return (
                         <span
@@ -297,6 +241,7 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
                             color: isEv ? '#92400e' : '#1e40af',
                             border: `1px solid ${isEv ? '#fde68a' : '#bfdbfe'}`,
                             cursor: isEv || s.source_url ? 'pointer' : 'default',
+                            transition: 'background-color 0.15s ease',
                           }}
                         >
                           {isEv ? `📄 ${displayName}` : `⚖️ ${displayName}`}

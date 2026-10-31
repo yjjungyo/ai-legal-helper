@@ -156,6 +156,7 @@ export interface ConsultationResponse {
   status: 'IN_PROGRESS' | 'SUCCESS' | 'ERROR' | 'APPROVAL_REQUIRED';
   detail?: string;
   final_disposition?: string;
+  answer_mode?: string | null;
   // 3계층 상태 분리 (P1-05 Three-Tier Status Model)
   execution_status?: 'IN_PROGRESS' | 'APPROVAL_REQUIRED' | 'COMPLETED' | 'ERROR';
   verification_status?: 'PASS' | 'REVISE' | 'INSUFFICIENT' | 'UNVERIFIED' | string;

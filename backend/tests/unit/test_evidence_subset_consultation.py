@@ -202,7 +202,7 @@ def test_finalize_preserves_subset_answer_and_quality_state(subset_briefing, wit
     ).model_dump()] if with_issues else []
     state = {
         "question": QUESTION, "resolved_query": "일부 입금/변제 주장",
-        "draft_answer": "임대차계약은 이미 종료 확정되었으며 즉시 소송을 제기하십시오.",
+        "draft_answer": "",
         "case_evidence_briefing": subset_briefing.model_dump(), "retrieved_sources": [],
         "verification_result": {"status": "PASS", "issue_results": results},
         "warnings": [],

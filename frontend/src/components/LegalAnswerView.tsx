@@ -661,74 +661,9 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
           );
         }
 
-        // 4. 다음 행동 권장 조치 카드 (산뜻한 블루 카드)
-        if (sec.type === 'action') {
-          return (
-            <div
-              key={idx}
-              style={{
-                backgroundColor: '#f0fdf4',
-                border: '1px solid #bbf7d0',
-                borderLeft: '4px solid #16a34a',
-                borderRadius: 'var(--radius-md, 6px)',
-                padding: '12px 14px',
-                color: 'var(--text-main, #1e293b)',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  fontWeight: 700,
-                  fontSize: '0.94em',
-                  color: '#15803d',
-                  marginBottom: '6px',
-                }}
-              >
-                <span>{sec.icon || '🚀'}</span>
-                <span>{sec.title}</span>
-
-              </div>
-              <div style={{ fontSize: '0.91em', color: 'var(--text-main)' }}>
-                {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx, onEvidenceClick, claimCitations))}
-              </div>
-            </div>
-          );
-        }
-
-        // 5. 일반 본문 및 8대 권장 구성요소 카드
-        const isSummary = sec.type === 'summary';
-        const isFacts = sec.type === 'facts';
+        // 4. 일반 본문 및 유연한 소제목 섹션 (STEP 6 지시서 6.4 C: 과도한 카드 스타일 제거 및 문단 중심 레이아웃)
         const hasTitle = Boolean(sec.title);
-        const nonEmptyLines = linesToRender.filter((l) => l.trim().length > 0);
-
-        // 소제목이 없는 다중 문단 통글인 경우에도 문단별 구분 카드로 가독성 향상
-        if (!hasTitle && sections.length === 1 && nonEmptyLines.length >= 2) {
-          return (
-            <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {nonEmptyLines.map((l, lIdx) => {
-                const isFirstLead = lIdx === 0;
-                return (
-                  <div
-                    key={lIdx}
-                    style={{
-                      backgroundColor: isFirstLead ? '#f8fafc' : '#ffffff',
-                      border: '1px solid #e2e8f0',
-                      borderLeft: isFirstLead ? '4px solid #2563eb' : '3px solid #94a3b8',
-                      borderRadius: '8px',
-                      padding: '10px 14px',
-                      fontSize: '0.92em',
-                      color: 'var(--text-main, #1e293b)',
-                    }}
-                  >
-                    {renderFormattedLine(l, lIdx, onEvidenceClick, claimCitations)}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        }
+        const isAction = sec.type === 'action';
 
         return (
           <div
@@ -736,42 +671,40 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
             style={{
               display: 'flex',
               flexDirection: 'column',
-              gap: '6px',
-              backgroundColor: isSummary ? '#f8fafc' : hasTitle ? '#ffffff' : 'transparent',
-              border: hasTitle ? '1px solid var(--border, #e2e8f0)' : 'none',
-              borderLeft: isSummary
-                ? '4px solid #2563eb'
-                : isFacts
-                  ? '4px solid #0284c7'
-                  : hasTitle
-                    ? '4px solid #64748b'
-                    : 'none',
-              borderRadius: hasTitle ? '8px' : '0',
-              padding: hasTitle ? '12px 14px' : '0',
+              gap: '4px',
+              marginTop: hasTitle && idx > 0 ? '14px' : '0',
             }}
           >
-            {sec.title && (
-              <div
+            {hasTitle && (
+              <h3
                 style={{
+                  margin: '8px 0 6px 0',
+                  fontSize: '1.04em',
                   fontWeight: 700,
-                  fontSize: '0.96em',
-                  color: isSummary ? '#1e40af' : isFacts ? '#0369a1' : 'var(--primary, #2563eb)',
+                  color: isAction ? '#15803d' : '#1e293b',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  paddingBottom: '6px',
+                  lineHeight: 1.4,
                   borderBottom: '1px solid #f1f5f9',
+                  paddingBottom: '4px',
                 }}
               >
-                <span>{sec.icon || '▪'}</span>
                 <span>{sec.title}</span>
-              </div>
+              </h3>
             )}
-            <div style={{ fontSize: '0.92em', color: 'var(--text-main)' }}>
+            <div
+              style={{
+                fontSize: '0.94em',
+                color: 'var(--text-main, #1e293b)',
+                lineHeight: 1.74,
+              }}
+            >
               {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx, onEvidenceClick, claimCitations))}
             </div>
           </div>
         );
+
       })}
     </div>
   );
