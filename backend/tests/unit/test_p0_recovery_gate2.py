@@ -196,7 +196,7 @@ def test_r13_multiple_citations_of_same_evidence_has_no_duplicates_in_sources(ba
     sources_section = answer.split("[6. 참고 법률 및 증거 출처]")[1]
 
     # 계약서가 2회 이상 중복 등록되지 않았는지 확인
-    assert sources_section.count("[E01_주택임대차계약서.pdf]") == 1
+    assert sources_section.count("E01_주택임대차계약서.pdf") == 1
     # 법령도 중복 없이 1회만 표시되었는지 확인
     assert sources_section.count("주택임대차보호법 제6조") == 1
 
@@ -242,14 +242,11 @@ def test_r15_standard_unreturned_deposit_restricts_actions_to_3_to_5_prioritized
     # 1. 행동 항목 수가 3~5개 사이인지 검증 (과잉 12~14개 완전 배제)
     assert 3 <= len(action_items) <= 5, f"Expected 3~5 actions, got {len(action_items)}"
 
-    # 2. 1순위: 대항력 및 점유 절대 유지
-    assert "점유" in action_items[0] and ("상실" in action_items[0] or "유지" in action_items[0])
-
-    # 3. 2순위: 내용증명 발송 (이행최고)
-    assert "내용증명" in action_items[1]
-
-    # 4. 3순위: 임차권등기명령 신청
-    assert "임차권등기명령" in action_items[2]
+    # 쟁점 검증 결과가 없으므로 사용자의 종료 주장만으로 법적 절차를 명령하지 않는다.
+    assert "갱신" in action_items[0] and "수신" in action_items[0]
+    assert "반환 거래" in action_items[1]
+    assert "현재 점유" in action_items[2]
+    assert "임차권등기명령을 신청" not in action_section
 
 
 def test_r16_no_auction_case_strictly_excludes_auction_dividend_action(base_scenario_gate2):

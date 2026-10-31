@@ -26,10 +26,12 @@
 """
 
 from typing import List, Dict, Any, Optional, Literal, Union, Tuple
+import datetime
 import re
 from pydantic import BaseModel, Field
 
 from ai_legal_helper.case_intelligence.case_briefing import CaseEvidenceBriefing
+from ai_legal_helper.case_intelligence.consultation_semantics import is_conditional_contract_statement
 from ai_legal_helper.case_intelligence.settlement_calculator import (
     is_fact_strictly_verified,
     format_krw_to_korean,
@@ -361,7 +363,11 @@ def verify_issue(
         # 묵시적 갱신 여부에 따른 해지 요건사실 분기
         if notice_info["is_implicit_renewal"]:
             if has_lease and has_reached and law_verified:
-                if notice_info.get("is_effect_date_future"):
+                if not effect_date:
+                    status = "CONDITIONAL"
+                    reason_codes.append("TERMINATION_EFFECT_DATE_UNCONFIRMED")
+                    safe_recommendations.append("해지 통지의 정확한 도달일이 없어 법정 효력 발생일을 확정할 수 없습니다.")
+                elif notice_info.get("is_effect_date_future"):
                     status = "CONDITIONAL"
                     reason_codes.append("TERMINATION_EFFECT_DATE_FUTURE")
                     safe_recommendations.append(
@@ -412,7 +418,7 @@ def verify_issue(
                 if not is_fact_strictly_verified(f, briefing):
                     continue
                 stmt = f.statement or ""
-                if any(w in stmt for w in ["만기", "만료", "계약기간", "종료"]):
+                if any(w in stmt for w in ["만기", "만료", "계약기간", "계약 기간", "임대차 기간", "종료"]):
                     expiry_dates.extend(extract_dates_from_text(stmt))
 
             is_future_expiry = False
@@ -431,11 +437,19 @@ def verify_issue(
                     pass
 
             is_term_expired = bool(contract_expiry_date and not is_future_expiry)
-            is_expired_or_reached = (
-                is_term_expired
-                or has_reached
-                or any(any(w in f.statement for w in ("만료", "종료")) for f in briefing.facts if is_fact_strictly_verified(f, briefing))
-            )
+            # 최초 만기 경과·일반 반환 조항·통지 도달만으로 현재 종료를 확정하지 않는다.
+            # 갱신 정보가 없을 때도 실제 종료 사건이 별도로 입증되어야 한다.
+            actual_termination_facts = [
+                f for f in briefing.facts
+                if is_fact_strictly_verified(f, briefing)
+                and not is_conditional_contract_statement(f.statement)
+                and re.search(
+                    r"(?:종료|해지)(?:되었|됐|하였다|하였|됨|되었습니다)|"
+                    r"합의\s*해지\s*완료",
+                    f.statement,
+                )
+            ]
+            is_expired_or_reached = bool(actual_termination_facts)
             if has_lease and is_future_expiry:
                 status = "CONDITIONAL"
                 reason_codes.append("TERMINATION_EXPIRY_DATE_FUTURE")
@@ -448,8 +462,7 @@ def verify_issue(
                 reason_codes.append("TERMINATION_FACTS_AND_LAW_SUPPORTED")
                 if is_term_expired:
                     safe_recommendations.append(
-                        f"임대차계약서상 계약 만기일({contract_expiry_date})이 경과하였고, "
-                        "임차인의 갱신거절·해지 통지에 대한 임대인 확인 회신 또는 기간 만료 사실이 공적으로 확인되었으므로, "
+                        f"임대차계약서상 계약 만기일({contract_expiry_date}) 경과와 별도로 실제 종료 사실이 등록 증거로 확인되었으므로, "
                         f"주택임대차보호법 제6조에 근거하여 임대인의 보증금 {deposit_text}(기변제 공제 후 {demand_summary_text}) 반환 채무는 확정적으로 이행기에 도달하였습니다."
                     )
                 else:
@@ -486,7 +499,19 @@ def verify_issue(
         effect_date = notice_info["statutory_effect_date"]
         move_out_date = notice_info["designated_move_out_date"]
 
-        if has_lease and has_reached and law_verified:
+        if has_lease and has_reached and notice_info.get("renewal_status") == "UNKNOWN":
+            # 통지 도달 자체는 확인해도 갱신 유형·종료 효력은 별도로 입증해야 한다.
+            status = "CONDITIONAL"
+            reason_codes.append("NOTICE_RENEWAL_STATUS_UNCONFIRMED")
+            safe_recommendations.append(
+                "통지 도달 사실은 확인되나 갱신 유형과 현재 계약 종료 여부는 미확인입니다. "
+                "최초 만기 이후의 갱신 경위와 통지 내용·일자를 대조해야 합니다."
+            )
+        elif has_lease and has_reached and law_verified and notice_info["is_implicit_renewal"] and not effect_date:
+            status = "CONDITIONAL"
+            reason_codes.append("NOTICE_EFFECT_DATE_UNCONFIRMED")
+            safe_recommendations.append("해지 통지의 정확한 도달일이 없어 법정 효력 발생일을 확정할 수 없습니다.")
+        elif has_lease and has_reached and law_verified:
             # 묵시적 갱신이 아닌 계약 만기 갱신거절 사안에서는 3개월 경과 효력일이 아닌 만기일에 확정 종료 (P0-02)
             if not notice_info["is_implicit_renewal"]:
                 status = "VERIFIED"
@@ -506,7 +531,7 @@ def verify_issue(
                     date_prefix = f"{ack_date} " if ack_date else ""
                     rec_parts.append(f"임대인이 {date_prefix}답변 또는 회신을 함으로써 통고 수령 사실이 객관적으로 입증됩니다. ")
 
-                rec_parts.append(f"따라서 계약기간 만료에 따라 임대인의 보증금 {deposit_text}(기변제 공제 후 {demand_summary_text}) 반환 채무는 확정적으로 이행기에 도달하였습니다.")
+                rec_parts.append("통지 도달과 계약 종료·반환채무 이행기는 별개의 판단이므로 계약기간과 갱신거절 요건을 함께 확인해야 합니다.")
                 safe_recommendations.append("".join(rec_parts))
             elif notice_info.get("is_effect_date_future"):
                 status = "CONDITIONAL"
@@ -962,7 +987,7 @@ def verify_issue(
         )
         verified_claims.append(v_rec_claim.model_dump())
 
-    logger.debug(f"[ISSUE_VERIFIER] {issue.issue_id} -> {status} (Facts={len(supported_fact_ids)}, Statutes={len(supported_statute_ids)})")
+    logger.debug(f"[ISSUE_VERIFIER] 쟁점 검증({issue.issue_id}) -> 상태={status} (확인사실={len(supported_fact_ids)}건, 법령근거={len(supported_statute_ids)}건)")
 
     return IssueVerificationResult(
         issue_id=issue.issue_id,

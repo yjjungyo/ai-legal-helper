@@ -121,7 +121,7 @@ def generate_node(state: DocumentState) -> DocumentState:
         state.structured_content = res.dict()
         state.draft_content = res.full_content
     except Exception as e:
-        logger.error(f"Doc Generation error: {e}")
+        logger.error(f"[법률 문서 생성] 문서 초안 생성 중 오류 발생: {e}")
         state.draft_content = "생성 오류 발생"
         
     return state

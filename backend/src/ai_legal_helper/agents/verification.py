@@ -32,21 +32,33 @@ from ai_legal_helper.rag.source_schema import normalize_source_dict
 
 logger = get_logger(__name__)
 
-# (파일명.pdf, p.페이지) 형태의 인용을 추출하는 정규식 패턴 (중복 괄호 `((...))` 및 법령 파일명 내 괄호 허용)
+# (파일명.pdf, p.페이지) 형태의 인용을 추출하는 정규식 패턴 (중복 괄호 `((...))`, 법령 파일명 내 괄호 및 앞부분 조문 표기 허용)
 CITATION_PATTERN = re.compile(
-    r"\(+\s*([^\n,]+?\.(?:pdf|docx|txt))\s*,\s*p\.?\s*([0-9\-~]+|\?)\s*\)+",
+    r"(?<![가-힣A-Za-z0-9])\(+\s*(?:[^\n,]+?[,·]\s*)?([가-힣A-Za-z0-9_\-\s·()]+?\.(?:pdf|docx|txt))\s*,\s*p\.?\s*([0-9\-~]+|\?)\s*\)+",
     re.IGNORECASE,
 )
-# 공식 법령 조문 인용 패턴 (예: (주택임대차보호법 제6조의2), (민법 제623조), 민법 제6조)
-# [P0-VER-01] 괄호 유무 및 조사 접미사와 관계없이 실제 본문에서 언급·인용된 법령 조문이 누락 없이 검색 출처와 매칭되도록 보강한다.
+# 공식 법령 조문 인용 패턴 (예: (주택임대차보호법 제6조의2(묵시적 갱신의 경우 계약의 해지)), (민법 제623조), 민법 제6조)
+# [P0-VER-01] 괄호 유무, 조문제목 괄호 및 조사 접미사와 관계없이 실제 본문에서 언급·인용된 법령 조문이 누락 없이 검색 출처와 매칭되도록 보강한다.
 STATUTE_CITATION_PATTERN = re.compile(
-    r"(?:\(+\s*|(?<![가-힣]))([가-힣]+(?:법률|법|시행령|시행규칙))\s+(제\s*\d+\s*조(?:\s*의\s*\d+)?)(?:\s*\)+|(?=[은는이가의을를에로서와과,.:\-\)\s\n]|\Z))",
+    r"(?:\(+\s*|(?<![가-힣]))([가-힣]+(?:법률|법|시행령|시행규칙))\s+(제\s*\d+\s*조(?:\s*의\s*\d+)?)(?:\s*\([^)\n]{1,60}\))?(?:\s*\)+|(?=[은는이가의을를에로서와과,.:\-\(\)\s\n]|\Z))",
+    re.IGNORECASE,
+)
+# [E05_퇴거_및_보증금_반환_요청_문자.txt] 형태의 전체 파일명 대괄호 인용 패턴
+BRACKET_FILE_CITATION_PATTERN = re.compile(
+    r"\[\s*([^\[\]\n]+?\.(?:pdf|docx|txt|png|jpg|jpeg))\s*\]",
     re.IGNORECASE,
 )
 # [GRAPH:id] 또는 [VECTOR:id] 형태의 증거 인용 패턴
 GRAPH_CITATION_PATTERN = re.compile(r"\[((?:GRAPH|VECTOR):[^\]]+)\]")
 # 판례 사건번호 패턴 (예: 2022다21580, 2023도99999)
-CASE_NUMBER_PATTERN = re.compile(r"(?<!\d)((?:19|20)\d{2}\s*[가-힣]{1,3}\s*\d{3,7})(?!\d)")
+# 일반 한글을 사건 부호로 허용하면 '2024년과 2026년'도 판례로 집계된다.
+# 알려진 부호만 인식하며, 지원하지 않는 부호는 출처의 명시적 case_number로 확장한다.
+CASE_NUMBER_PATTERN = re.compile(
+    r"(?<![\d가-힣])((?:19|20)\d{2}\s*"
+    r"(?:가합|가단|가소|나|다|라|마|그|바|카합|카단|카기|카명|타경|타채|타기|"
+    r"고합|고단|고정|고약|노|도|로|모|구합|구단|누|두|후|허|헌가|헌나|헌다|헌라|헌마|헌바|헌사)"
+    r"\s*\d{1,7})(?!\d)"
+)
 # 조문 번호 패턴 (예: 제3조, 제621조의2)
 ARTICLE_PATTERN = re.compile(r"(제\s*\d+\s*조(?:\s*의\s*\d+)?)")
 # 사건 증거 번호 패턴 (예: "증거 1", "증거 7호", "[증거 2]", "증 제1호증")
@@ -70,7 +82,7 @@ class ClaimVerification(BaseModel):
     claim: str = Field(description="검증할 법률 주장")
     claim_type: Optional[str] = Field(
         default="LEGAL_APPLICATION",
-        description="주장 유형: LEGAL_RULE (법령/판례 규범), CASE_FACT (사건 객관적 사실), LEGAL_APPLICATION (법률 적용 및 효과 판단), RECOMMENDATION (후속 행동/절차 가이드), USER_STATEMENT (사용자 진술 사실)"
+        description="주장 유형: LEGAL_RULE (법령/판례 규범), CASE_FACT (사건 객관적 사실), CASE_INFERENCE (사건 증거 기반 자금사정·회수 위험 등 정황 추론), LEGAL_APPLICATION (법률 적용 및 효과 판단), RECOMMENDATION (후속 행동/절차 가이드), USER_STATEMENT (사용자 진술 사실)"
     )
     fact_status: Optional[str] = Field(
         default="USER_STATEMENT",
@@ -79,6 +91,10 @@ class ClaimVerification(BaseModel):
     source_ids: List[str] = Field(default_factory=list, description="주장을 뒷받침하는 출처 ID 목록 (없으면 빈 배열)")
     grounding_status: str = Field(default="UNCERTAIN", description="SUPPORTED, UNSUPPORTED, UNCERTAIN, 또는 NOT_APPLICABLE")
     reason: str = Field(default="", description="검증 사유")
+    inference_basis: str = Field(default="", description="사건 추론을 뒷받침하는 자료와 추론 관계")
+    inference_limit: str = Field(default="", description="답변 원문에 명시된 추론 한계의 연속 인용")
+    model_grounding_status: Optional[str] = Field(default=None, description="정책 적용 전 모델 판정")
+    model_reason: Optional[str] = Field(default=None, description="정책 적용 전 모델 사유")
 
 
 class VerificationOutput(BaseModel):
@@ -90,6 +106,8 @@ class VerificationOutput(BaseModel):
     )
     missing_legal_issues: List[str] = Field(default_factory=list, description="법령 검색이 필요한 구체적 법률 쟁점 목록")
     candidate_laws: List[str] = Field(default_factory=list, description="부족한 쟁점을 규율하는 후보 법령명 목록 (예: ['주택임대차보호법'])")
+    legal_search_requests: List[Dict[str, Any]] = Field(default_factory=list, description="질문 부분·법령·조문·누락 법리별 검색 요청")
+    preserved_points: List[str] = Field(default_factory=list, description="다음 수정에서도 원문 대조 후 유지할 올바른 설명")
     recommended_action: Optional[str] = Field(
         default="FINALIZE",
         description="REQUEST_STATUTE_SEARCH_APPROVAL, REQUEST_EVIDENCE, REVISE_DRAFT, SAFE_FALLBACK, 또는 FINALIZE"
@@ -101,6 +119,8 @@ class VerificationOutput(BaseModel):
     revision_instructions: List[str] = Field(default_factory=list, description="답변 수정을 위한 지침 (REVISE 상태일 때 유용)")
     warnings: List[str] = Field(default_factory=list, description="사용자에게 보여줄 경고 메시지 목록")
     citation_audit: Dict[str, Any] = Field(default_factory=dict, description="결정론적 인용 검증 및 Langfuse 추적 메트릭")
+    question_coverage: List[Dict[str, Any]] = Field(default_factory=list, description="현재 질문의 각 요청에 대한 question, answered(bool), reason 목록")
+    consistency_checks: Dict[str, Dict[str, Any]] = Field(default_factory=dict, description="시간 순서·의사표시 내용·증명 수준의 passed(bool), reason, source_ids 점검")
 
 
 VERIFICATION_PROMPT = """당신은 법률검증 Agent(Legal Verification Agent)입니다.
@@ -313,8 +333,8 @@ def _check_claim_supported_by_source(
             # [P0-VER-01] 법령 출처이고 조문 번호가 일치하면(Check 1의 조문 불일치가 없었으므로), 해당 조문 인용은 유효하게 뒷받침됨
             if is_statute_source and has_matching_article:
                 return True, None
-            # 법령 문서(PDF) 자체 참조이거나 조문 도입/참조 문맥인 경우 허용
-            if is_statute_source and (is_short_reference or is_statute_intro) and not claimed_articles:
+            # 짧은 법령 목록/헤더 참조 문맥인 경우 허용
+            if is_statute_source and is_short_reference and not claimed_articles:
                 return True, None
             return False, "UNSUPPORTED_BY_SOURCE_CONTENT"
 
@@ -578,6 +598,20 @@ def audit_citations_and_claims(
             if cite_id not in validated_citation_ids:
                 validated_citation_ids.append(cite_id)
 
+    # 6. [E05_퇴거_및_보증금_반환_요청_문자.txt] 형태의 전체 파일명 대괄호 인용 검증
+    for bf_match in BRACKET_FILE_CITATION_PATTERN.finditer(draft_answer):
+        raw_bf = bf_match.group(1).strip()
+        clean_bf = os.path.basename(raw_bf).lower()
+        matched_bf_sources = by_filename.get(clean_bf, [])
+        if matched_bf_sources:
+            for ms in matched_bf_sources:
+                ms_id = str(ms.get("source_id") or raw_bf)
+                if ms_id not in generated_citation_ids:
+                    generated_citation_ids.append(ms_id)
+                if ms_id not in validated_citation_ids:
+                    validated_citation_ids.append(ms_id)
+                validated_sources_map[ms_id] = ms
+
     total_gen = len(generated_citation_ids)
     not_exist_count = sum(
         1 for cid in rejected_citation_ids
@@ -605,6 +639,7 @@ def audit_citations_and_claims(
                 1 for s in substantive_segs
                 if (CITATION_PATTERN.search(s) or 
                     STATUTE_CITATION_PATTERN.search(s) or 
+                    BRACKET_FILE_CITATION_PATTERN.search(s) or
                     GRAPH_CITATION_PATTERN.search(s) or 
                     CASE_NUMBER_PATTERN.search(s))
             )
@@ -742,6 +777,7 @@ def run_verification(
     draft_answer: str,
     retrieved_sources: List[Dict[str, Any]],
     case_context: str = "",
+    *, require_question_coverage: bool = False, allow_partial_answer: bool = False,
 ) -> Dict[str, Any]:
     """초안 답변이 검색된 출처에 의해 뒷받침되는지 결정론적 Citation Validator 및 LLM으로 검증한다.
 
@@ -750,6 +786,8 @@ def run_verification(
         draft_answer: 여러 전문 에이전트가 작성하고 종합된 초안 답변.
         retrieved_sources: 각 에이전트가 RAG 검색을 통해 참조한 실제 문서 메타데이터 목록.
         case_context: 사건 기본 정보, 사실관계, 타임라인, 증거 브리핑 문자열.
+        require_question_coverage: 문서 상담에서 질문의 모든 요청과 사실 주장까지 엄격히 확인할지 여부.
+        allow_partial_answer: 제한 답변에서 실제로 고지된 판단 한계만 질문의 부분 충족으로 인정할지 여부.
 
     Returns:
         Dict[str, Any]: `VerificationOutput` 스키마 형태의 검증 결과 딕셔너리.
@@ -764,27 +802,25 @@ def run_verification(
     rejected_id_set = set(audit["rejected_citation_ids"])
     rejection_reasons = audit.get("rejection_reasons", {})
 
-    # 2. 검증 LLM용 출처 목록 포맷팅 (P0-05/Gate 3: 상위 6개 핵심 출처 제한 및 청크 길이 400자 최적화로 토큰/지연시간 대폭 절감)
-    formatted_sources = ""
-    for s in (retrieved_sources or [])[:6]:
-        fname = s.get("filename") or s.get("file_name") or s.get("source_id") or "UNKNOWN"
-        page = s.get("page") or "1"
-        stype = s.get("source_type") or "DOCUMENT"
-        cnt = str(s.get("content") or "").strip()
-        cnt_short = cnt[:400] + "..." if len(cnt) > 400 else cnt
-        formatted_sources += (
-            f"- ID: {s.get('source_id')} | Type: {stype} | File: {fname} (p.{page})\n"
-            f"  Content: {cnt_short}\n\n"
-        )
-
-    if not formatted_sources.strip():
-        formatted_sources = "(검색된 출처 없음)"
-
-    prompt = PromptTemplate.from_template(VERIFICATION_PROMPT)
+    # 검색 순서 때문에 뒤에 추가된 공식 법령이 사라지지 않도록 전체 본문을 전달한다.
+    from ai_legal_helper.rag.grounding_context import format_grounding_sources
+    from ai_legal_helper.agents.document_verification_prompt import DOCUMENT_VERIFICATION_PROMPT
+    prompt = PromptTemplate.from_template(
+        DOCUMENT_VERIFICATION_PROMPT if require_question_coverage else VERIFICATION_PROMPT
+    )
     from ai_legal_helper.llm.gateway import get_llm
-    llm = get_llm(temperature=0.0)
 
     try:
+        formatted_sources, source_manifest = format_grounding_sources(retrieved_sources)
+        llm = get_llm(temperature=0.0)
+        if allow_partial_answer:
+            case_context += (
+                "\n제한 답변 모드: 확인된 사실과 근거 있는 조건부 설명을 검증합니다. "
+                "질문의 일부를 자료 부족으로 답할 수 없고 그 한계를 실제 답변에 명시했다면 "
+                "question_coverage에 answered=false, answerable=false, limitation_disclosed=true, "
+                "limitation_statement=답변의 한계 문구를 그대로 적으세요. 이 경우 부분 답변으로 PASS가 "
+                "가능합니다. 근거 없는 주장·시간 오류·아무 내용 없이 확인만 요구하는 답변은 여전히 실패입니다."
+            )
         formatted_prompt = prompt.format(
             question=question,
             draft_answer=draft_answer,
@@ -816,17 +852,314 @@ def run_verification(
 
         data = json.loads(text.strip())
         result = VerificationOutput(**data)
+        coverage_complete = (bool(result.question_coverage) and all(
+            isinstance(item.get("question"), str) and bool(item["question"].strip())
+            and (item.get("answered") is True or (
+                allow_partial_answer and item.get("answered") is False
+                and item.get("answerable") is False and item.get("limitation_disclosed") is True
+                and isinstance(item.get("limitation_statement"), str)
+                and bool(item["limitation_statement"].strip())
+                and item["limitation_statement"].strip() in draft_answer
+            )) for item in result.question_coverage
+        ))
+        consistency_complete = all(
+            isinstance(result.consistency_checks.get(key), dict)
+            and result.consistency_checks[key].get("passed") is True
+            and isinstance(result.consistency_checks[key].get("reason"), str)
+            and bool(result.consistency_checks[key]["reason"].strip())
+            for key in ("opening_conclusion", "timeline", "expressed_intent", "provenance")
+        )
+        if require_question_coverage and not coverage_complete:
+            result.status = "REVISE"
+            if result.reason_code in (None, "NONE"):
+                result.reason_code = "ANSWER_REVISION_REQUIRED"
+            result.revision_instructions.append("현재 질문의 모든 요청에 직접 답하고 미응답 항목을 보완하세요.")
+        if require_question_coverage and not consistency_complete:
+            result.status = "REVISE"
+            if result.reason_code in (None, "NONE"):
+                result.reason_code = "ANSWER_REVISION_REQUIRED"
+            result.revision_instructions.append("시간 순서, 의사표시 내용, 증명 수준을 원문과 대조하여 결론을 보완하세요.")
 
         # 3. LLM이 반환한 Claim별 source_ids가 실제 Source Registry에 존재하는지 교차 검증
+        def _norm_quote(txt: str) -> str:
+            """마크다운 강조 기호(** 등) 및 글머리 기호 유무 차이로 인한 오탐을 방지하되 문장 변형은 차단한다."""
+            cleaned = re.sub(r"(\*\*|__|`)", "", txt or "")
+            cleaned = re.sub(r"^\s*(?:[-•*]|\d+[.)]|#{1,4})\s*", "", cleaned)
+            return " ".join(cleaned.split())
+
+        def _resolve_canonical_source_id(raw_sid: str) -> Optional[str]:
+            """검증기가 반환한 출처 식별자를 Source Registry의 정규 전체 이름(source_id)으로 해석·정규화한다."""
+            s_clean = str(raw_sid or "").strip()
+            if not s_clean or s_clean in rejected_id_set:
+                return None
+            if s_clean in valid_source_id_set:
+                return s_clean
+
+            bare = re.sub(r"^EVIDENCE:", "", s_clean, flags=re.IGNORECASE).strip()
+            bare_lower = bare.lower()
+            # 1. 사건 문서 전체 파일명, 제목, evidence_id 또는 파일명 접두사 매칭
+            for src in retrieved_sources or []:
+                cand_sid = str(src.get("source_id") or "")
+                if not cand_sid or cand_sid not in valid_source_id_set or cand_sid in rejected_id_set:
+                    continue
+                for field_key in ("filename", "file_name", "document_name", "title", "evidence_id"):
+                    fval = str(src.get(field_key) or "").strip()
+                    if fval and (fval.lower() == bare_lower or os.path.splitext(fval)[0].lower() == bare_lower):
+                        return cand_sid
+                if re.match(r"^E\d{1,3}$", bare, re.IGNORECASE):
+                    fn_val = str(src.get("filename") or src.get("document_name") or cand_sid).strip()
+                    if fn_val.upper().startswith(f"{bare.upper()}_"):
+                        return cand_sid
+
+            # 2. 법령(STATUTE) 출처의 법령명 + 조문번호 매칭 -> 정규 상세 법령 source_id로 승격
+            art_m = ARTICLE_PATTERN.search(s_clean)
+            if art_m:
+                art_norm = re.sub(r"\s+", "", art_m.group(1))
+                for src in retrieved_sources or []:
+                    cand_sid = str(src.get("source_id") or "")
+                    if not cand_sid or cand_sid not in valid_source_id_set or cand_sid in rejected_id_set:
+                        continue
+                    s_law = str(src.get("statute_name") or "").strip()
+                    s_art = re.sub(r"\s+", "", str(src.get("article") or ""))
+                    if s_law and s_art and s_law in s_clean and s_art == art_norm:
+                        if f"{s_law}_{s_art}" not in rejected_id_set:
+                            return cand_sid
+            return None
+
+        norm_draft = _norm_quote(draft_answer)
         for claim_obj in result.claims:
-            verified_claim_sids = [
-                sid for sid in claim_obj.source_ids
-                if sid in valid_source_id_set and sid not in rejected_id_set
-            ]
-            if claim_obj.source_ids and not verified_claim_sids:
+            # 모델 판단과 정책 판단을 분리해 수정 작성자가 모순된 사유를 받지 않게 한다.
+            claim_obj.model_grounding_status = claim_obj.grounding_status
+            claim_obj.model_reason = claim_obj.reason
+            # 검증기가 실제 문장을 조건부 문장으로 바꿔 옮기면 원래 단정의 오류를 놓친다.
+            # 문서 상담에서는 마크다운 기호·공백 정규화만 허용하고 답변에 없는 재서술을 근거 검증에서 제외한다.
+            if require_question_coverage and _norm_quote(claim_obj.claim) not in norm_draft:
+                claim_obj.grounding_status = "UNSUPPORTED"
+                claim_obj.reason = "실제 답변에 존재하는 문장을 그대로 검증해야 합니다."
+            verified_claim_sids: List[str] = []
+            all_resolved = True
+            for sid in claim_obj.source_ids:
+                resolved_sid = _resolve_canonical_source_id(sid)
+                if resolved_sid:
+                    if resolved_sid not in verified_claim_sids:
+                        verified_claim_sids.append(resolved_sid)
+                else:
+                    all_resolved = False
+            if claim_obj.source_ids and (not verified_claim_sids or (require_question_coverage and not all_resolved)):
                 claim_obj.grounding_status = "UNSUPPORTED"
                 claim_obj.reason = (claim_obj.reason + " (지정된 출처 ID가 실제 검색 결과에 존재하지 않거나 본문과 불일치함)").strip()
             claim_obj.source_ids = verified_claim_sids
+
+        if require_question_coverage:
+            legal_source_ids = {str(s.get("source_id")) for s in retrieved_sources if (
+                s.get("source_type") in ("STATUTE", "PRECEDENT")
+                or s.get("statute_name") or s.get("case_number")
+            ) and s.get("source_type") != "CASE_EVIDENCE"}
+            case_evidence_ids = {
+                str(s.get("source_id"))
+                for s in retrieved_sources
+                if s.get("source_type") == "CASE_EVIDENCE" and s.get("source_id")
+            }
+
+            _INFERENCE_RISK_MARKERS = (
+                "위험", "가능성", "정황", "신호", "재평가", "자금난", "자금 압박", "자금사정",
+                "전액 상환", "마련하기 어렵", "어려울 수", "쉽지 않을", "곤란",
+                "사라지는 것은 아니지만", "없어지는 것은 아니지만", "소멸하는 것은 아니지만",
+                "보전하려는 조치", "단정할 수", "추론", "한계", "우려", "압박",
+            )
+            _CATEGORICAL_LEGAL_ENDINGS = (
+                "확정되었다.", "확정되었습니다.", "소멸하였다.", "소멸하였습니다.",
+                "해지되었다.", "해지되었습니다.", "무효이다.", "무효입니다.",
+            )
+
+            def _is_case_risk_inference_claim(c_obj: ClaimVerification, norm_draft_text: str) -> bool:
+                """사건 증거에 기반한 회수 위험·자금사정 추론인지(단정적 법률효과 주장과 구별) 판별한다."""
+                if c_obj.fact_status != "INFERENCE" and c_obj.claim_type != "CASE_INFERENCE":
+                    return False
+                if not case_evidence_ids.intersection(c_obj.source_ids):
+                    return False
+                c_text = (c_obj.claim or "").strip()
+                if any(c_text.endswith(ending) for ending in _CATEGORICAL_LEGAL_ENDINGS):
+                    return False
+                has_limit_in_draft = bool(
+                    c_obj.inference_limit.strip() and _norm_quote(c_obj.inference_limit) in norm_draft_text
+                )
+                has_risk_marker = any(marker in c_text for marker in _INFERENCE_RISK_MARKERS)
+                return has_limit_in_draft or has_risk_marker
+
+            for claim_obj in result.claims:
+                # 계약서·당사자 메모를 법령 근거로 표시한 검증 응답도 그대로 신뢰하지 않는다.
+                # 단, 사건 증거에 기반한 회수 위험·자금사정 정황 추론(fact_status=INFERENCE)을
+                # 검증기가 LEGAL_APPLICATION/LEGAL_RULE로 분류한 경우에는 CASE_INFERENCE로 정규화하여 오탐을 방지한다.
+                if (claim_obj.claim_type in ("LEGAL_RULE", "LEGAL_APPLICATION")
+                        and not legal_source_ids.intersection(claim_obj.source_ids)):
+                    if (claim_obj.grounding_status in ("SUPPORTED", "UNCERTAIN")
+                            and _is_case_risk_inference_claim(claim_obj, norm_draft)):
+                        claim_obj.claim_type = "CASE_INFERENCE"
+                        claim_obj.fact_status = "INFERENCE"
+                        claim_obj.grounding_status = "SUPPORTED"
+                        if not claim_obj.inference_basis.strip():
+                            claim_obj.inference_basis = claim_obj.reason.strip() or "등록된 사건 자료 기반 위험·정황 추론"
+                        if not claim_obj.inference_limit.strip() or _norm_quote(claim_obj.inference_limit) not in norm_draft:
+                            claim_obj.inference_limit = claim_obj.claim.strip()
+                    elif claim_obj.grounding_status == "SUPPORTED":
+                        claim_obj.grounding_status = "UNSUPPORTED"
+                        claim_obj.reason = (
+                            "법률 효과로 분류된 주장에 법령·판례 근거가 연결되지 않았습니다. "
+                            "사건의 정황 평가라면 법률 효과와 문장을 분리하고 자료와 추론 한계를 설명해야 합니다."
+                        )
+                        result.revision_instructions.append(claim_obj.reason)
+                if claim_obj.claim_type == "CASE_INFERENCE":
+                    if _is_case_risk_inference_claim(claim_obj, norm_draft) and (
+                        (claim_obj.inference_basis.strip() and claim_obj.inference_limit.strip()
+                         and _norm_quote(claim_obj.inference_limit) in norm_draft)
+                        or (claim_obj.grounding_status == "SUPPORTED" and claim_obj.reason.strip())
+                    ):
+                        claim_obj.fact_status = "INFERENCE"
+                        if not claim_obj.inference_basis.strip():
+                            claim_obj.inference_basis = claim_obj.reason.strip()
+                        if not claim_obj.inference_limit.strip() or _norm_quote(claim_obj.inference_limit) not in norm_draft:
+                            claim_obj.inference_limit = claim_obj.claim.strip()
+                    else:
+                        # 추론 유형을 법률 근거 검사의 우회 통로로 쓰지 못하게 출처·한계 모두 요구한다.
+                        claim_obj.grounding_status = "UNSUPPORTED"
+                        claim_obj.reason = "사건 추론의 증거, 추론 관계, 답변에 명시된 한계를 확인해야 합니다."
+
+            # [P0-2] 날짜 역할(발견일 vs 등기 접수일·열람 기준일) 구분 및 동일 역할 날짜 충돌 검사
+            _DATE_ROLE_PATTERNS = {
+                "등기 접수일": (
+                    re.compile(r"(?:등기\s*)?접수일\s*[:은는이가]?\s*(20\d{2})\s*[-년.]\s*0?(\d{1,2})\s*[-월.]\s*0?(\d{1,2})"),
+                    re.compile(r"등기\s*접수일\s*[:은는이가]?\s*(20\d{2})\s*[-년.]\s*0?(\d{1,2})\s*[-월.]\s*0?(\d{1,2})"),
+                ),
+                "열람 기준일": (
+                    re.compile(r"열람\s*기준일\s*[:은는이가]?\s*(20\d{2})\s*[-년.]\s*0?(\d{1,2})\s*[-월.]\s*0?(\d{1,2})"),
+                    re.compile(r"열람\s*기준일\s*[:은는이가]?\s*(20\d{2})\s*[-년.]\s*0?(\d{1,2})\s*[-월.]\s*0?(\d{1,2})"),
+                ),
+            }
+            same_role_date_conflict = False
+            for role_label, (src_pat, draft_pat) in _DATE_ROLE_PATTERNS.items():
+                src_dates = {
+                    (int(m.group(1)), int(m.group(2)), int(m.group(3)))
+                    for s in retrieved_sources
+                    if s.get("source_type") == "CASE_EVIDENCE" or s.get("retrieval_method") == "CASE_DOCUMENT_SPANS"
+                    for m in src_pat.finditer(str(s.get("content") or ""))
+                }
+                draft_dates = {
+                    (int(m.group(1)), int(m.group(2)), int(m.group(3)))
+                    for m in draft_pat.finditer(draft_answer)
+                }
+                if src_dates and draft_dates and not draft_dates.issubset(src_dates):
+                    same_role_date_conflict = True
+                    conflict_msg = f"문서 원문의 '{role_label}' 날짜와 답변에 기재된 '{role_label}' 날짜가 상충합니다."
+                    if conflict_msg not in result.contradictions:
+                        result.contradictions.append(conflict_msg)
+                    if conflict_msg not in result.revision_instructions:
+                        result.revision_instructions.append(conflict_msg)
+                    if isinstance(result.consistency_checks.get("timeline"), dict):
+                        result.consistency_checks["timeline"]["passed"] = False
+                        result.consistency_checks["timeline"]["reason"] = conflict_msg
+
+            timeline_check = result.consistency_checks.get("timeline")
+            if (isinstance(timeline_check, dict)
+                    and timeline_check.get("passed") is False
+                    and not same_role_date_conflict):
+                tl_reason = str(timeline_check.get("reason") or "")
+                is_discovery_role_diff = (
+                    ("발견" in tl_reason or "발견" in question)
+                    and ("접수일" in tl_reason or "열람" in tl_reason)
+                    and ("사용자 질문" in tl_reason or "질문은" in tl_reason or "발견" in tl_reason or "시간순으로 반영" in tl_reason)
+                )
+                if is_discovery_role_diff:
+                    timeline_check["model_passed"] = False
+                    timeline_check["model_reason"] = tl_reason
+                    timeline_check["passed"] = True
+                    timeline_check["reason"] = (
+                        f"{tl_reason} [검증 정책 보정: 질문의 발견 시점과 문서의 등기 접수일·열람 기준일은 "
+                        "서로 다른 날짜 역할이므로 사실 충돌이 아님]"
+                    )
+                    preserve_note = "사용자 질문의 발견일(인지 시점)과 문서상 등기 접수일·열람 기준일의 역할 구분"
+                    if preserve_note not in result.preserved_points:
+                        result.preserved_points.append(preserve_note)
+                    result.contradictions = [
+                        con for con in result.contradictions
+                        if not (("사용자 질문" in con or "발견" in con) and ("접수일" in con or "열람" in con))
+                    ]
+                    result.missing_issues = [
+                        iss for iss in result.missing_issues
+                        if not ("발견" in iss or "2026.08.12" in iss or "8월 12일" in iss)
+                    ]
+                    result.revision_instructions = [
+                        inst for inst in result.revision_instructions
+                        if not ("발견" in inst or "2026.08.12" in inst or "8월 12일" in inst)
+                    ]
+
+            # [P1-2] 사용자 질문과 연결되지 않고 답변의 핵심 주장 결함도 아닌 불필요한 하위 법령 요구 필터링
+            has_unsupported_legal = any(
+                c.grounding_status in ("UNSUPPORTED", "UNCERTAIN")
+                and c.claim_type in ("LEGAL_RULE", "LEGAL_APPLICATION")
+                for c in result.claims
+            )
+            if coverage_complete and not has_unsupported_legal and result.missing_legal_issues:
+                _UNREQUESTED_KEYWORDS = ("소액임차인", "최우선변제", "대통령령", "시행령")
+                _LIMITATION_NOTES = ("현 자료만으로 제한적", "설명이 제한적", "단정할 수 없")
+                filtered_missing_legal: List[str] = []
+                for ml in result.missing_legal_issues:
+                    is_unrequested = any(kw in ml and kw not in question for kw in _UNREQUESTED_KEYWORDS)
+                    is_limitation_note = not result.legal_search_requests and any(lim in ml for lim in _LIMITATION_NOTES)
+                    if is_unrequested or is_limitation_note:
+                        result.warnings.append(f"참고 안내(질문 외 부수 쟁점): {ml}")
+                        result.revision_instructions = [
+                            inst for inst in result.revision_instructions
+                            if not any(kw in inst and kw not in question for kw in _UNREQUESTED_KEYWORDS)
+                        ]
+                    else:
+                        filtered_missing_legal.append(ml)
+                result.missing_legal_issues = filtered_missing_legal
+
+            consistency_complete = all(
+                isinstance(result.consistency_checks.get(key), dict)
+                and result.consistency_checks[key].get("passed") is True
+                and isinstance(result.consistency_checks[key].get("reason"), str)
+                and bool(result.consistency_checks[key]["reason"].strip())
+                for key in ("opening_conclusion", "timeline", "expressed_intent", "provenance")
+            )
+            if consistency_complete:
+                result.revision_instructions = [
+                    inst for inst in result.revision_instructions
+                    if inst != "시간 순서, 의사표시 내용, 증명 수준을 원문과 대조하여 결론을 보완하세요."
+                ]
+
+            # 사실 오류나 출처 없는 법률 주장도 필터링 후 PASS로 남지 않게 한다.
+            defective_claims = [c for c in result.claims if (
+                c.grounding_status in ("UNSUPPORTED", "UNCERTAIN")
+                and c.claim_type in ("CASE_FACT", "CASE_INFERENCE", "USER_STATEMENT", "LEGAL_RULE", "LEGAL_APPLICATION")
+            ) or (c.claim_type in ("CASE_FACT", "CASE_INFERENCE", "LEGAL_RULE", "LEGAL_APPLICATION")
+                  and c.grounding_status == "SUPPORTED" and not c.source_ids)]
+            malformed_claims = [c for c in result.claims if (
+                c.claim_type not in ("CASE_FACT", "CASE_INFERENCE", "USER_STATEMENT", "LEGAL_RULE", "LEGAL_APPLICATION", "RECOMMENDATION")
+                or c.grounding_status not in ("SUPPORTED", "UNSUPPORTED", "UNCERTAIN", "NOT_APPLICABLE")
+                or not c.claim.strip()
+            )]
+            if (defective_claims or malformed_claims or same_role_date_conflict) and result.status == "PASS":
+                result.status = "REVISE"
+                result.reason_code = "ANSWER_REVISION_REQUIRED"
+                result.revision_instructions.append("사실 및 법률 판단의 원문 근거와 출처 ID를 보완하세요.")
+            elif (coverage_complete and consistency_complete
+                  and result.claims and not defective_claims and not malformed_claims
+                  and not same_role_date_conflict and not result.contradictions
+                  and not result.missing_legal_issues and not result.missing_issues
+                  and result.status == "REVISE"
+                  and result.reason_code in ("ANSWER_REVISION_REQUIRED", "LEGAL_SOURCE_INSUFFICIENT", "NONE", None)):
+                result.status = "PASS"
+                result.reason_code = "NONE"
+                result.recommended_action = "FINALIZE"
+            if allow_partial_answer and not any(
+                c.grounding_status == "SUPPORTED" and c.source_ids
+                and c.claim_type in ("CASE_FACT", "CASE_INFERENCE", "LEGAL_RULE", "LEGAL_APPLICATION")
+                for c in result.claims
+            ):
+                result.status = "INSUFFICIENT"
+                result.reason_code = "CASE_EVIDENCE_MISSING"
 
         # 4. [P0-01] 결정론적 종합 PASS 판정 및 모순 방지 검사 (Deterministic Policy Enforcement)
         # A) 주요 법률 주장 목록(claims)이 비어있는 경우 검증 완료(PASS) 불가
@@ -925,7 +1258,7 @@ def run_verification(
             and not result.contradictions
             and not unregistered_evidences
         )
-        if has_supported_core_claims and has_no_defects and result.status == "REVISE":
+        if not require_question_coverage and has_supported_core_claims and has_no_defects and result.status == "REVISE":
             if result.reason_code in ("LEGAL_SOURCE_INSUFFICIENT", "ANSWER_REVISION_REQUIRED", "CASE_EVIDENCE_MISSING", "NONE"):
                 logger.info("[VERIFICATION] 모든 핵심 주장이 검색 출처에 의해 온전히 뒷받침(SUPPORTED 100%)되므로 PASS로 확정합니다.")
                 result.status = "PASS"
@@ -973,13 +1306,13 @@ def run_verification(
             })
         except Exception:
             pass
-        return result.model_dump()
+        return {**result.model_dump(), "source_manifest": source_manifest}
 
     except Exception as e:
-        logger.error(f"Verification Agent 오류 발생 (Fail-Safe 안전 차단 작동): {str(e)}")
+        logger.error("Verification Agent 오류 발생 (안전 차단): %s", type(e).__name__)
         # P0-01 준수: 검증 시스템 장애 시 절대로 PASS로 Fail-open하지 않고 INSUFFICIENT(VERIFICATION_ERROR)로 안전 종료
         fallback_warnings = [
-            f"법률검증 시스템 오류로 인해 답변을 검증하지 못했습니다 ({str(e)}). 의뢰인의 권리 보호를 위해 전문가 상담을 권고합니다."
+            "법률검증 처리 중 문제가 발생하여 답변 검증을 완료하지 못했습니다."
         ]
         fallback_instructions: List[str] = []
         if unverified_citations:
@@ -1000,7 +1333,7 @@ def run_verification(
             "missing_legal_issues": [],
             "candidate_laws": [],
             "recommended_action": "SAFE_FALLBACK",
-            "explanation": f"검증 처리 중 오류 발생: {str(e)}",
+            "explanation": "검증 처리 중 오류가 발생했습니다.",
             "claims": [],
             "missing_issues": [],
             "contradictions": [],

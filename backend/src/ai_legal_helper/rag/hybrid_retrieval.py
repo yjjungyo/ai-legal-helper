@@ -205,7 +205,7 @@ class HybridLegalRetriever:
                 raw_dense = self.vs.similarity_search(query, k=fetch_k)
                 dense_docs_scored = [(d, 0.75) for d in raw_dense]
             except Exception as ex:
-                logger.warning(f"[HYBRID] Dense search error: {ex}")
+                logger.warning(f"[하이브리드 검색] 벡터(Dense) 검색 오류: {ex}")
 
         # 2. BM25 검색 수행
         bm25_docs_scored: List[Tuple[Document, float]] = []
@@ -228,7 +228,7 @@ class HybridLegalRetriever:
                     _BM25_CACHE[self.collection_name] = bm25_index
                     bm25_docs_scored = bm25_index.search(query, top_k=fetch_k)
         except Exception as ex:
-            logger.warning(f"[HYBRID] BM25 search error: {ex}")
+            logger.warning(f"[하이브리드 검색] 키워드(BM25) 검색 오류: {ex}")
 
         # 3. 문서 고유 식별자 기준 매핑
         doc_pool: Dict[str, Document] = {}

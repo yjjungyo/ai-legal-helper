@@ -56,7 +56,7 @@ async def lifespan(app: FastAPI):
         from ai_legal_helper.workflows.legal_workflow import init_checkpointer
         await init_checkpointer()
     except Exception as e:
-        logger.warning(f"[LIFESPAN] Checkpointer initialization warning: {e}")
+        logger.warning(f"[서버 시작] 체크포인터 초기화 경고: {e}")
 
     worker_task = asyncio.create_task(graph_sync_worker_loop())
     yield
@@ -204,7 +204,7 @@ app.include_router(auth.router, prefix="/api/v1")
 
 @app.exception_handler(SQLAlchemyError)
 async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError):
-    logger.error(f"Database error: {exc}")
+    logger.error(f"데이터베이스 처리 오류: {exc}")
     return JSONResponse(
         status_code=500,
         content={"detail": "데이터베이스 오류가 발생했습니다.", "error_code": "DB_ERROR"},
@@ -212,7 +212,7 @@ async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError):
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Unhandled server error: {exc}")
+    logger.error(f"처리되지 않은 서버 내부 오류: {exc}")
     return JSONResponse(
         status_code=500,
         content={"detail": "서버 내부 오류가 발생했습니다.", "error_code": "INTERNAL_SERVER_ERROR"},
@@ -236,7 +236,7 @@ async def health_ready():
             conn.execute(text("SELECT 1"))
         health_status["dependencies"]["postgres"] = "up"
     except Exception as e:
-        logger.error(f"Postgres check failed: {e}")
+        logger.error(f"PostgreSQL 연결 상태 점검 실패: {e}")
         health_status["dependencies"]["postgres"] = "down"
         health_status["status"] = "error"
         
@@ -247,7 +247,7 @@ async def health_ready():
             driver.verify_connectivity()
             health_status["dependencies"]["neo4j"] = "up"
         except Exception as e:
-            logger.error(f"Neo4j check failed: {e}")
+            logger.error(f"Neo4j 연결 상태 점검 실패: {e}")
             health_status["dependencies"]["neo4j"] = "down"
             health_status["status"] = "error"
     else:

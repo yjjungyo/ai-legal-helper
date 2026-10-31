@@ -368,7 +368,7 @@ def sync_case_to_graph(db: Session, driver, case_id: str) -> Dict[str, Any]:
     with driver.session() as session:
         stats = session.execute_write(_write_snapshot_tx, snap)
 
-    logger.info(f"[GRAPH_SYNC] case={case_id} nodes={stats['nodes']} links={stats['evidence_links']}")
+    logger.info(f"[그래프 동기화 완료] 사건={case_id}, 노드={stats['nodes']}개, 증거연결={stats['evidence_links']}개")
     return {"status": "SYNCED", "case_id": case_id, **stats}
 
 

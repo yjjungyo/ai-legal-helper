@@ -181,7 +181,7 @@ def _get_client():
         if os.getenv("TESTING") == "1":
             _client = chromadb.EphemeralClient()
             _used_index_info = "EPHEMERAL_TEST"
-            logger.debug("[RET] EphemeralClient init for tests")
+            logger.debug("[벡터DB] 테스트용 메모리 클라이언트(EphemeralClient) 초기화")
             return _client
             
         chroma_host = os.getenv("CHROMA_HOST")
@@ -198,7 +198,7 @@ def _get_client():
                 if any(n.startswith("law_docs_") for n in names):
                     _client = client
                     _used_index_info = f"HTTP_REMOTE:{chroma_host}:{chroma_port}"
-                    logger.debug(f"[RET] HttpClient connected: {chroma_host}:{chroma_port} ({len(names)} collections)")
+                    logger.debug(f"[벡터DB] 원격 ChromaDB 연결 완료: {chroma_host}:{chroma_port} (컬렉션 {len(names)}개)")
                     return _client
                 logger.warning(f"[RET] HttpClient({chroma_host}:{chroma_port})에 law_docs 컬렉션 부재. 로컬 PersistentClient({persist_dir})로 전환합니다.")
             except Exception as e:
@@ -211,7 +211,7 @@ def _get_client():
             os.makedirs(persist_dir, exist_ok=True)
             _client = chromadb.PersistentClient(path=persist_dir)
             _used_index_info = f"LOCAL_PERSISTENT:{persist_dir}"
-            logger.debug(f"[RET] PersistentClient init: {persist_dir}")
+            logger.debug(f"[벡터DB] 로컬 ChromaDB(PersistentClient) 초기화: {persist_dir}")
         except Exception as e:
             logger.warning(f"[RET] PersistentClient 초기화 실패({e}), EphemeralClient 폴백으로 전환합니다.")
             _client = chromadb.EphemeralClient()
@@ -229,7 +229,7 @@ def _list_collections() -> List[str]:
     try:
         cols = _get_client().list_collections()
         names = [getattr(c, "name", "") if hasattr(c, "name") else str(c) for c in cols]
-        logger.debug(f"[RET] collections={names}")
+        logger.debug(f"[벡터DB] 조회된 컬렉션 목록={names}")
         return names
     except Exception as e:
         logger.warning(f"[RET] 컬렉션 목록 조회 실패: {e}")
@@ -299,7 +299,7 @@ def retrieve_with_status(query: str, k: int = 3, category: Optional[str] = None)
             deduped_docs = deduplicate_chunks(restored_candidates)[:k]
             norm_docs = [_normalize_doc(d) for d in deduped_docs]
             st = RetrievalStatus.SUCCESS if norm_docs else RetrievalStatus.NO_MATCH
-            logger.debug(f"[RET] hits={len(norm_docs)} coll={coll}")
+            logger.debug(f"[벡터 검색 완료] 컬렉션={coll}, 검색된 문서={len(norm_docs)}건")
             try:
                 update_span(get_current_span_id(), {
                     "search_type": "Chroma_Single",
@@ -349,7 +349,7 @@ def retrieve_with_status(query: str, k: int = 3, category: Optional[str] = None)
         except Exception as e:
             has_error = True
             last_err = f"{type(e).__name__}: {str(e)}"
-            logger.warning(f"[RET] skip coll={coll}: {e}")
+            logger.warning(f"[벡터 검색] 컬렉션({coll}) 검색 건너뜀: {e}")
 
     if not hits and has_error:
         st = RetrievalStatus.EMBEDDING_ERROR if "embedding" in last_err.lower() else RetrievalStatus.RETRIEVER_UNAVAILABLE
@@ -362,7 +362,9 @@ def retrieve_with_status(query: str, k: int = 3, category: Optional[str] = None)
 
     reranked = rerank_with_article_and_keywords(query, hits, top_k=max(k * 2, 4))
     candidate_docs = [d for d, _ in reranked]
-    deduped_docs = deduplicate_chunks(candidate_docs)[:k]
+    from ai_legal_helper.rag.hybrid_retrieval import restore_parent_content
+    restored_candidates = [restore_parent_content(d) for d in candidate_docs]
+    deduped_docs = deduplicate_chunks(restored_candidates)[:k]
     norm_docs = [_normalize_doc(d) for d in deduped_docs]
     st = RetrievalStatus.SUCCESS if norm_docs else RetrievalStatus.NO_MATCH
 

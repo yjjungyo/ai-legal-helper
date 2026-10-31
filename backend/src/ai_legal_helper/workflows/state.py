@@ -47,6 +47,10 @@ class LegalState(MessagesState):
     agent_results: Dict[str, str]
     retrieved_sources: List[Dict[str, Any]]
     draft_answer: str
+    # 문서가 등록된 사건은 원문 작성 경로를 사용하고 작성 오류를 검증 성공으로 취급하지 않는다.
+    answer_mode: Optional[str]
+    answer_generation_error: Optional[str]
+    answer_source_manifest: Optional[Dict[str, Any]]
     verification_result: Dict[str, Any]
     revision_count: int
     cited_sources: Optional[List[Dict[str, Any]]] = None
@@ -61,8 +65,12 @@ class LegalState(MessagesState):
     # P4.1: Verifier-Guided HILT 법령 원문 검색 필드
     approval_request: Optional[Dict[str, Any]]
     approval_status: Optional[str]  # NONE, PENDING, APPROVED, REJECTED, EXPIRED
+    approved_statute_laws: Optional[List[str]]
     statute_search_results: Optional[List[Dict[str, Any]]]
+    statute_search_count: Optional[int]
+    statute_search_history: Optional[List[str]]
     hilt_executed: Optional[bool]
+    preserved_points: Optional[List[str]]
 
     # Router v2.0 분류 상태 관리 필드
     router_status: Optional[str] = None

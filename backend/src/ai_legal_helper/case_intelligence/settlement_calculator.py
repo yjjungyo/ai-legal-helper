@@ -29,6 +29,7 @@ import datetime
 import calendar
 
 from ai_legal_helper.case_intelligence.case_briefing import CaseEvidenceBriefing, FactItemBrief
+from ai_legal_helper.case_intelligence.consultation_semantics import is_conditional_contract_statement
 from ai_legal_helper.observability.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -197,7 +198,7 @@ def extract_case_contract_deposit(briefing: CaseEvidenceBriefing) -> int:
         if len(unique) == 1:
             return unique[0]
         # 보증금 후보 충돌 시 최대 금액 자동 선택 제거: 상충 발생 시 단정 배제 (0원 반환하여 추가 확인 유도)
-        logger.warning(f"[DEPOSIT_CONFLICT] Conflicting deposit candidates detected: {unique}. Refusing automatic max selection.")
+        logger.warning(f"[DEPOSIT_CONFLICT] 상충하는 보증금 후보 감지({unique}): 임의 최대값 선택을 보류합니다.")
         return 0
 
     # 2. 계약서 출처를 가진 Fact에서 계약 원금 재탐색 (검증된 Fact에 한함)
@@ -216,7 +217,7 @@ def extract_case_contract_deposit(briefing: CaseEvidenceBriefing) -> int:
         unique2 = sorted(list(set(step2_candidates)))
         if len(unique2) == 1:
             return unique2[0]
-        logger.warning(f"[DEPOSIT_CONFLICT] Conflicting step2 deposit candidates: {unique2}. Refusing automatic max selection.")
+        logger.warning(f"[DEPOSIT_CONFLICT] 2단계 상충 보증금 후보 감지({unique2}): 임의 최대값 선택을 보류합니다.")
         return 0
 
     return 0
@@ -399,7 +400,7 @@ def calculate_three_months_expiry(reach_date_str: str) -> Optional[str]:
         target_day = min(d, max_days)
         return datetime.date(target_year, target_month, target_day).strftime("%Y.%m.%d")
     except Exception as e:
-        logger.warning(f"Failed to calculate 3 months expiry for {reach_date_str}: {e}")
+        logger.warning(f"[정산 계산기] 해지 통지 도달일({reach_date_str}) 기준 3개월 만기일 계산 실패: {e}")
         return None
 
 
@@ -526,6 +527,8 @@ def evaluate_notice_status(
         "has_landlord_acknowledgement": False,
         "landlord_ack_date": None,
         "is_implicit_renewal": False,
+        # 기존 불리언은 호환용으로 유지하되, 정보 부재와 비갱신 입증을 별도로 구분한다.
+        "renewal_status": "UNKNOWN",
         "statutory_effect_date": None,
         "is_effect_date_reached": False,
         "is_effect_date_future": False,
@@ -541,6 +544,13 @@ def evaluate_notice_status(
         stmt = f.statement or ""
         if any(w in stmt for w in ["묵시적으로 갱신", "묵시적 갱신", "동일 조건으로 갱신", "별도 갱신거절 통지가 없어", "묵시적갱신"]):
             res["is_implicit_renewal"] = True
+            res["renewal_status"] = "IMPLICIT_RENEWAL"
+        elif (
+            res["renewal_status"] != "IMPLICIT_RENEWAL"
+            and not is_conditional_contract_statement(stmt)
+            and any(w in stmt for w in ["갱신 없이", "갱신하지 않았", "갱신되지 않았", "갱신거절 통지가 도달"])
+        ):
+            res["renewal_status"] = "NOT_RENEWED"
 
     # 2. 다툼/반대 주장 존재 여부 검사 (P0-05)
     has_disputed_reach = any(

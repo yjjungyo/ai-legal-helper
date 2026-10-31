@@ -48,7 +48,7 @@ def make_fixed_retrieval_tool(tool_name: str, category_eng: str, label_ko: str) 
         3. 검색된 결과를 컨텍스트 변수에 저장 (add_retrieved_source)
         4. LLM이 이해하기 쉬운 문자열 형태로 요약하여 반환
         """
-        logger.debug(f"[TOOL:{tool_name}] query_len={len(query or '')} label={label_ko} eng={category_eng}")
+        logger.debug(f"[법률 검색 도구 호출] 도구={tool_name}, 분야={label_ko}({category_eng}), 질의길이={len(query or '')}자")
         
         rewritten_query = rewrite_query(query or "", label_ko, max_terms=2)
         

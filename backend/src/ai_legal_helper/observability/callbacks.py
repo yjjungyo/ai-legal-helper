@@ -81,6 +81,10 @@ class TokenTrackingCallbackHandler(BaseCallbackHandler):
         self.call_inputs[run_id] = prompts
         self.call_models[run_id] = self._extract_model_from_context(serialized, kwargs)
         self.call_params[run_id] = self._extract_model_parameters(kwargs)
+        logger.info(
+            f"[LLM 호출 시작] 모델: {self.call_models[run_id]} (프롬프트: {len(prompts)}건)",
+            extra={"status": "START", "model_id": self.call_models[run_id]}
+        )
 
     def on_chat_model_start(
         self, serialized: Dict[str, Any], messages: List[List[Any]], **kwargs: Any
@@ -97,6 +101,10 @@ class TokenTrackingCallbackHandler(BaseCallbackHandler):
         self.call_inputs[run_id] = formatted_msgs
         self.call_models[run_id] = self._extract_model_from_context(serialized, kwargs)
         self.call_params[run_id] = self._extract_model_parameters(kwargs)
+        logger.info(
+            f"[LLM 호출 시작] 모델: {self.call_models[run_id]} (입력 메시지: {len(formatted_msgs)}건)",
+            extra={"status": "START", "model_id": self.call_models[run_id]}
+        )
 
     def on_llm_end(self, response: LLMResult, **kwargs: Any) -> Any:
         """LLM 호출 완료 시 실제 응답 모델명과 토큰을 집계하고 활성 Span 하위에 Generation을 기록한다."""
@@ -162,7 +170,13 @@ class TokenTrackingCallbackHandler(BaseCallbackHandler):
             status="SUCCESS",
         )
         global_token_tracker.add_record(record)
-        logger.info("LLM Call End", extra=record.model_dump())
+        total_tok_str = f"{total_tokens:,}" if total_tokens else "0"
+        in_tok_str = f"{input_tokens:,}" if input_tokens else "0"
+        out_tok_str = f"{output_tokens:,}" if output_tokens else "0"
+        logger.info(
+            f"[LLM 호출 완료] 모델: {model_id} (소요: {latency_ms:.0f}ms, 입력: {in_tok_str}토큰, 출력: {out_tok_str}토큰, 총: {total_tok_str}토큰)",
+            extra=record.model_dump()
+        )
 
         # Langfuse logging: 실제 입출력 텍스트 및 정확한 모델명/토큰을 전달
         try:
@@ -192,7 +206,7 @@ class TokenTrackingCallbackHandler(BaseCallbackHandler):
                 metadata={"system_name": LANGFUSE_SYSTEM_NAME, "tags": [LANGFUSE_SYSTEM_NAME]},
             )
         except Exception as e:
-            logger.warning(f"Failed to log generation to Langfuse: {e}")
+            logger.warning(f"Langfuse LLM 생성 결과 기록 실패: {e}")
 
     def on_llm_error(
         self, error: BaseException, **kwargs: Any
@@ -222,7 +236,7 @@ class TokenTrackingCallbackHandler(BaseCallbackHandler):
             latency_ms=latency_ms,
         )
         global_token_tracker.add_record(record)
-        logger.error(f"LLM Call Error: {str(error)}", extra=record.model_dump())
+        logger.error(f"[LLM 호출 오류] 모델: {model_id}, 오류: {str(error)}", extra=record.model_dump())
 
         LANGFUSE_SYSTEM_NAME = os.getenv("LANGFUSE_SYSTEM_NAME", "LegalAgent")
         try:
@@ -242,4 +256,4 @@ class TokenTrackingCallbackHandler(BaseCallbackHandler):
                 metadata={"system_name": LANGFUSE_SYSTEM_NAME, "tags": [LANGFUSE_SYSTEM_NAME]},
             )
         except Exception as e:
-            logger.warning(f"Failed to log generation error to Langfuse: {e}")
+            logger.warning(f"Langfuse LLM 오류 내역 기록 실패: {e}")

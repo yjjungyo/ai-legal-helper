@@ -103,7 +103,7 @@ def get_case_detail(
                 db.refresh(case)
         except Exception as e:
             db.rollback()
-            logger.warning(f"Failed to auto-sync case entities on detail view for {case.id}: {e}")
+            logger.warning(f"사건 상세 조회 중 엔티티 자동 동기화 실패 (사건: {case.id}): {e}")
 
     logger.info(f"사건 상세 정보 조회 완료: '{case.title}'")
     return case
@@ -213,7 +213,7 @@ def add_statement(
     except ValueError as ve:
         raise HTTPException(status_code=404, detail=str(ve))
     except Exception as e:
-        logger.error(f"Failed to add statement: {e}")
+        logger.error(f"의뢰인 진술 추가 실패: {e}")
         raise HTTPException(status_code=500, detail="서버 오류가 발생했습니다.")
     return updated_case
 
@@ -250,7 +250,7 @@ def create_action_plan(
     except ValueError as ve:
         raise HTTPException(status_code=404, detail=str(ve))
     except Exception as e:
-        logger.error(f"Action plan generation failed: {e}")
+        logger.error(f"법률 대응 행동 계획 생성 실패: {e}")
         raise HTTPException(status_code=500, detail="Action Plan 생성 중 오류가 발생했습니다.")
 
 @router.get("/{case_id}/actions", response_model=List[LegalActionSchema])
@@ -348,9 +348,9 @@ def delete_case(
                     try:
                         os.remove(file_path)
                     except Exception as e:
-                        logger.warning(f"Failed to delete evidence file {file_path}: {e}")
+                        logger.warning(f"증거 파일 삭제 실패 ({file_path}): {e}")
     except Exception as e:
-        logger.warning(f"Error while cleaning up evidence files: {e}")
+        logger.warning(f"증거 파일 정리 중 오류 발생: {e}")
 
     # 2. 법률 문서 내보내기 물리 파일 삭제
     try:
@@ -361,9 +361,9 @@ def delete_case(
                         try:
                             os.remove(exp.file_path)
                         except Exception as e:
-                            logger.warning(f"Failed to delete export file {exp.file_path}: {e}")
+                            logger.warning(f"내보내기 문서 파일 삭제 실패 ({exp.file_path}): {e}")
     except Exception as e:
-        logger.warning(f"Error while cleaning up document exports: {e}")
+        logger.warning(f"내보내기 문서 정리 중 오류 발생: {e}")
 
     # 3. Neo4j 지식 그래프 서브그래프 삭제
     try:
@@ -371,13 +371,13 @@ def delete_case(
         if driver:
             delete_case_graph(driver, case.id)
     except Exception as e:
-        logger.warning(f"Failed to delete Neo4j graph for case {case.id}: {e}")
+        logger.warning(f"사건 Neo4j 그래프 삭제 실패 (사건: {case.id}): {e}")
 
     # 5. 비동기 작업 큐 정리
     try:
         db.query(GraphSyncTask).filter_by(case_id=case.id).delete()
     except Exception as e:
-        logger.warning(f"Failed to delete sync tasks for case {case.id}: {e}")
+        logger.warning(f"사건 동기화 작업 내역 삭제 실패 (사건: {case.id}): {e}")
 
     # 6. RDB Case 레코드 삭제 (Cascade로 parties, facts, events, evidences, claims, actions, documents, consultations 일괄 삭제)
     db.delete(case)
@@ -393,7 +393,7 @@ def delete_case(
     db.add(audit)
     db.commit()
 
-    logger.info(f"Case {case_id} ('{case_title}') and all associated data permanently deleted.")
+    logger.info(f"사건 {case_id} ('{case_title}') 및 모든 연관 데이터가 영구 삭제되었습니다.")
     return {"status": "SUCCESS", "deleted_id": case_id, "title": case_title}
 
 

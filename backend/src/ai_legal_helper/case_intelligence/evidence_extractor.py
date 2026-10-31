@@ -226,7 +226,7 @@ def _extract_batch_claims_via_llm(
         chain = prompt | structured_llm
         return chain.invoke({"context": context_str})
     except Exception as e:
-        logger.warning(f"with_structured_output failed, falling back to JSON parsing: {str(e)}")
+        logger.warning(f"[증거 추출기] 구조화 출력 실패로 JSON 파싱 폴백 전환: {str(e)}")
         fallback_prompt = ChatPromptTemplate.from_messages([
             ("system", "당신은 법률 증거 분석 보조 AI입니다. 주어진 문서 내용을 바탕으로 중요한 사실들을 추출하세요.\n"
                        "각 사실의 claim_type은 다음 영문 코드 중 하나로 지정하세요: PROPERTY, RIGHT_DUTY, DOC_INFO, DATE, AMOUNT, PARTY_INFO, ACTION, CONDITION, GENERAL.\n"
@@ -274,7 +274,7 @@ def extract_claims_from_evidence(db: Session, doc_id: str) -> bool:
         .all()
     )
     if not spans:
-        logger.warning(f"No spans found for document {doc_id}")
+        logger.warning(f"[증거 추출기] 문서({doc_id})에서 추출된 텍스트 구간이 없습니다.")
         return False
 
     case_docs = db.query(EvidenceDocument).filter_by(case_id=doc.case_id).all()
@@ -344,7 +344,7 @@ def extract_claims_from_evidence(db: Session, doc_id: str) -> bool:
             if batch_res and batch_res.claims:
                 all_extracted_claims.extend(batch_res.claims)
         except Exception as parse_error:
-            logger.error(f"Failed to parse LLM JSON response: {str(parse_error)}")
+            logger.error(f"[증거 추출기] LLM JSON 응답 파싱 실패: {str(parse_error)}")
             if not all_extracted_claims:
                 doc.status = "FAILED"
                 doc.error_code = "AI_EXTRACTION_FAILED"

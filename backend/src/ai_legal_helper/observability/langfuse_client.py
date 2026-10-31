@@ -388,9 +388,8 @@ def _resolve_parent_span(
             return _active_spans[parent_span_id]
         else:
             logger.warning(
-                f"[SPAN_CROSS_TRACE_REJECTED] Rejected cross-trace parent '{parent_span_id}' "
-                f"(belongs to '{owner_trace}') from being linked into trace '{trace_id}' "
-                f"for span '{current_span_name}'({current_span_id})."
+                f"[SPAN_CROSS_TRACE_REJECTED] 교차 트레이스 상위 스팬 연결 차단: 상위 '{parent_span_id}'(소속: '{owner_trace}') -> "
+                f"현재 트레이스 '{trace_id}', 스팬 '{current_span_name}'({current_span_id})"
             )
             return None
 
@@ -398,8 +397,8 @@ def _resolve_parent_span(
 
     # 4단계: 부모 미해결 진단 로그 기록
     logger.warning(
-        f"[SPAN_PARENT_UNRESOLVED] trace_id={trace_id}, span={current_span_name}({current_span_id}): "
-        f"parent '{parent_span_id}' not found in active spans of this trace. Linking to root trace."
+        f"[SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id={trace_id}, "
+        f"스팬={current_span_name}({current_span_id}), 요청 상위='{parent_span_id}'"
     )
     return None
 
@@ -438,7 +437,7 @@ def start_span(
     # 비동기 종료 후 지연 콜백인 경우 새 Trace 생성 차단 (TC-P0-10)
     if trace_id in _ended_traces:
         logger.warning(
-            f"[DELAYED_CALLBACK_IGNORED] start_span rejected for ended trace_id={trace_id}, span={name}({span_id})"
+            f"[DELAYED_CALLBACK_IGNORED] 종료된 트레이스의 지연 스팬 생성 무시: trace_id={trace_id}, span={name}({span_id})"
         )
         return
 
@@ -466,6 +465,13 @@ def start_span(
     span_metadata = dict(metadata or {})
     if sys_name and "system_name" not in span_metadata:
         span_metadata["system_name"] = sys_name
+    try:
+        from ai_legal_helper.observability.decorators import get_kr_step_name
+        kr_name = get_kr_step_name(name)
+        if kr_name != name and "step_name_kr" not in span_metadata:
+            span_metadata["step_name_kr"] = kr_name
+    except Exception:
+        pass
 
     # 엄격한 trace_id 격리 부모 탐색 (전역 이름 탐색 제거)
     parent = _resolve_parent_span(trace_id, parent_span_id, name, span_id)
@@ -586,7 +592,7 @@ def log_generation(
         # 비동기 종료 후 지연 콜백인 경우 새 Trace 생성 차단 (TC-P0-10)
     if trace_id in _ended_traces:
         logger.warning(
-            f"[DELAYED_CALLBACK_IGNORED] log_generation rejected for ended trace_id={trace_id}, gen={name}"
+            f"[DELAYED_CALLBACK_IGNORED] 종료된 트레이스의 지연 LLM 기록 무시: trace_id={trace_id}, gen={name}"
         )
         return
 

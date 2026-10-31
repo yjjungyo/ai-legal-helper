@@ -32,6 +32,9 @@ from ai_legal_helper.utils.datetime_utils import get_kst_iso
 
 logger = get_logger(__name__)
 
+# 대화 맥락 유지를 위한 기본 슬라이딩 윈도우 크기 (최근 3개 턴 유지)
+DEFAULT_MAX_CONTEXT_TURNS = 3
+
 
 class ConversationTurn(BaseModel):
     """단일 상담 턴(Turn) 정보 모델.
@@ -62,6 +65,15 @@ class ConversationTurn(BaseModel):
         default=None,
         description="해당 턴에서 식별된 사건 사실·증거 변동 및 법률 판단 비교 (P0-3)"
     )
+
+    def __repr__(self) -> str:
+        """로그 및 관측성 도구에서 가독성을 높이기 위해 축약된 문자열을 반환한다."""
+        q_preview = (self.question[:30] + "...") if len(self.question) > 30 else self.question
+        a_preview = (self.answer[:30] + "...") if len(self.answer) > 30 else self.answer
+        return (
+            f"ConversationTurn(turn={self.turn_index}, req='{self.request_id[:8]}', "
+            f"q='{q_preview}', a='{a_preview}', status='{self.answer_status}')"
+        )
 
 
 class ConversationContext(BaseModel):
@@ -99,6 +111,18 @@ class ConversationContext(BaseModel):
         default=None,
         description="사건 장기 메모리 (기본정보, 당사자, 확정사실수, 등록증거수 등)"
     )
+    total_turns_count: int = Field(
+        default=0,
+        description="해당 대화 세션의 전체 누적 완료 턴 수"
+    )
+
+    def __repr__(self) -> str:
+        """로그 및 추적 도구에서 대화 맥락 상태를 한눈에 파악할 수 있도록 축약 문자열을 반환한다."""
+        turn_indices = [t.turn_index for t in self.previous_turns]
+        return (
+            f"ConversationContext(conv_id='{self.conversation_id}', case_id='{self.case_id}', "
+            f"turn_index={self.turn_index}, recent_turns={turn_indices}, total_turns={self.total_turns_count or len(self.previous_turns)})"
+        )
 
     def find_relevant_turns(self, query: str, top_k: int = 2) -> List[ConversationTurn]:
         """현재 질문과 의미상 관련성이 높은 과거 상담 턴을 검색한다 (P0-08).
@@ -133,13 +157,13 @@ class ConversationContext(BaseModel):
         scored.sort(key=lambda x: x[0], reverse=True)
         return [item[1] for item in scored[:top_k]]
 
-    def to_chat_history_messages(self, max_turns: int = 5) -> List[AnyMessage]:
+    def to_chat_history_messages(self, max_turns: int = DEFAULT_MAX_CONTEXT_TURNS) -> List[AnyMessage]:
         """과거 대화 턴들을 LangGraph 및 LLM 호출에 적합한 AnyMessage 리스트로 변환한다.
 
         더미 메시지나 비정상 문자열 없이 순수한 HumanMessage와 AIMessage 객체 쌍으로 구성한다.
 
         Args:
-            max_turns: 포함할 최근 턴 수 (기본값: 최근 5턴)
+            max_turns: 포함할 최근 턴 수 (기본값: DEFAULT_MAX_CONTEXT_TURNS = 3턴)
 
         Returns:
             List[AnyMessage]: [HumanMessage, AIMessage, ...] 형태의 정규화된 메시지 리스트
@@ -252,11 +276,14 @@ def load_conversation_context(
     case_id: Optional[str] = None,
     user_id: Optional[str] = None,
     auth_bypass: bool = False,
+    max_turns: Optional[int] = DEFAULT_MAX_CONTEXT_TURNS,
 ) -> ConversationContext:
     """DB에서 지정된 conversation_id의 완료된 과거 상담 레코드를 조회하여 ConversationContext를 구축한다.
 
     사용자 권한 및 사건 소유권을 엄격히 검증하여 다른 사건이나 다른 사용자의 대화 맥락이
     혼입되는 것을 원천 차단한다.
+    과거 완료된 턴 중 최근 max_turns(기본 3개)만 슬라이딩 윈도우로 유지하여,
+    토큰 비대화 및 무관한 이전 턴 맥락 오염을 방지한다.
 
     Args:
         db: SQLAlchemy 데이터베이스 세션
@@ -265,6 +292,7 @@ def load_conversation_context(
         case_id: 현재 사건 식별자 (제공 시 일치 여부 검증)
         user_id: 현재 로그인 사용자 식별자 (제공 시 소유권 검증)
         auth_bypass: 1인 로컬 테스트 환경 등에서 인증 검증 우회 여부
+        max_turns: 맥락으로 유지할 최근 최대 턴 수 (기본값: 3, None 전달 시 전체 유지)
 
     Raises:
         PermissionError: 다른 사용자의 대화이거나 다른 사건의 대화 세션에 무단 접근한 경우
@@ -280,6 +308,7 @@ def load_conversation_context(
             current_question=current_question,
             turn_index=1,
             previous_turns=[],
+            total_turns_count=0,
         )
 
     # 1. 대화 세션 기준 상담 레코드 조회
@@ -287,7 +316,7 @@ def load_conversation_context(
     records = (
         db.query(ConsultationRecord)
         .filter(ConsultationRecord.conversation_id == conversation_id)
-        .order_by(ConsultationRecord.created_at.asc(), ConsultationRecord.turn_index.asc())
+        .order_by(ConsultationRecord.turn_index.asc(), ConsultationRecord.created_at.asc())
         .all()
     )
 
@@ -296,15 +325,15 @@ def load_conversation_context(
         first_rec = records[0]
         if case_id and first_rec.case_id and first_rec.case_id != case_id:
             logger.error(
-                f"[CONVERSATION_CONTEXT_SECURITY] Case mismatch for conversation {conversation_id}: "
-                f"expected case {case_id}, found {first_rec.case_id}"
+                f"[CONVERSATION_CONTEXT_SECURITY] 대화 세션({conversation_id}) 사건 불일치: "
+                f"요청 사건={case_id}, 실제 소속 사건={first_rec.case_id}"
             )
             raise PermissionError(f"해당 대화 세션은 다른 사건(case_id: {first_rec.case_id})에 속해 있습니다.")
 
         if not auth_bypass and user_id and first_rec.user_id and first_rec.user_id != user_id:
             logger.error(
-                f"[CONVERSATION_CONTEXT_SECURITY] User mismatch for conversation {conversation_id}: "
-                f"requesting user {user_id}, owner {first_rec.user_id}"
+                f"[CONVERSATION_CONTEXT_SECURITY] 대화 세션({conversation_id}) 사용자 불일치: "
+                f"요청 사용자={user_id}, 실제 소유자={first_rec.user_id}"
             )
             raise PermissionError("해당 대화 세션에 대한 열람 및 작성 권한이 없습니다.")
 
@@ -345,10 +374,10 @@ def load_conversation_context(
         except PermissionError:
             raise
         except Exception as e:
-            logger.debug(f"[CONVERSATION_CONTEXT] case_memory build skipped or failed: {e}")
+            logger.debug(f"[대화 맥락] 사건 요약 메모리 구성 생략 또는 실패: {e}")
 
     if not records:
-        logger.debug(f"[CONVERSATION_CONTEXT] New conversation session started for case={case_id}, conv={conversation_id}")
+        logger.debug(f"[대화 맥락] 신규 대화 세션 시작 (사건={case_id}, 대화ID={conversation_id})")
         return ConversationContext(
             conversation_id=conversation_id,
             case_id=case_id,
@@ -356,11 +385,12 @@ def load_conversation_context(
             current_question=current_question,
             turn_index=1,
             previous_turns=[],
+            total_turns_count=0,
             case_memory=case_memory,
         )
 
-    # 3. 완료된 턴들만 필터링하여 ConversationTurn 목록 구성
-    turns: List[ConversationTurn] = []
+    # 4. 완료된 턴들만 필터링하여 ConversationTurn 목록 구성
+    all_turns: List[ConversationTurn] = []
     seen_sources: List[Dict[str, Any]] = []
     seen_source_ids = set()
 
@@ -385,7 +415,7 @@ def load_conversation_context(
             cdelta = rec.verification_result.get("case_delta")
 
         turn = ConversationTurn(
-            turn_index=rec.turn_index or (len(turns) + 1),
+            turn_index=rec.turn_index or (len(all_turns) + 1),
             request_id=rec.request_id,
             question=rec.question,
             answer=rec.answer,
@@ -395,20 +425,32 @@ def load_conversation_context(
             created_at=rec.created_at.isoformat() if rec.created_at else None,
             case_delta=cdelta,
         )
-        turns.append(turn)
+        all_turns.append(turn)
 
-    # 4. 다음 턴 번호 및 직전 답변 정보 추출
-    next_turn_index = len(turns) + 1
-    last_turn = turns[-1] if turns else None
+    # 5. 다음 턴 번호 및 직전 답변 정보 추출
+    # DB에 누적된 전체 완료 턴 수를 기반으로 다음 turn_index를 정확하게 계산
+    total_completed = len(all_turns)
+    next_turn_index = (all_turns[-1].turn_index + 1) if (all_turns and all_turns[-1].turn_index) else (total_completed + 1)
+    last_turn = all_turns[-1] if all_turns else None
     last_answer = last_turn.answer if last_turn else None
     last_answer_status = last_turn.answer_status if last_turn else None
 
-    # 5. 대화 요약문 구축
-    summary = build_conversation_summary(turns)
+    # 6. 최근 max_turns개 턴 슬라이딩 윈도우 분할 및 이전 대화 요약문 구축
+    # 사용자 요구사항에 따라 최근 max_turns(기본 3개) 턴만 previous_turns에 유지하여
+    # 토큰 비대화 및 무관한 이전 질의 오염을 원천 차단한다.
+    if max_turns is not None and max_turns > 0 and len(all_turns) > max_turns:
+        recent_turns = all_turns[-max_turns:]
+        prior_turns = all_turns[:-max_turns]
+        # 3개 턴 이전의 과거 대화는 핵심 요약문으로 압축 관리
+        summary = build_conversation_summary(prior_turns)
+    else:
+        recent_turns = all_turns
+        summary = ""
 
     logger.info(
-        f"[CONVERSATION_CONTEXT] Loaded context for conversation {conversation_id}: "
-        f"{len(turns)} turns found, next turn_index={next_turn_index}"
+        f"[대화 맥락 로드 완료] 대화ID={conversation_id}: "
+        f"DB 누적 {total_completed}턴 중 최근 {len(recent_turns)}턴 유지 (최대={max_turns}턴), "
+        f"현재 진행 턴={next_turn_index}턴"
     )
 
     return ConversationContext(
@@ -417,7 +459,8 @@ def load_conversation_context(
         user_id=user_id or first_rec.user_id,
         current_question=current_question,
         turn_index=next_turn_index,
-        previous_turns=turns,
+        previous_turns=recent_turns,
+        total_turns_count=total_completed,
         last_answer=last_answer,
         last_answer_status=last_answer_status,
         previously_cited_sources=seen_sources,

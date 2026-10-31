@@ -34,6 +34,9 @@ from pydantic import BaseModel, Field
 from langchain_core.prompts import PromptTemplate
 
 from ai_legal_helper.llm.gateway import get_llm
+from ai_legal_helper.case_intelligence.consultation_semantics import (
+    has_repayment_assertion, is_evidence_review_request,
+)
 from ai_legal_helper.observability.decorators import trace
 from ai_legal_helper.observability.logging_config import get_logger
 from ai_legal_helper.workflows.conversation_context import ConversationContext
@@ -127,6 +130,18 @@ def _heuristic_rule_fallback(
     q_clean = question.strip()
     q_stripped = q_clean.rstrip("!?.~ ")
 
+    # 자료 검토는 대화 유무와 무관하게 새 분석이다. '입금 자료'를 변제 진술로 바꾸지 않는다.
+    if is_evidence_review_request(q_clean):
+        return IntentDecision(
+            intent=ConsultationIntent.NEW_LEGAL_ANALYSIS,
+            resolved_query=q_clean,
+            requires_specialist=True,
+            requires_retrieval=True,
+            requires_verification=True,
+            requires_full_analysis=True,
+            reason="등록 자료에 대한 사실·권리 분석 요청",
+        )
+
     # 1. 일반 인사 / 감사
     general_keywords = ["감사", "고마", "고맙", "수고", "안녕", "좋은 하루", "반갑"]
     general_patterns = [
@@ -181,8 +196,7 @@ def _heuristic_rule_fallback(
         )
 
     # 3-2. 보증금 일부 변제 / 입금 주장 (e.g. "집주인이 2천만 원을 입금했어요", "5천만원 입금했다고 합니다")
-    repayment_keywords = ["입금", "변제", "일부 반환", "돌려받", "돌려줬", "돌려주", "송금", "갚았", "부쳤", "일부 지급"]
-    if any(k in q_clean for k in repayment_keywords) and any(w in q_clean for w in ["원", "만", "천", "억", "입금", "변제", "돌려", "받았", "보냈", "집주인", "임대인"]):
+    if has_repayment_assertion(q_clean):
         return IntentDecision(
             intent=ConsultationIntent.FACT_CLARIFICATION,
             resolved_query=f"의뢰인의 보증금 일부 입금/변제 주장에 따른 보증금 잔액 변동 및 입금 증거 확인 필요성 검토: {q_clean}",
@@ -305,16 +319,20 @@ def analyze_consultation_intent(
                 reason=reason_str,
             )
     except Exception as e:
-        logger.warning(f"[INTENT_ANALYZER] LLM intent analysis failed: {e}. Fallback applied.")
+        logger.warning(f"[INTENT_ANALYZER] LLM 질문 의도 분석 실패(규칙 폴백 적용): {e}")
 
     # 2. LLM 실패 시 결정론적 휴리스틱 폴백 적용
     if decision is None:
         decision = _heuristic_rule_fallback(question, has_history=has_history, case_context=case_context)
 
+    # LLM의 재작성도 원질문을 넘어 새 거래 사실을 만들 수 없도록 자료 분석 의도를 보존한다.
+    if is_evidence_review_request(question):
+        decision = _heuristic_rule_fallback(question, has_history=has_history, case_context=case_context)
+
     # 3. 코드 레벨의 엄격한 가드레일 정책 검증 (Deterministic Policy Verification)
     # 정책 A: 첫 번째 질문인데 FOLLOWUP 계열로 잘못 분류된 경우 신규 분석으로 강제 교정
     if not has_history and decision.intent in (ConsultationIntent.FOLLOWUP_ACTION, ConsultationIntent.FOLLOWUP_QUESTION):
-        logger.info(f"[INTENT_GUARDRAIL] First turn cannot be {decision.intent}. Correcting to NEW_LEGAL_ANALYSIS.")
+        logger.info(f"[INTENT_GUARDRAIL] 첫 번째 턴 의도({decision.intent})를 신규 법률 분석(NEW_LEGAL_ANALYSIS)으로 보정합니다.")
         decision.intent = ConsultationIntent.NEW_LEGAL_ANALYSIS
         decision.requires_specialist = True
         decision.requires_retrieval = True
@@ -345,9 +363,9 @@ def analyze_consultation_intent(
         decision.resolved_query = question.strip()
 
     logger.info(
-        f"[INTENT_ANALYZER] Final decision: intent={decision.intent.value}, "
-        f"specialist={decision.requires_specialist}, retrieval={decision.requires_retrieval}, "
-        f"resolved_q='{decision.resolved_query[:60]}...'"
+        f"[INTENT_ANALYZER] 질문 의도 판정 완료: 의도={decision.intent.value}, "
+        f"전문분석={decision.requires_specialist}, 자료검색={decision.requires_retrieval}, "
+        f"복원질의길이={len(decision.resolved_query)}자"
     )
 
     return decision

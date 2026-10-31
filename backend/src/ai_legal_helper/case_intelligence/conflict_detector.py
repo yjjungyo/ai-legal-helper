@@ -743,7 +743,7 @@ def _verify_pair_with_llm(
                         pass
                 return res
         except Exception as e:
-            logger.debug(f"[CONFLICT_DETECTOR] LLM structured verification fallback: {e}")
+            logger.debug(f"[모순 탐지기] LLM 구조화 검증 폴백 적용: {e}")
 
         raw_res = (prompt | llm).invoke(payload)
         text = getattr(raw_res, "content", str(raw_res)).strip()
@@ -764,7 +764,7 @@ def _verify_pair_with_llm(
                 pass
         return parsed
     except Exception as e:
-        logger.warning(f"[CONFLICT_DETECTOR] Stage 3 LLM verification failed safely: {type(e).__name__}: {e}")
+        logger.warning(f"[모순 탐지기] 3단계 LLM 심층 검증 예외 발생(안전 무시): {type(e).__name__}: {e}")
         if cur_span:
             try:
                 update_span(cur_span, {
@@ -1764,7 +1764,7 @@ def reconcile_case_conflicts(
             for cid in affected_cases:
                 safe_sync_case(cid)
         except Exception as e:
-            logger.warning(f"[CONFLICT_DETECTOR] Neo4j sync after reconciliation warning: {e}")
+            logger.warning(f"[모순 탐지기] 사실관계 재조정 후 Neo4j 동기화 경고: {e}")
 
     return {
         "dry_run": False,

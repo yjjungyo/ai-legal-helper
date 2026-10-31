@@ -27,6 +27,9 @@ import re
 from pydantic import BaseModel, Field
 
 from ai_legal_helper.case_intelligence.case_briefing import CaseEvidenceBriefing
+from ai_legal_helper.case_intelligence.consultation_semantics import (
+    has_repayment_assertion, is_evidence_review_request, is_conditional_contract_statement,
+)
 from ai_legal_helper.case_intelligence.settlement_calculator import (
     format_krw_to_korean,
     extract_dates_from_text,
@@ -50,7 +53,7 @@ logger = get_logger(__name__)
 
 # 부차적 메타데이터 배제용 패턴 (문서명, 연락처, 단순 서명란 서식)
 _METADATA_EXCLUDE_PATTERNS = [
-    re.compile(r"^(문서\s*제목은|이\s*문서는|제목은|문서의\s*명칭은|표제는)", re.IGNORECASE),
+    re.compile(r"^(문서(?:의)?\s*제목은|이\s*문서는|제목은|문서의\s*명칭은|표제는)", re.IGNORECASE),
     re.compile(r"(연락처는|전화번호는|휴대폰|010-\d{4}-\d{4})", re.IGNORECASE),
     re.compile(r"(서명란이\s*존재한다|기재되어\s*있고\s*서명란|서명·날인란|날인란)", re.IGNORECASE),
     re.compile(r"^임대차\s*목적물의\s*전용면적은", re.IGNORECASE),
@@ -178,6 +181,7 @@ def select_grounded_facts_for_display(
         if (f.adjudication_status in ("EVIDENCE_SUPPORTED", "CORROBORATED") or getattr(f, "trust_level", "") == "EVIDENCE_SUPPORTED")
         and getattr(f, "trust_level", "") != "SUPERSEDED"
         and not is_trivial_metadata_fact(f.statement)
+        and not is_conditional_contract_statement(f.statement)
     ]
 
     # 가중치 점수 내림차순 정렬
@@ -192,6 +196,25 @@ def select_grounded_facts_for_display(
     seen_semantic_keys = set()
     label_counts: Dict[str, int] = {}
     remaining_pool: List[Any] = []
+
+    # 기초 자료 분석은 점수순 나열에 앞서 요청된 요건별로 최소 한 사실을 확보한다.
+    # 일반 반환 문구가 당사자·목적물·기간·지급 방향을 밀어내지 않게 한다.
+    if is_evidence_review_request(query or ""):
+        for keywords in (
+            ("임대인", "임차인"), ("목적물", "소재지"), ("기간", "만기"),
+            ("보증금",), ("지급", "이체", "송금"), ("입주", "인도"),
+            ("전입", "주민등록"), ("확정일자",),
+        ):
+            fact = next((f for f in scored_facts if f not in selected
+                         and any(k in f.statement for k in keywords)), None)
+            if fact is not None:
+                selected.append(fact)
+                seen_stmts.add(fact.statement.strip())
+                seen_semantic_keys.add(_extract_semantic_fact_key(fact.statement.strip()))
+                label = fact.evidence_label or "UNKNOWN"
+                label_counts[label] = label_counts.get(label, 0) + 1
+                if len(selected) >= max_facts:
+                    return selected
 
     # 1차 라운드: 증거 라벨별 다양성 확보 및 의미론적 중복 제거
     for f in scored_facts:
@@ -227,6 +250,42 @@ def select_grounded_facts_for_display(
     return selected
 
 
+def reconcile_issue_results(
+    issue_results: List[IssueVerificationResult],
+) -> List[IssueVerificationResult]:
+    """같은 종료 전제에 대한 확정·조건부 검증 충돌을 보수적으로 조정한다.
+
+    Args:
+        issue_results: 검증기가 반환한 쟁점별 결과.
+
+    Returns:
+        원본을 변경하지 않고 종료 판단의 충돌을 조건부로 표시한 결과 목록.
+    """
+    conflict = any(
+        r.issue_id == "ISSUE_NOTICE_REACH" and r.status != "VERIFIED"
+        and any(re.search(r"(?:계약\s*종료|해지\s*효력).*(?:조건부|미확인|유보|확정할 수 없)", rec)
+                for rec in r.safe_recommendations)
+        for r in issue_results
+    )
+    reconciled = []
+    for result in issue_results:
+        if conflict and result.issue_id == "ISSUE_LEASE_TERMINATION" and result.status == "VERIFIED":
+            # 서로 다른 검증 의견을 문장 치환으로 숨기면 잘못된 확정 결론을 강화하게 된다.
+            reconciled.append(result.model_copy(update={
+                "status": "CONDITIONAL",
+                "reason_codes": result.reason_codes + ["TERMINATION_VERIFICATION_CONFLICT"],
+                "safe_recommendations": ["계약 종료에 관한 검증 결과가 상충하여 확정 판단을 유보합니다. 통지 도달과 종료 근거를 다시 확인해야 합니다."],
+                "verified_claims": [c for c in result.verified_claims if c.get("claim_type") in ("FACTUAL", "LEGAL_RULE")],
+                "unsupported_claims": result.unsupported_claims + [
+                    {"claim": rec, "reason": "TERMINATION_VERIFICATION_CONFLICT"}
+                    for rec in result.safe_recommendations
+                ],
+            }))
+        else:
+            reconciled.append(result)
+    return reconciled
+
+
 def determine_final_disposition(
     issue_results: List[IssueVerificationResult],
 ) -> Tuple[str, str]:
@@ -243,6 +302,7 @@ def determine_final_disposition(
     Returns:
         Tuple[str, str]: (final_disposition, disposition_reason)
     """
+    issue_results = reconcile_issue_results(issue_results)
     if not issue_results:
         return "WITHHELD", "검증 대상 법률 쟁점이 도출되지 않았습니다."
 
@@ -387,7 +447,8 @@ def detect_case_delta(
     Returns:
         Optional[Dict[str, Any]]: 사건 변동 사항이 식별된 경우 4대 영역 딕셔너리, 없으면 None.
     """
-    q_corpus = f"{current_question} {resolved_query}".lower()
+    # 내부 재작성은 검색 보조 정보일 뿐 새 사용자 사실의 출처가 아니다.
+    q_corpus = (current_question or "").lower()
     changed_facts: List[str] = []
     impacted_determinations: List[str] = []
     preserved_determinations: List[str] = []
@@ -405,10 +466,8 @@ def detect_case_delta(
     }
 
     # 1. 보증금 일부 변제 / 입금 (S01 / P0-3.1)
-    repayment_terms = ["입금", "변제", "일부 반환", "돌려받", "돌려줬", "돌려주", "송금", "갚았", "부쳤", "일부 지급"]
-    has_repayment_mention = any(t in q_corpus for t in repayment_terms) and any(
-        w in q_corpus for w in ["원", "만", "천", "억", "입금", "변제", "돌려", "받았", "보냈", "얼마", "잔액"]
-    )
+    # 재작성 질의가 만든 '변제 주장'이나 지급 자료 언급을 사용자 진술로 승격하지 않는다.
+    has_repayment_mention = has_repayment_assertion(current_question)
 
     has_verified_payment_fact = (prior_repaid_krw > 0) or any(
         any(w in (f.statement or "").lower() for w in ["일부 변제", "일부 반환", "일부변제", "입금 확인", "변제 확인"])
@@ -417,7 +476,7 @@ def detect_case_delta(
         for f in (briefing.facts or [])
     )
 
-    if has_repayment_mention or has_verified_payment_fact:
+    if has_repayment_mention or (has_verified_payment_fact and not is_evidence_review_request(current_question)):
         # 질문 내 언급된 변제/입금 금액 정밀 추출 (남은 잔액 수치와 엄격 분리)
         asserted_krw = 0
         # 1. '입금/변제/반환/송금/돌려/지급' 문맥의 변제 주장 금액 우선 추출
@@ -503,7 +562,7 @@ def detect_case_delta(
                     "일부 변제금은 민법 제479조에 따라 비용·이자·원본 순으로 충당됨"
                 )
                 preserved_determinations.append(
-                    "임차인의 대항력, 우선변제권 및 임차권등기명령 신청 권한은 보증금 전액 반환 시까지 온전히 유지됨"
+                    "임차인의 대항력, 우선변제권 및 임차권등기명령 신청 요건은 현재 점유·전입·종료 상태를 대조해야 하며 일부 반환만으로 유지가 확정되지 않음"
                 )
                 new_next_actions.append(
                     f"확정 미반환 잔액 {confirmed_balance:,}원을 기준으로 지급명령 또는 보증금 반환 청구 소송을 준비하되, "
@@ -538,7 +597,7 @@ def detect_case_delta(
                     )
                     preserved_determinations.append(
                         "임차인의 선순위 대항력 및 우선변제권, 임차권등기명령 신청 권한, 계약 해지 효력은 "
-                        "보증금 일부 변제와 무관하게 전액 반환 시까지 온전히 유지됨"
+                        "보증금 일부 변제와 별도로 현재 대항요건과 등기 상태의 확인이 필요함"
                     )
                     new_next_actions.append(
                         f"미반환 잔액 {confirmed_balance:,}원에 대한 지급명령 신청 또는 보증금 반환 청구 소송 제기"
@@ -551,7 +610,7 @@ def detect_case_delta(
                         "상세 금융 거래 내역 및 이체확인증에 대한 재검토가 필요함"
                     )
                     preserved_determinations.append(
-                        "임차인의 대항력, 우선변제권 및 전액 반환 청구 권리는 보증금 완제 시까지 온전히 유지됨"
+                        "임차인의 대항력, 우선변제권은 관련 요건 유지 여부를 추가 확인해야 하며 반환 청구액은 실제 반환 내역에 따라 정산해야 함"
                     )
                     new_next_actions.append(
                         "정확한 변제 잔액 산정을 위해 금융 거래 상세 내역서 또는 영수증 원본 재확인"
@@ -578,7 +637,7 @@ def detect_case_delta(
                     "일부 지급이 인정될 경우 민법 제479조에 따른 비용·이자·원본 충당 순서에 따라 실제 변제 잔액이 정산되어야 함"
                 )
                 preserved_determinations.append(
-                    "임차인의 대항력, 우선변제권, 임차권등기명령 신청 권리는 잔액 전액 반환 시까지 그대로 유지됨"
+                    "임차인의 대항력, 우선변제권, 임차권등기명령 신청 요건은 현재 점유·전입·종료 상태를 추가 확인해야 함"
                 )
                 new_next_actions.append(
                     f"임대인으로부터 받은 {alleged_amt:,}원의 계좌 이체확인증 또는 영수증을 증거로 등록하여 공적으로 입증할 것"
@@ -592,7 +651,7 @@ def detect_case_delta(
                     "정확한 입금액과 금융 증빙 확인 전까지는 법률상 보증금 원금 감축이 확정되지 않음"
                 )
                 preserved_determinations.append(
-                    "임차인의 대항력, 우선변제권 및 전액 반환 청구 권리는 보증금 완제 시까지 온전히 유지됨"
+                    "임차인의 대항력, 우선변제권은 관련 요건 유지 여부를 추가 확인해야 하며 반환 청구액은 실제 반환 내역에 따라 정산해야 함"
                 )
                 new_next_actions.append(
                     "임대인으로부터 입금받은 정확한 금액과 계좌 이체확인증 또는 입금증빙 자료를 증거로 등록하여 확인할 것"
@@ -776,11 +835,13 @@ def assemble_grounded_answer(
         str: 정돈된 마크다운 형태의 최종 법률 조언 답변.
     """
     sections = []
+    evidence_review = is_evidence_review_request(current_question or "")
     doc_name_map = {ev.evidence_label: ev.document_name for ev in (briefing.evidences or []) if ev.document_name}
     for lbl, reg in (briefing.source_registry or {}).items():
         if isinstance(reg, dict) and reg.get("document_name") and lbl not in doc_name_map:
             doc_name_map[lbl] = reg["document_name"]
 
+    issue_results = reconcile_issue_results(issue_results)
     verified_issues = [r for r in issue_results if r.status == "VERIFIED"]
     conditional_issues = [r for r in issue_results if r.status in ("CONDITIONAL", "NEEDS_EVIDENCE", "NEEDS_LEGAL_SOURCE", "BLOCKED")]
 
@@ -799,8 +860,6 @@ def assemble_grounded_answer(
     balance_krw = max(0, deposit_krw - repaid_krw) if deposit_krw > 0 else 0
     deposit_text = format_krw_to_korean(deposit_krw) if deposit_krw > 0 else "보증금"
     balance_text = format_krw_to_korean(balance_krw) if balance_krw > 0 else "미반환 보증금"
-    prop_name, prop_type = find_case_property_info(briefing)
-
     has_verified_termination = any(r.issue_id == "ISSUE_LEASE_TERMINATION" and r.status == "VERIFIED" for r in verified_issues)
 
     # --------------------------------------------------------------------------
@@ -830,21 +889,30 @@ def assemble_grounded_answer(
     # [1. 핵심 결론] (P0-03: 질문에 바로 답하는 2~4문장의 명확한 법률 결론)
     # --------------------------------------------------------------------------
     sections.append("[1. 핵심 결론]")
-    if has_verified_termination:
+    if evidence_review:
         conclusion_lines = [
-            f"임대차계약은 기간 만료로 이미 종료 확정되었으며, 임대인의 {balance_text if balance_krw > 0 else deposit_text} 반환 채무는 확정적으로 이행기에 도달하였습니다.",
-            "임대인이 다음 세입자 유치 시까지 반환을 미루더라도 이는 개인적 사정에 불과하며 의뢰인이 이를 기다릴 법적 의무는 전혀 없습니다.",
-            f"보증금 전액을 반환받을 때까지 {prop_type}의 점유와 대항력을 절대 상실하지 마시고, 즉시 임차권등기명령 신청과 내용증명 발송, 지급명령 또는 소송 절차에 착수하십시오.",
+            "등록된 자료에 기재된 계약·당사자·보증금 지급 사실과 추가 확인 사항을 구분하여 정리합니다.",
+            "문서에 약정된 기간과 실제 계약 종료는 다르며, 현재 권리의 취득·유지는 관련 요건과 원본 자료를 대조해야 합니다.",
         ]
+    elif has_verified_termination:
+        # 검증된 종료 원인을 그대로 사용하고 기간 만료·반환 지체 등 새 주장을 보태지 않는다.
+        conclusion_lines = [
+            rec for r in verified_issues if r.issue_id == "ISSUE_LEASE_TERMINATION"
+            for rec in r.safe_recommendations
+        ][:2] or ["계약 종료 쟁점은 검증되었으며 구체적 근거는 아래 쟁점별 분석을 확인하십시오."]
     elif verified_issues:
         top_recs = [rec for r in verified_issues for rec in r.safe_recommendations[:1]]
         conclusion_lines = top_recs[:2]
-        conclusion_lines.append(f"보증금({balance_text if balance_krw > 0 else deposit_text}) 회수를 위해 대항력을 유지한 상태에서 단계적 법적 조치를 진행하시기 바랍니다.")
     else:
         conclusion_lines = [
             f"현재 등록된 증거를 바탕으로 {deposit_text}에 관한 기초 권리관계를 확인 중입니다.",
-            "주택의 점유와 주민등록을 온전히 유지하시고, 아래 확인된 사실과 법률 분석을 바탕으로 단계별 조치를 준비하십시오.",
+            "확인된 계약 사실과 미확인 요건을 구분하며, 현재 권리관계와 종료 여부를 추가 확인해야 합니다.",
         ]
+    if repaid_krw > 0:
+        # 확인된 거래의 산술 차액을 표시하되 현재 청구권·이행기 확정과 구분한다.
+        conclusion_lines.append(
+            f"등록된 지급·반환 내역의 계산상 차액은 {balance_text}이며, 실제 미반환액과 청구 가능 시점은 추가 확인해야 합니다."
+        )
     sections.append(" ".join(conclusion_lines))
 
     # --------------------------------------------------------------------------
@@ -858,7 +926,14 @@ def assemble_grounded_answer(
                 amt_str = f"{next(iter(amts)):,}원" if amts else "일부 금액"
                 sections.append(f"- [잠정] 의뢰인이 임대인으로부터 {amt_str}을 입금받았다고 진술하였다 (증거 미제출 / USER_ALLEGED)")
 
-    selected_facts = select_grounded_facts_for_display(briefing, query=draft_answer, max_facts=5)
+    # 기초 분석은 초안의 분쟁 가정이 아닌 원질문을 기준으로 계약·지급·거주 사실을 넓게 보존한다.
+    selected_facts = select_grounded_facts_for_display(
+        briefing, query=current_question, max_facts=12 if evidence_review else 5,
+    )
+    if evidence_review:
+        selected_facts = [f for f in selected_facts if not is_conditional_contract_statement(f.statement)]
+        for party in briefing.parties:
+            sections.append(f"- 등록 당사자: {party.role} {party.name} (등록 정보 기준)")
     if selected_facts:
         for f in selected_facts:
             lbl = f.evidence_label or ""
@@ -882,57 +957,27 @@ def assemble_grounded_answer(
     lease_labels = find_evidence_labels_by_type(briefing, ["LEASE", "임대차", "계약서"])
     notice_labels = find_evidence_labels_by_type(briefing, ["NOTICE", "통고", "통지", "문자", "카카오", "내용증명"])
     residence_labels = find_evidence_labels_by_type(briefing, ["RESIDENCE", "주민등록", "전입", "초본", "등본"])
-    attachment_labels = find_evidence_labels_by_type(briefing, ["REGISTRY", "등기", "가압류", "압류", "근저당"])
-
-    q_user = (current_question or "").lower()
-    has_actual_auction = any(w in (briefing.title or "") or any(w in f.statement for f in briefing.facts) for w in ("경매개시", "경매 개시", "배당기일", "타경"))
-    has_actual_installment = any(w in (briefing.title or "") or any(w in f.statement for f in briefing.facts) or w in q_user for w in ("분할", "일부만 먼저"))
-
     prioritized_actions: List[Dict[str, Any]] = []
 
-    # 1) 절대 안전 조치 (대항력 및 점유 유지) - 전세 상담 1순위 수칙
-    prioritized_actions.append({
-        "text": f"보증금({balance_text if balance_krw > 0 else deposit_text}) 전액을 반환받거나 관할 법원의 임차권등기명령에 따른 등기가 등기부에 기재되기 전까지는 절대 {prop_type}의 점유를 상실(열쇠 인도, 비밀번호 공유, 임의 퇴거)하거나 전입을 옮기지 마십시오. (대항력 및 우선변제권 유지 필수)",
-        "evidence_labels": list(set(lease_labels + residence_labels)),
-    })
-
-    # 2) 내용증명 발송 및 이행최고
-    prioritized_actions.append({
-        "text": "임대인에게 보증금 반환 최고 및 지연손해금(민법 연 5%, 소촉법 연 12%) 청구 내용증명을 발송하여 임대인의 이행지체 책임을 명확히 하십시오.",
-        "evidence_labels": notice_labels or lease_labels,
-    })
-
-    # 3) 임차권등기명령 신청
-    prioritized_actions.append({
-        "text": "계약 종료 즉시 관할 법원에 주택임차권등기명령을 신청하여 향후 부득이하게 이사할 때에도 기존 대항력과 우선변제권이 온전히 유지·보전되도록 조치하십시오.",
-        "evidence_labels": list(set(lease_labels + residence_labels)),
-    })
-
-    # 4) 분할반환 제안 거절 (사건 또는 질문에 분할반환이 실제로 존재할 때만 추가)
-    if has_actual_installment:
-        demand_target = f"미반환 잔액 {balance_text}" if repaid_krw > 0 else f"{deposit_text} 전액"
-        prioritized_actions.append({
-            "text": f"임대인의 분할반환 제안을 거절하고 {demand_target}의 일시반환을 강력히 촉구하십시오.",
-            "evidence_labels": list(set(notice_labels + lease_labels)),
-        })
+    # 최종 조립 단계는 검증하지 않은 절차·이율·종료 전제를 새로 만들지 않는다.
+    # 종료가 확인된 상담에서만 검증기의 권고를 재사용하고, 나머지는 자료 확인으로 제한한다.
+    if has_verified_termination and not evidence_review:
+        for result in verified_issues:
+            for recommendation in result.safe_recommendations:
+                if recommendation not in [a["text"] for a in prioritized_actions]:
+                    prioritized_actions.append({
+                        "text": recommendation,
+                        "evidence_labels": result.supported_source_ids,
+                    })
     else:
-        # 지급명령 또는 보증금반환청구 소송 제기
-        prioritized_actions.append({
-            "text": "임대인의 반환 지체가 계속될 경우 지급명령 신청 또는 보증금반환청구 소송을 제기하여 조속히 강제집행 권원(판결문 등)을 확보하십시오.",
-            "evidence_labels": list(set(lease_labels + residence_labels)),
-        })
-
-    # 5) 경매 배당요구 (사건에 실제 경매가 개시된 경우에만 추가) vs 등기부 권리변동 모니터링
-    if has_actual_auction:
-        prioritized_actions.append({
-            "text": "경매 개시 결정 시 배당요구 종기일을 확인하고 선순위 대항력 또는 우선배당 권리신고 및 배당요구를 진행하십시오.",
-            "evidence_labels": list(set(lease_labels + attachment_labels)),
-        })
-    else:
-        prioritized_actions.append({
-            "text": f"대법원 인터넷등기소를 통해 {prop_name}의 최신 등기사항전부증명서(말소사항 포함)를 발급받아 가압류나 다른 선순위 권리 변동 여부를 주기적으로 확인하십시오.",
-            "evidence_labels": attachment_labels or lease_labels,
-        })
+        prioritized_actions = [
+            {"text": "갱신 여부, 종료 합의 및 해지·갱신거절 통지와 상대방 수신 자료를 확인하십시오.",
+             "evidence_labels": notice_labels},
+            {"text": "최초 보증금 지급과 임대인의 반환 거래를 구분하고, 현재까지의 실제 반환 내역을 대조하십시오.",
+             "evidence_labels": lease_labels},
+            {"text": "주민등록 초본·확정일자 확인 자료의 원본, 현재 점유 및 최신 등기사항을 확인하십시오.",
+             "evidence_labels": residence_labels},
+        ]
 
     # 최대 3~5개로 엄격히 제한
     final_actions = prioritized_actions[:5]
@@ -960,7 +1005,14 @@ def assemble_grounded_answer(
             act_text = f" (권장: {gap.recommended_action})" if gap.recommended_action else ""
             sections.append(f"- [{gap.priority}] {gap.target_proposition}{act_text}")
     else:
-        sections.append("- 사건 등록 증거 기준 기본 요건사실은 충실히 구비되어 있습니다.")
+        sections.append("- 증거 공백 목록이 없더라도 필수 요건이 모두 확인된 것은 아닙니다. 원본과 현재 상태를 추가 확인해야 합니다.")
+    if evidence_review:
+        sections.append("- 현재까지 전입·점유가 유지되는지, 원본 주민등록·확정일자 자료와 최신 등기 내역을 확인해야 합니다. 임차인 진술과 문서 기재 사실을 구분합니다.")
+        sections.append("- 최초 약정 기간이 경과했다는 이유만으로 현재 계약 종료, 미반환액 또는 반환 지체를 확정할 수 없습니다. 갱신·통지·반환 경위를 확인해야 합니다.")
+        sections.append("- 대항력·우선변제권의 취득과 현재 유지는 관련 요건 및 선순위 권리와 함께 검토해야 합니다.")
+        for fact in briefing.facts:
+            if fact.adjudication_status in ("PARTY_ALLEGED", "EVIDENCE_INCOMPLETE"):
+                sections.append(f"- [미확인 진술] {fact.statement} [{fact.document_name or fact.evidence_label or '추가 확인 필요'}]")
     sections.append(
         "- 구두 합의에만 의존한 조치는 불측의 손해를 초래할 수 있으므로, "
         "서류를 지참하여 대한법률구조공단(국번없이 132) 또는 변호사의 대면 전문 상담을 병행하시기 바랍니다."
@@ -970,7 +1022,9 @@ def assemble_grounded_answer(
     # [5. 상세 법률 분석 (심층 검토)] (검증 완료 및 조건부 쟁점 세부 내용 - UI 접기 지원)
     # --------------------------------------------------------------------------
     sections.append("\n[5. 상세 법률 분석 (심층 검토)]")
-    if verified_issues:
+    if evidence_review:
+        sections.append("- 위 내용은 등록 자료의 기초 사실 정리입니다. 구체적 법률 효과는 갱신·종료 경위, 원본 및 현재 권리 상태를 확인한 뒤 판단해야 합니다.")
+    elif verified_issues:
         for idx, r in enumerate(verified_issues, 1):
             sections.append(f"\n{idx}. '{r.issue_title}' (검증 완료)")
             for rec in r.safe_recommendations:
@@ -993,7 +1047,7 @@ def assemble_grounded_answer(
                 if valid_laws:
                     sections.append(f"  * 적용 법령: {', '.join(valid_laws)}")
 
-    if conditional_issues:
+    if conditional_issues and not evidence_review:
         sections.append("\n[3. 조건부 판단 및 미확인 사항]")
         start_idx_cond = len(verified_issues) + 1
         for idx, r in enumerate(conditional_issues, start_idx_cond):
@@ -1005,11 +1059,8 @@ def assemble_grounded_answer(
             }.get(r.status, "조건부 검토")
             sections.append(f"\n{idx}. '{r.issue_title}' ({status_kr})")
             for rec in r.safe_recommendations:
-                clean_rec = rec
-                if has_verified_termination and ("계약 종료 여부" in rec or "계약해지 효력" in rec):
-                    clean_rec = clean_rec.replace("계약 종료 여부가 조건부 상태입니다", "계약 자체는 기간 만료로 종료 확정되었으나 세부 통지 입증자료 보강이 권장됩니다")
-                    clean_rec = clean_rec.replace("계약 종료 여부는 전혀 확인할 수 없습니다", "임대차계약은 이미 종료 확정되었습니다")
-                sections.append(f"  * 조건부 판단: {clean_rec}")
+                # 다른 쟁점의 VERIFIED를 이유로 조건부 판단을 확정 문장으로 치환하지 않는다.
+                sections.append(f"  * 조건부 판단: {rec}")
             if r.unresolved_facts:
                 unres_text = ", ".join(r.unresolved_facts[:2])
                 sections.append(f"  * 전제 조건 및 미확인 사실: {unres_text}")
@@ -1040,7 +1091,8 @@ def assemble_grounded_answer(
     all_cited_docs = []
     for ev in (briefing.evidences or []):
         if ev.document_name and ev.document_name.strip():
-            all_cited_docs.append(f"[{ev.document_name.strip()}] ({ev.document_type or '증거'})")
+            # 파일명은 일반 텍스트로도 남겨 인용 버튼의 복사·접근성 동작에 의존하지 않는다.
+            all_cited_docs.append(f"{ev.document_name.strip()} [{ev.evidence_label}] ({ev.document_type or '증거'})")
     all_cited_docs = list(dict.fromkeys(all_cited_docs))
     if all_cited_docs:
         sections.append("■ 참조 사건 증거")

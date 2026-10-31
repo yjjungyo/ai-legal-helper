@@ -136,7 +136,7 @@ def classify_case_type(title: str, description: Optional[str] = None) -> str:
                         return std
                 return cleaned_predicted
     except Exception as e:
-        logger.warning(f"[CASE_CLASSIFIER] LLM classification failed, falling back to heuristic: {e}")
+        logger.warning(f"[사건 분류기] LLM 분류 실패로 키워드 휴리스틱 폴백 적용: {e}")
 
     # 휴리스틱 폴백
     return _heuristic_fallback(combined_text)

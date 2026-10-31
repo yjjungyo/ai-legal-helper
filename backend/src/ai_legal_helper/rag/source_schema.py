@@ -21,12 +21,14 @@ from pydantic import BaseModel, ConfigDict
 
 # 법령 파일명 패턴: 예) 민법(법률)(제20432호)(20250131).pdf
 _STATUTE_FILENAME_RE = re.compile(
-    r"^([가-힣A-Za-z0-9·\s]+?)\((?:법률|대통령령|총리령|부령|대법원규칙|헌법재판소규칙)[^)]*\)"
-    r"(?:\(제?\d+호\))?(?:\((\d{8})\))?\.pdf$",
+    r"^([가-힣A-Za-z0-9·\s]+?)\((법률|대통령령|총리령|부령|대법원규칙|헌법재판소규칙)[^)]*\)"
+    r"(?:\((제?\d+호)\))?(?:\((\d{8})\))?\.pdf$",
     re.IGNORECASE,
 )
 # 본문 내 조문 번호 패턴: 예) 제3조, 제621조의2
 _ARTICLE_RE = re.compile(r"(제\s*\d+\s*조(?:\s*의\s*\d+)?)")
+# 본문 내 조문 제목 패턴: 예) 제3조(대항력 등), 제6조의2(묵시적 갱신의 경우 계약의 해지)
+_ARTICLE_TITLE_RE = re.compile(r"제\s*\d+\s*조(?:\s*의\s*\d+)?\s*\(([^)\n]{1,60})\)")
 # 판례 사건번호 패턴: 예) 2022다21580, 2020도12345
 _CASE_NUMBER_RE = re.compile(r"((?:19|20)\d{2}\s*[가-힣]{1,3}\s*\d{2,7})")
 # 법원명 패턴: 예) 대법원, 헌법재판소, 서울고등법원, 서울중앙지방법원
@@ -55,10 +57,15 @@ class StandardSource(BaseModel):
     version_date: Optional[str] = None
     retrieved_at: Optional[str] = None
 
-    # 2. 법령(STATUTE) 전용 필드 (P1-02)
+    # 2. 법령(STATUTE) 전용 필드 (P1-02 및 상세 메타정보 확장)
     law_id: Optional[str] = None
     statute_name: Optional[str] = None
     article: Optional[str] = None
+    article_title: Optional[str] = None
+    paragraph_no: Optional[str] = None
+    part: Optional[str] = None
+    chapter: Optional[str] = None
+    section: Optional[str] = None
     promulgation_date: Optional[str] = None
     promulgation_number: Optional[str] = None
     effective_date: Optional[str] = None
@@ -140,30 +147,44 @@ def build_source_from_chroma_doc(
     explicit_type = str(meta.get("source_type") or meta.get("doc_type") or "").strip().upper()
     statute_name = meta.get("statute_name") or meta.get("law_name")
     article = meta.get("article") or meta.get("article_number")
+    article_title = str(meta.get("article_title") or "").strip() or None
+    raw_para_no = str(meta.get("paragraph_no") or "").strip()
+    paragraph_no = raw_para_no if raw_para_no and raw_para_no != "본문" else None
+    part = str(meta.get("part") or "").strip() or None
+    chapter = str(meta.get("chapter") or "").strip() or None
+    section = str(meta.get("section") or "").strip() or None
+    promulgation_number = str(meta.get("promulgation_number") or "").strip() or None
     effective_date = _format_yyyymmdd(meta.get("effective_date"))
 
     court = meta.get("court")
     case_number = meta.get("case_number")
     decision_date = meta.get("decision_date")
 
-    # 파일명에서 표준 법령명 및 시행일 추출 (예: 민법(법률)(제20432호)(20250131).pdf)
+    # 파일명에서 표준 법령명, 공포번호 및 시행일 추출 (예: 민법(법률)(제20432호)(20250131).pdf)
     if filename:
         m_stat = _STATUTE_FILENAME_RE.match(filename)
         if m_stat:
             if not statute_name:
                 statute_name = m_stat.group(1).strip()
-            if m_stat.group(2):
-                parsed_date = _format_yyyymmdd(m_stat.group(2))
+            if m_stat.group(3) and not promulgation_number:
+                promulgation_number = m_stat.group(3).strip()
+            if m_stat.group(4):
+                parsed_date = _format_yyyymmdd(m_stat.group(4))
                 if not version_date:
                     version_date = parsed_date
                 if not effective_date:
                     effective_date = parsed_date
 
-    # 본문에서 확인되는 조문 또는 판례 번호 추출 (임의 추론 금지, 정규식 완전 매칭만 허용)
+    # 본문에서 확인되는 조문, 조문제목 또는 판례 번호 추출 (임의 추론 금지, 정규식 완전 매칭만 허용)
     if not article and content:
         m_art = _ARTICLE_RE.search(content)
         if m_art:
             article = re.sub(r"\s+", "", m_art.group(1))
+
+    if not article_title and content:
+        m_at = _ARTICLE_TITLE_RE.search(content)
+        if m_at:
+            article_title = m_at.group(1).strip()
 
     if not case_number and content:
         m_cn = _CASE_NUMBER_RE.search(content)
@@ -196,22 +217,51 @@ def build_source_from_chroma_doc(
     if source_type != "STATUTE":
         statute_name = None
         article = article if source_type == "DOCUMENT" else None
+        article_title = None
+        paragraph_no = None
+        part = None
+        chapter = None
+        section = None
+        promulgation_number = None
         effective_date = None
     if source_type != "PRECEDENT":
         court = None
         case_number = None
         decision_date = None
 
-    title = (
-        meta.get("title")
-        or statute_name
-        or (f"{court or ''} {case_number}".strip() if case_number else None)
-        or filename
-    )
-
     fn_Part = filename or document_id or "unknown_doc"
     pg_Part = page_disp or "1"
-    source_id = str(meta.get("source_id") or f"{fn_Part}_{pg_Part}")
+
+    # 법령(STATUTE)인 경우 축약 청크 별칭(예: 민법_제597조_c1) 대신 법령명·조문·조문제목·파일명·페이지가 포함된 전체 이름을 사용한다.
+    if source_type == "STATUTE" and (statute_name or article or filename):
+        art_disp = f"{article}({article_title})" if (article and article_title) else (article or "")
+        # 부모 원문 복원이 되지 않은 개별 항/호 청크인 경우 항 번호 등을 함께 표기하여 구분한다.
+        if paragraph_no and not meta.get("child_snippet"):
+            art_disp = f"{art_disp} {paragraph_no}".strip()
+        if "[관련 호]" in content and not meta.get("child_snippet"):
+            art_disp = f"{art_disp} [관련 호]".strip()
+        statute_head = f"{statute_name} {art_disp}".strip() if statute_name else art_disp
+        file_part = f"{filename}, p.{page_disp}" if (filename and page_disp) else (filename or "")
+        detailed_statute_name = (
+            f"{statute_head} [{file_part}]" if (statute_head and file_part)
+            else (statute_head or file_part or f"{fn_Part}_{pg_Part}")
+        )
+        title = meta.get("title") or detailed_statute_name
+        raw_sid = str(meta.get("source_id") or "").strip()
+        # 기존 ChromaDB 인덱스의 단순 청크 ID(예: 민법_제284조_c1)는 전체 상세 식별자로 승격한다.
+        if not raw_sid or re.search(r"_(?:c\d+|p\d+|fixed_\d+)$", raw_sid) or raw_sid == f"{statute_name}_{article}":
+            source_id = detailed_statute_name
+        else:
+            source_id = raw_sid
+    else:
+        title = (
+            meta.get("title")
+            or statute_name
+            or (f"{court or ''} {case_number}".strip() if case_number else None)
+            or filename
+        )
+        source_id = str(meta.get("source_id") or f"{fn_Part}_{pg_Part}")
+
     if not chunk_id:
         chunk_id = f"{source_id}#chunk"
 
@@ -228,6 +278,12 @@ def build_source_from_chroma_doc(
         retrieved_at=_utc_now_iso(),
         statute_name=statute_name,
         article=article,
+        article_title=article_title,
+        paragraph_no=paragraph_no,
+        part=part,
+        chapter=chapter,
+        section=section,
+        promulgation_number=promulgation_number,
         effective_date=effective_date,
         court=court,
         case_number=case_number,
@@ -414,30 +470,64 @@ def normalize_source_dict(raw: Any) -> Dict[str, Any]:
         else:
             source_type = "DOCUMENT"
 
-    statute_name = raw.get("statute_name")
+    statute_name = raw.get("statute_name") or raw.get("law_name")
+    promulgation_number = str(raw.get("promulgation_number") or "").strip() or None
     version_date = _format_yyyymmdd(raw.get("version_date"))
     effective_date = _format_yyyymmdd(raw.get("effective_date"))
     if filename and source_type == "STATUTE":
         m_stat = _STATUTE_FILENAME_RE.match(filename)
         if m_stat:
             statute_name = statute_name or m_stat.group(1).strip()
-            if m_stat.group(2):
-                parsed_dt = _format_yyyymmdd(m_stat.group(2))
+            if m_stat.group(3) and not promulgation_number:
+                promulgation_number = m_stat.group(3).strip()
+            if m_stat.group(4):
+                parsed_dt = _format_yyyymmdd(m_stat.group(4))
                 version_date = version_date or parsed_dt
                 effective_date = effective_date or parsed_dt
 
     content = raw.get("content")
     article = raw.get("article")
-    if not article and content and source_type == "STATUTE":
-        m_art = _ARTICLE_RE.search(str(content))
-        if m_art:
-            article = re.sub(r"\s+", "", m_art.group(1))
+    if not article and source_type == "STATUTE":
+        # source_id, title, content 순서로 조문 번호(예: 제3조, 제6조의2)를 추출한다.
+        for candidate_str in (source_id, raw.get("title"), str(content or "")):
+            if candidate_str:
+                m_art = _ARTICLE_RE.search(str(candidate_str))
+                if m_art:
+                    article = re.sub(r"\s+", "", m_art.group(1))
+                    break
+
+    article_title = str(raw.get("article_title") or "").strip() or None
+    if not article_title and source_type == "STATUTE":
+        for candidate_str in (raw.get("title"), str(content or ""), source_id):
+            if candidate_str:
+                m_at = _ARTICLE_TITLE_RE.search(str(candidate_str))
+                if m_at:
+                    article_title = m_at.group(1).strip()
+                    break
+
+    raw_para_no = str(raw.get("paragraph_no") or "").strip()
+    paragraph_no = (raw_para_no if raw_para_no and raw_para_no != "본문" else None) if source_type == "STATUTE" else None
+    part = (str(raw.get("part") or "").strip() or None) if source_type == "STATUTE" else None
+    chapter = (str(raw.get("chapter") or "").strip() or None) if source_type == "STATUTE" else None
+    section = (str(raw.get("section") or "").strip() or None) if source_type == "STATUTE" else None
+
+    raw_title = str(raw.get("title") or "").strip() or None
+    if source_type == "STATUTE" and (not raw_title or raw_title == statute_name):
+        art_disp = f"{article}({article_title})" if (article and article_title) else (article or "")
+        if paragraph_no:
+            art_disp = f"{art_disp} {paragraph_no}".strip()
+        head = f"{statute_name} {art_disp}".strip() if statute_name else art_disp
+        if filename and filename != f"{statute_name}.pdf":
+            page_sfx = f", p.{page}" if page else ""
+            raw_title = f"{head} [{filename}{page_sfx}]" if head else filename
+        elif head:
+            raw_title = head
 
     std = StandardSource(
         source_id=source_id,
         source_type=source_type,
         document_id=raw.get("document_id") or raw.get("evidence_id") or filename,
-        title=raw.get("title") or statute_name or filename or source_id,
+        title=raw_title or statute_name or filename or source_id,
         content=content,
         retrieval_method=raw.get("retrieval_method") or (
             "NEO4J_GRAPH" if source_id.startswith("GRAPH:")
@@ -452,8 +542,13 @@ def normalize_source_dict(raw: Any) -> Dict[str, Any]:
         law_id=str(raw.get("law_id")).strip() if raw.get("law_id") else None,
         statute_name=statute_name if source_type == "STATUTE" else None,
         article=article if source_type in ("STATUTE", "DOCUMENT") else None,
+        article_title=article_title if source_type == "STATUTE" else None,
+        paragraph_no=paragraph_no,
+        part=part,
+        chapter=chapter,
+        section=section,
         promulgation_date=_format_yyyymmdd(raw.get("promulgation_date")) if source_type == "STATUTE" else None,
-        promulgation_number=str(raw.get("promulgation_number")).strip() if raw.get("promulgation_number") else None,
+        promulgation_number=promulgation_number if source_type == "STATUTE" else None,
         effective_date=effective_date if source_type == "STATUTE" else None,
         version_id=str(raw.get("version_id")).strip() if raw.get("version_id") else None,
         court=raw.get("court") if source_type == "PRECEDENT" else None,

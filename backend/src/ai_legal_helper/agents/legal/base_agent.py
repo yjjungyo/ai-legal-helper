@@ -210,6 +210,6 @@ def build_react_agent(
         early_stopping_method="force",
         return_intermediate_steps=False,
     )
-    logger.debug(f"[AGENT] built: category={category} tools={len(tools)} primary_tool={primary_tool}")
+    logger.debug(f"[전문 에이전트 준비] 분야={category}, 도구={len(tools)}개, 주력도구={primary_tool}")
     return exec_
 

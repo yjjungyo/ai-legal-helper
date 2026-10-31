@@ -66,19 +66,19 @@ def recover_stale_processing_tasks(
         task.updated_at = get_kst_now()
 
     db.commit()
-    logger.warning(f"[GRAPH_WORKER] Recovered {len(stale_tasks)} stale PROCESSING sync task(s).")
+    logger.warning(f"[그래프 동기화 워커] 중단된 동기화 작업 {len(stale_tasks)}건을 대기 상태로 복구했습니다.")
     return len(stale_tasks)
 
 
 async def graph_sync_worker_loop():
     """주기적으로 graph_sync_tasks 테이블을 폴링하여 동기화를 수행하는 백그라운드 워커."""
-    logger.info("Graph Sync Worker started.")
+    logger.info("[그래프 동기화 워커] 백그라운드 그래프 동기화 워커가 시작되었습니다.")
     while True:
         try:
             # 동기적인 DB 작업을 쓰레드에서 실행
             await asyncio.to_thread(_process_pending_tasks)
         except Exception as e:
-            logger.error(f"Graph Sync Worker error: {e}\n{traceback.format_exc()}")
+            logger.error(f"[그래프 동기화 워커] 오류 발생: {e}\n{traceback.format_exc()}")
         await asyncio.sleep(5)  # 5초 간격 폴링
 
 
@@ -113,7 +113,7 @@ def _process_pending_tasks():
     for info in task_info:
         task_id = info["id"]
         case_id = info["case_id"]
-        logger.info(f"[GRAPH_WORKER] Processing sync task for case {case_id}")
+        logger.info(f"[그래프 동기화 워커] 사건({case_id}) 그래프 동기화 작업 시작")
 
         # 실제 동기화 로직 수행 (PostgreSQL 스냅샷 -> Neo4j 단독 동기화, ChromaDB 미사용)
         result = safe_sync_case(case_id)
@@ -131,7 +131,7 @@ def _process_pending_tasks():
                 t.status = "FAILED"
                 t.retry_count += 1
                 t.error_message = str(result.get("error", result.get("status")))
-                logger.warning(f"[GRAPH_WORKER] Task failed for case {case_id}: {t.error_message}")
+                logger.warning(f"[그래프 동기화 워커] 사건({case_id}) 동기화 작업 실패: {t.error_message}")
             t.updated_at = get_kst_now()
             tx.commit()
 

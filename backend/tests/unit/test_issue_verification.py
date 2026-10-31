@@ -292,7 +292,8 @@ def test_c09_verify_issue_verified_when_facts_and_law_present():
         facts=[
             FactItemBrief(
                 fact_id="f1",
-                statement="2024년 2월 28일 만료 및 해지 통고 완료",
+                # 단순 발송 완료와 달리 실제 비갱신·종료가 증거로 뒷받침된 양성 사례다.
+                statement="2024년 2월 28일 갱신거절 통지가 도달하여 갱신 없이 계약이 종료되었다.",
                 adjudication_status="EVIDENCE_SUPPORTED",
                 evidence_label="E01",
             )

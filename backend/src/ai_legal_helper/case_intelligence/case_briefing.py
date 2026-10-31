@@ -26,6 +26,7 @@ from ai_legal_helper.database.models import (
     Fact,
     Event,
     EvidenceDocument,
+    EvidenceSpan,
     EvidenceClaim,
     EvidenceAssessment,
     FactAdjudication,
@@ -130,6 +131,7 @@ class CaseEvidenceBriefing(BaseModel):
     evidence_gaps: List[EvidenceGapBrief] = Field(default_factory=list, description="증거 공백 목록")
     genuinely_disputed: List[DisputedConflictBrief] = Field(default_factory=list, description="실제 상충 분쟁 목록")
     source_registry: Dict[str, Dict[str, Any]] = Field(default_factory=dict, description="증거 인용 레지스트리")
+    source_documents: List[Dict[str, Any]] = Field(default_factory=list, description="현재 사건에 등록된 문서의 추출 원문과 위치 정보")
     as_of_date: Optional[str] = Field(None, description="상담 기준일자 (YYYY.MM.DD 또는 YYYY-MM-DD)")
     formatted_summary: str = Field("", description="LLM Synthesizer/Agent 주입용 정돈된 브리핑 텍스트")
 
@@ -226,6 +228,26 @@ def build_case_evidence_briefing(
     )
     label_map = assign_evidence_labels(doc_records)
     doc_dict = {d.id: d for d in doc_records}
+
+    # 파생 Fact 요약을 원문처럼 사용하지 않는다. 현재 사건 문서의 추출 문단만 별도로 보존한다.
+    spans_by_document: Dict[str, List[Any]] = {}
+    if doc_dict:
+        for span in db.query(EvidenceSpan).filter(EvidenceSpan.evidence_id.in_(list(doc_dict))).all():
+            spans_by_document.setdefault(span.evidence_id, []).append(span)
+    source_documents = []
+    for document in doc_records:
+        spans = sorted(spans_by_document.get(document.id, []), key=lambda span: (
+            span.page_number or 0, span.paragraph_index or 0, span.char_start or 0, span.id,
+        ))
+        source_documents.append({
+            "evidence_id": document.id, "evidence_label": label_map[document.id],
+            "document_name": document.original_filename, "review_status": document.status,
+            "source_kind": document.source_kind,
+            "sha256": document.sha256, "extraction_version": document.extraction_version,
+            "extracted_at": str(document.extracted_at) if document.extracted_at else None,
+            "content": "\n".join(span.text_excerpt for span in spans),
+            "span_ids": [span.id for span in spans],
+        })
 
     # 증거별 Claim 건수 집계
     claim_counts: Dict[str, int] = {}
@@ -373,6 +395,7 @@ def build_case_evidence_briefing(
 
     # 6. Source Registry 구성 (인용 검증 및 Verifier/Synthesizer 공통 참조, P0-2)
     source_registry: Dict[str, Dict[str, Any]] = {}
+    document_content = {document["evidence_id"]: document["content"] for document in source_documents}
     for ev_item in evidence_items:
         entry = {
             "source_id": f"EVIDENCE:{ev_item.evidence_label}",
@@ -385,6 +408,8 @@ def build_case_evidence_briefing(
             "title": ev_item.document_name or ev_item.evidence_label,
             "source_type": "CASE_EVIDENCE",
             "citation_tag": f"[{ev_item.evidence_label}]",
+            "content": document_content.get(ev_item.evidence_id, ""),
+            "review_status": ev_item.status,
         }
         source_registry[ev_item.evidence_label] = entry
         source_registry[ev_item.evidence_id] = entry
@@ -467,5 +492,6 @@ def build_case_evidence_briefing(
         evidence_gaps=gap_items,
         genuinely_disputed=disputed_items,
         source_registry=source_registry,
+        source_documents=source_documents,
         formatted_summary=formatted_summary_text,
     )

@@ -536,6 +536,7 @@ def test_e09_concurrent_requests_handling(case_300m: Case, test_user_a: User):
             current_question="마지막 질문",
             case_id=target_case_id,
             user_id=target_user_id,
+            max_turns=None,  # 동시 기록된 4개 턴 전체 검증을 위해 윈도우 제한 해제
         )
         assert ctx is not None
         assert len(ctx.previous_turns) == 4

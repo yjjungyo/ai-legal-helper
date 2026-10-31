@@ -329,7 +329,7 @@ class GraphRAGRetriever:
                 include_pending=False,
             )
         except Exception as e:
-            logger.warning(f"[GRAPH_RAG] PostgreSQL evidence search error: {type(e).__name__}: {e}")
+            logger.warning(f"[GRAPH_RAG] PostgreSQL 사건 증거 검색 오류: {type(e).__name__}: {e}")
         finally:
             if owns_session and session is not None:
                 try:

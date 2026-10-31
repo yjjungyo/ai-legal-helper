@@ -46,10 +46,8 @@ def test_polling_consultation_skips_langfuse_and_info_log():
         # Langfuse 최상위 Root Trace가 생성되지 않아야 함
         mock_start_trace.assert_not_called()
 
-        # 터미널 스팸 방지를 위해 logger.info 대신 logger.debug가 호출되어야 함
+        # 터미널 스팸 방지를 위해 200 정상 폴링 시 logger.info가 호출되지 않아야 함 (완전 무음화)
         mock_log_info.assert_not_called()
-        mock_log_debug.assert_called_once()
-        assert f"/api/v1/consultations/{req_id}" in mock_log_debug.call_args[0][0]
 
     # 정리
     _consultations.pop(req_id, None)

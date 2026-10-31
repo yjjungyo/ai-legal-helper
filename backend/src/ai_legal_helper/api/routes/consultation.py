@@ -124,7 +124,7 @@ def update_progress_step(
                 rec.progress = resp.progress.model_dump()
                 db_session.commit()
     except Exception as e:
-        logger.warning(f"[UPDATE_PROGRESS] Failed to persist progress to DB: {e}")
+        logger.warning(f"[진행 상태 저장 실패] DB 진행 단계 업데이트 오류: {e}")
 
 
 def _parse_or_build_progress(
@@ -316,10 +316,14 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
     )
     start_time = time.time()
     try:
-        # LangGraph 노드 실행 단계별 진행 상태 실시간 콜백
+        # LangGraph 노드 실행 단계별 진행 상태 실시간 콜백 및 한국어 로그 출력
+        logger.info(f"[상담 분석 시작] 의뢰인 질문 접수 (사건: {req.case_id or '단독상담'}, 요청: {request_id[:8]})")
+
         async def on_step(node_name: str):
             if node_name in NODE_TO_PROGRESS_STEP:
                 step_id, msg = NODE_TO_PROGRESS_STEP[node_name]
+                step_num = step_id.replace("step_", "")
+                logger.info(f"[{step_num}단계 진행 상태] {msg} (노드: {node_name})")
                 update_progress_step(request_id, step_id, ConsultationStepStatus.RUNNING, msg)
 
         # Run unified workflow
@@ -356,6 +360,9 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
             agent_usage=agent_usage,
         )
         
+        logger.info(
+            f"[상담 분석 완료] 6단계 분석 및 검증 완료 (소요시간: {elapsed_ms:.1f}ms)"
+        )
         resp = _consultations[request_id]
         if hasattr(result, "get"):
             if result.get("conversation_id"):
@@ -795,6 +802,8 @@ async def process_consultation_resume(
         async def on_step(node_name: str):
             if node_name in NODE_TO_PROGRESS_STEP:
                 step_id, msg = NODE_TO_PROGRESS_STEP[node_name]
+                step_num = step_id.replace("step_", "")
+                logger.info(f"[{step_num}단계 재개 상태] {msg} (노드: {node_name})")
                 update_progress_step(request_id, step_id, ConsultationStepStatus.RUNNING, msg)
 
         # LangGraph Command(resume=...) 호출로 인터럽트된 노드 재개
@@ -935,7 +944,7 @@ async def process_consultation_resume(
             pass
 
     except Exception as e:
-        logger.error(f"[RESUME_ERROR] consultation {request_id} resume failed: {e}")
+        logger.error(f"[상담 재개 오류] 상담({request_id}) 재개 처리 실패: {e}")
         resp = _consultations.get(request_id)
         if resp:
             resp.status = "ERROR"

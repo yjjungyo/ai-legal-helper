@@ -239,7 +239,8 @@ def test_counterexample_04_distinguish_expiry_from_implicit_renewal():
         facts=[
             FactItemBrief(
                 fact_id="f1",
-                statement="2024년 2월 28일 임대차계약 기간 만료 및 해지 통고 완료",
+                # 발송 완료만으로 종료를 입증하지 않도록 실제 도달·비갱신·종료가 확인된 사례를 사용한다.
+                statement="2024년 2월 28일 임대차계약 기간 만료. 갱신거절 통지가 도달하여 갱신 없이 계약이 종료되었다.",
                 adjudication_status="EVIDENCE_SUPPORTED",
                 evidence_label="E01",
             ),

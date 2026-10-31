@@ -22,10 +22,15 @@ export interface Source {
   version_date?: string | null;
   retrieved_at?: string | null;
 
-  // 법령(STATUTE) 전용 필드 (P1-02 보강)
+  // 법령(STATUTE) 전용 필드 (P1-02 보강 및 상세 메타데이터 확장)
   law_id?: string | null;
   statute_name?: string | null;
   article?: string | null;
+  article_title?: string | null;
+  paragraph_no?: string | null;
+  part?: string | null;
+  chapter?: string | null;
+  section?: string | null;
   promulgation_date?: string | null;
   promulgation_number?: string | null;
   effective_date?: string | null;
@@ -39,6 +44,8 @@ export interface Source {
   // 사건 증거(CASE_EVIDENCE) 및 일반 문서(DOCUMENT) 전용 필드
   evidence_id?: string | null;
   filename?: string | null;
+  file_name?: string | null;
+  document_name?: string | null;
   original_filename?: string | null;
   category?: string | null;
   evidence_label?: string | null;

@@ -50,15 +50,15 @@ function classifySectionTitle(title: string): SectionCategoryConfig {
   }
 
   // 1. 핵심 결론 (P0-03)
-  if (t.includes('핵심 결론') || t.includes('사건 요약') || t.includes('상담 요약') || t.includes('개요')) {
+  if (t.includes('핵심 결론') || t.includes('핵심 요약') || t.includes('사건 요약') || t.includes('상담 요약') || t.includes('개요')) {
     return { icon: '📋', theme: 'summary' };
   }
   // 2. 사건 사실관계 및 판단 근거 (P0-03)
-  if (t.includes('판단 근거') || t.includes('사실관계') || t.includes('확인된 사실') || t.includes('사건 사실') || t.includes('증거 자료') || t.includes('기초 사실')) {
+  if (t.includes('판단 근거') || t.includes('사실관계') || t.includes('확인된 사실') || t.includes('확인되는 계약') || t.includes('계약 사실') || t.includes('보증금 지급') || t.includes('사건 사실') || t.includes('증거 자료') || t.includes('기초 사실')) {
     return { icon: '🔍', theme: 'facts' };
   }
   // 3. 쟁점별 법률 분석 / 상세 법률 분석 (P0-03)
-  if (t.includes('상세 법률 분석') || t.includes('쟁점별 법률 분석') || t.includes('법률 분석') || t.includes('법적 근거 및 심층 분석') || t.includes('법률 쟁점') || t.includes('주요 쟁점') || t.includes('쟁점')) {
+  if (t.includes('상세 법률 분석') || t.includes('쟁점별 법률 분석') || t.includes('법률 분석') || t.includes('법적 근거 및 심층 분석') || t.includes('법률 쟁점') || t.includes('주요 쟁점') || t.includes('쟁점') || t.includes('임차인의 권리') || t.includes('계약 상태') || t.includes('법적 상태')) {
     return { icon: '⚖️', theme: 'issues' };
   }
   // 4. 우선순위별 다음 행동 / 우선 행동 가이드 (P0-04)
@@ -66,7 +66,7 @@ function classifySectionTitle(title: string): SectionCategoryConfig {
     return { icon: '🚀', theme: 'action' };
   }
   // 5. 미확인 사항 및 주의사항
-  if (t.includes('미확인') || t.includes('추가 확인') || t.includes('확인사항') || t.includes('유의사항') || t.includes('입증 필요') || t.includes('불확실')) {
+  if (t.includes('미확인') || t.includes('추가 확인') || t.includes('확인할 사항') || t.includes('확인사항') || t.includes('유의사항') || t.includes('입증 필요') || t.includes('불확실')) {
     return { icon: '⚠️', theme: 'uncertain' };
   }
 
@@ -106,8 +106,10 @@ export function renderInlineMarkdown(
     .replace(/:\s*,+\s*/g, ': ')
     .replace(/\[\s*\]/g, '');
 
-  // 토큰 분할 정규식: **볼드**, `인라인코드`, *이탤릭*, [증거파일명], [E01] 등
-  const tokenRegex = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*|\[(?:E\d{1,3}[^\]]*|[^\]+\.(?:pdf|docx|txt|png|jpg|jpeg)|[^\]\n]+)\])/gi;
+  // 토큰 분할 정규식: **볼드**, `인라인코드`, *이탤릭*, [증거파일명], (법령명 제N조(조문제목), 파일명.pdf...) 등
+  const tokenRegex = (
+    /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*|\[(?:E\d{1,3}[^\]]*|[^\]\n]+\.(?:pdf|docx|txt|png|jpg|jpeg)|[^\]\n]+)\]|\([가-힣A-Za-z0-9·\s]+(?:법률|법|시행령|시행규칙)\s+제\s*\d+\s*조(?:[^()\n]|\([^()\n]*\))*\))/gi
+  );
   const parts = sanitizedText.split(tokenRegex);
 
   return parts.map((part, index) => {
@@ -149,7 +151,8 @@ export function renderInlineMarkdown(
             c.evidence_refs.some((r) => {
               const rLbl = (r.evidence_label || '').toUpperCase();
               const rName = (r.document_name || '').toUpperCase();
-              return rLbl === cleanUpper || rName === cleanUpper || rName.includes(cleanUpper) || cleanUpper.includes(rName);
+              // 빈 파일명은 모든 문자열의 부분 문자열이므로 실제 이름이 있을 때만 비교한다.
+              return rLbl === cleanUpper || (!!rName && (rName === cleanUpper || rName.includes(cleanUpper) || cleanUpper.includes(rName)));
             })
           );
         });
@@ -159,7 +162,8 @@ export function renderInlineMarkdown(
             match.evidence_refs.find((r) => {
               const rLbl = (r.evidence_label || '').toUpperCase();
               const rName = (r.document_name || '').toUpperCase();
-              return rLbl === cleanUpper || rName === cleanUpper || rName.includes(cleanUpper) || cleanUpper.includes(rName);
+              // 이름 없는 다른 증거가 현재 인용의 원문으로 선택되지 않게 한다.
+              return rLbl === cleanUpper || (!!rName && (rName === cleanUpper || rName.includes(cleanUpper) || cleanUpper.includes(rName)));
             }) || match.evidence_refs[0];
 
           meta = {
@@ -225,6 +229,28 @@ export function renderInlineMarkdown(
         <em key={index} style={{ fontStyle: 'italic' }}>
           {part.slice(1, -1)}
         </em>
+      );
+    }
+
+    // 인라인 법령 조문 인용 배지: (주택임대차보호법 제2조, 제3조 제1항) 등
+    if (part.startsWith('(') && part.endsWith(')') && /제\s*\d+\s*조/.test(part)) {
+      return (
+        <span
+          key={index}
+          style={{
+            display: 'inline-block',
+            backgroundColor: '#eff6ff',
+            color: '#1d4ed8',
+            border: '1px solid #bfdbfe',
+            borderRadius: '4px',
+            padding: '0px 6px',
+            fontSize: '0.88em',
+            fontWeight: 600,
+            margin: '0 2px',
+          }}
+        >
+          {part}
+        </span>
       );
     }
 
@@ -301,9 +327,80 @@ function renderFormattedLine(line: string, index: number, onEvidenceClick?: (lab
     );
   }
 
-  // 4. 일반 문장
+  // 4. 문장 내 '첫째, ... 둘째, ... 셋째, ...' 또는 '정리하면,'이 한 줄에 이어진 경우 가독성을 위해 자동 단락/목록 분리
+  if (/(?:첫째,|둘째,|셋째,|넷째,|다섯째,)/.test(trimmed) && trimmed.includes('첫째,')) {
+    const segments = trimmed
+      .split(/(?=(?:첫째,|둘째,|셋째,|넷째,|다섯째,|정리하면,|요약하면,))/g)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (segments.length > 1) {
+      return (
+        <div key={index} style={{ display: 'flex', flexDirection: 'column', gap: '6px', margin: '8px 0' }}>
+          {segments.map((seg, sIdx) => {
+            const enumMatch = seg.match(/^(첫째|둘째|셋째|넷째|다섯째),\s*(.+)$/);
+            const summaryMatch = seg.match(/^(정리하면|요약하면),\s*(.+)$/);
+            if (enumMatch) {
+              return (
+                <div
+                  key={sIdx}
+                  style={{
+                    display: 'flex',
+                    gap: '8px',
+                    alignItems: 'flex-start',
+                    padding: '6px 10px',
+                    backgroundColor: '#f8fafc',
+                    borderRadius: '6px',
+                    borderLeft: '3px solid #3b82f6',
+                  }}
+                >
+                  <span style={{ color: '#1d4ed8', fontWeight: 700, minWidth: '42px', fontSize: '0.92em' }}>
+                    {enumMatch[1]}
+                  </span>
+                  <span style={{ flex: 1, lineHeight: 1.68 }}>
+                    {renderInlineMarkdown(enumMatch[2], onEvidenceClick, claimCitations, seg)}
+                  </span>
+                </div>
+              );
+            }
+            if (summaryMatch) {
+              return (
+                <div
+                  key={sIdx}
+                  style={{
+                    marginTop: '4px',
+                    padding: '8px 12px',
+                    backgroundColor: '#eff6ff',
+                    borderRadius: '6px',
+                    borderLeft: '4px solid #2563eb',
+                    lineHeight: 1.68,
+                  }}
+                >
+                  <strong style={{ color: '#1e40af', marginRight: '6px' }}>{summaryMatch[1]}:</strong>
+                  {renderInlineMarkdown(summaryMatch[2], onEvidenceClick, claimCitations, seg)}
+                </div>
+              );
+            }
+            return (
+              <div key={sIdx} style={{ lineHeight: 1.7, fontWeight: 600, color: '#1e293b', marginTop: '2px' }}>
+                {renderInlineMarkdown(seg, onEvidenceClick, claimCitations, seg)}
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+  }
+
+  // 5. 일반 문단 (문단 간 충분한 여백과 줄간격 부여)
   return (
-    <div key={index} style={{ margin: '2px 0', lineHeight: 1.6 }}>
+    <div
+      key={index}
+      style={{
+        margin: '8px 0',
+        lineHeight: 1.74,
+        wordBreak: 'keep-all',
+      }}
+    >
       {renderInlineMarkdown(line, onEvidenceClick, claimCitations, line)}
     </div>
   );
@@ -493,7 +590,7 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
 
         // 3-1. 쟁점별 심층 법률 분석 (접기/펼치기 아코디언 지원 - P0-03/Gate 2 기본 접힘 제공)
         if (sec.type === 'issues') {
-          const isCollapsed = collapsedSections[idx] !== undefined ? collapsedSections[idx] : true;
+          const isCollapsed = collapsedSections[idx] !== undefined ? collapsedSections[idx] : false;
           return (
             <div
               key={idx}
@@ -601,6 +698,38 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
         }
 
         // 5. 일반 본문 및 8대 권장 구성요소 카드
+        const isSummary = sec.type === 'summary';
+        const isFacts = sec.type === 'facts';
+        const hasTitle = Boolean(sec.title);
+        const nonEmptyLines = linesToRender.filter((l) => l.trim().length > 0);
+
+        // 소제목이 없는 다중 문단 통글인 경우에도 문단별 구분 카드로 가독성 향상
+        if (!hasTitle && sections.length === 1 && nonEmptyLines.length >= 2) {
+          return (
+            <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {nonEmptyLines.map((l, lIdx) => {
+                const isFirstLead = lIdx === 0;
+                return (
+                  <div
+                    key={lIdx}
+                    style={{
+                      backgroundColor: isFirstLead ? '#f8fafc' : '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      borderLeft: isFirstLead ? '4px solid #2563eb' : '3px solid #94a3b8',
+                      borderRadius: '8px',
+                      padding: '10px 14px',
+                      fontSize: '0.92em',
+                      color: 'var(--text-main, #1e293b)',
+                    }}
+                  >
+                    {renderFormattedLine(l, lIdx, onEvidenceClick, claimCitations)}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        }
+
         return (
           <div
             key={idx}
@@ -608,7 +737,17 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
               display: 'flex',
               flexDirection: 'column',
               gap: '6px',
-              padding: sec.title ? '4px 0' : '0',
+              backgroundColor: isSummary ? '#f8fafc' : hasTitle ? '#ffffff' : 'transparent',
+              border: hasTitle ? '1px solid var(--border, #e2e8f0)' : 'none',
+              borderLeft: isSummary
+                ? '4px solid #2563eb'
+                : isFacts
+                  ? '4px solid #0284c7'
+                  : hasTitle
+                    ? '4px solid #64748b'
+                    : 'none',
+              borderRadius: hasTitle ? '8px' : '0',
+              padding: hasTitle ? '12px 14px' : '0',
             }}
           >
             {sec.title && (
@@ -616,16 +755,16 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
                 style={{
                   fontWeight: 700,
                   fontSize: '0.96em',
-                  color: 'var(--primary, #2563eb)',
+                  color: isSummary ? '#1e40af' : isFacts ? '#0369a1' : 'var(--primary, #2563eb)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  marginTop: '4px',
+                  paddingBottom: '6px',
+                  borderBottom: '1px solid #f1f5f9',
                 }}
               >
                 <span>{sec.icon || '▪'}</span>
                 <span>{sec.title}</span>
-
               </div>
             )}
             <div style={{ fontSize: '0.92em', color: 'var(--text-main)' }}>

@@ -7,7 +7,7 @@
 환경변수 LOG_FORMAT에 따라 텍스트 포맷(기본값) 또는 기계 분석용 JSON 포맷을 선택할 수 있다.
 
 [주요 기능]
-1. LoguruStyleFormatter: Loguru/Rich 스타일 고가독성 포맷터 (파이프 구분, Multi-Agent 흐름 [Agent >> Node], 콘솔 ANSI 컬러 vs 파일 클린 텍스트)
+1. LoguruStyleFormatter: Loguru/Rich 스타일 고가독성 포맷터 (파이프 구분, 한국어 단계 [에이전트 >> 단계명], 저수준 네트워크 트레이스 한국어 변환, 콘솔 ANSI 컬러 vs 파일 클린 텍스트)
 2. CustomJsonFormatter: 기계 및 로그 수집기(ELK/CloudWatch)용 구조화 JSON 포맷터 (파일명, 라인, 모듈 포함)
 3. HttpNoiseFilter: CORS OPTIONS 프리플라이트 및 헬스체크 등 디버깅 방해 노이즈 필터링
 4. setup_logging: 콘솔(sys.stdout, colorize=True) 및 일자별 롤링 파일(TimedRotatingFileHandler, colorize=False) 구성
@@ -15,6 +15,7 @@
 import logging
 from logging.handlers import TimedRotatingFileHandler
 import os
+import re
 import sys
 from datetime import datetime
 from typing import Optional
@@ -42,19 +43,141 @@ _CYAN = "\033[36m"
 _BOLD_RED = "\033[1;31m"
 _RED = "\033[31m"
 
+# LangGraph 노드 및 에이전트 한국어 단계 매핑 (콘솔 및 파일 로그 가독성 향상)
+_NODE_KR_LABELS = {
+    "supervisor_initialize": "1단계: 사건·맥락 확인(init)",
+    "intent_analysis": "1단계: 질문 의도 분석(intent)",
+    "general_conversation": "1단계: 일반 대화 안내(general)",
+    "followup_action": "후속턴: 실무 행동 가이드(followup_action)",
+    "route": "2단계: 법률 분야 판별(route)",
+    "routing_exit": "2단계: 추가 정보 안내(routing_exit)",
+    "plan": "2단계: 쟁점·도구 계획(plan)",
+    "run_agents": "3단계: 법령·판례 검색(run_agents)",
+    "synthesize": "4단계: 쟁점별 분석·초안 작성(synthesize)",
+    "verification": "5단계: 법령·증거 근거 검증(verification)",
+    "revise": "5단계: 답변 보강·재작성(revise)",
+    "statute_search_approval": "5단계: 외부 법령 조회 승인 대기(hilt)",
+    "execute_statute_search": "5단계: 국가법령정보센터 조회(statute_search)",
+    "re_analyze": "5단계: 확보 법령 기반 재분석(re_analyze)",
+    "finalize": "6단계: 최종 답변 확정(finalize)",
+    "insufficient": "6단계: 판단 유보·보완 안내(insufficient)",
+}
+
+_AGENT_KR_LABELS = {
+    "IntentAnalyzer": "의도분석 에이전트",
+    "RouterAgent": "분야분류 에이전트",
+    "PlannerAgent": "쟁점계획 에이전트",
+    "SynthesizerAgent": "종합분석 에이전트",
+    "VerificationAgent": "근거검증 에이전트",
+    "DocumentAnswerAgent": "문서상담 에이전트",
+    "DocumentVerifier": "문서검증 에이전트",
+    "ActionPlanner": "대응전략 에이전트",
+}
+
+
+def _translate_log_message(msg: str) -> str:
+    """httpcore/httpcore2(_trace.py), httpx, asyncio 등 저수준 영문 네트워크·시스템 로그를
+    사람이 직관적으로 이해할 수 있는 한국어 메시지로 변환한다.
+
+    비즈니스 로직에는 영향을 주지 않으며, 포맷팅 출력 시점에만 동작한다.
+
+    Args:
+        msg (str): 원본 로그 메시지 문자열.
+
+    Returns:
+        str: 한국어로 변환된 로그 메시지 (변환 대상이 아닌 경우 원문 그대로 반환).
+    """
+    if not msg or not isinstance(msg, str):
+        return msg
+
+    stripped = msg.strip()
+
+    # 1. httpcore / httpcore2 (_trace.py) 저수준 통신 트레이스 변환
+    if stripped.startswith("connect_tcp.started"):
+        host_m = re.search(r"host='([^']+)'", stripped)
+        port_m = re.search(r"port=(\d+)", stripped)
+        host_str = host_m.group(1) if host_m else "AI 서버"
+        port_str = f":{port_m.group(1)}" if port_m else ""
+        return f"[AI 서버 연결] TCP 네트워크 연결 시작 (대상: {host_str}{port_str})"
+
+    if stripped.startswith("connect_tcp.complete"):
+        return "[AI 서버 연결] TCP 네트워크 스트림 연결 완료"
+
+    if stripped.startswith("connect_tcp.failed"):
+        return f"[AI 서버 연결] TCP 네트워크 연결 실패 ({stripped})"
+
+    if stripped.startswith("start_tls.started"):
+        srv_m = re.search(r"server_hostname='([^']+)'", stripped)
+        srv_str = f" (서버: {srv_m.group(1)})" if srv_m else ""
+        return f"[보안 채널 수립] TLS/SSL 암호화 핸드셰이크 시작{srv_str}"
+
+    if stripped.startswith("start_tls.complete"):
+        return "[보안 채널 수립] TLS/SSL 암호화 보안 연결 완료"
+
+    if stripped.startswith("start_tls.failed"):
+        return f"[보안 채널 수립] TLS/SSL 암호화 연결 실패 ({stripped})"
+
+    if stripped.startswith("send_request_headers.started"):
+        meth_m = re.search(r"\[b'([A-Z]+)'\]", stripped)
+        meth_str = f" (메서드: {meth_m.group(1)})" if meth_m else ""
+        return f"[AI 요청 전송] HTTP 요청 헤더 전송 시작{meth_str}"
+
+    if stripped.startswith("send_request_headers.complete"):
+        return "[AI 요청 전송] HTTP 요청 헤더 전송 완료"
+
+    if stripped.startswith("send_request_body.started"):
+        return "[AI 데이터 전송] LLM 프롬프트·컨텍스트 본문 데이터 전송 시작"
+
+    if stripped.startswith("send_request_body.complete"):
+        return "[AI 데이터 전송] LLM 프롬프트·컨텍스트 본문 데이터 전송 완료"
+
+    if stripped.startswith("receive_response_headers.started"):
+        return "[AI 응답 대기] LLM 서버 추론 및 응답 헤더 수신 대기 중..."
+
+    if stripped.startswith("receive_response_headers.complete"):
+        code_m = re.search(r"\(\s*b'[^']+'\s*,\s*(\d+)", stripped)
+        code_str = f" (상태코드: {code_m.group(1)})" if code_m else ""
+        return f"[AI 응답 수신] LLM 서버 응답 헤더 수신 완료{code_str}"
+
+    if stripped.startswith("receive_response_body.started"):
+        return "[AI 응답 수신] LLM 생성 답변 본문 데이터 수신 시작"
+
+    if stripped.startswith("receive_response_body.complete"):
+        return "[AI 응답 완료] LLM 생성 답변 본문 데이터 수신 완료"
+
+    if stripped.startswith("response_closed.started"):
+        return "[통신 세션 정리] HTTP 응답 스트림 종료 시작"
+
+    if stripped.startswith("response_closed.complete"):
+        return "[통신 세션 정리] HTTP 응답 스트림 종료 완료"
+
+    if stripped.startswith("close.started"):
+        return "[통신 세션 정리] 네트워크 소켓 연결 닫기 시작"
+
+    if stripped.startswith("close.complete"):
+        return "[통신 세션 정리] 네트워크 소켓 연결 닫기 완료"
+
+    # 2. httpx 요약 로그 변환
+    if stripped.startswith("HTTP Request:"):
+        req_m = re.match(r'HTTP Request:\s+([A-Z]+)\s+(\S+)\s+"([^"]+)"', stripped)
+        if req_m:
+            return f"[외부 API 통신 완료] {req_m.group(1)} {req_m.group(2)} -> 응답: {req_m.group(3)}"
+
+    # 3. asyncio 이벤트 루프 로그 변환
+    if stripped.startswith("Using selector:") or stripped.startswith("Using proactor:"):
+        parts = stripped.split(":", 1)
+        detail = parts[1].strip() if len(parts) > 1 else stripped
+        return f"[비동기 이벤트 루프] 입출력 제어기 초기화 완료 ({detail})"
+
+    return msg
+
 
 class LoguruStyleFormatter(logging.Formatter):
     """Loguru/Rich 스타일의 고가독성 포맷터 (스타일 1, 3, 4 통합).
 
     1. 대괄호 남발을 줄이고 파이프(|) 구분자를 사용하여 시각적 피로도를 최소화한다.
-    2. Multi-Agent(LangGraph) 컨텍스트가 활성화되어 있으면 [Agent >> Node] 흐름을 강조 표기한다.
+    2. Multi-Agent(LangGraph) 컨텍스트가 활성화되어 있으면 [에이전트 >> 한국어 단계명] 흐름을 강조 표기한다.
     3. colorize 플래그에 따라 콘솔에는 ANSI 컬러를, 파일(app.log)에는 순수 텍스트(Clean text)를 출력한다.
-
-    출력 예시:
-        2026-10-14 23:26:42.124 | INFO  | 770fee01 | cases.py:61:list_cases     - 사건 목록 조회 완료 (총 3건) [req:7a09d1bd]
-        2026-10-14 23:26:43.500 | INFO  | 770fee01 | planner.py:84:plan         - [Planner >> extract_facts] 사실 관계 5건 추출 완료 [case:d54ebb0d]
-        2026-10-14 23:26:44.200 | WARN  | 770fee01 | evidence.py:120:extract    - 증거 파일 텍스트 추출 중 [case:d54ebb0d]
-        2026-10-14 23:26:45.000 | ERROR | 88b9e683 | manager.py:215:sync        - 데이터베이스 연결 시간 초과 오류 [case:d54ebb0d]
     """
 
     def __init__(self, colorize: bool = False):
@@ -97,15 +220,18 @@ class LoguruStyleFormatter(logging.Formatter):
             loc_str = f"{record.filename}:{record.lineno}"
         loc_formatted = f"{loc_str:<28}"
 
-        # 5. Multi-Agent / LangGraph 실행 컨텍스트 ([Agent >> Node])
-        agent_name = ctx.get("agent_name") or getattr(record, "agent_name", None)
-        node_name = ctx.get("node_name") or getattr(record, "node_name", None)
-        if agent_name and node_name:
-            agent_str = f"[{agent_name} >> {node_name}] "
-        elif agent_name:
-            agent_str = f"[{agent_name}] "
-        elif node_name:
-            agent_str = f"[{node_name}] "
+        # 5. Multi-Agent / LangGraph 실행 컨텍스트 ([에이전트 >> 한국어 단계명])
+        raw_agent = ctx.get("agent_name") or getattr(record, "agent_name", None)
+        raw_node = ctx.get("node_name") or getattr(record, "node_name", None)
+        agent_disp = _AGENT_KR_LABELS.get(raw_agent, raw_agent) if raw_agent else None
+        node_disp = _NODE_KR_LABELS.get(raw_node, raw_node) if raw_node else None
+
+        if agent_disp and node_disp and raw_agent != raw_node:
+            agent_str = f"[{agent_disp} >> {node_disp}] "
+        elif node_disp:
+            agent_str = f"[{node_disp}] "
+        elif agent_disp:
+            agent_str = f"[{agent_disp}] "
         else:
             agent_str = ""
 
@@ -120,8 +246,8 @@ class LoguruStyleFormatter(logging.Formatter):
                 ctx_items.append(f"{label}:{val_short}")
         ctx_suffix = f" [{', '.join(ctx_items)}]" if ctx_items else ""
 
-        # 7. 본문 메시지
-        msg = record.getMessage()
+        # 7. 본문 메시지 (저수준 영문 네트워크 트레이스 등을 한국어로 자동 변환)
+        msg = _translate_log_message(record.getMessage())
 
         # 8. 색상 적용 (콘솔 vs 파일 분기)
         if self.colorize:
@@ -272,11 +398,8 @@ def setup_logging(log_level: Optional[str] = None):
     uvi_access.propagate = False
 
     # 4. 외부 고노이즈 라이브러리 억제 (네트워크 패킷 트레이스 등)
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
-    logging.getLogger("openai").setLevel(logging.WARNING)
-    logging.getLogger("neo4j").setLevel(logging.WARNING)
-    logging.getLogger("langfuse").setLevel(logging.WARNING)
+    for noisy_lib in ("httpx", "httpcore", "httpcore2", "openai", "neo4j", "langfuse"):
+        logging.getLogger(noisy_lib).setLevel(logging.WARNING)
 
 
 def get_logger(name: str) -> logging.Logger:

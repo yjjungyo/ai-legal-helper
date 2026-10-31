@@ -263,7 +263,7 @@ def extract_text_from_evidence(db: Session, doc_id: str) -> bool:
         return True
         
     except Exception as e:
-        logger.error(f"Failed to extract text from evidence {doc_id}: {str(e)}")
+        logger.error(f"[증거 수집] 증거 문서({doc_id}) 텍스트 추출 실패: {str(e)}")
         doc.status = "FAILED"
         doc.error_code = "EXTRACTION_ERROR"
         db.commit()

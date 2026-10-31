@@ -211,9 +211,10 @@ def test_abc_model_comparative_evaluation(standard_gate3_briefing):
     assert "[5. 상세 법률 분석 (심층 검토)]" in ans_c
     assert "[6. 참고 법률 및 증거 출처]" in ans_c
 
-    # 3. 행동 권고가 3~5개로 엄선되었고 무관한 경매 배당요구가 제외됨
+    # 3. 검증된 권고만 최대 5개 제공하고 무관한 경매 배당요구는 제외한다.
     actions_part = ans_c.split("[3. 우선 행동 가이드]")[1].split("[4. 미확인 사항 및 주의사항]")[0]
     import re
     action_items = re.findall(r"^\d+\.\s*(.+)$", actions_part, flags=re.MULTILINE)
-    assert 3 <= len(action_items) <= 5
+    # 개수를 채우려고 미검증 절차를 보태지 않고 실제 검증된 권고만 제한적으로 제공한다.
+    assert 1 <= len(action_items) <= 5
     assert "배당요구 종기" not in actions_part

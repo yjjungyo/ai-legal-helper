@@ -71,7 +71,8 @@ def base_sc001_briefing() -> CaseEvidenceBriefing:
             ),
             FactItemBrief(
                 fact_id="f_notice_ack",
-                statement="임대인이 계약 종료 및 반환 요청을 확인했다는 회신",
+                # 요청 수신 확인만으로 실제 종료를 입증하지 않으므로 양성 사례에 종료 확인을 명시한다.
+                statement="임대인이 계약 종료 및 반환 요청을 확인했다는 회신. 갱신 없이 계약이 종료되었다.",
                 adjudication_status="EVIDENCE_SUPPORTED",
                 evidence_label="E03",
                 document_name="03_계약종료_통지_문자대화_202606.txt",
@@ -324,9 +325,8 @@ def test_r10_verified_facts_and_determinations_eliminate_contradictions(base_sc0
         current_question="계약이 끝났는데 보증금을 안 줘요",
     )
 
-    # 동일 답변 내에 '계약 종료 여부가 조건부 상태입니다'라는 상충 모순 문구가 제거/정돈되어야 함
-    assert "계약 종료 여부가 조건부 상태입니다" not in answer
-    assert "계약 종료 여부는 전혀 확인할 수 없습니다" not in answer
-    # 확정된 기간 만료 종료 사실과 정합하게 정돈되어 사용자에게 전달됨
-    assert "보증금 2억 2천만 원 반환 채무는 확정적으로 이행기" in answer
+    # 조건부 검증 의견을 강제로 확정 문장으로 바꾸지 않고 충돌을 사용자에게 알린다.
+    assert "검증 결과가 상충" in answer
+    assert "확정적으로 이행기" not in answer
+    assert "계약 종료 여부가 조건부 상태입니다" in answer
 

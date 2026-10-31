@@ -7,7 +7,7 @@
 자동화하는 `@trace` 데코레이터 모듈이다.
 
 [주요 기능]
-1. 실행 시작/성공/오류 시점의 소요 시간(elapsed_ms) 및 소스 위치 로깅
+1. 실행 시작/성공/오류 시점의 소요 시간(elapsed_ms) 및 소스 위치 한국어 로깅
 2. 상위 Span ID(`prev_span_id`)를 보존하여 중첩 `@trace` 호출 시 부모-자식 Span 트리 구성
 3. 예외 발생 시 API 키, 토큰, 이메일, 전화번호, 주민등록번호 등 민감정보(PII) 자동 마스킹
 """
@@ -28,6 +28,110 @@ from ai_legal_helper.observability.langfuse_client import start_trace, start_spa
 from opentelemetry.trace import Status, StatusCode
 
 logger = get_logger(__name__)
+
+# 함수명 및 LangGraph 노드명 매핑을 위한 한국어 단계명 사전
+FUNCTION_KR_NAMES: dict[str, str] = {
+    # 1. 6단계 상담 워크플로우 노드 (LangGraph)
+    "supervisor_initialize_node": "1단계: 사건·맥락 확인",
+    "supervisor_initialize": "1단계: 사건·맥락 확인",
+    "intent_analysis_node": "1단계: 의도 분석",
+    "intent_analysis": "1단계: 의도 분석",
+    "route_node": "2단계: 분야 판별",
+    "route": "2단계: 분야 판별",
+    "route_categories": "2단계: 법률 분야 분류",
+    "route_categories_detailed": "2단계: 법률 분야 상세 분류",
+    "plan_node": "2단계: 쟁점 계획",
+    "plan": "2단계: 쟁점 계획",
+    "plan_tools": "2단계: 도구 및 에이전트 계획",
+    "run_agents_node": "3단계: 법령·판례 검색",
+    "run_agents": "3단계: 법령·판례 검색",
+    "execute_statute_search_node": "3단계: 공식 법령 조회",
+    "execute_statute_search": "3단계: 공식 법령 조회",
+    "statute_search_approval_node": "3단계: 공식 검색 승인 대기",
+    "statute_search_approval": "3단계: 공식 검색 승인 대기",
+    "synthesize_node": "4단계: 쟁점별 분석",
+    "synthesize": "4단계: 쟁점별 분석",
+    "re_analyze_node": "4단계: 쟁점별 재분석",
+    "re_analyze": "4단계: 쟁점별 재분석",
+    "followup_action_node": "4단계: 후속 조치 가이드",
+    "followup_action": "4단계: 후속 조치 가이드",
+    "verification_node": "5단계: 근거 검증",
+    "verification": "5단계: 근거 검증",
+    "run_verification": "5단계: 조문·증거 일치성 검증",
+    "revise_node": "5단계: 답변 보강",
+    "revise": "5단계: 답변 보강",
+    "finalize_node": "6단계: 최종 답변 작성",
+    "finalize": "6단계: 최종 답변 작성",
+    "insufficient_node": "6단계: 판단 유보 안내 작성",
+    "insufficient": "6단계: 판단 유보 안내 작성",
+    "routing_exit_node": "6단계: 분류 오류 안내",
+    "routing_exit": "6단계: 분류 오류 안내",
+    "general_conversation_node": "6단계: 일반 대화 안내",
+    "general_conversation": "6단계: 일반 대화 안내",
+
+    # 2. 통합 상담 실행 함수
+    "run_legal_consultation": "통합 법률 상담 워크플로우",
+    "_execute_consultation": "법률 상담 그래프 실행",
+    "build_legal_graph": "법률 상담 워크플로우 그래프 빌드",
+
+    # 3. 문서 기반 직접 상담 (Document Grounded Mode)
+    "generate_answer": "문서 사건: 원문 기반 답변 작성",
+    "verify_answer": "문서 사건: 원문 및 근거 검증",
+
+    # 4. 전문 에이전트 및 RAG / 검색 / 사건 인텔리전스
+    "run_specialist_agent": "전문 에이전트 분석",
+    "build_react_agent": "전문 에이전트 초기화",
+    "plan_legal_actions": "법률 대응 행동 계획 수립",
+    "retrieve_with_status": "법률 지식베이스 검색",
+    "retrieve": "법률 문서 검색",
+    "_get_client": "벡터DB 클라이언트 연결",
+    "_get_vs": "벡터스토어 컬렉션 로드",
+    "_list_collections": "벡터DB 컬렉션 목록 조회",
+    "make_fixed_retrieval_tool": "법률 검색 도구 생성",
+    "_run": "법률 검색 도구 실행",
+    "rewrite_query": "검색 질의어 법령 용어 확장",
+    "search_official_statutes": "국가법령정보센터 공식 조문 검색",
+    "search_case_evidence": "사건 증거 문서 검색",
+    "search_evidence_in_postgres": "DB 사건 증거 검색",
+    "search_traversal": "지식그래프 연관 경로 탐색",
+    "search_hybrid": "하이브리드 지식 그래프 검색",
+    "retrieve_structured_evidence": "구조화 사건 증거 조회",
+    "analyze_consultation_intent": "상담 질문 의도 분석",
+    "synthesize_legal_answers": "법률 답변 종합 합성",
+    "classify_case_type": "사건 유형 자동 분류",
+    "extract_case_facts": "사건 사실관계 추출",
+    "extract_case_info": "의뢰인 진술 사건 정보 추출",
+    "extract_claims_from_evidence": "증거 문서 주장·사실 추출",
+    "extract_text_from_evidence": "증거 문서 원문 텍스트 추출",
+    "ingest_evidence": "증거 문서 수집 및 색인",
+    "process_new_statement": "신규 진술 분석 및 반영",
+    "build_case_timeline": "사건 타임라인 구축",
+    "build_timeline_from_facts": "사건 타임라인 구성",
+
+    # 5. 법률 문서 생성 워크플로우
+    "context_node": "문서작성: 사건 맥락 수집",
+    "requirements_node": "문서작성: 필수 기재사항 점검",
+    "generate_node": "문서작성: 법률 문서 초안 생성",
+    "review_gate_node": "문서작성: 품질 검토 게이트",
+}
+
+
+def get_kr_step_name(func_name: str) -> str:
+    """함수명 또는 노드명에 대응하는 가독성 높은 한국어 단계명을 반환한다.
+
+    Args:
+        func_name: 대상 함수명 또는 노드 식별자.
+
+    Returns:
+        str: 매핑된 한국어 단계명 (사전에 없는 경우 원본 함수명 반환).
+    """
+    if func_name in FUNCTION_KR_NAMES:
+        return FUNCTION_KR_NAMES[func_name]
+    if func_name.endswith("_node"):
+        base_name = func_name[:-5]
+        if base_name in FUNCTION_KR_NAMES:
+            return FUNCTION_KR_NAMES[base_name]
+    return func_name
 
 
 def _get_func_meta(func: Callable) -> tuple[str, int]:
@@ -71,7 +175,9 @@ def trace(func: Callable) -> Callable:
             "agent_name": parent_agent,
             "node_name": parent_node,
         }
-        logger.info(f"Starting execution of {func.__name__}", extra=log_data)
+        step_desc = get_kr_step_name(func.__name__)
+        log_data["step_name_kr"] = step_desc
+        logger.info(f"[{step_desc}] 단계 시작 ({func.__name__})", extra=log_data)
 
         # P3.6 Langfuse: 실제 상위 Span UUID(parent_span_id)를 우선 연결하여 중첩 트리 구조를 형성
         try:
@@ -89,7 +195,7 @@ def trace(func: Callable) -> Callable:
                 input=input_data,
             )
         except Exception as ex:
-            logger.debug(f"Langfuse log_entry error: {ex}")
+            logger.debug(f"Langfuse 시작 스팬 기록 오류: {ex}")
 
     def log_success(start_time: float, current_span_id: str, parent_agent: str, parent_node: str, output_data: Any = None):
         elapsed_ms = (time.time() - start_time) * 1000
@@ -102,12 +208,14 @@ def trace(func: Callable) -> Callable:
             "agent_name": parent_agent,
             "node_name": parent_node,
         }
-        logger.info(f"Successfully completed {func.__name__}", extra=log_data)
+        step_desc = get_kr_step_name(func.__name__)
+        log_data["step_name_kr"] = step_desc
+        logger.info(f"[{step_desc}] 단계 완료 ({elapsed_ms:.1f}ms)", extra=log_data)
 
         try:
             end_span(span_id=current_span_id, output=output_data)
         except Exception as ex:
-            logger.debug(f"Langfuse log_success error: {ex}")
+            logger.debug(f"Langfuse 완료 스팬 기록 오류: {ex}")
 
     def log_interrupt(start_time: float, current_span_id: str, e: Exception, parent_agent: str, parent_node: str):
         elapsed_ms = (time.time() - start_time) * 1000
@@ -120,11 +228,13 @@ def trace(func: Callable) -> Callable:
             "agent_name": parent_agent,
             "node_name": parent_node,
         }
-        logger.info(f"[HILT_INTERRUPT] {func.__name__} paused for Human-in-the-Loop decision: {e}", extra=log_data)
+        step_desc = get_kr_step_name(func.__name__)
+        log_data["step_name_kr"] = step_desc
+        logger.info(f"[HILT_INTERRUPT] [{step_desc}] 사용자 승인(HILT) 대기 일시 중단: {e}", extra=log_data)
         try:
             end_span(span_id=current_span_id, level="DEFAULT", status_message="Interrupted for HILT decision")
         except Exception as ex:
-            logger.debug(f"Langfuse log_interrupt error: {ex}")
+            logger.debug(f"Langfuse 중단 스팬 기록 오류: {ex}")
 
     def log_error(start_time: float, current_span_id: str, e: Exception, parent_agent: str, parent_node: str):
         elapsed_ms = (time.time() - start_time) * 1000
@@ -170,7 +280,9 @@ def trace(func: Callable) -> Callable:
             "agent_name": parent_agent,
             "node_name": parent_node,
         }
-        logger.error(f"Error in {func.__name__}: {safe_error_msg}", extra=log_data)
+        step_desc = get_kr_step_name(func.__name__)
+        log_data["step_name_kr"] = step_desc
+        logger.error(f"[{step_desc}] 단계 처리 오류 발생: {safe_error_msg}", extra=log_data)
 
         try:
             end_span(
@@ -179,7 +291,7 @@ def trace(func: Callable) -> Callable:
                 status_message=safe_error_msg,
             )
         except Exception as ex:
-            logger.debug(f"Langfuse log_error error: {ex}")
+            logger.debug(f"Langfuse 오류 스팬 기록 실패: {ex}")
 
     if is_coroutine:
         @functools.wraps(func)
@@ -303,4 +415,3 @@ def trace(func: Callable) -> Callable:
                         flush_langfuse()
                         reset_trace_id(token)
         return sync_wrapper
-

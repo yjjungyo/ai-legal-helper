@@ -136,5 +136,5 @@ def process_new_statement(db: Session, case_id: str, statement: str) -> Case:
         
     except Exception as e:
         db.rollback()
-        logger.error(f"Failed to process statement for case {case_id}: {str(e)}")
+        logger.error(f"[사건 매니저] 사건({case_id}) 진술 분석 처리 실패: {str(e)}")
         raise e

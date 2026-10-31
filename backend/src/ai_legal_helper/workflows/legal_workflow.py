@@ -1,4 +1,3 @@
-from ai_legal_helper.agents.intent_analyzer import analyze_consultation_intent, ConsultationIntent
 # -*- coding: utf-8 -*-
 """
 모듈명: legal_workflow.py
@@ -14,6 +13,10 @@ from ai_legal_helper.agents.intent_analyzer import analyze_consultation_intent, 
 5. 검증 결과에 따른 재검토 및 최종 상태(PASS/REVISE/INSUFFICIENT) 결정
 
 [처리 흐름]
+등록 문서가 있는 사건: 원문 준비 → 법률 자료 검색 → 단일 답변 작성 → 질문·원문 검증
+  → 누락 법령 승인 검색 또는 최대 두 번 재작성 → 통과한 동일 답변 확정 / 판단 유보
+
+등록 문서가 없는 일반 상담:
 사용자 질문
   → Supervisor Initialize
   → Route (분야 판별)
@@ -33,10 +36,11 @@ from ai_legal_helper.agents.intent_analyzer import analyze_consultation_intent, 
 - ai_legal_helper.observability: Trace Context 및 로깅
 
 [주의사항]
-- 재검토 횟수는 최대 1회로 제한된다. 무한 루프를 방지한다.
+- 문서 상담 재작성은 공식 검색 후 재분석을 포함해 총 두 번, 기존 일반 상담은 한 번으로 제한한다.
 - 비동기 `run_agents_node` 호출 시 ContextVar의 복제 동작을 위해 파이썬 내장 `asyncio.to_thread`를 사용한다.
 """
 from typing import Dict, List, Any, Optional
+from ai_legal_helper.agents.intent_analyzer import analyze_consultation_intent, ConsultationIntent
 import os
 import uuid
 import sys
@@ -44,6 +48,7 @@ import asyncio
 import re
 from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import HumanMessage, AIMessage
+from ai_legal_helper.case_intelligence.consultation_semantics import is_evidence_review_request
 from langgraph.types import interrupt, Command, Send
 from langgraph.checkpoint.memory import MemorySaver
 try:
@@ -54,6 +59,9 @@ import operator
 from typing import Annotated
 
 from ai_legal_helper.workflows.state import LegalState
+from ai_legal_helper.workflows.document_consultation import (
+    DOCUMENT_MODE, generate_answer, verify_answer, next_verification_step, finish_answer,
+)
 from ai_legal_helper.agents.router import route_categories
 from ai_legal_helper.agents.planner import plan_tools
 from ai_legal_helper.agents.specialist import run_specialist_agent
@@ -81,16 +89,16 @@ async def init_checkpointer():
     """애플리케이션 시작 시 PostgreSQL 체크포인트 테이블을 자동 초기화(setup)한다."""
     checkpointer_type = os.getenv("CHECKPOINTER_TYPE", "postgres").lower()
     if checkpointer_type == "memory":
-        logger.info("[CHECKPOINTER] Using MemorySaver (setup skipped)")
+        logger.info("[체크포인터] 메모리 기반 체크포인터(MemorySaver) 사용 (초기화 생략)")
         return
 
     conn_string = get_postgres_conn_string()
     try:
         async with AsyncPostgresSaver.from_conn_string(conn_string) as saver:
             await saver.setup()
-        logger.info("[CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully")
+        logger.info("[체크포인터] PostgreSQL 체크포인트 테이블 초기화 완료")
     except Exception as e:
-        logger.error(f"[CHECKPOINTER] Failed to setup PostgreSQL checkpointer: {e}")
+        logger.error(f"[체크포인터] PostgreSQL 체크포인터 초기화 실패: {e}")
         raise
 
 
@@ -134,6 +142,14 @@ def _brief_history(messages: List[Any], max_chars: int = 1000) -> str:
 
 @trace
 def supervisor_initialize_node(state: LegalState) -> Dict:
+    """현재 사건 브리핑을 읽고 문서 원문 유무에 따라 답변 경로를 초기화한다.
+
+    Args:
+        state: 현재 사용자 메시지와 대화·사건 식별 상태.
+
+    Returns:
+        원본 질문, 현재 사건의 원문 브리핑, 답변 모드 및 초기 검증·검색 상태.
+    """
     set_node_name("supervisor_initialize")
     q = None
     for m in reversed(state.get("messages", [])):
@@ -227,6 +243,10 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
         "conversation_context": conv_ctx,
         "turn_index": turn_idx,
         "question": q or "(질문 미확인)",
+        # 등록 문서가 있는 사건은 파생 Fact 기반 다중 작성 대신 원문 작성 경로로 보낸다.
+        "answer_mode": DOCUMENT_MODE if briefing_dict and briefing_dict.get("source_documents") else None,
+        "answer_generation_error": None,
+        "answer_source_manifest": None,
         "revision_count": 0,
         "warnings": [],
         "retrieved_sources": [],
@@ -238,8 +258,12 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
         "issue_results": [],
         "approval_request": None,
         "approval_status": "NONE",
+        "approved_statute_laws": [],
         "statute_search_results": [],
+        "statute_search_count": 0,
+        "statute_search_history": [],
         "hilt_executed": False,
+        "preserved_points": [],
     }
 
 
@@ -322,11 +346,12 @@ def route_node(state: LegalState) -> Dict:
     from ai_legal_helper.agents.router import route_categories_detailed
 
     q = state.get("resolved_query") or state.get("question", "(질문 미확인)")
-    case_ctx = state.get("case_context") or ""
+    # 원문 작성 경로에서 분류는 검색 분야 선택 용도다. 이전 AI 판단을 분류 근거로 전달하지 않는다.
+    case_ctx = ((state.get("case_evidence_briefing") or {}).get("case_type") or "") if state.get("answer_mode") == DOCUMENT_MODE else (state.get("case_context") or "")
     decision = route_categories_detailed(question=q, case_context=case_ctx)
 
     logger.debug(
-        f"[NODE:route] status={decision.status.value} cats={decision.categories} reason={decision.reason}"
+        f"[분야 판별 결과] 상태={decision.status.value}, 선정 분야={decision.categories}, 사유={decision.reason}"
     )
     return {
         "categories": decision.categories,
@@ -345,6 +370,9 @@ def route_condition(state: LegalState) -> str:
     - ROUTER_ERROR: 기술적 오류로 시스템 오류 안내 노드('routing_exit')로 전이.
     """
     from ai_legal_helper.agents.router import RouterStatus
+    # 문서 질문의 답변 가능 여부는 분야 분류가 아니라 원문 작성 후 검증에서 결정한다.
+    if state.get("answer_mode") == DOCUMENT_MODE:
+        return "plan"
     status = state.get("router_status")
     if status == RouterStatus.CLASSIFIED.value or (not status and state.get("categories")):
         return "plan"
@@ -404,12 +432,41 @@ def plan_node(state: LegalState) -> Dict:
     set_node_name("plan")
     cats = state.get("categories", [])
     plan = plan_tools(cats)
-    logger.debug(f"[NODE:plan] plan={plan}")
+    logger.debug(f"[쟁점 계획 결과] 선정 도구={plan}")
     return {"plan": plan, "analysis_plan": plan}
 
 @trace
 async def run_agents_node(state: LegalState) -> Dict:
+    """문서 사건은 법률 자료만 검색하고, 일반 상담은 기존 전문 에이전트를 실행한다.
+
+    Args:
+        state: 현재 질문, 사건 원문 및 검색할 법률 분야.
+
+    Returns:
+        검색 출처와 실행 결과. 문서 사건에서는 전문 에이전트 답변을 생성하지 않는다.
+    """
     set_node_name("run_agents")
+    if state.get("answer_mode") == DOCUMENT_MODE:
+        from ai_legal_helper.rag.retrieval import retrieve_with_status
+        from ai_legal_helper.rag.source_schema import build_source_from_chroma_doc
+
+        sources = []
+        retrieval_warnings = []
+        for category in (state.get("categories") or [None])[:2]:
+            try:
+                retrieved = await asyncio.to_thread(
+                    retrieve_with_status, query=state.get("question", ""), category=category, k=6,
+                )
+                sources.extend(build_source_from_chroma_doc(
+                    doc, category=category, retrieval_method="CHROMA_VECTOR",
+                ) for doc in retrieved.documents)
+                if retrieved.error_detail:
+                    retrieval_warnings.append("관련 법률 자료 검색 일부를 완료하지 못했습니다.")
+            except Exception as exc:
+                logger.warning("문서 상담 법률 검색 실패: %s", type(exc).__name__)
+                retrieval_warnings.append("관련 법률 자료 검색을 완료하지 못했습니다.")
+        return {"results": {}, "agent_results": {}, "retrieved_sources": sources,
+                "warnings": list(dict.fromkeys((state.get("warnings") or []) + retrieval_warnings))}
     cats = state.get("categories", [])
     q = state.get("resolved_query") or state.get("question", "")
     brief = _brief_history(state.get("messages", []))
@@ -436,12 +493,22 @@ async def run_agents_node(state: LegalState) -> Dict:
         results[cat] = text
         all_sources.extend(sources)
 
-    logger.debug(f"[NODE:run_agents] done: {list(results.keys())}")
+    logger.debug(f"[전문 에이전트 분석 완료] 분석 완료 분야={list(results.keys())}")
     return {"results": results, "agent_results": results, "retrieved_sources": all_sources}
 
 @trace
 def synthesize_node(state: LegalState) -> Dict:
+    """문서 원문 또는 기존 전문 분석으로 초안을 작성한다.
+
+    Args:
+        state: 질문, 원문 출처 또는 기존 전문 분석 결과.
+
+    Returns:
+        사용자 이력에 아직 추가하지 않은 초안과 원문 작성 명세.
+    """
     set_node_name("synthesize")
+    if state.get("answer_mode") == DOCUMENT_MODE:
+        return generate_answer(state)
     intent_val = state.get("intent")
     msgs = synthesize(
         state.get("messages", []),
@@ -469,6 +536,8 @@ def verification_node(state: LegalState) -> Dict:
        (증거 부족은 법령 답변의 오류가 아니라 사건 정보의 한계이기 때문).
     """
     set_node_name("verification")
+    if state.get("answer_mode") == DOCUMENT_MODE:
+        return verify_answer(state)
     from ai_legal_helper.agents.verification import run_verification
     from ai_legal_helper.rag.graph_rag import (
         graph_paths_to_sources,
@@ -593,7 +662,7 @@ def verification_node(state: LegalState) -> Dict:
         if "citation_support_rate" in audit:
             log_score(t_id, "citation_support_rate", float(audit["citation_support_rate"]))
     except Exception as ex:
-        logger.debug(f"Langfuse log_score in verification_node failed: {ex}")
+        logger.debug(f"Langfuse 검증 점수 기록 실패: {ex}")
 
     # 쟁점별 독립 검증 실행 (P0-04, P0-09)
     issue_tasks_raw = state.get("issue_tasks") or []
@@ -664,6 +733,9 @@ def verification_node(state: LegalState) -> Dict:
 def verification_condition(state: LegalState) -> str:
     """법률 답변의 검증 결과에 따라 다음 실행 단계(Node)를 결정한다.
 
+    등록 문서가 있는 사건은 질문 충족 검증을 포함한 별도 원문 정책을 우선 적용한다.
+    아래 쟁점별 조건부 확정 정책은 문서 원문이 없는 기존 일반 상담에만 적용한다.
+
     1. 검증 통과(PASS): 최종 답변 확정(`finalize`).
     2. 법령 근거 부족(LEGAL_SOURCE_MISSING / LEGAL_SOURCE_INSUFFICIENT) 및 후보 법령 존재 시:
        사용자 승인을 구하는 HILT 노드(`statute_search_approval`)로 라우팅한다.
@@ -678,6 +750,8 @@ def verification_condition(state: LegalState) -> str:
     Returns:
         str: 다음 실행할 노드 이름 ('finalize', 'statute_search_approval', 'revise', 'insufficient').
     """
+    if state.get("answer_mode") == DOCUMENT_MODE:
+        return next_verification_step(state)
     ver_res = state.get("verification_result", {}) or {}
     status = ver_res.get("status", "PASS")
     reason_code = ver_res.get("reason_code", "NONE")
@@ -846,6 +920,8 @@ def revise_node(state: LegalState) -> Dict:
         Dict: 수정된 `draft_answer`, 보강된 `retrieved_sources`, 증가된 `revision_count`.
     """
     set_node_name("revise")
+    if state.get("answer_mode") == DOCUMENT_MODE:
+        return generate_answer(state, repair=True)
     from ai_legal_helper.llm.gateway import get_llm
     from ai_legal_helper.rag.retrieval import retrieve
     from ai_legal_helper.rag.source_schema import build_source_from_chroma_doc
@@ -939,6 +1015,8 @@ def insufficient_node(state: LegalState) -> Dict:
     4. final_disposition은 항상 'WITHHELD'로 확정하여 answer_status 불일치를 원천 차단한다.
     """
     set_node_name("insufficient")
+    if state.get("answer_mode") == DOCUMENT_MODE:
+        return finish_answer(state)
     from ai_legal_helper.agents.verification import sanitize_unverified_citations
     from ai_legal_helper.utils.text_formatter import clean_markdown_formatting
 
@@ -1066,8 +1144,10 @@ def insufficient_node(state: LegalState) -> Dict:
 
 @trace
 def finalize_node(state: LegalState) -> Dict:
-    """검증 통과 또는 조건부 통과(REVISE) 시 미검증 인용을 정화하고 마크다운 기호를 정제하여 답변을 확정한다."""
+    """문서 사건은 검증한 초안을 그대로 반환하고 일반 상담은 기존 출력 처리를 적용한다."""
     set_node_name("finalize")
+    if state.get("answer_mode") == DOCUMENT_MODE:
+        return finish_answer(state)
     from ai_legal_helper.agents.verification import sanitize_unverified_citations, audit_citations_and_claims
     from ai_legal_helper.utils.text_formatter import clean_markdown_formatting
 
@@ -1096,19 +1176,23 @@ def finalize_node(state: LegalState) -> Dict:
         any(k in q_text for k in ["사건", "내 사건", "증거", "서류", "진행", "소송"])
     )
 
-    if briefing_raw and issue_results_raw and is_case_relevant:
+    if briefing_raw and is_case_relevant and (issue_results_raw or is_evidence_review_request(q_text)):
         from ai_legal_helper.case_intelligence.case_briefing import CaseEvidenceBriefing
         from ai_legal_helper.agents.issue_verifier import IssueVerificationResult
         from ai_legal_helper.workflows.final_disposition import (
             assemble_grounded_answer,
             determine_final_disposition,
             detect_case_delta,
+            reconcile_issue_results,
         )
 
         briefing_obj = CaseEvidenceBriefing(**briefing_raw)
-        issue_res_objs = [IssueVerificationResult(**ir) for ir in issue_results_raw]
+        issue_res_objs = reconcile_issue_results([IssueVerificationResult(**ir) for ir in issue_results_raw])
+        issue_results_raw = [result.model_dump() for result in issue_res_objs]
+        ver_res["issue_results"] = issue_results_raw
         calc_disp, _ = determine_final_disposition(issue_res_objs)
-        final_disp = "DELIVERED" if ver_status == "PASS" else calc_disp
+        # 전체 초안의 PASS가 쟁점별 미확인 상태를 덮어쓰지 않도록 최종 처분을 보존한다.
+        final_disp = calc_disp if ver_status == "PASS" or calc_disp == "WITHHELD" else "CAUTIONARY"
 
         case_delta = detect_case_delta(
             briefing=briefing_obj,
@@ -1296,10 +1380,20 @@ def statute_search_approval_node(state: LegalState) -> Dict:
     elif isinstance(decision, bool):
         approved = decision
 
-    logger.info(f"[HILT:statute_search_approval] decision={approved}, reason={user_reason}")
+    from ai_legal_helper.workflows.document_search import law_names
+
+    raw_law_refs = list(candidate_laws or []) + [
+        r.get("law_name", "")
+        for r in (ver_res.get("legal_search_requests") or [])
+        if isinstance(r, dict) and r.get("law_name")
+    ]
+    approved_laws = law_names(raw_law_refs) if approved else []
+
+    logger.info(f"[공식 법령 검색 승인 결과] 승인여부={approved}, 사유={user_reason}")
     return {
         "approval_request": approval_payload,
         "approval_status": "APPROVED" if approved else "REJECTED",
+        "approved_statute_laws": approved_laws,
         "hilt_executed": True,
     }
 
@@ -1334,9 +1428,24 @@ def execute_statute_search_node(state: LegalState) -> Dict:
     """
     set_node_name("execute_statute_search")
     from ai_legal_helper.tools.official_statute_search import search_official_statutes
+    from ai_legal_helper.workflows.document_search import execute_document_search, law_names
 
     ver_res = state.get("verification_result", {}) or {}
     candidate_laws = list(ver_res.get("candidate_laws", []) or [])
+    if state.get("answer_mode") == DOCUMENT_MODE:
+        search_state = dict(state)
+        if search_state.get("approval_status") == "APPROVED" and not search_state.get("approved_statute_laws"):
+            raw_refs = list(candidate_laws) + [
+                r.get("law_name", "")
+                for r in (ver_res.get("legal_search_requests") or [])
+                if isinstance(r, dict) and r.get("law_name")
+            ]
+            search_state["approved_statute_laws"] = law_names(raw_refs)
+        doc_search_out = execute_document_search(search_state)
+        warnings = list(state.get("warnings", []) or [])
+        if not doc_search_out.get("statute_search_results"):
+            warnings.append("공식 법령 원문 검색 시스템에서 요청하신 법령의 해당 조문을 찾지 못했습니다.")
+        return {**doc_search_out, "warnings": warnings}
     missing_issues = list(ver_res.get("missing_legal_issues", []) or ver_res.get("missing_issues", []) or [])
     issue_results_raw = ver_res.get("issue_results") or state.get("issue_results") or []
     for ir in issue_results_raw:
@@ -1405,6 +1514,8 @@ def re_analyze_node(state: LegalState) -> Dict:
     도메인 중립적 4단계 표준 구조([1. 핵심 결론], [2. 지금 해야 할 일], [3. 쟁점별 상세 법률 분석], [4. 추가 확인사항 및 유의사항])를 적용한다.
     """
     set_node_name("re_analyze")
+    if state.get("answer_mode") == DOCUMENT_MODE:
+        return generate_answer(state, repair=True, increment_revision=False)
     from ai_legal_helper.llm.gateway import get_llm
     from ai_legal_helper.utils.text_formatter import clean_markdown_formatting
     from langchain_core.prompts import PromptTemplate
@@ -1498,6 +1609,18 @@ def intent_analysis_node(state: LegalState) -> Dict:
     graph_evidence 및 case_context에 반영한다.
     """
     set_node_name("intent_analysis")
+    # 문서 사건은 질문을 변형하거나 과거 AI 결론에 따라 답변 종류를 고정하지 않는다.
+    # 지시어 해석에 필요한 이전 사용자 발언은 원문 작성자가 진술로 구분하여 읽는다.
+    if state.get("answer_mode") == DOCUMENT_MODE:
+        # 순수 인사·감사까지 법률 주장 검증에 넣으면 주장 부재로 불필요하게 답변이 보류된다.
+        # 전체 문장 일치만 허용하여 '감사합니다. 그런데 계약은?' 같은 실제 질문은 원문 경로로 남긴다.
+        pure_greeting = re.fullmatch(
+            r"(?:안녕하세요|안녕|감사합니다|고맙습니다|고마워요|고마워|수고하세요|수고하셨습니다|네|알겠습니다|알겠어요)[.!?~\s]*",
+            state.get("question", "").strip(),
+        )
+        intent = ConsultationIntent.GENERAL_CONVERSATION if pure_greeting else ConsultationIntent.NEW_LEGAL_ANALYSIS
+        return {"intent": intent.value,
+                "resolved_query": state.get("question", ""), "intent_decision": {}}
     q = state.get("question", "")
     conv_ctx = state.get("conversation_context")
     case_ctx = state.get("case_context") or ""
@@ -1511,7 +1634,8 @@ def intent_analysis_node(state: LegalState) -> Dict:
             c_obj = None
 
     decision = analyze_consultation_intent(question=q, conversation_context=c_obj, case_context=case_ctx)
-    logger.info(f"[NODE:intent_analysis] intent={decision.intent.value}, resolved_q='{decision.resolved_query[:60]}...'")
+    # 의도와 길이만 기록하여 재작성된 상담 원문을 로그에 노출하지 않는다.
+    logger.info(f"[의도 분석 완료] 판정 의도={decision.intent.value}, 복원 질의 길이={len(decision.resolved_query)}자")
 
     updates: Dict[str, Any] = {
         "intent": decision.intent.value,
@@ -1640,7 +1764,7 @@ def followup_action_node(state: LegalState) -> Dict:
     res = llm.invoke(prompt_str)
     raw_content = getattr(res, "content", str(res)).strip()
 
-    logger.info(f"[NODE:followup_action] Generated actionable guide ({len(raw_content)} chars)")
+    logger.info(f"[실무 행동 가이드 작성 완료] 생성 분량={len(raw_content)}자")
 
     return {
         "draft_answer": raw_content,
@@ -1701,6 +1825,7 @@ def build_legal_graph(checkpointer: Optional[Any] = None):
     graph.add_conditional_edges("verification", verification_condition, {
         "finalize": "finalize",
         "statute_search_approval": "statute_search_approval",
+        "execute_statute_search": "execute_statute_search",
         "revise": "revise",
         "insufficient": "insufficient"
     })
@@ -1723,7 +1848,7 @@ def build_legal_graph(checkpointer: Optional[Any] = None):
     if checkpointer is None:
         checkpointer = get_checkpointer()
     app = graph.compile(checkpointer=checkpointer)
-    logger.info("[GRAPH] Unified Legal Engine (with HILT Statute Search) build complete")
+    logger.info("[워크플로우 그래프] 통합 법률 상담 엔진(공식 법령 검색 포함) 그래프 빌드 완료")
     return app
 
 
@@ -1772,7 +1897,7 @@ async def _execute_consultation(
                                 else:
                                     on_step_callback(node_name)
                             except Exception as ex:
-                                logger.warning(f"[STEP_CALLBACK] Failed on {node_name}: {ex}")
+                                logger.warning(f"[진행 단계 콜백 경고] {node_name} 단계 진행 상태 알림 실패: {ex}")
                 state_snapshot = await app.aget_state(config)
                 final_state = dict(state_snapshot.values)
                 if interrupt_payload is not None:
@@ -1780,7 +1905,8 @@ async def _execute_consultation(
             else:
                 final_state = await app.ainvoke(Command(resume=resume_data), config)
         else:
-            history_messages = conversation_context.to_chat_history_messages(max_turns=5) if conversation_context and hasattr(conversation_context, "to_chat_history_messages") else []
+            # 대화 맥락 비대화 및 무관한 이전 질의 오염을 방지하기 위해 최근 최대 3개 턴만 메시지 히스토리로 주입
+            history_messages = conversation_context.to_chat_history_messages(max_turns=3) if conversation_context and hasattr(conversation_context, "to_chat_history_messages") else []
             conv_id = getattr(conversation_context, "conversation_id", None) or ""
             conv_dump = conversation_context.model_dump() if (conversation_context and hasattr(conversation_context, "model_dump")) else (conversation_context if isinstance(conversation_context, dict) else None)
             t_idx = getattr(conversation_context, "turn_index", 1) or 1
@@ -1808,7 +1934,7 @@ async def _execute_consultation(
                                 else:
                                     on_step_callback(node_name)
                             except Exception as ex:
-                                logger.warning(f"[STEP_CALLBACK] Failed on {node_name}: {ex}")
+                                logger.warning(f"[진행 단계 콜백 경고] {node_name} 단계 진행 상태 알림 실패: {ex}")
                 state_snapshot = await app.aget_state(config)
                 final_state = dict(state_snapshot.values)
                 if interrupt_payload is not None:
@@ -1825,7 +1951,7 @@ async def _execute_consultation(
     if "__interrupt__" in final_state and final_state["__interrupt__"]:
         interrupt_obj = final_state["__interrupt__"][0]
         approval_payload = interrupt_obj.value if hasattr(interrupt_obj, "value") else interrupt_obj
-        logger.info(f"[RUN_LEGAL_CONSULTATION] Interrupted for approval on thread {thread_id}")
+        logger.info(f"[사용자 승인 대기] 공식 법령 검색 승인을 위해 상담 워크플로우 일시 중단 (스레드: {thread_id})")
         return {
             "status": "APPROVAL_REQUIRED",
             "approval_request": approval_payload,
@@ -1856,7 +1982,8 @@ async def _execute_consultation(
         final_disp = "DELIVERED" if ver_status == "PASS" else "WITHHELD"
 
     from ai_legal_helper.agents.router import RouterStatus
-    router_st = final_state.get("router_status")
+    # 문서 사건에서 분류는 보조 검색용이므로 답변 검증 완료 후 분류 오류를 실행 오류로 덮지 않는다.
+    router_st = "CLASSIFIED" if final_state.get("answer_mode") == DOCUMENT_MODE else final_state.get("router_status")
     if router_st == RouterStatus.ROUTER_ERROR.value:
         status_val = "ERROR"
         exec_status = "ERROR"
@@ -1880,7 +2007,7 @@ async def _execute_consultation(
         "cited_sources": final_state.get("cited_sources") or [],
         "retrieved_sources": final_state.get("retrieved_sources", []),
         "verification_result": final_state.get("verification_result", {}),
-        "verification_status": final_state.get("verification_status", "UNVERIFIED"),
+        "verification_status": (final_state.get("verification_result") or {}).get("status") or final_state.get("verification_status", "UNVERIFIED"),
         "warnings": final_state.get("warnings", []),
         "revision_count": final_state.get("revision_count", 0),
         "trace_id": final_state.get("trace_id", ""),

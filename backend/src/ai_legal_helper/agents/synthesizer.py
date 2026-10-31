@@ -188,7 +188,7 @@ def synthesize(
 
     if not results:
         final = "관련 카테고리에서 유의미한 답변을 생성하지 못했습니다. 질문을 구체화해 주세요."
-        logger.debug("[SYN] empty results -> fallback")
+        logger.debug("[종합 분석] 전문 에이전트 분석 결과가 비어 있어 기본 안내로 대체합니다.")
         return messages + [AIMessage(content=final)]
 
     chat_brief = _brief_history(messages)

@@ -200,37 +200,110 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
                   <span style={{ fontSize: '0.76em', color: '#64748b', fontWeight: 600 }}>
                     📚 참고 출처:
                   </span>
-                  {message.sources.map((s, idx) => {
-                    const sid = s.source_id || s.document_id || s.file || `SRC-${idx + 1}`;
-                    const evLabel = s.evidence_label || s.label || (sid.startsWith('E') ? sid : (s.file && s.file.startsWith('E') ? s.file.split('_')[0] : null));
-                    const isEv = s.source_type === 'CASE_EVIDENCE' || Boolean(evLabel);
-                    const displayName = s.original_filename || s.title || s.file || sid;
-                    return (
-                      <span
-                        key={idx}
-                        onClick={() => {
-                          if (isEv) {
-                            onEvidenceClick(displayName, {
-                              evidenceId: s.evidence_id || undefined,
-                              claimId: s.claim_id || undefined,
-                              spanId: s.span_id || undefined,
-                            });
-                          }
-                        }}
-                        style={{
-                          fontSize: '0.76em',
-                          padding: '2px 8px',
-                          borderRadius: '4px',
-                          backgroundColor: isEv ? '#fef3c7' : '#eff6ff',
-                          color: isEv ? '#92400e' : '#1e40af',
-                          border: `1px solid ${isEv ? '#fde68a' : '#bfdbfe'}`,
-                          cursor: isEv ? 'pointer' : 'default',
-                        }}
-                      >
-                        {isEv ? `📄 ${displayName}` : displayName}
-                      </span>
-                    );
-                  })}
+                  {(() => {
+                    const seenDisplays = new Set<string>();
+                    return message.sources.map((s, idx) => {
+                      const sid = s.source_id || s.document_id || s.file || `SRC-${idx + 1}`;
+                      const rawDocName = s.original_filename || s.document_name || s.filename || s.file_name || s.file || '';
+                      const isEv =
+                        s.source_type === 'CASE_EVIDENCE' ||
+                        Boolean(s.evidence_id) ||
+                        /^E\d{1,3}_/i.test(rawDocName) ||
+                        /^E\d{1,3}_/i.test(sid);
+
+                      let displayName = (rawDocName || s.title || sid).replace(/^EVIDENCE:/i, '').trim();
+                      const isStatute = s.source_type === 'STATUTE' || Boolean(s.statute_name) || Boolean(s.article);
+
+                      if (!isEv && isStatute) {
+                        const lawName = (s.statute_name || s.title || rawDocName || sid)
+                          .split('[')[0]
+                          .replace(/\.pdf$/i, '')
+                          .trim();
+                        const artMatch = (s.article || sid || s.title || s.content || '').match(/(제\s*\d+\s*조(?:\s*의\s*\d+)?)/);
+                        const artStr = (s.article || (artMatch ? artMatch[1] : '')).replace(/\s+/g, '');
+                        const titleMatch = (s.article_title || s.title || s.content || '').match(/제\s*\d+\s*조(?:\s*의\s*\d+)?\s*\(([^)\n]{1,50})\)/);
+                        const artTitle = (s.article_title || (titleMatch ? titleMatch[1] : '')).trim();
+                        const paraNo = s.paragraph_no && s.paragraph_no !== '본문' ? s.paragraph_no.trim() : '';
+
+                        let artDisplay = artStr;
+                        if (artStr && artTitle && !artStr.includes('(')) {
+                          artDisplay = `${artStr}(${artTitle})`;
+                        }
+                        if (paraNo && artDisplay && !artDisplay.includes(paraNo)) {
+                          artDisplay = `${artDisplay} ${paraNo}`;
+                        }
+
+                        const head = artDisplay && !lawName.includes(artStr) ? `${lawName} ${artDisplay}` : lawName;
+                        const promNo = s.promulgation_number
+                          ? (String(s.promulgation_number).startsWith('제') ? s.promulgation_number : `제${s.promulgation_number}호`)
+                          : '';
+                        const effDate = s.effective_date || s.version_date || '';
+                        const pageStr = s.page && s.page !== '?' ? `p.${s.page}` : '';
+
+                        if (s.retrieval_method === 'OFFICIAL_STATUTE_SEARCH') {
+                          const openLawMeta = [
+                            promNo,
+                            effDate ? `시행 ${effDate}` : '',
+                            rawDocName && rawDocName !== `${lawName}.pdf` ? rawDocName : '국가법령정보센터',
+                          ].filter(Boolean).join(' · ');
+                          displayName = openLawMeta ? `${head} [${openLawMeta}]` : head;
+                        } else {
+                          const ragMeta = [
+                            rawDocName || '',
+                            pageStr,
+                            !rawDocName && effDate ? `시행 ${effDate}` : '',
+                          ].filter(Boolean).join(', ');
+                          displayName = ragMeta && !head.includes(rawDocName) ? `${head} [${ragMeta}]` : head;
+                        }
+                      } else if (!isEv && (s.source_type === 'PRECEDENT' || s.case_number)) {
+                        displayName = [s.court, s.case_number].filter(Boolean).join(' ') || displayName;
+                      }
+
+                      // 동일한 법령·조문 또는 증거 표시명의 중복 배지 렌더링 방지
+                      const dedupKey = `${isEv ? 'EV' : 'LAW'}:${displayName}`;
+                      if (seenDisplays.has(dedupKey)) return null;
+                      seenDisplays.add(dedupKey);
+
+                      const hierarchy = [s.part, s.chapter, s.section].filter(Boolean).join(' > ');
+                      const tooltipLines = isEv
+                        ? [`증거 문서: ${displayName}`]
+                        : [
+                            displayName,
+                            hierarchy ? `편·장·절: ${hierarchy}` : '',
+                            s.content ? s.content.slice(0, 240) : '',
+                          ].filter(Boolean);
+
+                      return (
+                        <span
+                          key={idx}
+                          onClick={() => {
+                            if (isEv) {
+                              onEvidenceClick(displayName, {
+                                evidenceId: s.evidence_id || undefined,
+                                claimId: s.claim_id || undefined,
+                                spanId: s.span_id || undefined,
+                              });
+                            } else if (s.source_url) {
+                              window.open(s.source_url, '_blank', 'noopener,noreferrer');
+                            }
+                          }}
+                          title={tooltipLines.join('\n')}
+                          style={{
+                            fontSize: '0.76em',
+                            padding: '3px 9px',
+                            borderRadius: '6px',
+                            fontWeight: 500,
+                            backgroundColor: isEv ? '#fef3c7' : '#eff6ff',
+                            color: isEv ? '#92400e' : '#1e40af',
+                            border: `1px solid ${isEv ? '#fde68a' : '#bfdbfe'}`,
+                            cursor: isEv || s.source_url ? 'pointer' : 'default',
+                          }}
+                        >
+                          {isEv ? `📄 ${displayName}` : `⚖️ ${displayName}`}
+                        </span>
+                      );
+                    });
+                  })()}
                 </div>
               )}
             </div>

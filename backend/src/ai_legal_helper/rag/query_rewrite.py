@@ -115,17 +115,17 @@ def rewrite_query(
         raw = llm.invoke(prompt)
         text = (getattr(raw, "content", str(raw)) or "").strip()
         terms = _parse_terms(text)[:max_terms]
-        logger.debug(f"[REWRITE] llm_terms={terms} (from effective_q='{effective_q[:40]}...')")
+        logger.debug(f"[질의어 확장] LLM 도출 법률 키워드={terms} (질의='{effective_q[:40]}...')")
     except Exception as e:
         logger.warning(f"[REWRITE] LLM 실패: {e}")
 
     if not terms:
         fb = _cheap_fallback_terms(effective_q, k=min(3, max_terms))
-        logger.debug(f"[REWRITE] fallback_terms={fb}")
+        logger.debug(f"[질의어 확장] 규칙 기반 폴백 키워드={fb}")
         terms = fb
 
     final = user_orig
     if terms:
         final = f"{user_orig}\n키워드: {', '.join(terms)}"
-    logger.debug(f"[REWRITE] final_len={len(final)} final=[{final}]")
+    logger.debug(f"[질의어 확장 완료] 최종 길이={len(final)}자, 확장 질의=[{final}]")
     return final

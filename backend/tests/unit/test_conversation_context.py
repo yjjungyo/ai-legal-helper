@@ -16,6 +16,8 @@ ConversationContext 구축, 다중 턴 메시지 정규화, 사건 및 사용자
 6. `test_security_isolation_case_mismatch`: 다른 사건의 대화 세션 접근 시 PermissionError 차단 검증
 7. `test_security_isolation_user_mismatch`: 다른 사용자의 대화 세션 접근 시 PermissionError 차단 검증
 8. `test_langgraph_nodes_messages_normalization`: 워크플로우 노드들의 AIMessage 정규 출력 검증
+9. `test_load_conversation_context_sliding_window_3_turns`: 최근 3개 턴만 슬라이딩 윈도우로 유지하고 turn_index를 순차 보존하는지 검증
+10. `test_conversation_turn_and_context_repr`: 관측성 도구 및 로그를 위한 간결한 __repr__ 문자열 표현 검증
 """
 
 import pytest
@@ -301,4 +303,87 @@ def test_langgraph_nodes_messages_normalization():
     assert len(f_out["messages"]) == 1
     assert isinstance(f_out["messages"][0], AIMessage)
     assert f_out["messages"][0].content == "검증 완료된 최종 답변입니다."
+
+
+def test_load_conversation_context_sliding_window_3_turns():
+    """DB에 과거 5개 턴이 있을 때 최근 3개 턴만 previous_turns로 유지되고 next turn_index는 6이 되는지 검증한다."""
+    mock_db = MagicMock()
+
+    recs = [
+        ConsultationRecord(
+            id=f"c-{i}",
+            case_id="case-window",
+            user_id="user-1",
+            request_id=f"req-{i}",
+            conversation_id="conv-window",
+            turn_index=i,
+            question=f"질문 {i}",
+            answer=f"답변 {i}",
+            status="SUCCESS",
+            answer_status="DELIVERED",
+            created_at=datetime(2026, 10, 22, 10, i, 0),
+            sources=[],
+        )
+        for i in range(1, 6)
+    ]
+
+    mock_db.query.return_value.filter.return_value.order_by.return_value.all.return_value = recs
+
+    # 기본 호출 (max_turns=DEFAULT_MAX_CONTEXT_TURNS = 3)
+    ctx = load_conversation_context(
+        db=mock_db,
+        conversation_id="conv-window",
+        current_question="여섯 번째 질문입니다.",
+        case_id="case-window",
+        user_id="user-1",
+        auth_bypass=False,
+    )
+
+    # 1. 다음 턴 번호는 6이어야 함 (전체 5개 턴 다음)
+    assert ctx.turn_index == 6
+    assert ctx.total_turns_count == 5
+
+    # 2. previous_turns에는 최근 3개 턴(3, 4, 5)만 유지되어야 함
+    assert len(ctx.previous_turns) == 3
+    turn_indices = [t.turn_index for t in ctx.previous_turns]
+    assert turn_indices == [3, 4, 5]
+
+    # 3. 직전 답변은 가장 최근 턴인 5번 턴의 답변이어야 함
+    assert ctx.last_answer == "답변 5"
+
+    # 4. 3턴 이전의 과거 대화(1, 2번 턴)는 요약문에 포함되어야 함
+    assert "질의 '질문 1'" in ctx.conversation_summary
+    assert "질의 '질문 2'" in ctx.conversation_summary
+
+
+def test_conversation_turn_and_context_repr():
+    """ConversationTurn 및 ConversationContext의 __repr__이 간결하게 축약 출력되는지 검증한다."""
+    turn = ConversationTurn(
+        turn_index=1,
+        request_id="req-repr-12345678",
+        question="엄청나게 긴 사용자 질문 텍스트입니다. " * 10,
+        answer="엄청나게 긴 AI 법률 분석 및 인용 조문 답변 원문 텍스트입니다. " * 20,
+        answer_status="DELIVERED",
+    )
+    turn_repr = repr(turn)
+    # 답변 원문 전체(수백 자)가 그대로 노출되지 않고 축약되어야 함
+    assert len(turn_repr) < 200
+    assert "turn=1" in turn_repr
+    assert "req='req-repr'" in turn_repr
+
+    ctx = ConversationContext(
+        conversation_id="conv-repr-test",
+        case_id="case-repr-test",
+        current_question="테스트 질문",
+        turn_index=15,
+        previous_turns=[turn],
+        total_turns_count=14,
+    )
+    ctx_repr = repr(ctx)
+    assert len(ctx_repr) < 250
+    assert "conv_id='conv-repr-test'" in ctx_repr
+    assert "turn_index=15" in ctx_repr
+    assert "recent_turns=[1]" in ctx_repr
+    assert "total_turns=14" in ctx_repr
+
 
