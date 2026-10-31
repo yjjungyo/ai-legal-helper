@@ -183,13 +183,27 @@ def test_reconciliation_restores_false_dispute_and_adjudication(db):
     assert again["removed_false_contradict_links"] == 0
 
 
-def test_reconciliation_keeps_canonical_contradicts_link_type(db):
-    """잠재 상충이 진짜 상충으로 확인되면 DB에 CONTRADICTS를 기록한다."""
+@pytest.mark.parametrize("original_link_type", ["POTENTIAL_CONFLICT", "CONTRADICTION"])
+def test_reconciliation_keeps_canonical_contradicts_link_type(db, original_link_type):
+    """신규·레거시 관계는 실제 상충 판정 시 모두 CONTRADICTS로 정규화한다."""
     case, fact, claim, link = seed_conflict(
         db, fact_statement="보증금은 3억 원이다.",
         claim_statement="보증금은 2억 원이다.",
-        link_type="POTENTIAL_CONFLICT",
+        link_type=original_link_type,
     )
     reconcile_case_conflicts(db, case_id=case.id, dry_run=False, sync_neo4j=False)
     db.expire_all()
     assert db.get(EvidenceLink, link.id).link_type == "CONTRADICTS"
+
+
+def test_genuine_conflict_remains_visible_after_graph_validation(db, monkeypatch):
+    """원천 금액 불일치처럼 실제 모순인 관계는 그래프 필터가 숨기지 않는다."""
+    case, fact, claim, _ = seed_conflict(
+        db, fact_statement="보증금은 3억 원이다.",
+        claim_statement="보증금은 2억 원이다.",
+    )
+    monkeypatch.setattr("ai_legal_helper.database.neo4j.get_neo4j_driver", lambda: None)
+    confirmed = graph_route._validated_graph_contradictions(case=case, db=db)
+    assert len(confirmed) == 1
+    assert confirmed[0]["target_id"] == fact.id
+    assert confirmed[0]["contradicting_id"] == claim.id
