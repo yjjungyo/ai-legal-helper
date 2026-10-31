@@ -20,6 +20,10 @@ from ai_legal_helper.case_intelligence.fact_semantics import (
     extract_semantic_proposition,
     check_proposition_comparability,
 )
+from ai_legal_helper.rag.graph_rag import (
+    validate_graph_paths,
+    filter_verified_graph_contradictions,
+)
 from ai_legal_helper.database.models import (
     Base, User, Case, EvidenceDocument, EvidenceClaim, EvidenceLink,
     Fact, FactAdjudication,
@@ -207,3 +211,40 @@ def test_genuine_conflict_remains_visible_after_graph_validation(db, monkeypatch
     assert len(confirmed) == 1
     assert confirmed[0]["target_id"] == fact.id
     assert confirmed[0]["contradicting_id"] == claim.id
+
+
+@pytest.mark.parametrize("really_conflicts", [False, True])
+def test_graph_rag_consultation_excludes_false_contradiction(db, really_conflicts):
+    """UI 외 상담 GraphRAG 컨텍스트도 현재 증거로 재검증된 CONTRADICTS만 전달한다."""
+    if really_conflicts:
+        case, fact, claim, _ = seed_conflict(
+            db, fact_statement="보증금은 3억 원이다.",
+            claim_statement="보증금은 2억 원이다.",
+        )
+    else:
+        case, fact, claim, _ = seed_conflict(db)
+
+    raw = [{
+        "target_type": "Fact",
+        "target_id": fact.id,
+        "target_content": fact.statement,
+        "contradicting_id": claim.id,
+        "contradicting_statement": claim.statement,
+    }]
+    filtered = filter_verified_graph_contradictions(db, case.id, raw)
+    assert len(filtered) == (1 if really_conflicts else 0)
+
+    graph_path = {
+        "target_type": "Fact",
+        "target_id": fact.id,
+        "relation": "CONTRADICTS",
+        "claim_id": claim.id,
+        "evidence_id": claim.evidence_id,
+    }
+    checked = validate_graph_paths(db, case.id, [graph_path])
+    if really_conflicts:
+        assert len(checked["valid"]) == 1
+        assert checked["invalid"] == []
+    else:
+        assert checked["valid"] == []
+        assert "UNVERIFIED_CONTRADICTION" in checked["invalid"][0]["reasons"]
