@@ -427,6 +427,73 @@ class GraphRAGRetriever:
         return {"case_id": case_id, "nodes": nodes, "edges": edges}
 
 
+def _is_verified_fact_contradiction(db, case_id: str, claim_id: Optional[str], fact_id: Optional[str]) -> bool:
+    """현재 PostgreSQL 원문 기준으로 상충 엣지의 양립 불가능성을 재검증한다.
+
+    과거 그래프 엣지의 존재만으로 상충을 확정하지 않는다. 미확인·미승인·
+    다른 사건의 관계도 상담 근거에 투입하지 않는다.
+    """
+    if not claim_id or not fact_id:
+        return False
+    from ai_legal_helper.database.models import EvidenceClaim, EvidenceDocument, Fact
+    from ai_legal_helper.case_intelligence.conflict_detector import (
+        build_structured_slots, evaluate_claim_against_fact,
+    )
+
+    claim = db.get(EvidenceClaim, claim_id)
+    fact = db.get(Fact, fact_id)
+    if (
+        claim is None or fact is None
+        or claim.case_id != case_id or fact.case_id != case_id
+        or claim.review_status not in _APPROVED
+    ):
+        return False
+    claim_doc = db.get(EvidenceDocument, claim.evidence_id)
+    fact_doc = db.get(EvidenceDocument, fact.source_ref) if fact.source_ref else None
+    if claim_doc is None or claim_doc.case_id != case_id:
+        return False
+
+    slots = build_structured_slots(
+        statement=claim.statement or "",
+        claim_type=claim.claim_type,
+        subject=claim.subject_key,
+        predicate=claim.predicate_key,
+        scope=claim.scope,
+        temporal_context=claim.temporal_context,
+        evidence_id=claim.evidence_id,
+        document_name=claim_doc.original_filename,
+    )
+    decision = evaluate_claim_against_fact(
+        claim_slots=slots,
+        fact=fact,
+        fact_doc_name=fact_doc.original_filename if fact_doc else None,
+        claim_id=claim.id,
+        enable_llm_verification=False,
+    )
+    logger.debug(
+        "[GRAPH_RAG_CONFLICT_CHECK] claim=%s fact=%s status=%s reason=%s",
+        claim.id, fact.id, decision.status, decision.reason_code,
+    )
+    return decision.status == "CONTRADICTION"
+
+
+def filter_verified_graph_contradictions(db, case_id: str, records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """GraphRAG의 후보 상충 목록에서 현재 사실관계로 검증된 Fact 상충만 유지한다."""
+    checked = [
+        item for item in (records or [])
+        if _is_verified_fact_contradiction(
+            db, case_id, item.get("contradicting_id") or item.get("claim_id"),
+            item.get("target_id"),
+        )
+    ]
+    if len(checked) != len(records or []):
+        logger.info(
+            "[GRAPH_RAG_CONFLICT_FILTER] case=%s 후보=%d 확인=%d 오탐제외=%d",
+            case_id, len(records or []), len(checked), len(records or []) - len(checked),
+        )
+    return checked
+
+
 def validate_graph_paths(db, case_id: str, paths: List[Dict[str, Any]]) -> Dict[str, Any]:
     """그래프 경로를 PostgreSQL(Source of Truth)과 대조하여 코드 레벨로 검증하고 원문 위치를 보강한다.
 
@@ -473,6 +540,17 @@ def validate_graph_paths(db, case_id: str, paths: List[Dict[str, Any]]) -> Dict[
         target = db.get(model, p.get("target_id")) if model and p.get("target_id") else None
         if target is None or target.case_id != case_id:
             reasons.append("TARGET_NOT_FOUND")
+
+        # 기존 승인·출처 검증만으로는 과거의 잘못된 CONTRADICTS 링크를 차단할 수 없다.
+        # 쟁점을 경유한 그래프 경로는 via_fact_id를 원천 Fact로 사용해 재평가한다.
+        if not reasons and p.get("relation") == "CONTRADICTS":
+            relation_fact_id = p.get("via_fact_id") or (
+                p.get("target_id") if p.get("target_type") == "Fact" else None
+            )
+            if not _is_verified_fact_contradiction(
+                db, case_id, p.get("claim_id"), relation_fact_id,
+            ):
+                reasons.append("UNVERIFIED_CONTRADICTION")
 
         if reasons:
             invalid.append({"path": p, "reasons": reasons})
@@ -625,6 +703,9 @@ def retrieve_structured_evidence(
 
     retriever = GraphRAGRetriever(driver)
     raw_hybrid = retriever.search_hybrid(case_id=case_id, query=query, db=db)
+    raw_hybrid["contradictions"] = filter_verified_graph_contradictions(
+        db, case_id, raw_hybrid.get("contradictions", []),
+    )
 
     traversal_paths = raw_hybrid.get("traversal_paths", [])
     checked = (
