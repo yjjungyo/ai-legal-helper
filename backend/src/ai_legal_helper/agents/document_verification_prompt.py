@@ -75,7 +75,7 @@ source_ids(대조한 출처 ID 배열)로 기록하세요. 해당 사건이 없�
 - status: PASS(모든 검사와 주요 주장 통과), REVISE(고칠 수 있는 오류), INSUFFICIENT(근거로 답할 수 없음).
 - reason_code: NONE, ANSWER_REVISION_REQUIRED, LEGAL_SOURCE_MISSING, LEGAL_SOURCE_INSUFFICIENT,
   CASE_EVIDENCE_MISSING, EVIDENCE_CONFLICT, CITATION_INVALID 중 하나.
-- claims: claim, claim_type, fact_status, source_ids, grounding_status, reason의 배열.
+- claims: claim, claim_type, fact_status, source_ids, grounding_status, reason, inference_basis, inference_limit의 배열.
   fact_status는 VERIFIED_FACT, USER_STATEMENT, INFERENCE, EVIDENCE_NEEDED, CONFLICTED 중 하나.
   grounding_status는 SUPPORTED, UNSUPPORTED, UNCERTAIN, NOT_APPLICABLE 중 하나.
   source_ids에는 'E01', 'E05', 'EVIDENCE:E05' 같은 축약 별칭을 절대 쓰지 말고, 반드시 [전체 근거 원문과 출처 ID]에 제공된 정확한 source_id 전체 이름(사건 문서는 'E05_퇴거_및_보증금_반환_요청_문자.txt' 등 전체 파일명, 법조문은 제공된 상세 source_id 문자열 그대로)만 기재하세요. 법률 판단에는 법률 출처, 사실에는 해당 문서를 연결하세요.

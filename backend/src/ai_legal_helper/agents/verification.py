@@ -22,7 +22,7 @@ import json
 import os
 import re
 from langchain_core.prompts import PromptTemplate
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, ValidationInfo, ValidationError
 
 from ai_legal_helper.observability.decorators import trace
 from ai_legal_helper.observability.context import get_current_span_id, set_agent_name
@@ -96,10 +96,76 @@ class ClaimVerification(BaseModel):
     model_grounding_status: Optional[str] = Field(default=None, description="정책 적용 전 모델 판정")
     model_reason: Optional[str] = Field(default=None, description="정책 적용 전 모델 사유")
 
+    @field_validator("inference_basis", "inference_limit", "reason", mode="before")
+    @classmethod
+    def _normalize_string_fields(cls, v: Any, info: ValidationInfo) -> str:
+        """inference_basis, inference_limit, reason 필드가 리스트, 딕셔너리, None으로 들어와도 문자열로 정규화한다."""
+        field_name = info.field_name
+        if v is None:
+            return ""
+        if isinstance(v, list):
+            logger.info(f"[VERIFICATION_SCHEMA] {field_name} 자료형: list -> 문자열 정규화 적용")
+            items = [str(x).strip() for x in v if x is not None and str(x).strip()]
+            norm_val = ", ".join(items)
+            logger.info(f"[VERIFICATION_SCHEMA] 정규화 결과: SUCCESS ({field_name}='{norm_val[:60]}')")
+            return norm_val
+        if isinstance(v, dict):
+            logger.info(f"[VERIFICATION_SCHEMA] {field_name} 자료형: dict -> 문자열 정규화 적용")
+            items = [f"{k}: {val}" for k, val in v.items() if val]
+            norm_val = ", ".join(items)
+            logger.info(f"[VERIFICATION_SCHEMA] 정규화 결과: SUCCESS ({field_name}='{norm_val[:60]}')")
+            return norm_val
+        return str(v).strip()
+
+    @field_validator("claim", mode="before")
+    @classmethod
+    def _normalize_claim(cls, v: Any) -> str:
+        """claim 필드가 리스트로 들어와도 단일 문자열로 안전하게 결합하며 필수 의미를 검증한다."""
+        if v is None:
+            return ""
+        if isinstance(v, list):
+            logger.info("[VERIFICATION_SCHEMA] claim 자료형: list -> 문자열 정규화 적용")
+            items = [str(x).strip() for x in v if x is not None and str(x).strip()]
+            norm_val = " ".join(items)
+            logger.info(f"[VERIFICATION_SCHEMA] 정규화 결과: SUCCESS (claim='{norm_val[:60]}')")
+            return norm_val
+        return str(v).strip()
+
+    @field_validator("source_ids", mode="before")
+    @classmethod
+    def _normalize_source_ids(cls, v: Any) -> List[str]:
+        """source_ids 필드가 단일 문자열, 콤마 구분 문자열, 또는 None으로 들어와도 문자열 리스트로 정규화한다."""
+        if v is None:
+            return []
+        if isinstance(v, str):
+            v_str = v.strip()
+            if not v_str:
+                return []
+            logger.info("[VERIFICATION_SCHEMA] source_ids 자료형: str -> 리스트 정규화 적용")
+            if "," in v_str:
+                res = [part.strip() for part in v_str.split(",") if part.strip()]
+            else:
+                res = [v_str]
+            logger.info(f"[VERIFICATION_SCHEMA] 정규화 결과: SUCCESS (source_ids={res})")
+            return res
+        if isinstance(v, list):
+            res = []
+            for item in v:
+                if item is None:
+                    continue
+                s_item = str(item).strip()
+                if s_item:
+                    res.append(s_item)
+            return res
+        if isinstance(v, dict):
+            res = [str(val).strip() for val in v.values() if val and str(val).strip()]
+            return res
+        return [str(v).strip()]
+
 
 class VerificationOutput(BaseModel):
     """법률검증 Agent의 종합 검증 출력 스키마."""
-    status: str = Field(description="PASS, REVISE, 또는 INSUFFICIENT")
+    status: str = Field(default="REVISE", description="PASS, REVISE, 또는 INSUFFICIENT")
     reason_code: Optional[str] = Field(
         default="NONE",
         description="LEGAL_SOURCE_MISSING, LEGAL_SOURCE_INSUFFICIENT, CASE_EVIDENCE_MISSING, EVIDENCE_CONFLICT, ANSWER_REVISION_REQUIRED, CITATION_INVALID, VERIFICATION_ERROR, 또는 NONE"
@@ -121,6 +187,76 @@ class VerificationOutput(BaseModel):
     citation_audit: Dict[str, Any] = Field(default_factory=dict, description="결정론적 인용 검증 및 Langfuse 추적 메트릭")
     question_coverage: List[Dict[str, Any]] = Field(default_factory=list, description="현재 질문의 각 요청에 대한 question, answered(bool), reason 목록")
     consistency_checks: Dict[str, Dict[str, Any]] = Field(default_factory=dict, description="시간 순서·의사표시 내용·증명 수준의 passed(bool), reason, source_ids 점검")
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def _normalize_status(cls, v: Any) -> str:
+        """status 필드가 누락되거나 소문자로 들어와도 정규화하며 기본값 REVISE를 부여한다."""
+        if not v:
+            return "REVISE"
+        s_val = str(v).strip().upper()
+        if s_val in ("PASS", "REVISE", "INSUFFICIENT"):
+            return s_val
+        return "REVISE"
+
+    @field_validator("reason_code", mode="before")
+    @classmethod
+    def _normalize_reason_code(cls, v: Any) -> str:
+        """reason_code 필드가 누락되거나 빈 문자열일 때 기본값 NONE을 부여한다."""
+        if not v:
+            return "NONE"
+        return str(v).strip().upper()
+
+    @field_validator(
+        "candidate_laws",
+        "missing_legal_issues",
+        "missing_issues",
+        "contradictions",
+        "revision_instructions",
+        "warnings",
+        "preserved_points",
+        mode="before",
+    )
+    @classmethod
+    def _normalize_list_fields(cls, v: Any, info: ValidationInfo) -> List[str]:
+        """문자열 리스트 필드가 단일 문자열 또는 None으로 들어와도 안전하게 List[str]로 정규화한다."""
+        field_name = info.field_name
+        if v is None:
+            return []
+        if isinstance(v, str):
+            v_str = v.strip()
+            if not v_str:
+                return []
+            logger.info(f"[VERIFICATION_SCHEMA] {field_name} 자료형: str -> 리스트 정규화 적용")
+            if "," in v_str:
+                res = [part.strip() for part in v_str.split(",") if part.strip()]
+            else:
+                res = [v_str]
+            logger.info(f"[VERIFICATION_SCHEMA] 정규화 결과: SUCCESS ({field_name}={res})")
+            return res
+        if isinstance(v, list):
+            res = []
+            for item in v:
+                if item is None:
+                    continue
+                s_item = str(item).strip()
+                if s_item:
+                    res.append(s_item)
+            return res
+        return [str(v).strip()]
+
+    @field_validator("legal_search_requests", mode="before")
+    @classmethod
+    def _normalize_legal_search_requests(cls, v: Any) -> List[Dict[str, Any]]:
+        """legal_search_requests 필드가 단일 딕셔너리나 None으로 들어와도 안전하게 List[Dict]로 정규화한다."""
+        if v is None:
+            return []
+        if isinstance(v, dict):
+            logger.info("[VERIFICATION_SCHEMA] legal_search_requests 자료형: dict -> 리스트 정규화 적용")
+            return [v]
+        if isinstance(v, list):
+            return [item for item in v if isinstance(item, dict)]
+        return []
 
 
 VERIFICATION_PROMPT = """당신은 법률검증 Agent(Legal Verification Agent)입니다.
@@ -810,6 +946,7 @@ def run_verification(
     )
     from ai_legal_helper.llm.gateway import get_llm
 
+    error_type: Optional[str] = None
     try:
         formatted_sources, source_manifest = format_grounding_sources(retrieved_sources)
         llm = get_llm(temperature=0.0)
@@ -838,20 +975,50 @@ def run_verification(
                     raise net_err
 
         if res is None:
+            error_type = "LLM_RESPONSE_EMPTY"
+            logger.error("[VERIFICATION_SCHEMA] LLM 응답 객체 누락 (LLM_RESPONSE_EMPTY)")
             raise RuntimeError("검증기 응답을 수신하지 못했습니다.")
 
         raw_content = getattr(res, "content", res)
         text = raw_content if isinstance(raw_content, str) else str(raw_content)
         text = text.strip()
-        if text.startswith("```json"):
-            text = text[7:]
-        elif text.startswith("```"):
-            text = text[3:]
-        if text.endswith("```"):
-            text = text[:-3]
+        if not text:
+            error_type = "LLM_RESPONSE_EMPTY"
+            logger.error("[VERIFICATION_SCHEMA] LLM 응답 본문 비어있음 (LLM_RESPONSE_EMPTY)")
+            raise RuntimeError("검증기 응답 본문이 비어 있습니다.")
 
-        data = json.loads(text.strip())
-        result = VerificationOutput(**data)
+        # 마크다운 코드블록 또는 텍스트 내 JSON 객체 추출
+        try:
+            json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(1).strip()
+            else:
+                brace_start = text.find("{")
+                brace_end = text.rfind("}")
+                if brace_start != -1 and brace_end != -1 and brace_end > brace_start:
+                    json_str = text[brace_start : brace_end + 1].strip()
+                else:
+                    json_str = text
+            data = json.loads(json_str)
+        except Exception as json_err:
+            error_type = "JSON_PARSE_ERROR"
+            logger.error(f"[VERIFICATION_SCHEMA] JSON 파싱 실패 (JSON_PARSE_ERROR): {json_err}")
+            raise json_err
+
+        # Pydantic 스키마 검증 및 정규화
+        try:
+            logger.info("[VERIFICATION_SCHEMA] 검증 출력 수신 및 스키마 검증 시작")
+            result = VerificationOutput(**data)
+            logger.info(f"[VERIFICATION_SCHEMA] 스키마 검증 및 정규화 결과: SUCCESS (주장수={len(result.claims)}, 상태={result.status})")
+            logger.info("[VERIFICATION] 법률 주장 검증 계속 진행")
+        except ValidationError as val_err:
+            error_type = "SCHEMA_NORMALIZATION"
+            logger.error(f"[VERIFICATION_SCHEMA] 정규화 실패 (SCHEMA_NORMALIZATION): {val_err}")
+            for err in val_err.errors():
+                loc_str = ".".join(str(l) for l in err.get("loc", []))
+                logger.error(f"[VERIFICATION_SCHEMA] 오류 필드: {loc_str} | 오류 종류: {err.get('type')}")
+            logger.error("[VERIFICATION_SCHEMA] 법률 근거 부족과 구분하여 기술 오류 처리")
+            raise val_err
         coverage_complete = (bool(result.question_coverage) and all(
             isinstance(item.get("question"), str) and bool(item["question"].strip())
             and (item.get("answered") is True or (
@@ -931,11 +1098,18 @@ def run_verification(
             # 모델 판단과 정책 판단을 분리해 수정 작성자가 모순된 사유를 받지 않게 한다.
             claim_obj.model_grounding_status = claim_obj.grounding_status
             claim_obj.model_reason = claim_obj.reason
+
+            # 1. 주장 내용이 공백인 경우 SUPPORTED 금지
+            if not claim_obj.claim or not claim_obj.claim.strip():
+                claim_obj.grounding_status = "UNSUPPORTED"
+                claim_obj.reason = "주장 내용이 비어 있습니다."
+
             # 검증기가 실제 문장을 조건부 문장으로 바꿔 옮기면 원래 단정의 오류를 놓친다.
             # 문서 상담에서는 마크다운 기호·공백 정규화만 허용하고 답변에 없는 재서술을 근거 검증에서 제외한다.
             if require_question_coverage and _norm_quote(claim_obj.claim) not in norm_draft:
                 claim_obj.grounding_status = "UNSUPPORTED"
                 claim_obj.reason = "실제 답변에 존재하는 문장을 그대로 검증해야 합니다."
+
             verified_claim_sids: List[str] = []
             all_resolved = True
             for sid in claim_obj.source_ids:
@@ -949,6 +1123,13 @@ def run_verification(
                 claim_obj.grounding_status = "UNSUPPORTED"
                 claim_obj.reason = (claim_obj.reason + " (지정된 출처 ID가 실제 검색 결과에 존재하지 않거나 본문과 불일치함)").strip()
             claim_obj.source_ids = verified_claim_sids
+
+            # 2. 근거 출처가 전무한 법률 규범(LEGAL_RULE), 법률 적용(LEGAL_APPLICATION), 사건 사실(CASE_FACT) 주장은
+            #    모델이 임의로 SUPPORTED로 반환하더라도 뒷받침 출처 부재로 UNSUPPORTED로 강등한다 (STEP 2 원칙).
+            if not claim_obj.source_ids and claim_obj.grounding_status == "SUPPORTED":
+                if claim_obj.claim_type in ("LEGAL_RULE", "LEGAL_APPLICATION", "CASE_FACT"):
+                    claim_obj.grounding_status = "UNSUPPORTED"
+                    claim_obj.reason = (claim_obj.reason + " (주장을 뒷받침하는 법률 또는 사건 출처가 지정되지 않음)").strip()
 
         if require_question_coverage:
             legal_source_ids = {str(s.get("source_id")) for s in retrieved_sources if (
@@ -1175,7 +1356,7 @@ def run_verification(
         unsupported_core_claims = [
             c for c in result.claims
             if c.grounding_status == "UNSUPPORTED"
-            and c.claim_type in ("LEGAL_RULE", "LEGAL_APPLICATION")
+            and c.claim_type in ("LEGAL_RULE", "LEGAL_APPLICATION", "CASE_FACT")
         ]
         uncertain_core_claims = [
             c for c in result.claims
@@ -1309,10 +1490,24 @@ def run_verification(
         return {**result.model_dump(), "source_manifest": source_manifest}
 
     except Exception as e:
-        logger.error("Verification Agent 오류 발생 (안전 차단): %s", type(e).__name__)
-        # P0-01 준수: 검증 시스템 장애 시 절대로 PASS로 Fail-open하지 않고 INSUFFICIENT(VERIFICATION_ERROR)로 안전 종료
+        if not error_type:
+            if isinstance(e, (TimeoutError, ConnectionError)):
+                error_type = "LLM_TIMEOUT"
+            elif isinstance(e, json.JSONDecodeError):
+                error_type = "JSON_PARSE_ERROR"
+            elif isinstance(e, ValidationError):
+                error_type = "SCHEMA_NORMALIZATION"
+            else:
+                error_type = "SYSTEM_ERROR"
+
+        logger.error(
+            "Verification Agent 오류 발생 (안전 차단 | 기술오류유형=%s): %s",
+            error_type,
+            type(e).__name__,
+        )
+        # P0-01 & STEP 2 준수: 검증 시스템 장애 시 절대로 PASS로 Fail-open하지 않고 INSUFFICIENT(VERIFICATION_ERROR)로 안전 종료
         fallback_warnings = [
-            "법률검증 처리 중 문제가 발생하여 답변 검증을 완료하지 못했습니다."
+            f"법률검증 처리 중 기술적 문제({error_type})가 발생하여 답변 검증을 완료하지 못했습니다."
         ]
         fallback_instructions: List[str] = []
         if unverified_citations:
@@ -1330,10 +1525,12 @@ def run_verification(
         return {
             "status": "INSUFFICIENT",
             "reason_code": "VERIFICATION_ERROR",
+            "error_type": error_type,
+            "verification_error_type": error_type,
             "missing_legal_issues": [],
             "candidate_laws": [],
             "recommended_action": "SAFE_FALLBACK",
-            "explanation": "검증 처리 중 오류가 발생했습니다.",
+            "explanation": f"검증 처리 중 기술적 문제({error_type})로 인해 안전 종료되었습니다.",
             "claims": [],
             "missing_issues": [],
             "contradictions": [],
