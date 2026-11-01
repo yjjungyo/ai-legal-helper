@@ -8,6 +8,7 @@ import type { ClaimCitation, ConsultationPresentation } from '../types/consultat
 import { LegalAnswerView } from './LegalAnswerView';
 import type { CitationMeta } from './LegalAnswerView';
 import { shouldCollapsePresentationBlock } from './presentationLayout';
+import { linkedSemanticCounts } from './presentationSemantics';
 
 interface Props {
   presentation: ConsultationPresentation;
@@ -24,6 +25,7 @@ export const VerifiedPresentationView = ({ presentation, claimCitations, onEvide
         const collapsible = shouldCollapsePresentationBlock(block, index);
         const expanded = !collapsible || (opened[block.block_id] ?? false);
         const toggle = () => setOpened((prev) => ({ ...prev, [block.block_id]: !expanded }));
+        const semanticCounts = linkedSemanticCounts(presentation, block.claim_refs);
         const panelId = `presentation-panel-${block.block_id}`;
         return (
           <section
@@ -58,11 +60,21 @@ export const VerifiedPresentationView = ({ presentation, claimCitations, onEvide
             )}
             <div id={panelId} hidden={!expanded}>
               {expanded && (
-                <LegalAnswerView
-                  content={block.markdown}
-                  claimCitations={claimCitations}
-                  onEvidenceClick={onEvidenceClick}
-                />
+                <>
+                  <LegalAnswerView
+                    content={block.markdown}
+                    claimCitations={claimCitations}
+                    onEvidenceClick={onEvidenceClick}
+                  />
+                  {semanticCounts.length > 0 && (
+                    <div className="chat-semantic-provenance" aria-label="이 문단의 출처 연결 검증 주장 유형">
+                      <span className="chat-semantic-prefix">출처 연결 주장</span>
+                      {semanticCounts.map(({type, label, count}) => (
+                        <span className="chat-semantic-item" key={type}>{label} {count}건</span>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </section>

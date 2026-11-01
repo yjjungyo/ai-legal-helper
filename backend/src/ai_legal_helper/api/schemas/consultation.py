@@ -182,6 +182,8 @@ class PresentationClaim(BaseModel):
     claim_type: Optional[str] = None
     fact_status: Optional[str] = None
     grounding_status: str = "SUPPORTED"
+    semantic_type: str = "OTHER"
+    source_binding: str = "NOT_LINKED"
     source_refs: List[str] = Field(default_factory=list)
 
 

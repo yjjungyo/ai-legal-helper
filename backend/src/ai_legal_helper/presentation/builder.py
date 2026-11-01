@@ -11,6 +11,7 @@ import hashlib
 import re
 from typing import Any, Optional, Sequence
 
+from ai_legal_helper.presentation.semantics import classify_claim
 from ai_legal_helper.api.schemas.consultation import (
     ConsultationPresentation,
     PresentationBlock,
@@ -139,6 +140,8 @@ def build_consultation_presentation(
         claims.append(PresentationClaim(
             claim_id=claim_id, text=txt, start=start, end=end,
             claim_type=item.get("claim_type"), fact_status=item.get("fact_status"),
+            semantic_type=classify_claim(item.get("claim_type"), item.get("fact_status")),
+            source_binding="SOURCE_LINKED" if matched else "NOT_LINKED",
             source_refs=matched,
         ))
         for block in blocks:
