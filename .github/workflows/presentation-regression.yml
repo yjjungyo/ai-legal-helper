@@ -7,6 +7,8 @@ on:
       - 'frontend/**'
       - 'backend/src/ai_legal_helper/presentation/**'
       - 'backend/src/ai_legal_helper/api/schemas/consultation.py'
+      - 'backend/src/ai_legal_helper/api/routes/consultation.py'
+      - 'backend/src/ai_legal_helper/database/models.py'
       - 'backend/tests/unit/test_verified_presentation.py'
       - 'backend/tests/unit/test_p4_presentation_semantics.py'
       - 'backend/tests/unit/test_presentation_source_contract.py'
@@ -48,5 +50,7 @@ jobs:
       - name: Check single Alembic head and migration syntax
         run: |
           python -m py_compile backend/alembic/versions/c402b8e5a201_persist_consultation_presentation_snapshot.py
+          python -m py_compile backend/src/ai_legal_helper/api/routes/consultation.py
+          python -m py_compile backend/src/ai_legal_helper/database/models.py
           alembic -c backend/alembic.ini heads
           test "$(alembic -c backend/alembic.ini heads | wc -l)" -eq 1
