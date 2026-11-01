@@ -11,6 +11,7 @@
 import React, { useState, useEffect } from 'react';
 import type { ConsultationResponse, Source } from '../../types/consultation';
 import { LegalAnswerView } from '../LegalAnswerView';
+import { VerifiedPresentationView } from '../VerifiedPresentationView';
 import { ConsultationProgress } from './ConsultationProgress';
 
 export interface AssistantMessageProps {
@@ -151,11 +152,19 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
             </div>
           ) : message.answer ? (
             <div className="chat-assistant-card" style={{ padding: '4px 0' }}>
-              <LegalAnswerView
-                content={message.answer || ''}
-                onEvidenceClick={onEvidenceClick}
-                claimCitations={message.claim_citations || (message.verification_result as any)?.claim_citations}
-              />
+              {message.presentation?.schema_version === '1.0' && message.presentation.blocks.length > 0 ? (
+                <VerifiedPresentationView
+                  presentation={message.presentation}
+                  onEvidenceClick={onEvidenceClick}
+                  claimCitations={message.claim_citations || (message.verification_result as any)?.claim_citations}
+                />
+              ) : (
+                <LegalAnswerView
+                  content={message.answer || ''}
+                  onEvidenceClick={onEvidenceClick}
+                  claimCitations={message.claim_citations || (message.verification_result as any)?.claim_citations}
+                />
+              )}
 
               {/* 하단 인용 출처 목록 배지 (중복 최소화 및 자연스러운 표시) */}
               {message.sources && message.sources.length > 0 && (

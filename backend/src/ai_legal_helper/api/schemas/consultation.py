@@ -161,6 +161,54 @@ class UsageSummary(BaseModel):
     total_tokens: int
     agent_usage: Dict[str, int] = {}
 
+class PresentationBlock(BaseModel):
+    """최종 답변 원문의 연속 구간. markdown은 검증된 answer의 정확한 부분 문자열이다."""
+    block_id: str
+    kind: str  # LEAD | SECTION | BODY
+    start: int
+    end: int
+    markdown: str
+    title: Optional[str] = None
+    claim_refs: List[str] = Field(default_factory=list)
+    source_refs: List[str] = Field(default_factory=list)
+
+
+class PresentationClaim(BaseModel):
+    """검증된 주장 중 답변에서 정확히 한 위치에 고정된 주장만 포함한다."""
+    claim_id: str
+    text: str
+    start: int
+    end: int
+    claim_type: Optional[str] = None
+    fact_status: Optional[str] = None
+    grounding_status: str = "SUPPORTED"
+    source_refs: List[str] = Field(default_factory=list)
+
+
+class PresentationSource(BaseModel):
+    """원문 레지스트리에 존재하는 자료만 식별자로 표현하며 출처 내용을 재생성하지 않는다."""
+    source_id: str
+    source_type: Optional[str] = None
+    display_name: str
+    evidence_id: Optional[str] = None
+    claim_id: Optional[str] = None
+    span_id: Optional[str] = None
+    document_name: Optional[str] = None
+    statute_name: Optional[str] = None
+    article: Optional[str] = None
+    source_url: Optional[str] = None
+
+
+class ConsultationPresentation(BaseModel):
+    schema_version: str = "1.0"
+    source_answer_sha256: str
+    verification_binding: str  # HASH_MATCHED | STATUS_MATCHED
+    direct_answer_block_id: Optional[str] = None
+    blocks: List[PresentationBlock] = Field(default_factory=list)
+    claims: List[PresentationClaim] = Field(default_factory=list)
+    sources: List[PresentationSource] = Field(default_factory=list)
+
+
 class ConsultationResponse(BaseModel):
     request_id: str
     conversation_id: Optional[str] = None  # 연속된 대화 식별자
@@ -177,6 +225,8 @@ class ConsultationResponse(BaseModel):
     resolved_query: Optional[str] = None           # 대화 문맥이 결합되어 복원된 내부 검색 질의
 
     answer: Optional[str] = None
+    # 검증 완료 답변의 손실 없는 화면용 구조. 기존 answer/sources는 하위 호환 유지.
+    presentation: Optional[ConsultationPresentation] = None
     sources: List[Source] = []
     elapsed_ms: Optional[float] = None
     usage_summary: Optional[UsageSummary] = None
