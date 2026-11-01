@@ -102,7 +102,7 @@ export function buildConsultationDigest(presentation: Pick<ConsultationPresentat
   const used = new Set<string>();
   for (const classifier of CLASSIFIERS) {
     const block = blocks.find((b) => b.kind === 'SECTION'
-      && classifier.test(b.title || '') && !used.has(b.block_id) && getExactBulletLines(b).length > 0);
+      && classifier.test.test(b.title || '') && !used.has(b.block_id) && getExactBulletLines(b).length > 0);
     if (!block) continue;
     used.add(block.block_id);
     sections.push({
