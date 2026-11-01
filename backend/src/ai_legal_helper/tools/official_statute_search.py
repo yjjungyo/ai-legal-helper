@@ -34,6 +34,7 @@ from dataclasses import dataclass, field
 from ai_legal_helper.observability.decorators import trace
 from ai_legal_helper.observability.logging_config import get_logger
 from ai_legal_helper.rag.source_schema import normalize_source_dict
+from ai_legal_helper.tools.statute_temporal import extract_addenda, iso_date, _effective_from_addendum
 
 logger = get_logger(__name__)
 
@@ -357,6 +358,12 @@ def search_official_statutes(
 
             detail_root = ET.fromstring(detail_xml_bytes)
             article_nodes = detail_root.findall(".//조문단위")
+            # 법령 공통 시행일은 개별 조문·개정부칙 시행일과 다를 수 있다.
+            # 현재 공포번호에 해당하는 부칙만 정확히 식별한다.
+            matched_addenda = extract_addenda(detail_root, law_no)
+            date_sensitive = bool(re.search(r"(?:20\d{2}\s*[년./-]\s*\d{1,2}|시행일|공포일|적용시점)", query or ""))
+            if date_sensitive and not matched_addenda:
+                logger.warning("[STATUTE_TEMPORAL] 개정/시점 질문인데 해당 공포번호의 부칙을 확보하지 못함 | 법령=%s | 공포번호=%s", official_law_name, law_no)
             if not article_nodes:
                 logger.warning(f"[OFFICIAL_STATUTE] '{official_law_name}'의 세부 조문이 없습니다.")
                 continue
@@ -461,6 +468,7 @@ def search_official_statutes(
                     "article_label": article_label,
                     "article_title": art_title,
                     "content": full_article_text,
+                    "article_effective_date": iso_date(node.findtext("조문시행일자")),
                     "explicit_score": explicit_score,
                     "title_score": title_score,
                     "body_score": body_score,
@@ -549,8 +557,10 @@ def search_official_statutes(
                 art_label = item["article_label"]
                 art_title = (item.get("article_title") or "").strip()
                 art_full = f"{art_label}({art_title})" if art_title else art_label
-                if law_no_disp and eff_date_raw:
-                    doc_filename = f"{official_law_name}({law_type_name or '법률'})({law_no_disp})({eff_date_raw}).pdf"
+                article_effective = item.get("article_effective_date") or effective_date_str
+                filename_effective = (article_effective or "").replace("-", "")
+                if law_no_disp and filename_effective:
+                    doc_filename = f"{official_law_name}({law_type_name or '법률'})({law_no_disp})({filename_effective}).pdf"
                 else:
                     doc_filename = f"{official_law_name}.pdf"
 
@@ -558,7 +568,7 @@ def search_official_statutes(
                     p for p in (
                         law_type_name,
                         law_no_disp,
-                        f"시행 {effective_date_str}" if effective_date_str else "",
+                        f"조문 시행 {article_effective}" if article_effective else "",
                     ) if p
                 ]
                 meta_suffix = f" [{', '.join(meta_parts)}]" if meta_parts else ""
@@ -581,8 +591,8 @@ def search_official_statutes(
                     "retrieval_method": "OFFICIAL_STATUTE_SEARCH",
                     "chunk_id": f"statute-{mst}-{art_label}",
                     "source_url": f"https://www.law.go.kr/법령/{urllib.parse.quote(official_law_name)}/{art_label}",
-                    "version_date": effective_date_str or None,
-                    "effective_date": effective_date_str or None,
+                    "version_date": article_effective or None,
+                    "effective_date": article_effective or None,
                     "court": None,
                     "case_number": None,
                     "decision_date": None,
@@ -597,7 +607,45 @@ def search_official_statutes(
                 }
                 retrieved_sources.append(normalize_source_dict(source_dict))
 
-            logger.info(f"[OFFICIAL_STATUTE] '{official_law_name}'에서 조문 {len(selected_articles)}건 확보 완료")
+            # 날짜가 쟁점인 질문에서는 부칙의 시행일·적용례까지 근거로 제공한다.
+            # 부칙 원문을 검색 결과에서 버리면 LLM이 공포일과 시행일을 혼동할 수 있다.
+            if date_sensitive:
+                for addendum in matched_addenda:
+                    addendum_effective = _effective_from_addendum(addendum, "")
+                    addendum_title = f"{official_law_name} 부칙 [공포번호 {law_no_disp}]"
+                    logger.info(
+                        "[STATUTE_TEMPORAL] 부칙 확보 | 법령=%s | 공포=%s | 기본시행일=%s | 원문길이=%d",
+                        official_law_name, addendum.promulgation_date,
+                        addendum_effective or "UNCONFIRMED", len(addendum.content),
+                    )
+                    retrieved_sources.append(normalize_source_dict({
+                        "source_id": addendum_title,
+                        "source_type": "STATUTE",
+                        "document_id": f"{official_law_name}_부칙_{law_no}.txt",
+                        "title": addendum_title,
+                        "statute_name": official_law_name,
+                        "article": "부칙",
+                        "article_title": "시행일 및 적용례",
+                        "law_id": law_id or None,
+                        "version_id": mst,
+                        "promulgation_date": addendum.promulgation_date or promulgation_date_str or None,
+                        "promulgation_number": law_no_disp or None,
+                        "content": addendum.content,
+                        "retrieval_method": "OFFICIAL_STATUTE_SEARCH",
+                        "chunk_id": f"statute-{mst}-addendum-{law_no}",
+                        "source_url": f"https://www.law.go.kr/법령/{urllib.parse.quote(official_law_name)}",
+                        # 부칙 기본 시행일. 예외 조항은 반드시 부칙 원문으로 별도 확인.
+                        "version_date": addendum_effective,
+                        "effective_date": addendum_effective,
+                        "filename": f"{official_law_name}_부칙_{law_no}.txt",
+                        "file": f"{official_law_name}_부칙_{law_no}.txt",
+                        "file_name": f"{official_law_name}_부칙_{law_no}.txt",
+                        "page": "1",
+                        "category": "civil",
+                        "retrieved_at": _get_kst_iso(),
+                        "verified": False,
+                    }))
+            logger.info(f"[OFFICIAL_STATUTE] '{official_law_name}'에서 조문 {len(selected_articles)}건 확보 완료 | 부칙 {len(matched_addenda) if date_sensitive else 0}건")
 
         except Exception as e:
             masked_err = mask_api_key(f"{type(e).__name__}: {str(e)}", api_key)
