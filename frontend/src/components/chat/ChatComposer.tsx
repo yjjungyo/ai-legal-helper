@@ -33,12 +33,12 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // 텍스트 내용 길이에 따라 textarea 높이를 동적으로 자동 조절 (최대 140px)
+  // 텍스트 내용 길이에 따라 textarea 높이를 동적으로 자동 조절 (기본 52px ~ 최대 200px)
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = 'auto';
-    const newHeight = Math.min(el.scrollHeight, 140);
+    const newHeight = Math.max(Math.min(el.scrollHeight, 200), 52);
     el.style.height = `${newHeight}px`;
   }, [value]);
 
@@ -72,7 +72,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
         <div className="chat-textarea-wrapper" style={{ width: '100%', display: 'flex', alignItems: 'flex-end', boxSizing: 'border-box' }}>
           <textarea
             ref={textareaRef}
-            rows={1}
+            rows={2}
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -96,12 +96,12 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
             aria-label="질문 전송"
           >
             <svg
-              width="18"
-              height="18"
+              width="22"
+              height="22"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth="2.2"
+              strokeWidth="2.3"
               strokeLinecap="round"
               strokeLinejoin="round"
             >
@@ -109,6 +109,9 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
               <polygon points="22 2 15 22 11 13 2 9 22 2" />
             </svg>
           </button>
+        </div>
+        <div className="chat-composer-hint">
+          <span>Shift + Enter 줄바꿈 · Enter 전송</span>
         </div>
       </div>
     </footer>
