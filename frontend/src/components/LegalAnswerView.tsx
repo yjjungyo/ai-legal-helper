@@ -117,10 +117,10 @@ export function renderInlineMarkdown(
 
     // 대괄호 일반 텍스트와 실제 증거 인용을 명확히 분리한다.
     // [잠정], [1. 핵심 결론] 같은 제목/표시는 클릭 가능한 증거가 아니다.
-    const bracketMatch = part.match(/^\\[([^\\]\\n]+)\\]$/);
+    const bracketMatch = part.match(/^\[([^\]\n]+)\]$/);
     const rawLabel = bracketMatch?.[1]?.trim() || '';
-    const isEvidenceLabel = /^E\\d{1,3}(?:$|[_.\\s-])/i.test(rawLabel);
-    const isEvidenceFilename = /\\.(?:pdf|docx|txt|png|jpg|jpeg)$/i.test(rawLabel);
+    const isEvidenceLabel = /^E\d{1,3}(?:$|[_.\s-])/i.test(rawLabel);
+    const isEvidenceFilename = /\.(?:pdf|docx|txt|png|jpg|jpeg)$/i.test(rawLabel);
     if (bracketMatch && (isEvidenceLabel || isEvidenceFilename)) {
       const cleanUpper = rawLabel.toUpperCase();
       let meta: CitationMeta | undefined;
