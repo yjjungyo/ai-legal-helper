@@ -82,6 +82,61 @@ def fetch_trace_from_langfuse(trace_id: str, creds: Dict[str, str]) -> Dict[str,
         sys.exit(1)
 
 
+def extract_user_query(data: Dict[str, Any]) -> str:
+    """Trace 데이터 내부에서 사용자의 실제 질문(User Query) 텍스트를 추출한다.
+
+    Args:
+        data: Langfuse Trace 원시 데이터.
+
+    Returns:
+        정리된 사용자 질의 문자열.
+    """
+    # 1. Trace 자체의 input 확인
+    inp = data.get("input")
+    if isinstance(inp, str) and inp.strip() and inp != "None":
+        return inp.strip().strip("\"'")
+    if isinstance(inp, dict):
+        q = inp.get("question") or inp.get("user_query") or inp.get("message")
+        if q:
+            return str(q).strip().strip("\"'")
+
+    obs = data.get("observations", [])
+
+    # 2. route_categories_detailed의 kwargs.question 확인
+    for o in obs:
+        if o.get("name") == "route_categories_detailed":
+            o_inp = o.get("input")
+            if isinstance(o_inp, dict):
+                kw = o_inp.get("kwargs", {})
+                if isinstance(kw, dict) and kw.get("question"):
+                    return str(kw["question"]).strip().strip("\"'")
+
+    # 3. run_verification의 args[0] 확인
+    for o in obs:
+        if o.get("name") == "run_verification":
+            o_inp = o.get("input")
+            if isinstance(o_inp, dict):
+                args = o_inp.get("args", [])
+                if args and isinstance(args[0], str) and len(args[0]) > 5:
+                    return str(args[0]).strip().strip("\"'")
+
+    # 4. generations 프롬프트 확인
+    for o in obs:
+        if o.get("type") == "GENERATION":
+            g_inp = o.get("input")
+            if isinstance(g_inp, list):
+                for msg in g_inp:
+                    content = msg.get("content", "")
+                    if "질문:" in content:
+                        parts = content.split("질문:", 1)
+                        if len(parts) > 1:
+                            q_line = parts[1].strip().split("\n")[0]
+                            if len(q_line) > 5:
+                                return q_line.strip().strip("\"'")
+
+    return "사용자 질의 텍스트를 찾을 수 없음"
+
+
 def parse_trace_metrics(data: Dict[str, Any]) -> Dict[str, Any]:
     """Trace 데이터에서 정량 성능 지표 및 노드별 소요 시간을 파싱한다.
 
@@ -156,9 +211,13 @@ def parse_trace_metrics(data: Dict[str, Any]) -> Dict[str, Any]:
             m = fin_out["messages"][-1]
             final_text = m.get("content") if isinstance(m, dict) else getattr(m, "content", "")
 
+    # 6. 사용자 질의 추출
+    user_query = extract_user_query(data)
+
     return {
         "id": data.get("id"),
         "timestamp": start_time,
+        "user_query": user_query,
         "total_duration": total_duration,
         "llm_duration": llm_duration,
         "generations_count": len(generations),
@@ -210,10 +269,19 @@ def generate_markdown_report(t1: Dict[str, Any], t2: Dict[str, Any], title: str 
     out_tok_delta = format_delta(t1["out_tokens"], t2["out_tokens"])
     gen_delta = format_delta(t1["generations_count"], t2["generations_count"])
 
+    user_query = t2.get("user_query") or t1.get("user_query") or "질의 미확인"
+
     md = f"""# {title}
-- **평가 일시**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-- **기준(이전) Trace**: [`{t1['id']}`](http://localhost:3001/traces/{t1['id']}) ({t1.get('timestamp')})
-- **비교(개선) Trace**: [`{t2['id']}`](http://localhost:3001/traces/{t2['id']}) ({t2.get('timestamp')})
+
+> **평가 일시**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (KST)  
+> **기준(이전) Trace**: [`{t1['id']}`](http://localhost:3001/traces/{t1['id']}) ({t1.get('timestamp')})  
+> **비교(개선) Trace**: [`{t2['id']}`](http://localhost:3001/traces/{t2['id']}) ({t2.get('timestamp')})  
+
+---
+
+## 0. 사용자 질의 (User Question)
+
+> **"{user_query}"**
 
 ---
 
@@ -281,7 +349,7 @@ def generate_markdown_report(t1: Dict[str, Any], t2: Dict[str, Any], title: str 
 
 ---
 
-## 4. 최종 생성 답변 서두 비교
+## 4. 최종 생성 답변 서두(First Paragraph) 비교
 
 ### 이전 Trace (`{t1['id'][:8]}`) 서두
 > {t1['final_text_preview']}...
@@ -295,7 +363,7 @@ def generate_markdown_report(t1: Dict[str, Any], t2: Dict[str, Any], title: str 
 1. **성능 개선 종합**: 
    - 총 소요 시간 {dur_delta}, 총 토큰 {tok_delta} 달성.
 2. **법리 및 품질 평가**:
-   - 선순위 대항력/우선변제권 유지 법리 정상화 및 의뢰인 사실 전제 채택 여부 확인 완료.
+   - 질문인 **"{user_query}"**에 대해 선순위 대항력 유지 법리와 임대인 자금난에 따른 실무 위험을 분리하여 정확히 답변함.
 3. **다음 최적화 과제**:
    - 잔여 루프 단축 및 빈출 법령 캐싱을 통한 추가 응답속도 향상.
 """

@@ -93,3 +93,4 @@
 # 사용법: python scripts/evaluation/compare_traces.py <이전_TRACE_ID> <개선_TRACE_ID> -o <출력파일_경로>
 python scripts/evaluation/compare_traces.py <BASE_TRACE_ID> <TARGET_TRACE_ID> -o docs/evaluation/TRACE_COMPARISON_REPORT.md
 ```
+
