@@ -158,6 +158,43 @@ def _parse_or_build_progress(
     return None
 
 
+def _attach_presentation(resp: ConsultationResponse) -> ConsultationResponse:
+    """표시 데이터는 검증 완료된 answer에서만 결정론적으로 생성한다.
+
+    GET(메모리/DB) 및 사건 이력 호출 모두 동일한 계약을 사용한다. 구조화 실패는
+    원본 answer를 훼손하지 않고 기존 렌더러로 폴백한다.
+    """
+    if resp.status != "SUCCESS":
+        resp.presentation = None
+        return resp
+    try:
+        from ai_legal_helper.presentation.builder import build_consultation_presentation
+        resp.presentation = build_consultation_presentation(
+            answer=resp.answer,
+            verification_result=resp.verification_result,
+            verification_status=resp.verification_status,
+            answer_status=resp.answer_status,
+            sources=resp.sources,
+        )
+        if resp.presentation:
+            logger.info(
+                "[PRESENTATION_BUILD] request=%s binding=%s blocks=%d claims=%d sources=%d",
+                (resp.request_id or "")[:8],
+                resp.presentation.verification_binding,
+                len(resp.presentation.blocks),
+                len(resp.presentation.claims),
+                len(resp.presentation.sources),
+            )
+    except Exception as exc:
+        resp.presentation = None
+        logger.warning(
+            "[PRESENTATION_BUILD] request=%s fallback=LEGACY reason=%s",
+            (resp.request_id or "")[:8],
+            type(exc).__name__,
+        )
+    return resp
+
+
 @router.post("/consultations", response_model=ConsultationResponse)
 async def start_consultation(
     req: ConsultationRequest, 
@@ -606,7 +643,7 @@ async def get_consultation(
             raise HTTPException(status_code=403, detail="해당 상담에 접근할 권한이 없습니다.")
         if resp.progress is None:
             resp.progress = _parse_or_build_progress(None, resp.status, resp.request_id, resp.created_at)
-        return resp
+        return _attach_presentation(resp)
         
     record = db.query(ConsultationRecord).filter(
         ConsultationRecord.request_id == request_id
@@ -640,7 +677,7 @@ async def get_consultation(
         record.request_id,
         get_kst_iso(record.created_at) if record.created_at else None
     )
-    return ConsultationResponse(
+    response = ConsultationResponse(
         request_id=record.request_id,
         conversation_id=record.conversation_id,
         turn_index=record.turn_index or 1,
@@ -668,6 +705,7 @@ async def get_consultation(
         case_delta=ver_res.get("case_delta"),
         progress=prog,
     )
+    return _attach_presentation(response)
 
 @router.get("/consultations/{request_id}/status")
 async def get_consultation_status(
@@ -1076,7 +1114,7 @@ async def list_case_consultations(
             claim_citations=(rec.verification_result or {}).get("claim_citations", []),
             progress=prog,
         ))
-    return results
+    return [_attach_presentation(item) for item in results]
 
 
 

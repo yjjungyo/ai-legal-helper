@@ -738,3 +738,11 @@
     max-width: 100vw;
   }
 }
+
+/* P2: 검증된 답변의 원문 구간만 시각적으로 표현한다. 재요약/문장 재배열 없음. */
+.chat-presentation { display: flex; flex-direction: column; gap: 8px; }
+.chat-presentation-block { min-width: 0; }
+.chat-presentation-lead { padding: 10px 0 12px; border-bottom: 1px solid #e2e8f0; font-size: 1.06em; }
+.chat-presentation-lead strong { font-weight: 750; }
+.chat-presentation-section { margin-top: 4px; }
+@media (max-width: 768px) { .chat-presentation-lead { font-size: 1em; } }

@@ -148,6 +148,51 @@ export interface ConsultationProgress {
 }
 
 
+export interface PresentationBlock {
+  block_id: string;
+  kind: 'LEAD' | 'SECTION' | 'BODY';
+  start: number;
+  end: number;
+  markdown: string;
+  title?: string | null;
+  claim_refs: string[];
+  source_refs: string[];
+}
+
+export interface PresentationClaim {
+  claim_id: string;
+  text: string;
+  start: number;
+  end: number;
+  claim_type?: string | null;
+  fact_status?: string | null;
+  grounding_status: string;
+  source_refs: string[];
+}
+
+export interface PresentationSource {
+  source_id: string;
+  source_type?: string | null;
+  display_name: string;
+  evidence_id?: string | null;
+  claim_id?: string | null;
+  span_id?: string | null;
+  document_name?: string | null;
+  statute_name?: string | null;
+  article?: string | null;
+  source_url?: string | null;
+}
+
+export interface ConsultationPresentation {
+  schema_version: '1.0';
+  source_answer_sha256: string;
+  verification_binding: 'HASH_MATCHED' | 'STATUS_MATCHED';
+  direct_answer_block_id?: string | null;
+  blocks: PresentationBlock[];
+  claims: PresentationClaim[];
+  sources: PresentationSource[];
+}
+
 export interface ConsultationResponse {
   request_id: string;
   conversation_id?: string;
@@ -165,6 +210,7 @@ export interface ConsultationResponse {
   intent?: string;
   resolved_query?: string;
   answer?: string;
+  presentation?: ConsultationPresentation | null;
   sources: Source[];
   elapsed_ms?: number;
   usage_summary?: UsageSummary;
