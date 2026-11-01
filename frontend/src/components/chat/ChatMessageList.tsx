@@ -102,7 +102,6 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
       // 질문 제출 시에는 새 메시지를 보여주되, 기존 요청의 진행 단계 변경으로는 읽던 위치를 바꾸지 않는다.
       if (last.status === 'IN_PROGRESS') {
         isFollowingRef.current = true;
-        setShowJump(false);
       }
     }
     if (isFollowingRef.current && container) {
