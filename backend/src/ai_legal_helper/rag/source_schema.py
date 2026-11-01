@@ -84,6 +84,8 @@ class StandardSource(BaseModel):
     claim_id: Optional[str] = None
     paragraph_index: Optional[int] = None
     filename: Optional[str] = None
+    original_filename: Optional[str] = None
+    document_name: Optional[str] = None
     page: Optional[str] = None
     text_excerpt: Optional[str] = None
 
@@ -447,7 +449,12 @@ def normalize_source_dict(raw: Any) -> Dict[str, Any]:
             file_name=fn,
         ).model_dump()
 
-    raw_fn = raw.get("filename") or raw.get("file_name") or raw.get("file") or raw.get("document_name")
+    # UI 출처 표시에 필요한 원본/문서명을 별도로 보존한다. source_id를 파일명으로 위장하지 않는다.
+    raw_original = raw.get("original_filename")
+    raw_document = raw.get("document_name")
+    original_filename = os.path.basename(str(raw_original)).strip() if raw_original and str(raw_original).strip() not in ("", "?") else None
+    document_name = os.path.basename(str(raw_document)).strip() if raw_document and str(raw_document).strip() not in ("", "?") else None
+    raw_fn = original_filename or document_name or raw.get("filename") or raw.get("file_name") or raw.get("file")
     filename = os.path.basename(str(raw_fn)).strip() if raw_fn and str(raw_fn).strip() not in ("", "?") else None
     raw_page = raw.get("page") if raw.get("page") is not None else raw.get("page_number")
     page = str(raw_page).strip() if raw_page not in (None, "", "?") else None
@@ -561,6 +568,8 @@ def normalize_source_dict(raw: Any) -> Dict[str, Any]:
         claim_id=raw.get("claim_id"),
         text_excerpt=raw.get("text_excerpt"),
         filename=filename,
+        original_filename=original_filename,
+        document_name=document_name,
         page=page,
         file=filename or raw.get("file") or source_id,
         file_name=filename,

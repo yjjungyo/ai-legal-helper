@@ -216,14 +216,15 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
                     const seenDisplays = new Set<string>();
                     return message.sources.map((s: Source, idx: number) => {
                       const sid = s.source_id || s.document_id || s.file || `SRC-${idx + 1}`;
-                      const rawDocName = s.original_filename || s.document_name || s.filename || s.file_name || s.file || '';
+                      const fileCandidate = s.original_filename || s.document_name || s.filename || s.file_name || s.file || '';
+                      const rawDocName = /^(EVIDENCE:|GRAPH:|VECTOR:|UNKNOWN$|\\?$)/i.test(fileCandidate) ? '' : fileCandidate;
                       const isEv =
                         s.source_type === 'CASE_EVIDENCE' ||
                         Boolean(s.evidence_id) ||
                         /^E\d{1,3}_/i.test(rawDocName) ||
                         /^E\d{1,3}_/i.test(sid);
 
-                      let displayName = (rawDocName || s.title || sid).replace(/^EVIDENCE:/i, '').trim();
+                      let displayName = (isEv ? (rawDocName || '파일명 확인 필요') : (rawDocName || s.title || sid)).trim();
                       const isStatute = s.source_type === 'STATUTE' || Boolean(s.statute_name) || Boolean(s.article);
 
                       if (!isEv && isStatute) {
@@ -252,15 +253,18 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
                       if (seenDisplays.has(dedupKey)) return null;
                       seenDisplays.add(dedupKey);
 
+                      const canOpenEvidence = isEv && Boolean(s.evidence_id || rawDocName);
                       const tooltipLines = isEv
                         ? [`증거 문서: ${displayName}`]
                         : [`참고 법령: ${displayName}`, s.content ? s.content.slice(0, 200) : ''].filter(Boolean);
 
                       return (
-                        <span
+                        <button
                           key={idx}
+                          type="button"
+                          disabled={!canOpenEvidence && !s.source_url}
                           onClick={() => {
-                            if (isEv) {
+                            if (canOpenEvidence) {
                               onEvidenceClick(displayName, {
                                 evidenceId: s.evidence_id || undefined,
                                 claimId: s.claim_id || undefined,
@@ -279,12 +283,12 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
                             backgroundColor: isEv ? '#fef3c7' : '#eff6ff',
                             color: isEv ? '#92400e' : '#1e40af',
                             border: `1px solid ${isEv ? '#fde68a' : '#bfdbfe'}`,
-                            cursor: isEv || s.source_url ? 'pointer' : 'default',
+                            cursor: canOpenEvidence || s.source_url ? 'pointer' : 'default',
                             transition: 'background-color 0.15s ease',
                           }}
                         >
                           {isEv ? `📄 ${displayName}` : `⚖️ ${displayName}`}
-                        </span>
+                        </button>
                       );
                     });
                   })()}
