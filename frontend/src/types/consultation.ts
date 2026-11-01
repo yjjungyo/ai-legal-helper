@@ -167,6 +167,8 @@ export interface PresentationClaim {
   claim_type?: string | null;
   fact_status?: string | null;
   grounding_status: string;
+  semantic_type?: 'FACT' | 'USER_STATEMENT' | 'INFERENCE' | 'LEGAL_RULE' | 'LEGAL_APPLICATION' | 'ACTION' | 'UNCERTAINTY' | 'OTHER';
+  source_binding?: 'SOURCE_LINKED' | 'NOT_LINKED';
   source_refs: string[];
 }
 
