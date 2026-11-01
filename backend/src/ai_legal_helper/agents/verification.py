@@ -1367,9 +1367,10 @@ def run_verification(
                 ]
 
             # 사실 오류나 출처 없는 법률 주장도 필터링 후 PASS로 남지 않게 한다.
+            # 의뢰인의 질문 진술·상담 전제 사실(USER_STATEMENT)은 공적 원본 부재만을 이유로 결함 주장으로 취급하지 않는다.
             defective_claims = [c for c in result.claims if (
                 c.grounding_status in ("UNSUPPORTED", "UNCERTAIN")
-                and c.claim_type in ("CASE_FACT", "CASE_INFERENCE", "USER_STATEMENT", "LEGAL_RULE", "LEGAL_APPLICATION")
+                and c.claim_type in ("CASE_FACT", "CASE_INFERENCE", "LEGAL_RULE", "LEGAL_APPLICATION")
             ) or (c.claim_type in ("CASE_FACT", "CASE_INFERENCE", "LEGAL_RULE", "LEGAL_APPLICATION")
                   and c.grounding_status == "SUPPORTED" and not c.source_ids)]
             malformed_claims = [c for c in result.claims if (
@@ -1384,9 +1385,15 @@ def run_verification(
             elif (coverage_complete and consistency_complete
                   and result.claims and not defective_claims and not malformed_claims
                   and not same_role_date_conflict and not result.contradictions
-                  and not result.missing_legal_issues and not result.missing_issues
+                  and not result.missing_legal_issues
                   and result.status == "REVISE"
                   and result.reason_code in ("ANSWER_REVISION_REQUIRED", "LEGAL_SOURCE_INSUFFICIENT", "NONE", None)):
+                # 부수적인 권고 사항(missing_issues)은 warnings로 이동하고 정상 PASS 확정
+                if result.missing_issues:
+                    for mi in result.missing_issues:
+                        if mi not in result.warnings:
+                            result.warnings.append(f"참고 확인사항: {mi}")
+                    result.missing_issues = []
                 result.status = "PASS"
                 result.reason_code = "NONE"
                 result.recommended_action = "FINALIZE"

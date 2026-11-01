@@ -276,9 +276,16 @@ def check_deterministic_qa(
     has_receipt_evidence = any(kw in case_context for kw in ("도달 완료", "배달증명", "수령 완료", "확정 도달"))
 
     for idx, sent in enumerate(sentences):
+        sent_stripped = sent.strip()
         # 해당 문장에 자체 조건부 설명(도달한 때부터 등)이 포함되어 있다면 안전함
         sent_is_conditional = any(kw in sent for kw in RECEIPT_CONDITIONAL_PATTERNS)
-        if not has_receipt_evidence and not sent_is_conditional:
+        # 소제목, 불릿 항목 명칭, 질문/의문형/검토형 종결 문장은 법률 효과 확정 단정이 아니므로 제외
+        sent_is_caution_or_inquiry = (
+            sent_stripped.startswith(("#", "- **", "* **", "1.", "2.", "3.", "4.", "5."))
+            or sent_stripped.endswith(("?", "인지", "는지", "여부", "여부입니다.", "검토", "살펴봅니다.", "확인", "필요가 있습니다.", "주의해야 합니다.", "위험이 있습니다.", "수 있습니다."))
+            or any(kw in sent_stripped for kw in ("성숙했는지", "가능 여부", "확인할 필요", "지연될 실무적 위험", "주의가 필요"))
+        )
+        if not has_receipt_evidence and not sent_is_conditional and not sent_is_caution_or_inquiry:
             for pat in UNCONFIRMED_TERMINATION_PATTERNS:
                 m = pat.search(sent)
                 if m:
@@ -321,7 +328,10 @@ def check_deterministic_qa(
         s.get("source_type") == "STATUTE" or "statute" in str(s.get("source_id", "")).lower()
         for s in (retrieved_sources or [])
     )
-    complex_legal_kws = ("가압류", "압류", "경매", "배당", "우선순위", "우선변제", "소멸", "손해배상", "불법행위", "상계")
+    complex_legal_kws = (
+        "가압류", "압류", "경매", "배당", "우선순위", "우선변제", "소멸", "손해배상",
+        "불법행위", "상계", "해지", "해제", "효력", "통지", "대항력",
+    )
     has_complex_rights = any(kw in question or kw in draft_answer for kw in complex_legal_kws)
 
     is_pure_statute_query = (

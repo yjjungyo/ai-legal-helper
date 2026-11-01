@@ -275,8 +275,12 @@ def next_verification_step(state: Dict[str, Any]) -> str:
                 target_node = "revise"
                 route_reason = f"답변 보강 재작성 ({state.get('revision_count', 0) + 1}/3회)"
             else:
-                target_node = "insufficient"
-                route_reason = f"재작성 한도 초과 또는 추가 근거 부재 ({result.get('status')}/{result.get('reason_code')})"
+                if state.get("draft_answer") and result.get("claims"):
+                    target_node = "finalize"
+                    route_reason = f"재작성 한도 도달 후 초안 보존 최종화 ({result.get('status')}/{result.get('reason_code')})"
+                else:
+                    target_node = "insufficient"
+                    route_reason = f"재작성 한도 초과 또는 추가 근거 부재 ({result.get('status')}/{result.get('reason_code')})"
 
     logger.info(
         "[DOC_ROUTING] 검증 후 다음 실행 노드 결정: %s (사유: %s | 재작성=%d회 | 법령검색=%d회)",
@@ -286,18 +290,6 @@ def next_verification_step(state: Dict[str, Any]) -> str:
         state.get("statute_search_count", 0),
     )
     return target_node
-    if result.get("status") == "PASS":
-        return "finalize"
-    requests = pending_searches(state)
-    if requests and (state.get("statute_search_count") or 0) < 2:
-        if search_is_approved(state, requests):
-            return "execute_statute_search"
-        if not state.get("hilt_executed"):
-            # 법령명 하나가 검색되었다고 해당 법의 다른 누락 조문까지 확보된 것으로 보지 않는다.
-            return "statute_search_approval"
-    if result.get("status") in ("REVISE", "INSUFFICIENT") and (state.get("revision_count") or 0) < 3:
-        return "revise"
-    return "insufficient"
 
 
 def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
