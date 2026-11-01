@@ -950,7 +950,11 @@ def run_verification(
     )
 
     # 단순 법령 질의이면서 결정론적 검사 ALL PASS인 경우: 불필요한 LLM 호출을 건너뛰고 조기 PASS 확정
-    if not qa_check.requires_llm_eval and qa_check.status == "PASS":
+    from ai_legal_helper.tools.statute_temporal import temporal_answer_errors
+    preliminary_temporal_errors = temporal_answer_errors(question, draft_answer, retrieved_sources)
+    if preliminary_temporal_errors:
+        logger.warning("[STATUTE_TEMPORAL] 경량 PASS 생략: 시행일/계약일 충돌 %d건", len(preliminary_temporal_errors))
+    if not qa_check.requires_llm_eval and qa_check.status == "PASS" and not preliminary_temporal_errors:
         logger.info("[VERIFICATION] 경량 검사 ALL PASS: LLM 검증 생략 및 초안 즉시 확정")
         from ai_legal_helper.rag.grounding_context import format_grounding_sources
         _, source_manifest = format_grounding_sources(retrieved_sources)
@@ -1508,6 +1512,20 @@ def run_verification(
                 result.status = "PASS"
                 result.reason_code = "NONE"
                 result.recommended_action = "FINALIZE"
+
+        # [P0-LAW-02] LLM이 PASS를 반환해도 공식 조문/부칙의 시행일과
+        # 사건 기준일이 정면 충돌하는 법적 의무 단정은 최종 전달하지 않는다.
+        # 기존의 LLM 재검증 및 PASS 승격 처리 이후에 시행하여 재승격을 차단한다.
+        from ai_legal_helper.tools.statute_temporal import temporal_answer_errors
+        temporal_errors = temporal_answer_errors(question, draft_answer, retrieved_sources)
+        if temporal_errors:
+            result.status = "REVISE"
+            result.reason_code = "ANSWER_REVISION_REQUIRED"
+            result.recommended_action = "REVISE_DRAFT"
+            result.revision_instructions.extend(temporal_errors)
+            result.warnings.append("법령 개정 조문의 시행일과 계약 기준일이 일치하지 않아 법률 판단을 재검증해야 합니다.")
+            for error in temporal_errors:
+                logger.warning("[STATUTE_TEMPORAL] 시행일-사건일 불일치로 PASS 차단: %s", error)
 
         result.citation_audit = audit
 
