@@ -1,0 +1,39 @@
+name: Evidence Conflict Semantic Regression
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/src/ai_legal_helper/case_intelligence/fact_semantics.py'
+      - 'backend/src/ai_legal_helper/case_intelligence/conflict_detector.py'
+      - 'backend/tests/unit/test_repayment_dialogue_conflict_regression.py'
+      - 'backend/tests/unit/test_installment_proposal_conflict_regression.py'
+      - 'backend/tests/unit/test_conflict_detector.py'
+      - 'backend/tests/unit/test_conflict_detector_v1_2.py'
+      - '.github/workflows/conflict-semantic-regression.yml'
+  workflow_dispatch:
+
+jobs:
+  conflict-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - name: Install backend test environment
+        run: python -m pip install -e './backend[dev]'
+      - name: Validate changed Python files
+        run: |
+          python -m py_compile backend/src/ai_legal_helper/case_intelligence/fact_semantics.py
+          python -m py_compile backend/src/ai_legal_helper/case_intelligence/conflict_detector.py
+      - name: Existing and new contradiction regression
+        run: |
+          PYTHONPATH=backend/src python -m pytest \
+            backend/tests/unit/test_repayment_dialogue_conflict_regression.py \
+            backend/tests/unit/test_installment_proposal_conflict_regression.py \
+            backend/tests/unit/test_conflict_detector.py \
+            backend/tests/unit/test_conflict_detector_v1_2.py -q

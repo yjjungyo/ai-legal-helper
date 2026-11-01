@@ -124,7 +124,8 @@ class SemanticProposition(BaseModel):
         "NOTICE",
         "QUESTION",
         "PROMISE",
-    ]] = Field("STATEMENT", description="화행 유형 (단순 진술, 이행 청구, 분할 제안, 거절 등)")
+        "PLAN",
+    ]] = Field("STATEMENT", description="화행 유형 (단순 진술, 문의, 제안, 거절, 후속 계획 등)")
     speaker_key: Optional[str] = Field(None, description="발화자 또는 의사표시 주체")
 
     source_evidence_id: Optional[str] = Field(None, description="출처 증거 문서 ID")
@@ -887,6 +888,51 @@ def extract_semantic_fact(
 # 3-1. 사실 명제 추출 함수 (extract_semantic_proposition)
 # ==============================================================================
 
+def _enrich_proposition_speech_act(prop: SemanticProposition) -> SemanticProposition:
+    """원문에서 화행을 보완한다. SemanticFact→Proposition 경로에서도 동일한 규칙 사용.
+
+    '반환/지급'이라는 공통 단어보다 '문의·제안·거절·계획'이라는 발언의
+    성격을 우선한다. 실제 지급과 지급 방안 제안은 같은 사건이 아니다.
+    부정된 제안/약속은 긍정 제안과의 대립을 가릴 수 있으므로 제안으로
+    승격하지 않는다. 특정 사건·인명·금액에 의존하지 않는다.
+    """
+    compact = re.sub(r"\s+", "", prop.statement or "")
+
+    # 제안/거절/질문은 내용에 포함된 '반환'이라는 동사만으로 실제 이행으로 해석하지 않는다.
+    if re.search(r"(?:동의할수없|동의하기어렵|동의하지않|수락하지않|승낙하지않|"
+                 r"받아들일수없|받아들이지않|거절하|거부하|반대하)", compact):
+        prop.speech_act = "REJECTION"
+    elif re.search(r"(?:방안을제안|제안하였|제안했다|제안함|조건을제안|"
+                   r"제시하였|제시했다|분할반환을제시)", compact) and not re.search(
+        r"(?:제안하지않|제안한적없|제안을거절|제안하지못|제시하지않)", compact
+    ):
+        prop.speech_act = "PROPOSAL"
+    elif re.search(r"(?:문의하였|문의했다|문의했|문의하였다|가능한지문의|"
+                   r"가능한지물|물어보았|질문하였|질문했다)", compact):
+        prop.speech_act = "QUESTION"
+    elif re.search(r"(?:요청하였|요청했다|요구하였|요구했다|촉구하였|"
+                   r"청구하였|달라고요구|해달라고요구)", compact):
+        prop.speech_act = "REQUEST"
+    elif re.search(r"(?:동의하였|동의했다|동의하였다|수락하였|"
+                   r"수락했다|합의하였|승낙하였)", compact):
+        prop.speech_act = "ACCEPTANCE"
+    elif re.search(r"(?:약속하였|약속했다|확약하였|확약했다)", compact):
+        prop.speech_act = "PROMISE"
+    elif re.search(r"(?:찾겠다는|찾겠다고|모색하겠|진행하겠다는|진행하겠다고|"
+                   r"추진하겠다는|추진하겠다고|계획이라고밝혔|"
+                   r"절차를먼저진행|방법을찾겠|방안을찾겠)", compact):
+        prop.speech_act = "PLAN"
+    elif re.search(r"(?:통보하였|통지하였|고지하였|알렸)", compact):
+        prop.speech_act = "NOTICE"
+
+    if prop.speech_act in ("PROPOSAL", "REJECTION", "QUESTION", "REQUEST",
+                           "PLAN", "ACCEPTANCE", "PROMISE"):
+        # 이것은 지급·이행 완료가 아니라 의사표시/계획을 보고한 사실이다.
+        # 원본 서술 극성은 유지한다(예: '동의할 수 없다'는 실제 지급 부정 아님).
+        prop.provenance = {**(prop.provenance or {}), "speech_act_enriched": True}
+    return prop
+
+
 def extract_semantic_proposition(
     statement: str,
     context: Optional[Dict[str, Any]] = None,
@@ -913,17 +959,8 @@ def extract_semantic_proposition(
     sem_fact = extract_semantic_fact(stmt, context=ctx)
     prop = sem_fact.to_proposition()
 
-    # 1. 화행(Speech Act) 정밀 추출 (CASE-04: 제안 vs 거절 분리)
-    if any(kw in compact for kw in ("방안을제안", "제안하였", "조건을제안", "제안함", "제시하였", "제안했다")):
-        prop.speech_act = "PROPOSAL"
-    elif any(kw in compact for kw in ("동의하지않", "거절하였", "거부하였", "받아들이지않", "응하지않", "거절함", "거부함")):
-        prop.speech_act = "REJECTION"
-    elif any(kw in compact for kw in ("요청하였", "요구하였", "촉구하였", "청구하였", "달라고요구", "해달라고요구")):
-        prop.speech_act = "REQUEST"
-    elif any(kw in compact for kw in ("동의하였", "수락하였", "합의하였", "승낙하였")):
-        prop.speech_act = "ACCEPTANCE"
-    elif any(kw in compact for kw in ("통보하였", "통지하였", "고지하였", "알렸")):
-        prop.speech_act = "NOTICE"
+    # SemanticFact→Proposition과 동일한 화행 보완 로직을 공유한다.
+    _enrich_proposition_speech_act(prop)
 
     # 2. 인식 상태(Epistemic Status) 및 정보 부족 분리 (CASE-01, CASE-05, CASE-06)
     if any(kw in compact for kw in (
@@ -1043,15 +1080,52 @@ def check_proposition_comparability(
             predicate_match_basis="Epistemic status vs Factual assertion",
         )
 
-    # 3. 화행(Speech Act) 분리: 제안(PROPOSAL) vs 거절(REJECTION) (CASE-04)
+    # 3. 상충 비교 가능성 게이트: 서로 다른 화행은 별개의 사건 사실이다.
+    # 문의→제안→거절→대안 모색은 사건 진행의 연쇄이지 논리적 모순이 아니다.
+    # 요청/질문/제안/계획은 지급이나 이행이 발생했다고 증명하지도 않는다.
+    # 단, '동의했다 vs 동의하지 않았다'처럼 동일 의사표시의
+    # 직접 긍정·부정은 비교에서 제외하지 않는다.
+    acts = {pa.speech_act, pb.speech_act}
+    speech_steps = {"REQUEST", "QUESTION", "PROPOSAL", "REJECTION", "PLAN",
+                    "ACCEPTANCE", "PROMISE"}
+    same_consent_event = (
+        acts == {"ACCEPTANCE", "REJECTION"}
+        and any(root in (pa.statement or "") and root in (pb.statement or "")
+                for root in ("동의", "수락", "승낙"))
+        and pa.subject_key == pb.subject_key
+    )
+    if (
+        pa.speech_act != pb.speech_act
+        and pa.speech_act in speech_steps
+        and pb.speech_act in speech_steps
+        and not same_consent_event
+    ):
+        mismatched.append("SPEECH_ACT")
+        return ComparabilityResult(
+            is_comparable=False,
+            status="DIFFERENT_CONTEXT",
+            identity_status="COMPATIBLE",
+            reason_code="DISTINCT_SPEECH_ACTS",
+            explanation=(
+                "문의·요청·제안·거절·후속 계획은 서로 다른 의사표시입니다. "
+                "같은 계약이나 금전 지급을 언급하더라도 동시에 참일 수 있으므로 "
+                "동일 명제의 상충으로 판단하지 않습니다."
+            ),
+            matched_dimensions=matched,
+            mismatched_dimensions=mismatched,
+            predicate_match_basis=f"SpeechAct: {pa.speech_act} vs {pb.speech_act}",
+        )
+
+    # 3-0. 아래 레거시 제안/거절 검사도 일반 규칙에 포함되며
+    # 기존 reason_code를 다루는 외부 소비자를 고려하여 유지한다.
     if {pa.speech_act, pb.speech_act} == {"PROPOSAL", "REJECTION"}:
         mismatched.append("SPEECH_ACT")
         return ComparabilityResult(
             is_comparable=False,
-            status="CONSISTENT",
+            status="DIFFERENT_CONTEXT",
             identity_status="COMPATIBLE",
             reason_code="PROPOSAL_VS_REJECTION",
-            explanation="임대인의 분할 반환 제안(PROPOSAL)과 임차인의 거절(REJECTION)은 서로 다른 별개 의사표시로서 양립 가능하며 모순이 아닙니다.",
+            explanation="제안과 거절은 별개의 양립 가능한 의사표시로서 모순이 아닙니다.",
             matched_dimensions=matched,
             mismatched_dimensions=mismatched,
             predicate_match_basis="Proposal responds to Rejection",
@@ -1504,8 +1578,11 @@ def compare_fact_identity(
     fact_b: SemanticFact,
 ) -> ComparabilityResult:
     """두 SemanticFact가 상충 가능 여부를 검증할 수 있는 동일 명제인지 판정한다 (SemanticProposition 위임)."""
-    prop_a = fact_a.to_proposition()
-    prop_b = fact_b.to_proposition()
+    # 기존 경로는 SemanticFact.to_proposition()까지만 호출하여
+    # '동의할 수 없다', '문의하였다', '다른 방법을 찾겠다'를 STATEMENT로
+    # 뭉뚱그리는 결함이 있었다. 별도 LLM/중복 의미 추출 없이 화행을 보완한다.
+    prop_a = _enrich_proposition_speech_act(fact_a.to_proposition())
+    prop_b = _enrich_proposition_speech_act(fact_b.to_proposition())
     return check_proposition_comparability(prop_a, prop_b)
 
 
