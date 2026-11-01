@@ -16,11 +16,12 @@ import type { ConsultationResponse, ConversationSummary, ConversationDetail } fr
 export async function startConsultation(
   question: string,
   case_id?: string,
-  conversation_id?: string
+  conversation_id?: string,
+  reanalysis_of_request_id?: string
 ): Promise<ConsultationResponse> {
   const res = await apiFetch(`/consultations`, {
     method: 'POST',
-    body: JSON.stringify({ question, case_id, conversation_id })
+    body: JSON.stringify({ question, case_id, conversation_id, reanalysis_of_request_id })
   });
   if (!res.ok) throw new Error('Failed to start consultation');
   return res.json();

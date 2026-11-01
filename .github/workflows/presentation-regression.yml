@@ -13,7 +13,9 @@ on:
       - 'backend/tests/unit/test_p4_presentation_semantics.py'
       - 'backend/tests/unit/test_presentation_source_contract.py'
       - 'backend/tests/unit/test_p4_presentation_snapshot.py'
+      - 'backend/tests/unit/test_p4_case_evidence_manifest.py'
       - 'backend/alembic/versions/c402b8e5a201_persist_consultation_presentation_snapshot.py'
+      - 'backend/alembic/versions/d4c3e2a1f903_add_case_evidence_baseline.py'
       - '.github/workflows/presentation-regression.yml'
   workflow_dispatch:
 
@@ -46,10 +48,12 @@ jobs:
       - name: Install minimal Pydantic tests
         run: python -m pip install 'pydantic>=2.5,<3' 'pytest>=8,<10' 'alembic>=1.13,<2'
       - name: Verify lossless presentation and semantic contract
-        run: PYTHONPATH=backend/src python -m pytest backend/tests/unit/test_presentation_source_contract.py backend/tests/unit/test_verified_presentation.py backend/tests/unit/test_p4_presentation_semantics.py backend/tests/unit/test_p4_presentation_snapshot.py -q
+        run: PYTHONPATH=backend/src python -m pytest backend/tests/unit/test_presentation_source_contract.py backend/tests/unit/test_verified_presentation.py backend/tests/unit/test_p4_presentation_semantics.py backend/tests/unit/test_p4_presentation_snapshot.py backend/tests/unit/test_p4_case_evidence_manifest.py -q
       - name: Check single Alembic head and migration syntax
         run: |
           python -m py_compile backend/alembic/versions/c402b8e5a201_persist_consultation_presentation_snapshot.py
+          python -m py_compile backend/alembic/versions/d4c3e2a1f903_add_case_evidence_baseline.py
+          python -m py_compile backend/src/ai_legal_helper/presentation/evidence_manifest.py
           python -m py_compile backend/src/ai_legal_helper/api/routes/consultation.py
           python -m py_compile backend/src/ai_legal_helper/database/models.py
           alembic -c backend/alembic.ini heads

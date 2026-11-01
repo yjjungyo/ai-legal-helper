@@ -75,6 +75,7 @@ class ConsultationRequest(BaseModel):
     case_id: Optional[str] = None
     session_id: Optional[str] = None
     conversation_id: Optional[str] = None  # 연속된 대화 식별자 (미전달 시 서버가 신규 생성)
+    reanalysis_of_request_id: Optional[str] = None  # 같은 사건의 완료된 과거 상담을 명시적으로 재분석
 
 class Source(BaseModel):
     """법률 RAG 및 사건 증거 RAG 통합 표준 출처 응답 스키마.
@@ -232,6 +233,9 @@ class ConsultationResponse(BaseModel):
     # 내부 보관: 기존 API 계약을 바꾸지 않도록 snapshot 전체는 응답 직렬화에서 제외
     presentation_snapshot: Optional[Dict[str, Any]] = Field(default=None, exclude=True)
     presentation_origin: Optional[str] = None  # FROZEN | LEGACY_REBUILT | INVALID_SNAPSHOT | UNAVAILABLE
+    case_evidence_manifest: Optional[Dict[str, Any]] = Field(default=None, exclude=True)
+    evidence_freshness: Optional[Dict[str, Any]] = None
+    reanalysis_of_request_id: Optional[str] = None
     sources: List[Source] = []
     elapsed_ms: Optional[float] = None
     usage_summary: Optional[UsageSummary] = None

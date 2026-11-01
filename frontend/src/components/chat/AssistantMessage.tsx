@@ -26,6 +26,8 @@ export interface AssistantMessageProps {
   onReject: (requestId: string) => void;
   /** HILT 버튼 처리 중 여부 */
   isActionLoading?: boolean;
+  onReanalyze?: (message: ConsultationResponse) => void;
+  isReanalysisDisabled?: boolean;
 }
 
 /**
@@ -94,6 +96,8 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
   onApprove,
   onReject,
   isActionLoading = false,
+  onReanalyze,
+  isReanalysisDisabled = false,
 }) => {
   const [copied, setCopied] = useState(false);
   const isRunningOrApproval = message.status === 'IN_PROGRESS' || message.status === 'APPROVAL_REQUIRED';
@@ -118,6 +122,30 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
     navigator.clipboard.writeText(message.answer);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleSourceClick = (label: string, meta?: any) => {
+    const historical = Boolean(
+      message.case_id && message.evidence_freshness &&
+      message.evidence_freshness.status !== 'CURRENT'
+    );
+    if (!historical) {
+      onEvidenceClick(label, meta);
+      return;
+    }
+    const matching = (message.sources || []).filter((source) => {
+      if (meta?.evidenceId && source.evidence_id === meta.evidenceId) return true;
+      const names = [source.original_filename, source.document_name, source.filename,
+                     source.evidence_label, source.file].filter(Boolean);
+      return names.includes(label);
+    });
+    const frozen = matching.length === 1 ? matching[0] : undefined;
+    onEvidenceClick(label, {
+      ...meta, historicalMode: true,
+      historicalExcerpt: frozen?.text_excerpt || undefined,
+      historicalFileName: frozen?.original_filename || frozen?.document_name ||
+                          frozen?.filename || label,
+    });
   };
 
   return (
@@ -171,6 +199,41 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
             />
           )}
 
+          {message.status === 'SUCCESS' && message.case_id && message.evidence_freshness?.status === 'EVIDENCE_CHANGED' && (
+            <div className="chat-evidence-reanalysis" role="status">
+              <strong>이 상담 이후 사건 증거가 변경되었습니다.</strong>
+              <span>이 답변은 상담 당시 자료를 기준으로 작성되었습니다. 변경된 자료의 법적 영향은 재분석으로 확인해야 합니다.</span>
+              <span className="chat-evidence-changes">
+                {message.evidence_freshness.added.length > 0 && `추가 ${message.evidence_freshness.added.length}건 · `}
+                {message.evidence_freshness.modified.length > 0 && `수정·검토 상태 변경 ${message.evidence_freshness.modified.length}건 · `}
+                {message.evidence_freshness.removed.length > 0 && `삭제 ${message.evidence_freshness.removed.length}건`}
+              </span>
+              <details className="chat-evidence-change-files">
+                <summary>추가·변경된 증거 파일명 확인</summary>
+                <ul>
+                  {message.evidence_freshness.added.map((name, index) => (
+                    <li key={`add-${index}`}>추가: {name}</li>
+                  ))}
+                  {message.evidence_freshness.modified.map((name, index) => (
+                    <li key={`edit-${index}`}>수정·검토 변경: {name}</li>
+                  ))}
+                  {message.evidence_freshness.removed.map((name, index) => (
+                    <li key={`remove-${index}`}>삭제: {name}</li>
+                  ))}
+                </ul>
+              </details>
+              {message.evidence_freshness.pending_count > 0 && (
+                <span>현재 처리 또는 검토 중인 증거 {message.evidence_freshness.pending_count}건이 있습니다. 가능하면 검토를 완료한 뒤 재분석하세요.</span>
+              )}
+              {onReanalyze && (
+                <button type="button" className="chat-reanalysis-button"
+                  disabled={isReanalysisDisabled}
+                  onClick={() => onReanalyze(message)}>
+                  같은 질문으로 재분석
+                </button>
+              )}
+            </div>
+          )}
           {/* 상태별 세부 결과 (오류 알림 또는 최종 완성된 법률 상담 답변) */}
           {isFailed ? (
             <div
@@ -195,19 +258,19 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
               {message.verification_status === 'PASS' && message.answer_status !== 'WITHHELD' && message.presentation?.schema_version === '1.0' && message.presentation.blocks.length > 0 && message.presentation.blocks.map((block) => block.markdown).join('') === message.answer ? (
                 <VerifiedPresentationView
                   presentation={message.presentation}
-                  onEvidenceClick={onEvidenceClick}
+                  onEvidenceClick={handleSourceClick}
                   claimCitations={message.claim_citations || (message.verification_result as any)?.claim_citations}
                 />
               ) : (
                 <LegalAnswerView
                   content={message.answer || ''}
-                  onEvidenceClick={onEvidenceClick}
+                  onEvidenceClick={handleSourceClick}
                   claimCitations={message.claim_citations || (message.verification_result as any)?.claim_citations}
                 />
               )}
 
               {message.sources && message.sources.length > 0 && (
-                <ConsultationSources sources={message.sources} onEvidenceClick={onEvidenceClick} />
+                <ConsultationSources sources={message.sources} onEvidenceClick={handleSourceClick} />
               )}
             </div>
           ) : null}

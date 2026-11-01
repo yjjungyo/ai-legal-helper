@@ -60,6 +60,9 @@ export const ChatSection: React.FC<ChatSectionProps> = ({ caseId }) => {
   const [activeEvidenceId, setActiveEvidenceId] = useState<string | null>(null);
   const [activeClaimId, setActiveClaimId] = useState<string | null>(null);
   const [activeSpanId, setActiveSpanId] = useState<string | null>(null);
+  const [historicalMode, setHistoricalMode] = useState(false);
+  const [historicalExcerpt, setHistoricalExcerpt] = useState<string | null>(null);
+  const [historicalFileName, setHistoricalFileName] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   /**
@@ -91,6 +94,9 @@ export const ChatSection: React.FC<ChatSectionProps> = ({ caseId }) => {
     setActiveEvidenceId(meta?.evidenceId || null);
     setActiveClaimId(meta?.claimId || null);
     setActiveSpanId(meta?.spanId || null);
+    setHistoricalMode(Boolean(meta?.historicalMode));
+    setHistoricalExcerpt(meta?.historicalExcerpt || null);
+    setHistoricalFileName(meta?.historicalFileName || null);
     setIsDrawerOpen(true);
   }, []);
 
@@ -177,6 +183,9 @@ export const ChatSection: React.FC<ChatSectionProps> = ({ caseId }) => {
         selectedEvidenceId={activeEvidenceId}
         selectedClaimId={activeClaimId}
         selectedSpanId={activeSpanId}
+        historicalMode={historicalMode}
+        historicalExcerpt={historicalExcerpt}
+        historicalFileName={historicalFileName}
         caseId={caseId}
         evidenceDocuments={evidenceDocs}
         onNavigateToEvidence={handleNavigateToEvidence}

@@ -21,6 +21,8 @@ export interface ChatMessageProps {
   onReject: (requestId: string) => void;
   /** HILT 승인/거절 액션 로딩 상태 */
   isActionLoading?: boolean;
+  onReanalyze?: (message: ConsultationResponse) => void;
+  isReanalysisDisabled?: boolean;
 }
 
 /**
@@ -34,6 +36,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   onApprove,
   onReject,
   isActionLoading,
+  onReanalyze,
+  isReanalysisDisabled,
 }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -53,6 +57,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         onApprove={onApprove}
         onReject={onReject}
         isActionLoading={isActionLoading}
+        onReanalyze={onReanalyze}
+        isReanalysisDisabled={isReanalysisDisabled}
       />
     </div>
   );

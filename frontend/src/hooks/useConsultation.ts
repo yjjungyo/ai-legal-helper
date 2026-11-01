@@ -144,7 +144,7 @@ export function useConsultation(caseId?: string) {
    * 새 질문 전송
    */
   const sendQuestion = useCallback(
-    async (questionText?: string) => {
+    async (questionText?: string, reanalysisOfRequestId?: string) => {
       const query = (questionText !== undefined ? questionText : question).trim();
       if (!query || !caseId || loading) return;
 
@@ -157,7 +157,8 @@ export function useConsultation(caseId?: string) {
         const initial = await startConsultation(
           query,
           caseId,
-          conversationId || undefined
+          conversationId || undefined,
+          reanalysisOfRequestId
         );
 
         if (initial.conversation_id) {
@@ -223,6 +224,7 @@ export function useConsultation(caseId?: string) {
     submit: () => sendQuestion(),
     handleApproval,
     refreshChat: loadCaseChat,
+    reanalyze: (prior: ConsultationResponse) => sendQuestion(prior.question || '', prior.request_id),
     // 하위 호환 필드
     result: activeRecord || null,
     history: messages,

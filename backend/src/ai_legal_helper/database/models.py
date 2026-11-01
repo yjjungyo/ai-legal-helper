@@ -570,6 +570,9 @@ class ConsultationRecord(Base):
     verification_result = Column(JSON, nullable=True)
     # P4.2: immutable-at-application-level structured result snapshot (NULL for historical rows)
     presentation_snapshot = Column(JSON, nullable=True)
+    # P4.3: consultation-start case evidence fingerprint and explicit reanalysis lineage
+    case_evidence_manifest = Column(JSON, nullable=True)
+    reanalysis_of_request_id = Column(String, nullable=True, index=True)
     warnings = Column(JSON, nullable=True)
     selected_agents = Column(JSON, nullable=True)
     progress = Column(JSON, nullable=True)  # LangGraph 6단계 실시간 진행 상태 (ConsultationProgress)

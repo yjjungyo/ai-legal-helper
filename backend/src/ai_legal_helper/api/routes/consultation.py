@@ -44,6 +44,9 @@ logger = get_logger(__name__)
 from ai_legal_helper.database.session import get_db, SessionLocal
 from ai_legal_helper.database.models import User, Case, ConsultationRecord
 from ai_legal_helper.utils.datetime_utils import get_kst_iso
+from ai_legal_helper.presentation.evidence_manifest import (
+    capture_case_evidence_manifest, compare_case_evidence_manifests,
+)
 
 router = APIRouter()
 
@@ -223,6 +226,17 @@ def _attach_presentation(
     return resp
 
 
+def _attach_case_freshness(
+    resp: ConsultationResponse, current_manifest: Optional[dict],
+) -> ConsultationResponse:
+    """Read-time evidence comparison never rewrites an old consultation."""
+    if resp.case_id:
+        resp.evidence_freshness = compare_case_evidence_manifests(
+            resp.case_evidence_manifest, current_manifest,
+        )
+    return resp
+
+
 def _freeze_record_presentation(rec: ConsultationRecord, resp: ConsultationResponse) -> Optional[dict]:
     """Prepare a one-time frozen snapshot inside the consultation DB transaction."""
     from ai_legal_helper.presentation.snapshot import freeze_record_once
@@ -265,6 +279,22 @@ async def start_consultation(
     else:
         conversation_id = req.conversation_id or str(uuid.uuid4())
 
+    if req.reanalysis_of_request_id:
+        if not req.case_id:
+            raise HTTPException(status_code=400, detail="재분석에는 사건 ID가 필요합니다.")
+        prior = db.query(ConsultationRecord).filter(
+            ConsultationRecord.request_id == req.reanalysis_of_request_id,
+            ConsultationRecord.case_id == req.case_id,
+        ).first()
+        if prior is None or (not AUTH_BYPASS and prior.user_id != current_user.id):
+            raise HTTPException(status_code=404, detail="재분석 대상 상담을 찾을 수 없습니다.")
+        if prior.status != "SUCCESS":
+            raise HTTPException(status_code=409, detail="완료된 상담만 재분석할 수 있습니다.")
+        if (prior.question or "").strip() != req.question.strip():
+            raise HTTPException(status_code=400, detail="재분석 질문은 이전 상담과 같아야 합니다.")
+        logger.info("[REANALYSIS_LINK] case=%s previous=%s",
+                    req.case_id[:8], prior.request_id[:8])
+
     from ai_legal_helper.observability.context import get_trace_id, get_request_id
 
     # 미들웨어에서 주입된 전역 trace_id와 request_id를 승계하여 로그와 Langfuse를 1:1 매핑
@@ -302,6 +332,11 @@ async def start_consultation(
         conv_context.turn_index = turn_index
 
         now_kst = get_kst_iso()
+        evidence_baseline = capture_case_evidence_manifest(db, req.case_id)
+        logger.info("[EVIDENCE_BASELINE] request=%s case=%s docs=%d fingerprint=%s",
+                    request_id[:8], (req.case_id or "")[:8],
+                    len((evidence_baseline or {}).get("documents", [])),
+                    (evidence_baseline or {}).get("fingerprint", "")[:12])
         initial_progress = create_initial_progress(request_id, now_kst)
 
         # Initial status (P1-05 3-tier status model + Case-Centric Progress P0-05)
@@ -319,6 +354,8 @@ async def start_consultation(
             case_id=req.case_id,
             created_at=now_kst,
             progress=initial_progress,
+            case_evidence_manifest=evidence_baseline,
+            reanalysis_of_request_id=req.reanalysis_of_request_id,
         )
         # Store user_id to authorize GET later
         _consultations[request_id] = resp
@@ -344,6 +381,8 @@ async def start_consultation(
                     answer_status="WITHHELD",
                     routing_status=None,
                     progress=initial_progress.model_dump(),
+                    case_evidence_manifest=evidence_baseline,
+                    reanalysis_of_request_id=req.reanalysis_of_request_id,
                 )
                 db.add(record)
                 db.commit()
@@ -703,7 +742,10 @@ async def get_consultation(
         if persisted is None or getattr(persisted, "presentation_snapshot", None) is None:
             if resp.progress is None:
                 resp.progress = _parse_or_build_progress(None, resp.status, resp.request_id, resp.created_at)
-            return _attach_presentation(resp)
+            ready = _attach_presentation(resp)
+            return _attach_case_freshness(
+                ready, capture_case_evidence_manifest(db, resp.case_id),
+            )
 
     record = persisted or db.query(ConsultationRecord).filter(
         ConsultationRecord.request_id == request_id
@@ -749,6 +791,8 @@ async def get_consultation(
         routing_status=getattr(record, "routing_status", None),
         answer=record.answer,
         presentation_snapshot=getattr(record, "presentation_snapshot", None),
+        case_evidence_manifest=getattr(record, "case_evidence_manifest", None),
+        reanalysis_of_request_id=getattr(record, "reanalysis_of_request_id", None),
         approval_request=record.approval_request,
         sources=sources,
         elapsed_ms=record.elapsed_ms,
@@ -766,7 +810,10 @@ async def get_consultation(
         case_delta=ver_res.get("case_delta"),
         progress=prog,
     )
-    return _attach_presentation(response, source_records=record.sources or [])
+    ready = _attach_presentation(response, source_records=record.sources or [])
+    return _attach_case_freshness(
+        ready, capture_case_evidence_manifest(db, record.case_id),
+    )
 
 @router.get("/consultations/{request_id}/status")
 async def get_consultation_status(
@@ -1121,7 +1168,8 @@ async def list_case_consultations(
     if conversation_id:
         query = query.filter(ConsultationRecord.conversation_id == conversation_id)
     records = query.order_by(ConsultationRecord.created_at.asc(), ConsultationRecord.turn_index.asc()).all()
-    
+    current_evidence_manifest = capture_case_evidence_manifest(db, case_id)
+
     results = []
     for rec in records:
         if rec.request_id in _consultations and getattr(rec, "presentation_snapshot", None) is None:
@@ -1162,6 +1210,8 @@ async def list_case_consultations(
             routing_status=getattr(rec, "routing_status", None),
             answer=rec.answer,
             presentation_snapshot=getattr(rec, "presentation_snapshot", None),
+            case_evidence_manifest=getattr(rec, "case_evidence_manifest", None),
+            reanalysis_of_request_id=getattr(rec, "reanalysis_of_request_id", None),
             approval_request=rec.approval_request,
             sources=sources,
             elapsed_ms=rec.elapsed_ms,
@@ -1179,7 +1229,12 @@ async def list_case_consultations(
             progress=prog,
         ))
     record_sources = {rec.request_id: (rec.sources or []) for rec in records}
-    return [_attach_presentation(item, source_records=record_sources.get(item.request_id)) for item in results]
+    return [
+        _attach_case_freshness(
+            _attach_presentation(item, source_records=record_sources.get(item.request_id)),
+            current_evidence_manifest,
+        ) for item in results
+    ]
 
 
 
@@ -1289,6 +1344,8 @@ async def get_case_conversation_detail(
                 routing_status=getattr(rec, "routing_status", None),
                 answer=rec.answer,
                 presentation_snapshot=getattr(rec, "presentation_snapshot", None),
+                case_evidence_manifest=getattr(rec, "case_evidence_manifest", None),
+                reanalysis_of_request_id=getattr(rec, "reanalysis_of_request_id", None),
                 approval_request=rec.approval_request,
                 sources=sources,
                 elapsed_ms=rec.elapsed_ms,
@@ -1308,8 +1365,14 @@ async def get_case_conversation_detail(
         )
 
     original_sources = {rec.request_id: (rec.sources or []) for rec in records}
+    current_evidence_manifest = capture_case_evidence_manifest(db, case_id)
     return ConversationDetail(
         conversation_id=conversation_id,
         case_id=case_id,
-        turns=[_attach_presentation(turn, source_records=original_sources.get(turn.request_id)) for turn in turns],
+        turns=[
+            _attach_case_freshness(
+                _attach_presentation(turn, source_records=original_sources.get(turn.request_id)),
+                current_evidence_manifest,
+            ) for turn in turns
+        ],
     )

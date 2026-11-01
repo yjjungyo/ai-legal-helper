@@ -12,6 +12,9 @@ export interface CitationMeta {
   evidenceId?: string;
   claimId?: string;
   spanId?: string;
+  historicalMode?: boolean;
+  historicalExcerpt?: string;
+  historicalFileName?: string;
 }
 
 export interface LegalAnswerViewProps {

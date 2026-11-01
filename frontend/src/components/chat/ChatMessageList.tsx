@@ -21,6 +21,8 @@ export interface ChatMessageListProps {
   onReject: (requestId: string) => void;
   /** HILT 승인/거절 액션 로딩 상태 */
   isActionLoading?: boolean;
+  onReanalyze?: (message: ConsultationResponse) => void;
+  isReanalysisDisabled?: boolean;
   /** 추천 질문 칩 클릭 시 질문 입력창에 설정하는 콜백 */
   onSelectSampleQuestion?: (question: string) => void;
 }
@@ -74,6 +76,8 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
   onApprove,
   onReject,
   isActionLoading,
+  onReanalyze,
+  isReanalysisDisabled = false,
   onSelectSampleQuestion,
 }) => {
   const bottomAnchorRef = useRef<HTMLDivElement>(null);
@@ -153,6 +157,9 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
       <div className="case-chat-stream-inner">
         {messages.map((msg, index) => {
           const prevMsg = index > 0 ? messages[index - 1] : undefined;
+          const previousConsultation = msg.reanalysis_of_request_id
+            ? messages.find((record) => record.request_id === msg.reanalysis_of_request_id)
+            : undefined;
           const showDateDivider =
             index === 0 || isDifferentDay(prevMsg?.created_at, msg.created_at);
 
@@ -167,7 +174,30 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                 onApprove={onApprove}
                 onReject={onReject}
                 isActionLoading={isActionLoading}
+                onReanalyze={onReanalyze}
+                isReanalysisDisabled={isReanalysisDisabled}
               />
+              {previousConsultation?.answer && msg.status === 'SUCCESS' && msg.answer && (
+                <details className="chat-answer-comparison">
+                  <summary>이전 상담과 재분석 답변 원문 비교</summary>
+                  <p>다음은 두 상담의 답변 원문입니다. 문장 차이만으로 법률 판단이 변경되었다고 단정하지 않습니다.</p>
+                  <div className="chat-answer-comparison-grid">
+                    <section>
+                      <h4>이전 상담 (턴 {previousConsultation.turn_index || '-'})</h4>
+                      <pre>{previousConsultation.answer}</pre>
+                    </section>
+                    <section>
+                      <h4>재분석 상담 (턴 {msg.turn_index || '-'})</h4>
+                      <pre>{msg.answer}</pre>
+                    </section>
+                  </div>
+                  <p className="chat-comparison-note">
+                    {previousConsultation.answer === msg.answer
+                      ? '답변 원문이 동일합니다. 증거 검토 결과도 동일한지는 별도로 확인해야 합니다.'
+                      : '답변 원문에 차이가 있습니다. 추가 증거와 각 상담의 근거를 비교해 주세요.'}
+                  </p>
+                </details>
+              )}
             </React.Fragment>
           );
         })}
