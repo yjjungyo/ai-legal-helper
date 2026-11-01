@@ -1509,6 +1509,20 @@ def run_verification(
                 result.reason_code = "NONE"
                 result.recommended_action = "FINALIZE"
 
+        # [P0-LAW-02] LLM이 PASS를 반환해도 공식 조문/부칙의 시행일과
+        # 사건 기준일이 정면 충돌하는 법적 의무 단정은 최종 전달하지 않는다.
+        # 기존의 LLM 재검증 및 PASS 승격 처리 이후에 시행하여 재승격을 차단한다.
+        from ai_legal_helper.tools.statute_temporal import temporal_answer_errors
+        temporal_errors = temporal_answer_errors(question, draft_answer, retrieved_sources)
+        if temporal_errors:
+            result.status = "REVISE"
+            result.reason_code = "ANSWER_REVISION_REQUIRED"
+            result.recommended_action = "REVISE_DRAFT"
+            result.revision_instructions.extend(temporal_errors)
+            result.warnings.append("법령 개정 조문의 시행일과 계약 기준일이 일치하지 않아 법률 판단을 재검증해야 합니다.")
+            for error in temporal_errors:
+                logger.warning("[STATUTE_TEMPORAL] 시행일-사건일 불일치로 PASS 차단: %s", error)
+
         result.citation_audit = audit
 
         logger.info(
