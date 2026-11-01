@@ -146,6 +146,22 @@ def temporal_answer_errors(question: str, answer: str, sources: list[dict]) -> l
     target = find_contract_date(question)
     if not target:
         return errors
+    # 공포 후 유예된 개정의 적용 여부가 핵심이면 부칙 원문 없이는
+    # 어떤 방향의 단정도 검증 완료(PASS)로 표시하지 않는다.
+    amendment_question = "개정" in question and any(
+        term in question for term in ("시행령", "시행규칙", "법률", "개정법")
+    )
+    has_addendum_evidence = any(
+        s.get("source_type") == "STATUTE"
+        and (s.get("article") == "부칙" or "부칙" in str(s.get("title") or ""))
+        and bool(str(s.get("content") or "").strip())
+        for s in (sources or [])
+    )
+    if amendment_question and not has_addendum_evidence:
+        errors.append(
+            "개정 법령의 부칙(시행일·적용례) 원문이 검색 출처에 없습니다. "
+            "공포일만으로 계약일의 신법 적용 여부를 확정하지 마세요."
+        )
     positive = bool(re.search(
         r"시행일\s*이후|적용됩니다|적용된다|적용됩니다|포함해야\s*합니다|포함해야\s*한다",
         answer or "",
