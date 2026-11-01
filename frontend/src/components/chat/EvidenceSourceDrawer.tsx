@@ -118,12 +118,29 @@ export const EvidenceSourceDrawer: React.FC<EvidenceSourceDrawerProps> = ({
   const [claims, setClaims] = useState<EvidenceClaim[]>([]);
   const [loadingClaims, setLoadingClaims] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
+  const [showOtherClaims, setShowOtherClaims] = useState(false);
 
   // 대상 증거 문서 조회 (UUID 우선 -> 라벨/접두사 매핑)
   const matchedDoc = useMemo(
     () => findDocument(selectedEvidenceId, selectedLabel, evidenceDocuments),
     [selectedEvidenceId, selectedLabel, evidenceDocuments]
   );
+
+  // 사용자가 인용을 변경하면 원문 하이라이트와 펼침 상태도 초기화한다.
+  useEffect(() => {
+    setShowOtherClaims(false);
+  }, [isOpen, selectedEvidenceId, selectedClaimId, selectedSpanId, selectedLabel]);
+
+  const targetedClaim = useMemo(() => {
+    if (selectedClaimId) {
+      const found = claims.find((c) => c.id === selectedClaimId);
+      if (found && (!selectedSpanId || found.spans?.some((s) => s.id === selectedSpanId))) return found;
+      return null;
+    }
+    return selectedSpanId ? (claims.find((c) => c.spans?.some((s) => s.id === selectedSpanId)) || null) : null;
+  }, [claims, selectedClaimId, selectedSpanId]);
+  const hasPreciseTarget = Boolean(selectedClaimId || selectedSpanId);
+  const shownClaims = showOtherClaims ? claims : targetedClaim ? [targetedClaim] : claims.slice(0, 3);
 
   // ESC 키로 닫기 핸들러 등록
   useEffect(() => {
@@ -170,7 +187,7 @@ export const EvidenceSourceDrawer: React.FC<EvidenceSourceDrawerProps> = ({
     };
   }, [isOpen, matchedDoc, caseId]);
 
-  if (!isOpen && !selectedLabel && !selectedEvidenceId) {
+  if (!isOpen) {
     return null;
   }
 
@@ -229,7 +246,7 @@ export const EvidenceSourceDrawer: React.FC<EvidenceSourceDrawerProps> = ({
                   padding: '14px 16px',
                 }}
               >
-                <div style={{ fontWeight: 700, fontSize: '0.95em', color: '#1e293b', marginBottom: '8px', wordBreak: 'break-all' }}>
+                <div style={{ fontWeight: 700, fontSize: '0.95em', color: '#1e293b', marginBottom: '8px', overflowWrap: 'anywhere' }}>
                   📄 {matchedDoc.original_filename || matchedDoc.filename}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', fontSize: '0.8em', color: '#64748b' }}>
@@ -258,7 +275,7 @@ export const EvidenceSourceDrawer: React.FC<EvidenceSourceDrawerProps> = ({
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                   <h4 style={{ margin: 0, fontSize: '0.92em', fontWeight: 700, color: '#334155' }}>
-                    🔍 추출된 사실관계 및 원문 발췌 ({claims.length}건)
+                    🔍 {targetedClaim ? '선택한 인용의 근거 원문' : '추출된 사실관계 및 원문 발췌'} ({claims.length}건)
                   </h4>
                 </div>
 
@@ -277,8 +294,16 @@ export const EvidenceSourceDrawer: React.FC<EvidenceSourceDrawerProps> = ({
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {claims.map((claim) => {
-                      const isClaimActive = Boolean(selectedClaimId && claim.id === selectedClaimId);
+                    {hasPreciseTarget && !targetedClaim && (
+                      <div className="chat-evidence-missing-span" role="status">
+                        선택한 주장 또는 원문 위치를 찾지 못했습니다. 다른 내용을 임의의 근거로 표시하지 않습니다.
+                      </div>
+                    )}
+                    {targetedClaim && (
+                      <div className="chat-evidence-focus-label">선택한 상담 인용에 연결된 추출 내용</div>
+                    )}
+                    {shownClaims.map((claim) => {
+                      const isClaimActive = Boolean(targetedClaim && claim.id === targetedClaim.id);
                       const hasSpans = claim.spans && claim.spans.length > 0;
                       return (
                         <div
@@ -314,7 +339,10 @@ export const EvidenceSourceDrawer: React.FC<EvidenceSourceDrawerProps> = ({
                           {/* 원문 발췌 스팬 */}
                           {hasSpans ? (
                             <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                              {claim.spans.map((span) => {
+                              {[...claim.spans].sort((a, b) =>
+                                Number(Boolean(selectedSpanId && b.id === selectedSpanId && isClaimActive)) -
+                                Number(Boolean(selectedSpanId && a.id === selectedSpanId && isClaimActive))
+                              ).map((span) => {
                                 const isSpanActive = Boolean(selectedSpanId && span.id === selectedSpanId);
                                 return (
                                   <div
@@ -343,6 +371,20 @@ export const EvidenceSourceDrawer: React.FC<EvidenceSourceDrawerProps> = ({
                         </div>
                       );
                     })}
+                    {!showOtherClaims && claims.length > shownClaims.length && (
+                      <button
+                        type="button"
+                        className="chat-evidence-more"
+                        onClick={() => setShowOtherClaims(true)}
+                      >
+                        문서의 다른 추출 사실 {claims.length - shownClaims.length}건 보기 ▾
+                      </button>
+                    )}
+                    {showOtherClaims && claims.length > (targetedClaim ? 1 : 3) && (
+                      <button type="button" className="chat-evidence-more" onClick={() => setShowOtherClaims(false)}>
+                        다른 추출 사실 접기 ▴
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

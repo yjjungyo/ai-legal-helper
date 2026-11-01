@@ -9,10 +9,11 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import type { ConsultationResponse, Source } from '../../types/consultation';
+import type { ConsultationResponse } from '../../types/consultation';
 import { LegalAnswerView } from '../LegalAnswerView';
 import { VerifiedPresentationView } from '../VerifiedPresentationView';
 import { ConsultationProgress } from './ConsultationProgress';
+import { ConsultationSources } from './ConsultationSources';
 
 export interface AssistantMessageProps {
   /** 렌더링할 어시스턴트 메시지 데이터 */
@@ -205,103 +206,8 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
                 />
               )}
 
-              {/* 하단 인용 출처 목록 배지 (중복 최소화 및 자연스러운 표시) */}
               {message.sources && message.sources.length > 0 && (
-                <div
-                  style={{
-                    marginTop: '16px',
-                    paddingTop: '12px',
-                    borderTop: '1px solid #f1f5f9',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  <span style={{ fontSize: '0.76em', color: '#64748b', fontWeight: 600 }}>
-                    📚 참고 출처:
-                  </span>
-                  {(() => {
-                    const seenDisplays = new Set<string>();
-                    return message.sources.map((s: Source, idx: number) => {
-                      const sid = s.source_id || s.document_id || s.file || `SRC-${idx + 1}`;
-                      const fileCandidate = s.original_filename || s.document_name || s.filename || s.file_name || s.file || '';
-                      const rawDocName = /^(EVIDENCE:|GRAPH:|VECTOR:|UNKNOWN$|\\?$)/i.test(fileCandidate) ? '' : fileCandidate;
-                      const isEv =
-                        s.source_type === 'CASE_EVIDENCE' ||
-                        Boolean(s.evidence_id) ||
-                        /^E\d{1,3}_/i.test(rawDocName) ||
-                        /^E\d{1,3}_/i.test(sid);
-
-                      let displayName = (isEv ? (rawDocName || '파일명 확인 필요') : (rawDocName || s.title || sid)).trim();
-                      const isStatute = s.source_type === 'STATUTE' || Boolean(s.statute_name) || Boolean(s.article);
-
-                      if (!isEv && isStatute) {
-                        const lawName = (s.statute_name || s.title || rawDocName || sid)
-                          .split('[')[0]
-                          .replace(/\.pdf$/i, '')
-                          .trim();
-                        const artMatch = (s.article || sid || s.title || s.content || '').match(/(제\s*\d+\s*조(?:\s*의\s*\d+)?)/);
-                        const artStr = (s.article || (artMatch ? artMatch[1] : '')).replace(/\s+/g, '');
-                        const titleMatch = (s.article_title || s.title || s.content || '').match(/제\s*\d+\s*조(?:\s*의\s*\d+)?\s*\(([^)\n]{1,50})\)/);
-                        const artTitle = (s.article_title || (titleMatch ? titleMatch[1] : '')).trim();
-
-                        let artDisplay = artStr;
-                        if (artStr && artTitle && !artStr.includes('(')) {
-                          artDisplay = `${artStr}(${artTitle})`;
-                        }
-
-                        // STEP 6: 긴 공포번호 나열 대신 간결한 법령명 + 조문명으로 표시
-                        displayName = artDisplay && !lawName.includes(artStr) ? `${lawName} ${artDisplay}` : lawName;
-                      } else if (!isEv && (s.source_type === 'PRECEDENT' || s.case_number)) {
-                        displayName = [s.court, s.case_number].filter(Boolean).join(' ') || displayName;
-                      }
-
-                      // 동일한 법령·조문 또는 증거 표시명의 중복 배지 렌더링 방지 (지시서 6.4 E)
-                      const dedupKey = `${isEv ? 'EV' : 'LAW'}:${displayName}`;
-                      if (seenDisplays.has(dedupKey)) return null;
-                      seenDisplays.add(dedupKey);
-
-                      const canOpenEvidence = isEv && Boolean(s.evidence_id || rawDocName);
-                      const tooltipLines = isEv
-                        ? [`증거 문서: ${displayName}`]
-                        : [`참고 법령: ${displayName}`, s.content ? s.content.slice(0, 200) : ''].filter(Boolean);
-
-                      return (
-                        <button
-                          key={idx}
-                          type="button"
-                          disabled={!canOpenEvidence && !s.source_url}
-                          onClick={() => {
-                            if (canOpenEvidence) {
-                              onEvidenceClick(displayName, {
-                                evidenceId: s.evidence_id || undefined,
-                                claimId: s.claim_id || undefined,
-                                spanId: s.span_id || undefined,
-                              });
-                            } else if (s.source_url) {
-                              window.open(s.source_url, '_blank', 'noopener,noreferrer');
-                            }
-                          }}
-                          title={tooltipLines.join('\n')}
-                          style={{
-                            fontSize: '0.76em',
-                            padding: '3px 9px',
-                            borderRadius: '6px',
-                            fontWeight: 500,
-                            backgroundColor: isEv ? '#fef3c7' : '#eff6ff',
-                            color: isEv ? '#92400e' : '#1e40af',
-                            border: `1px solid ${isEv ? '#fde68a' : '#bfdbfe'}`,
-                            cursor: canOpenEvidence || s.source_url ? 'pointer' : 'default',
-                            transition: 'background-color 0.15s ease',
-                          }}
-                        >
-                          {isEv ? `📄 ${displayName}` : `⚖️ ${displayName}`}
-                        </button>
-                      );
-                    });
-                  })()}
-                </div>
+                <ConsultationSources sources={message.sources} onEvidenceClick={onEvidenceClick} />
               )}
             </div>
           ) : null}
