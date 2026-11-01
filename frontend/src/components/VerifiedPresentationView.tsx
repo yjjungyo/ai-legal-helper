@@ -1,75 +1,87 @@
 /**
- * P3: 검증된 원문 블록을 순서 그대로 표시한다.
- * 결론·주의·행동은 펼친 상태, 선택적인 상세 근거는 접근성 있는 버튼으로 접는다.
- * 문자열 재요약·재배치·상태 재판정은 이 컴포넌트에서 하지 않는다.
+ * 모바일에서도 1화면 안에서 법률 판단의 방향과 다음 확인 항목을 읽도록 구성한다.
+ * 안내 카드의 모든 문장은 검증을 통과한 최종 답변에서 그대로 발췌한다.
+ * 인용 버튼은 기존의 정확한 evidenceId/claimId/spanId 매핑을 재사용한다.
  */
-import { useState } from 'react';
 import type { ClaimCitation, ConsultationPresentation } from '../types/consultation';
-import { LegalAnswerView } from './LegalAnswerView';
+import { LegalAnswerView, renderInlineMarkdown } from './LegalAnswerView';
 import type { CitationMeta } from './LegalAnswerView';
-import { shouldCollapsePresentationBlock } from './presentationLayout';
+import { buildConsultationDigest, splitAnswerForDisplay } from './consultationDigest';
 
 interface Props {
-  presentation: ConsultationPresentation;
+  presentation?: ConsultationPresentation | null;
+  answer?: string;
+  isVerified?: boolean;
   claimCitations?: ClaimCitation[];
   onEvidenceClick?: (label: string, meta?: CitationMeta) => void;
 }
 
-export const VerifiedPresentationView = ({ presentation, claimCitations, onEvidenceClick }: Props) => {
-  const [opened, setOpened] = useState<Record<string, boolean>>({});
+export const VerifiedPresentationView = ({
+  presentation, answer, isVerified = false, claimCitations, onEvidenceClick,
+}: Props) => {
+  // 현재 원문과 완전히 같은 verified presentation만 사용한다.
+  // 조건부 상담이나 구 이력은 표시 전용 파서로 구간만 추출하며, 검증 데이터로 저장하지 않는다.
+  const fullAnswer = answer ?? presentation?.blocks.map(b => b.markdown).join('') ?? '';
+  const verifiedBlocks = presentation && presentation.blocks.map(b => b.markdown).join('') === fullAnswer
+    ? presentation.blocks : null;
+  const displayBlocks = verifiedBlocks || splitAnswerForDisplay(fullAnswer);
+  const digest = buildConsultationDigest({blocks: displayBlocks});
+
+  // 명시적인 결론/요약이 없는 답변에는 임의의 '핵심 결론'을 붙이지 않는다.
+  if (!digest.lead && digest.sections.length === 0) {
+    return (
+      <div className="chat-verified-fallback">
+        <LegalAnswerView content={digest.fullAnswer} claimCitations={claimCitations} onEvidenceClick={onEvidenceClick} />
+      </div>
+    );
+  }
 
   return (
-    <div className="chat-presentation" data-presentation-version={presentation.schema_version}>
-      {presentation.blocks.map((block, index) => {
-        const collapsible = shouldCollapsePresentationBlock(block, index);
-        const expanded = !collapsible || (opened[block.block_id] ?? false);
-        const toggle = () => setOpened((prev) => ({ ...prev, [block.block_id]: !expanded }));
-        const panelId = `presentation-panel-${block.block_id}`;
-        return (
-          <section
-            key={block.block_id}
-            className={`chat-presentation-block chat-presentation-${block.kind.toLowerCase()}`}
-            data-block-id={block.block_id}
-          >
-            {collapsible && !expanded && (
-              <button
-                type="button"
-                className="chat-presentation-disclosure"
-                aria-expanded={false}
-                aria-controls={panelId}
-                onClick={toggle}
-              >
-                <span className="chat-presentation-disclosure-name">{block.title || '상세 내용'}</span>
-                <span className="chat-presentation-disclosure-action">상세 보기 ▾</span>
-              </button>
-            )}
-            {collapsible && expanded && (
-              <div className="chat-presentation-collapse-row">
-                <button
-                  type="button"
-                  className="chat-presentation-collapse-button"
-                  aria-expanded={true}
-                  aria-controls={panelId}
-                  onClick={toggle}
-                >
-                  상세 접기 ▴
-                </button>
-              </div>
-            )}
-            <div id={panelId} hidden={!expanded}>
-              {expanded && (
-                <>
-                  <LegalAnswerView
-                    content={block.markdown}
-                    claimCitations={claimCitations}
-                    onEvidenceClick={onEvidenceClick}
-                  />
-                </>
-              )}
-            </div>
-          </section>
-        );
-      })}
+    <div className="chat-consultation-digest" data-presentation-version={verifiedBlocks ? presentation?.schema_version : 'display-only'}>
+      {digest.lead && (
+        <section className="chat-digest-lead" aria-label="상담 핵심 답변">
+          <div className="chat-digest-eyebrow">
+            <span className="chat-digest-eyebrow-dot" aria-hidden="true" />
+            상담 핵심 답변
+            <span className="chat-digest-original-note">{isVerified && verifiedBlocks ? '검증된 답변 원문 발췌' : '상담 답변 원문 발췌'}</span>
+          </div>
+          <div className="chat-digest-lead-text">
+            <LegalAnswerView content={digest.lead} claimCitations={claimCitations} onEvidenceClick={onEvidenceClick} />
+          </div>
+        </section>
+      )}
+
+      {digest.sections.length > 0 && (
+        <div className="chat-digest-grid" aria-label="상담 중요 항목">
+          {digest.sections.map((section) => (
+            <section className={`chat-digest-summary chat-digest-${section.kind}`} key={section.kind}>
+              <h3 className="chat-digest-summary-title">{section.title}</h3>
+              <ul className="chat-digest-summary-list">
+                {section.items.map((item, index) => (
+                  <li key={index}>
+                    {renderInlineMarkdown(item, onEvidenceClick, claimCitations, item)}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      )}
+
+      <details className="chat-digest-full-answer">
+        <summary>
+          <span className="chat-digest-expand-icon" aria-hidden="true">▸</span>
+          <span className="chat-digest-expand-title">전체 법률 분석 자세히 보기</span>
+          <span className="chat-digest-expand-hint">사실관계 · 법률 판단 · 증거별 근거</span>
+        </summary>
+        <div className="chat-digest-full-content">
+          <LegalAnswerView
+            content={digest.fullAnswer}
+            claimCitations={claimCitations}
+            onEvidenceClick={onEvidenceClick}
+          />
+        </div>
+      </details>
     </div>
   );
 };

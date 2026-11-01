@@ -36,7 +36,7 @@ jobs:
         run: npm run build
         working-directory: frontend
       - name: Presentation regression
-        run: node --test tests/legal-answer-view.test.cjs tests/presentation-layout.test.cjs tests/consultation-sources.test.cjs tests/presentation-semantics.test.cjs tests/consultation-reader-ui.test.cjs
+        run: node --test tests/legal-answer-view.test.cjs tests/presentation-layout.test.cjs tests/consultation-sources.test.cjs tests/presentation-semantics.test.cjs tests/consultation-reader-ui.test.cjs tests/consultation-digest.test.cjs
         working-directory: frontend
   backend:
     runs-on: ubuntu-latest
