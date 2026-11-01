@@ -85,7 +85,7 @@ const mockLegal = {
 };
 const { VerifiedPresentationView } = transpileFile('VerifiedPresentationView.tsx', {
   './LegalAnswerView': mockLegal,
-  './consultationDigest': {buildConsultationDigest},
+  './consultationDigest': {buildConsultationDigest, splitAnswerForDisplay},
 });
 
 test('초기 화면은 요약을 표시하고 전체 분석은 기본 닫힘 details 안에 둔다', () => {
