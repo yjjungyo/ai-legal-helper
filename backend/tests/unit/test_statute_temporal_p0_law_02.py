@@ -124,3 +124,18 @@ def test_wrong_law_addendum_not_attached(monkeypatch):
     """공포번호가 다르면 임의로 다른 법령의 부칙을 붙이지 않는다."""
     root = _api_payload()
     assert extract_addenda(root, "36795") == []
+
+
+def test_amendment_answer_cannot_pass_without_official_addenda():
+    """조문만 확보하고 부칙을 누락했다면 긍정·부정 결론 모두 검증 보류."""
+    source = {"source_type": "STATUTE", "statute_name": "민간임대주택에 관한 특별법 시행령",
+              "article": "제36조", "effective_date": "2026-10-27",
+              "content": "제36조(임대차계약의 신고)"}
+    assert "부칙" in " ".join(temporal_answer_errors(QUESTION, BAD_ANSWER, [source]))
+    assert "부칙" in " ".join(temporal_answer_errors(QUESTION, GOOD_ANSWER, [source]))
+
+
+def test_question_without_contract_date_has_no_false_conflict():
+    """날짜가 없는 일반 법령 설명 질의는 이전 응답을 회귀시키지 않는다."""
+    question = "민법 제6조는 무슨 뜻인가요?"
+    assert temporal_answer_errors(question, "민법 제6조에 해당합니다.", []) == []
