@@ -162,6 +162,15 @@ def temporal_answer_errors(question: str, answer: str, sources: list[dict]) -> l
             "개정 법령의 부칙(시행일·적용례) 원문이 검색 출처에 없습니다. "
             "공포일만으로 계약일의 신법 적용 여부를 확정하지 마세요."
         )
+    if amendment_question and has_addendum_evidence and not any(
+        (s.get("article") == "부칙" or "부칙" in str(s.get("title") or ""))
+        and parse_date(s.get("effective_date"))
+        for s in (sources or [])
+    ):
+        errors.append(
+            "부칙 원문은 확보했지만 시행일을 구조화하여 확정하지 못했습니다. "
+            "부칙의 원문·예외·적용례를 확인하기 전 적용 여부를 단정하지 마세요."
+        )
     positive = bool(re.search(
         r"시행일\s*이후|적용됩니다|적용된다|적용됩니다|포함해야\s*합니다|포함해야\s*한다",
         answer or "",
