@@ -374,7 +374,11 @@ def main():
     parser = argparse.ArgumentParser(description="Langfuse Trace 정량 지표 비교 및 평가 보고서 생성 도구")
     parser.add_argument("base_trace_id", help="기준(이전) Langfuse Trace UUID")
     parser.add_argument("target_trace_id", help="비교(개선) Langfuse Trace UUID")
-    parser.add_argument("-o", "--output", help="마크다운 보고서 저장 경로 (생략 시 콘솔 출력)")
+    parser.add_argument(
+        "-o",
+        "--output",
+        help="마크다운 보고서 저장 경로 (생략 시 docs/evaluation/kpi/ 기본 저장)",
+    )
     parser.add_argument("-t", "--title", default="Trace 비교 평가 보고서", help="보고서 제목")
 
     args = parser.parse_args()
@@ -392,14 +396,21 @@ def main():
 
     report = generate_markdown_report(m1, m2, title=args.title)
 
+    default_kpi_dir = project_root / "docs" / "evaluation" / "kpi"
     if args.output:
         out_path = Path(args.output)
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(out_path, "w", encoding="utf-8") as f:
-            f.write(report)
-        print(f"[SUCCESS] 비교 보고서가 성공적으로 생성되었습니다: {out_path}")
+        if not out_path.is_absolute() and len(out_path.parts) == 1:
+            # 파일명만 지정한 경우 docs/evaluation/kpi/ 하위에 저장
+            out_path = default_kpi_dir / out_path
     else:
-        print("\n" + report)
+        # 생략 시 docs/evaluation/kpi/ 하위에 자동 파일명으로 저장
+        filename = f"TRACE_COMPARISON_{args.base_trace_id[:8]}_VS_{args.target_trace_id[:8]}.md"
+        out_path = default_kpi_dir / filename
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(report)
+    print(f"[SUCCESS] 비교 보고서가 성공적으로 저장되었습니다: {out_path}")
 
 
 if __name__ == "__main__":

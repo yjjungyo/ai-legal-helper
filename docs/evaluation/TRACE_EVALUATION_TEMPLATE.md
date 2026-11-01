@@ -88,9 +88,12 @@
 ---
 
 ### [참고] 자동 비교 보고서 생성 방법
-다음 CLI 명령을 통해 위 마크다운 보고서를 1초 만에 자동 생성할 수 있습니다:
+다음 CLI 명령을 통해 위 마크다운 보고서를 1초 만에 `docs/evaluation/kpi/` 폴더에 자동 생성할 수 있습니다:
 ```bash
-# 사용법: python scripts/evaluation/compare_traces.py <이전_TRACE_ID> <개선_TRACE_ID> -o <출력파일_경로>
-python scripts/evaluation/compare_traces.py <BASE_TRACE_ID> <TARGET_TRACE_ID> -o docs/evaluation/TRACE_COMPARISON_REPORT.md
+# 기본 사용법 (-o 생략 시 docs/evaluation/kpi/에 자동 저장):
+python scripts/evaluation/compare_traces.py <이전_TRACE_ID> <개선_TRACE_ID>
+
+# 파일명을 지정할 때 (docs/evaluation/kpi/ 폴더 하위에 저장):
+python scripts/evaluation/compare_traces.py <BASE_TRACE_ID> <TARGET_TRACE_ID> -o TRACE_COMPARISON_REPORT.md
 ```
 
