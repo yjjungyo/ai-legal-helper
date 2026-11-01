@@ -807,3 +807,98 @@
 .chat-historical-evidence { padding:12px 14px; border:1px solid #fde68a; background:#fffbeb; border-radius:9px; color:#78350f; font-size:.89em; overflow-wrap:anywhere; }
 .chat-historical-evidence blockquote { margin:9px 0 0; background:white; border-left:3px solid #f59e0b; padding:9px 12px; white-space:pre-wrap; overflow-wrap:anywhere; }
 @media (max-width:768px) { .chat-answer-comparison { margin-left:0; } .chat-answer-comparison-grid { grid-template-columns:1fr; } }
+
+
+/* P5 reader-first consultation display: legal answer is the focus, not pipeline chrome. */
+.case-chat-stream { scroll-behavior: auto; background: #f7f9fc; }
+.case-chat-stream-inner { max-width: 960px; gap: 26px; }
+.chat-assistant-container { gap: 13px; align-items: flex-start; }
+.chat-assistant-body { gap: 10px; }
+.chat-assistant-header { padding: 0 2px 2px; min-height: 27px; }
+.chat-assistant-author { color: #17253e; font-size: .95em; }
+.chat-assistant-avatar {
+  box-shadow: none; background: #21344f; border-radius: 11px;
+  width: 34px; height: 34px;
+}
+.chat-assistant-card {
+  border: 1px solid #e5eaf1; border-radius: 14px;
+  background: #fff; padding: 22px 26px 14px !important;
+  box-shadow: 0 3px 14px rgba(20,36,62,.035);
+}
+/* The answer's first paragraph is foregrounded, but not an oversized blue panel. */
+.chat-presentation { gap: 0; }
+.chat-presentation-block { padding: 0; }
+.chat-presentation-block + .chat-presentation-block { margin-top: 0; }
+.chat-presentation-lead {
+  background: #f5f8fd; border: 0; border-left: 3px solid #315ed5;
+  border-radius: 7px; padding: 14px 18px !important;
+  margin: 0 0 23px; font-size: 1.025em;
+}
+.chat-presentation-lead strong { color: #15243d; }
+.chat-presentation-section { margin-top: 0; }
+.chat-presentation-section + .chat-presentation-section { margin-top: 0; }
+.chat-legal-answer {
+  display: flex; flex-direction: column; gap: 0;
+  color: #233148; font-size: .96rem; line-height: 1.78;
+  min-width: 0; overflow-wrap: anywhere;
+}
+.chat-legal-section { min-width: 0; margin: 0; }
+.chat-legal-section.has-heading { margin: 22px 0 0; }
+.chat-legal-section.has-heading:first-child { margin-top: 0; }
+.chat-legal-section.plain + .chat-legal-section.plain { margin-top: 6px; }
+.chat-legal-heading {
+  margin: 0 0 11px; padding: 0;
+  color: #18263b; font-size: 1.055rem; line-height: 1.4;
+  font-weight: 760; letter-spacing: -.016em;
+  border: 0; display: block;
+}
+.chat-legal-section.action-section .chat-legal-heading { color: #176346; }
+.chat-legal-content { color: #334155; font-size: .95em; line-height: 1.78; }
+.chat-legal-content > div:first-child { margin-top: 0 !important; }
+.chat-legal-content > div:last-child { margin-bottom: 0 !important; }
+.chat-legal-answer p, .chat-legal-answer span { overflow-wrap: anywhere; }
+.chat-legal-answer strong { font-weight: 700; }
+.chat-legal-answer .chat-evidence-tag {
+  display: inline; padding: 1px 4px; margin: 0 2px; font: inherit;
+  font-size: .86em; line-height: inherit; font-weight: 600;
+  vertical-align: baseline; white-space: normal; overflow-wrap: anywhere;
+  background: #eff5ff; border: 1px solid #d4e3fc;
+  color: #2356ba; border-radius: 4px; box-shadow: none;
+}
+.chat-legal-answer .chat-evidence-tag:hover {
+  transform: none; box-shadow: none; background: #e1edff; border-color: #a7c4f3;
+}
+.chat-sources-details { margin-top: 24px; border-top: 1px solid #e8edf4; }
+.chat-sources-summary { padding: 12px 2px 6px; font-size: .82em; color: #52647b; }
+.chat-sources-counts { color: #8491a3; }
+.chat-progress-audit { margin-top: 9px; border-top: 1px solid #f1f4f8; }
+.chat-progress-audit > summary {
+  padding: 12px 2px 3px; color: #758396; font-size: .78rem;
+  cursor: pointer; list-style: none; width: fit-content;
+}
+.chat-progress-audit > summary::-webkit-details-marker { display: none; }
+.chat-progress-audit > summary::before { content: "▸"; margin-right: 7px; color: #94a3b8; }
+.chat-progress-audit[open] > summary::before { content: "▾"; }
+.chat-progress-audit > summary span { margin-left: 5px; color: #94a3b8; }
+.chat-progress-audit > summary:focus-visible { outline: 2px solid #2563eb; outline-offset: 3px; border-radius: 3px; }
+.chat-progress-audit-steps { padding: 10px 0 4px; }
+.chat-progress-audit-step {
+  display: flex; align-items: center; gap: 11px; padding: 7px 2px;
+  font-size: .8rem; color: #475569; border-bottom: 1px solid #f5f7fa;
+}
+.chat-progress-audit-status { margin-left: auto; color: #64748b; font-size: .88em; }
+.chat-progress-card { padding: 16px 18px; box-shadow: none; }
+.chat-progress-step-item.completed { background: #f8fbfa; border-color: #e4efe9; }
+.chat-progress-steps-list { gap: 6px; }
+.chat-legal-section.action-section { border: 0; }
+.chat-presentation-disclosure { margin: 12px 0 0; font-size: .88em; box-shadow: none; }
+@media (max-width: 768px) {
+  .case-chat-stream { padding: 16px 10px; }
+  .case-chat-stream-inner { gap: 18px; }
+  .chat-assistant-container { gap: 9px; }
+  .chat-assistant-avatar { width: 29px; height: 29px; font-size: .94em; }
+  .chat-assistant-card { padding: 15px 13px 12px !important; }
+  .chat-legal-answer { font-size: .92rem; }
+  .chat-legal-heading { font-size: 1rem; }
+  .chat-presentation-lead { padding: 12px 12px !important; font-size: 1em; margin-bottom: 15px; }
+}

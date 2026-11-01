@@ -4,7 +4,7 @@
  * 실시간 상태(RUNNING, COMPLETED, WAITING_APPROVAL, SKIPPED, FAILED)를 단계별 체크리스트로 시각화합니다.
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import type { ConsultationProgress as IConsultationProgress, ConsultationStep, ApprovalRequest } from '../../types/consultation';
 
 export interface ConsultationProgressProps {
@@ -83,19 +83,13 @@ export const ConsultationProgress: React.FC<ConsultationProgressProps> = ({
   isCompleted = false,
 }) => {
   const completedMode = isCompleted || status === 'SUCCESS';
-  // 상담 완료 시 6단계 검증 카드는 한 줄 요약 카드로 기본 자동 접기, 진행 중일 때는 단계별 펼침
-  const [isExpanded, setIsExpanded] = useState(!completedMode);
+  // Native <details> always starts closed on transition to completed,
+  // even if the active analysis was previously expanded.
 
   // 서버로부터 전달받은 단계 목록이 있으면 사용하고, 없으면 기본 목록에 상태 보정
   let steps = progress?.steps && progress.steps.length > 0 ? progress.steps : DEFAULT_STEPS;
 
-  if (completedMode) {
-    // 최종 완료 상태에서는 모든 단계가 완료된 상태로 단정하게 보이도록 보정
-    steps = steps.map((s) => ({
-      ...s,
-      status: s.status === 'PENDING' || s.status === 'RUNNING' ? 'COMPLETED' : s.status,
-    }));
-  } else if (status === 'APPROVAL_REQUIRED') {
+  if (!completedMode && status === 'APPROVAL_REQUIRED') {
     // HILT 승인 대기 상태인 경우 5번째 단계를 WAITING_APPROVAL로 보정
     steps = steps.map((s) => {
       if (s.step_id === 'STATUTE_APPROVAL') {
@@ -110,9 +104,34 @@ export const ConsultationProgress: React.FC<ConsultationProgressProps> = ({
 
   const isApprovalWaiting = status === 'APPROVAL_REQUIRED';
 
+  // Completed consultations: process steps are secondary audit data.
+  // Never claim a skipped, failed or pending step was completed.
+  if (completedMode) {
+    return (
+      <details className="chat-progress-audit">
+        <summary>상담 처리 과정 확인 <span>{steps.length}개 단계</span></summary>
+        <div className="chat-progress-audit-steps">
+          {steps.map((step) => (
+            <div className="chat-progress-audit-step" key={step.step_id}>
+              <span>{renderStepIcon(step.status)}</span>
+              <span>{step.step_name || step.title}</span>
+              <span className="chat-progress-audit-status">
+                {step.status === 'COMPLETED' ? '완료' :
+                 step.status === 'SKIPPED' ? '건너뜀' :
+                 step.status === 'FAILED' ? '실패' :
+                 step.status === 'WAITING_APPROVAL' ? '승인 대기' :
+                 step.status === 'RUNNING' ? '진행 중' : '대기'}
+              </span>
+            </div>
+          ))}
+        </div>
+      </details>
+    );
+  }
+
   return (
     <div
-      className={`chat-progress-card ${completedMode ? 'completed' : ''} ${isExpanded ? 'expanded' : 'collapsed'}`}
+      className="chat-progress-card"
       role="status"
       aria-live="polite"
     >
@@ -153,22 +172,12 @@ export const ConsultationProgress: React.FC<ConsultationProgressProps> = ({
               : progress?.current_step_name || progress?.current_step || (isApprovalWaiting ? 'HILT 법령 검색 승인' : '증거 교차 검증')}
           </span>
 
-          {completedMode && (
-            <button
-              type="button"
-              onClick={() => setIsExpanded(!isExpanded)}
-              className="btn btn-secondary btn-sm"
-              style={{ padding: '2px 8px', fontSize: '0.74em', color: '#475569' }}
-              title={isExpanded ? '진행과정 접기' : '진행과정 펼치기'}
-            >
-              {isExpanded ? '▲ 진행과정 접기' : '▼ 진행과정 보기'}
-            </button>
-          )}
+
         </div>
       </div>
 
       {/* 6단계 진행 리스트 (펼침 상태이거나 분석 중일 때 단계별로 시각화) */}
-      {(!completedMode || isExpanded) && (
+      {!completedMode && (
         <div className="chat-progress-steps-list">
           {steps.map((step) => {
             const statusClass = step.status.toLowerCase();

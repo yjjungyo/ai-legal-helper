@@ -186,7 +186,7 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
           </div>
 
           {/* 콘텐츠 영역: 6단계 진행과정 추적 카드 (진행 중일 때는 실시간 단계별 진행 표시, 완료 시 접기/펼치기 카드로 보존) */}
-          {(isRunningOrApproval || message.progress || message.status === 'SUCCESS' || message.answer) && !isFailed && (
+          {isRunningOrApproval && !isFailed && (
             <ConsultationProgress
               progress={message.progress}
               status={message.status}
@@ -271,6 +271,16 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
 
               {message.sources && message.sources.length > 0 && (
                 <ConsultationSources sources={message.sources} onEvidenceClick={handleSourceClick} />
+              )}
+              {message.status === 'SUCCESS' && message.progress && (
+                <ConsultationProgress
+                  progress={message.progress}
+                  status={message.status}
+                  onApprove={onApprove}
+                  onReject={onReject}
+                  requestId={message.request_id}
+                  isCompleted
+                />
               )}
             </div>
           ) : null}

@@ -4,7 +4,7 @@
  * 삽입하며, 신규 메시지 수신 및 진행 상태 갱신 시 부드러운 하단 자동 스크롤을 유지합니다.
  */
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import type { ConsultationResponse } from '../../types/consultation';
 import { ChatDateDivider } from './ChatDateDivider';
 import { ChatMessage } from './ChatMessage';
@@ -84,20 +84,12 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const isFollowingRef = useRef(true);
   const previousLastRequestRef = useRef<string | null>(null);
-  const [showJump, setShowJump] = useState(false);
 
   const handleScroll = () => {
     const container = containerRef.current;
     if (!container) return;
     const nearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
     isFollowingRef.current = nearBottom;
-    setShowJump(!nearBottom);
-  };
-
-  const jumpLatest = () => {
-    isFollowingRef.current = true;
-    setShowJump(false);
-    containerRef.current?.scrollTo({ top: containerRef.current.scrollHeight, behavior: 'auto' });
   };
 
   // 사용자 스크롤을 존중: 답변을 읽고 있을 때 단계 폴링이 화면을 아래로 끌어내리지 않는다.
@@ -203,11 +195,6 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
         })}
         <div ref={bottomAnchorRef} style={{ height: '4px' }} />
       </div>
-      {showJump && (
-        <button type="button" className="chat-jump-latest" onClick={jumpLatest}>
-          ↓ 최신 메시지
-        </button>
-      )}
     </main>
   );
 };

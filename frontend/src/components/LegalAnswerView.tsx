@@ -255,7 +255,7 @@ export function renderInlineMarkdown(
 function renderFormattedLine(line: string, index: number, onEvidenceClick?: (label: string, meta?: CitationMeta) => void, claimCitations?: ClaimCitation[]): React.ReactNode {
   const trimmed = line.trim();
   if (!trimmed) {
-    return <div key={index} style={{ height: '6px' }} />;
+    return null;
   }
 
   // 1. 불릿 목록 (- 또는 • 또는 *)
@@ -386,8 +386,8 @@ function renderFormattedLine(line: string, index: number, onEvidenceClick?: (lab
     <div
       key={index}
       style={{
-        margin: '8px 0',
-        lineHeight: 1.74,
+        margin: '4px 0',
+        lineHeight: 1.78,
         wordBreak: 'keep-all',
       }}
     >
@@ -443,7 +443,9 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
     const bracketMatch = trimmed.match(/^\[(.+)\]$/);
     const mdHeaderMatch = trimmed.match(/^#{1,4}\s*(.+)$/);
 
-    if (bracketMatch) {
+    if (bracketMatch
+        && !/^E\d{1,3}(?:$|[_.\s-])/i.test(bracketMatch[1])
+        && !/\.(?:pdf|docx|txt|png|jpg|jpeg)$/i.test(bracketMatch[1])) {
       detectedTitle = bracketMatch[1];
     } else if (mdHeaderMatch) {
       detectedTitle = mdHeaderMatch[1].replace(/^\*\*|\*\*$/g, ''); // 볼드 감싸진 헤더 정제
@@ -472,7 +474,7 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', lineHeight: 1.65 }}>
+    <div className="chat-legal-answer">
       {sections.map((sec, idx) => {
         // 1. 구분선
         if (sec.title === '__DIVIDER__') {
@@ -656,43 +658,19 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
         const isAction = sec.type === 'action';
 
         return (
-          <div
+          <section
             key={idx}
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '4px',
-              marginTop: hasTitle && idx > 0 ? '14px' : '0',
-            }}
+            className={`chat-legal-section ${hasTitle ? 'has-heading' : 'plain'} ${isAction ? 'action-section' : ''}`}
           >
             {hasTitle && (
-              <h3
-                style={{
-                  margin: '8px 0 6px 0',
-                  fontSize: '1.04em',
-                  fontWeight: 700,
-                  color: isAction ? '#15803d' : '#1e293b',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  lineHeight: 1.4,
-                  borderBottom: '1px solid #f1f5f9',
-                  paddingBottom: '4px',
-                }}
-              >
+              <h3 className="chat-legal-heading">
                 <span>{sec.title}</span>
               </h3>
             )}
-            <div
-              style={{
-                fontSize: '0.94em',
-                color: 'var(--text-main, #1e293b)',
-                lineHeight: 1.74,
-              }}
-            >
+            <div className="chat-legal-content">
               {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx, onEvidenceClick, claimCitations))}
             </div>
-          </div>
+          </section>
         );
 
       })}
