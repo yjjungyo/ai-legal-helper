@@ -229,6 +229,9 @@ class ConsultationResponse(BaseModel):
     answer: Optional[str] = None
     # 검증 완료 답변의 손실 없는 화면용 구조. 기존 answer/sources는 하위 호환 유지.
     presentation: Optional[ConsultationPresentation] = None
+    # 내부 보관: 기존 API 계약을 바꾸지 않도록 snapshot 전체는 응답 직렬화에서 제외
+    presentation_snapshot: Optional[Dict[str, Any]] = Field(default=None, exclude=True)
+    presentation_origin: Optional[str] = None  # FROZEN | LEGACY_REBUILT | INVALID_SNAPSHOT | UNAVAILABLE
     sources: List[Source] = []
     elapsed_ms: Optional[float] = None
     usage_summary: Optional[UsageSummary] = None

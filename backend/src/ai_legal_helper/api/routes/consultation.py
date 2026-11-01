@@ -158,16 +158,43 @@ def _parse_or_build_progress(
     return None
 
 
-def _attach_presentation(resp: ConsultationResponse) -> ConsultationResponse:
-    """표시 데이터는 검증 완료된 answer에서만 결정론적으로 생성한다.
+def _attach_presentation(
+    resp: ConsultationResponse, source_records: Optional[List[Dict[str, Any]]] = None,
+) -> ConsultationResponse:
+    """Prefer the exact frozen snapshot over rebuilding the current presentation code.
 
-    GET(메모리/DB) 및 사건 이력 호출 모두 동일한 계약을 사용한다. 구조화 실패는
-    원본 answer를 훼손하지 않고 기존 렌더러로 폴백한다.
+    NULL snapshots from old consultations are explicitly marked LEGACY_REBUILT.
+    Invalid snapshots are never repaired or silently regenerated.
     """
     if resp.status != "SUCCESS":
         resp.presentation = None
+        resp.presentation_origin = "UNAVAILABLE"
         return resp
+
     try:
+        if resp.presentation_snapshot is not None:
+            from ai_legal_helper.presentation.snapshot import validate_presentation_snapshot
+            verified = validate_presentation_snapshot(
+                resp.presentation_snapshot,
+                answer=resp.answer,
+                verification_result=resp.verification_result,
+                sources=source_records if source_records is not None else resp.sources,
+                request_id=resp.request_id,
+                case_id=resp.case_id,
+                verification_status=resp.verification_status,
+                answer_status=resp.answer_status,
+            )
+            if resp.verification_status != "PASS" or resp.answer_status not in ("DELIVERED", "CAUTIONARY", "REVISED"):
+                verified = None
+            resp.presentation = verified
+            resp.presentation_origin = "FROZEN" if verified is not None else "INVALID_SNAPSHOT"
+            if verified is None:
+                logger.error(
+                    "[PRESENTATION_SNAPSHOT] request=%s INVALID_SNAPSHOT; original answer retained",
+                    (resp.request_id or "")[:8],
+                )
+            return resp
+
         from ai_legal_helper.presentation.builder import build_consultation_presentation
         resp.presentation = build_consultation_presentation(
             answer=resp.answer,
@@ -176,9 +203,10 @@ def _attach_presentation(resp: ConsultationResponse) -> ConsultationResponse:
             answer_status=resp.answer_status,
             sources=resp.sources,
         )
+        resp.presentation_origin = "LEGACY_REBUILT" if resp.presentation else "UNAVAILABLE"
         if resp.presentation:
             logger.info(
-                "[PRESENTATION_BUILD] request=%s binding=%s blocks=%d claims=%d sources=%d",
+                "[PRESENTATION_LEGACY] request=%s binding=%s blocks=%d claims=%d sources=%d",
                 (resp.request_id or "")[:8],
                 resp.presentation.verification_binding,
                 len(resp.presentation.blocks),
@@ -187,12 +215,35 @@ def _attach_presentation(resp: ConsultationResponse) -> ConsultationResponse:
             )
     except Exception as exc:
         resp.presentation = None
+        resp.presentation_origin = "INVALID_SNAPSHOT" if resp.presentation_snapshot is not None else "UNAVAILABLE"
         logger.warning(
-            "[PRESENTATION_BUILD] request=%s fallback=LEGACY reason=%s",
-            (resp.request_id or "")[:8],
-            type(exc).__name__,
+            "[PRESENTATION_READ] request=%s fallback=ANSWER_TEXT error=%s",
+            (resp.request_id or "")[:8], type(exc).__name__,
         )
     return resp
+
+
+def _freeze_record_presentation(rec: ConsultationRecord, resp: ConsultationResponse) -> Optional[dict]:
+    """Prepare a one-time frozen snapshot inside the consultation DB transaction."""
+    from ai_legal_helper.presentation.snapshot import freeze_record_once
+    try:
+        frozen = freeze_record_once(rec, resp)
+    except Exception as exc:
+        # 이미 확정된 스냅샷이 바뀌었다면 DB 트랜잭션을 롤백해야 한다.
+        if rec.presentation_snapshot is not None:
+            raise
+        logger.warning(
+            "[PRESENTATION_FREEZE] request=%s legacy_fallback reason=%s",
+            (resp.request_id or "")[:8], type(exc).__name__,
+        )
+        return None
+    if frozen is not None:
+        logger.info(
+            "[PRESENTATION_FREEZE] request=%s version=%s binding=%s",
+            (resp.request_id or "")[:8], frozen["snapshot_version"],
+            frozen["presentation"].get("verification_binding", "UNKNOWN"),
+        )
+    return frozen
 
 
 @router.post("/consultations", response_model=ConsultationResponse)
@@ -608,7 +659,9 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
                         rec.conversation_id = resp.conversation_id
                     if getattr(resp, "turn_index", None):
                         rec.turn_index = resp.turn_index
+                    frozen = _freeze_record_presentation(rec, resp)
                     db_session.commit()
+                    resp.presentation_snapshot = frozen
         except Exception as db_err:
             logger.error(f"[상담 DB 저장 실패] 상담 결과 데이터베이스 커밋 실패 (요청: {request_id[:8]}): {db_err}")
 
@@ -688,6 +741,7 @@ async def get_consultation(
         answer_status=ans_status,
         routing_status=getattr(record, "routing_status", None),
         answer=record.answer,
+        presentation_snapshot=getattr(record, "presentation_snapshot", None),
         approval_request=record.approval_request,
         sources=sources,
         elapsed_ms=record.elapsed_ms,
@@ -705,7 +759,7 @@ async def get_consultation(
         case_delta=ver_res.get("case_delta"),
         progress=prog,
     )
-    return _attach_presentation(response)
+    return _attach_presentation(response, source_records=record.sources or [])
 
 @router.get("/consultations/{request_id}/status")
 async def get_consultation_status(
@@ -1033,7 +1087,9 @@ async def process_consultation_resume(
                     rec.elapsed_ms = resp.elapsed_ms
                     if getattr(resp, "progress", None):
                         rec.progress = resp.progress.model_dump()
+                    frozen = _freeze_record_presentation(rec, resp)
                     db_session.commit()
+                    resp.presentation_snapshot = frozen
         except Exception as db_err:
             logger.error(f"[상담 재개 DB 저장 실패] 상담 재개 결과 DB 커밋 실패 (요청: {request_id[:8]}): {db_err}")
 
@@ -1063,6 +1119,8 @@ async def list_case_consultations(
     for rec in records:
         if rec.request_id in _consultations:
             live_resp = _consultations[rec.request_id]
+            if getattr(rec, "presentation_snapshot", None) is not None:
+                live_resp.presentation_snapshot = rec.presentation_snapshot
             if live_resp.progress is None:
                 live_resp.progress = _parse_or_build_progress(rec.progress, live_resp.status, rec.request_id, live_resp.created_at)
             results.append(live_resp)
@@ -1098,6 +1156,7 @@ async def list_case_consultations(
             answer_status=ans_status,
             routing_status=getattr(rec, "routing_status", None),
             answer=rec.answer,
+            presentation_snapshot=getattr(rec, "presentation_snapshot", None),
             approval_request=rec.approval_request,
             sources=sources,
             elapsed_ms=rec.elapsed_ms,
@@ -1114,7 +1173,8 @@ async def list_case_consultations(
             claim_citations=(rec.verification_result or {}).get("claim_citations", []),
             progress=prog,
         ))
-    return [_attach_presentation(item) for item in results]
+    record_sources = {rec.request_id: (rec.sources or []) for rec in records}
+    return [_attach_presentation(item, source_records=record_sources.get(item.request_id)) for item in results]
 
 
 
@@ -1223,6 +1283,7 @@ async def get_case_conversation_detail(
                 answer_status=ans_status,
                 routing_status=getattr(rec, "routing_status", None),
                 answer=rec.answer,
+                presentation_snapshot=getattr(rec, "presentation_snapshot", None),
                 approval_request=rec.approval_request,
                 sources=sources,
                 elapsed_ms=rec.elapsed_ms,
@@ -1241,8 +1302,9 @@ async def get_case_conversation_detail(
             )
         )
 
+    original_sources = {rec.request_id: (rec.sources or []) for rec in records}
     return ConversationDetail(
         conversation_id=conversation_id,
         case_id=case_id,
-        turns=turns,
+        turns=[_attach_presentation(turn, source_records=original_sources.get(turn.request_id)) for turn in turns],
     )

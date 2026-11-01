@@ -213,6 +213,7 @@ export interface ConsultationResponse {
   resolved_query?: string;
   answer?: string;
   presentation?: ConsultationPresentation | null;
+  presentation_origin?: 'FROZEN' | 'LEGACY_REBUILT' | 'INVALID_SNAPSHOT' | 'UNAVAILABLE' | null;
   sources: Source[];
   elapsed_ms?: number;
   usage_summary?: UsageSummary;

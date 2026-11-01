@@ -568,6 +568,8 @@ class ConsultationRecord(Base):
     approval_request = Column(JSON, nullable=True)
     sources = Column(JSON, nullable=True)
     verification_result = Column(JSON, nullable=True)
+    # P4.2: immutable-at-application-level structured result snapshot (NULL for historical rows)
+    presentation_snapshot = Column(JSON, nullable=True)
     warnings = Column(JSON, nullable=True)
     selected_agents = Column(JSON, nullable=True)
     progress = Column(JSON, nullable=True)  # LangGraph 6단계 실시간 진행 상태 (ConsultationProgress)
