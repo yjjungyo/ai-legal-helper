@@ -248,3 +248,43 @@ def test_graph_rag_consultation_excludes_false_contradiction(db, really_conflict
     else:
         assert checked["valid"] == []
         assert "UNVERIFIED_CONTRADICTION" in checked["invalid"][0]["reasons"]
+
+
+# 다섯 건 오탐: 이미 DB/Neo4j에 저장된 레거시 CONTRADICTS 엣지 재판정.
+# 상충 탐지기를 고친 뒤 저장된 링크를 바로 신뢰하지 않는지 검증한다.
+@pytest.mark.parametrize("fact_text, claim_text", [
+    ("이수현은 2026년 9월 30일 보증금 반환 일정이 가능한지 문의하였다.",
+     "박정훈은 보증금을 일시에 전액 반환하지 않고 분할 반환하는 방안을 제안하였다."),
+    ("박정훈은 보증금 반환 확답 대신 새 세입자 구하는 절차를 먼저 진행하겠다는 입장을 밝혔다.",
+     "박정훈은 보증금을 일시에 전액 반환하지 않고 분할 반환하는 방안을 제안하였다."),
+    ("이수현은 2026년 9월 30일 보증금 반환 일정이 가능한지 문의하였다.",
+     "이수현은 분할 반환에 동의할 수 없다고 밝혔다."),
+    ("박정훈은 보증금 반환 확답 대신 새 세입자 구하는 절차를 먼저 진행하겠다는 입장을 밝혔다.",
+     "이수현은 분할 반환에 동의할 수 없다고 밝혔다."),
+    ("박정훈은 보증금을 일시에 전액 반환하지 않고 분할 반환하는 방안을 제안하였다.",
+     "박정훈은 보증금 반환을 위한 다른 방법을 찾겠다는 입장을 밝혔다."),
+])
+def test_stale_dialogue_conflicts_not_exposed_by_graph_and_api(db, monkeypatch, fact_text, claim_text):
+    from ai_legal_helper.api.routes.evidence import get_evidence_conflicts
+
+    case, fact, claim, link = seed_conflict(
+        db, fact_statement=fact_text, claim_statement=claim_text,
+    )
+    monkeypatch.setattr("ai_legal_helper.database.neo4j.get_neo4j_driver", lambda: None)
+    results = get_evidence_conflicts(case=case, db=db)
+    assert results["contradiction_count"] == 0
+    assert results["potential_conflict_count"] == 0
+
+    raw = [{
+        "target_id": fact.id, "contradicting_id": claim.id,
+        "target_type": "Fact", "contradicting_statement": claim.statement,
+    }]
+    assert filter_verified_graph_contradictions(db, case.id, raw) == []
+
+    dry = reconcile_case_conflicts(db, case_id=case.id, dry_run=True, sync_neo4j=False)
+    assert dry["removed_false_contradict_links"] == 1
+    assert db.get(EvidenceLink, link.id) is not None
+    applied = reconcile_case_conflicts(db, case_id=case.id, dry_run=False, sync_neo4j=False)
+    assert applied["removed_false_contradict_links"] == 1
+    assert db.get(EvidenceLink, link.id) is None
+    assert db.get(Fact, fact.id).verification_status != "DISPUTED"

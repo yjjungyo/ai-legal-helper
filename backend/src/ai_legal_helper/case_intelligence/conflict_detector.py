@@ -885,6 +885,14 @@ def evaluate_claim_against_fact(
         },
     )
     comp_gate = compare_fact_identity(claim_sem, fact_sem)
+    # 승인된 사실 쌍의 비교 가능성 자체를 Trace에서 추적할 수 있게 한다.
+    # 기본 로그는 판정 이유와 ID만 보존하고, 원문은 DEBUG에서만 남긴다.
+    logger.debug(
+        "[CONFLICT_PAIR] claim_id=%s fact_id=%s is_comparable=%s status=%s "
+        "reason=%s claim=%r fact=%r",
+        claim_id, fact.id, comp_gate.is_comparable, comp_gate.status,
+        comp_gate.reason_code, claim_slots.statement, fact_slots.statement,
+    )
     if not comp_gate.is_comparable:
         return ConflictDecision(
             claim_id=claim_id,
