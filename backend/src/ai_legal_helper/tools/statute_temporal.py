@@ -159,9 +159,14 @@ def temporal_answer_errors(question: str, answer: str, sources: list[dict]) -> l
         if source.get("source_type") != "STATUTE":
             continue
         article = str(source.get("article") or "")
-        if not article or article == "부칙":
+        if not article:
             continue
-        if article not in answer and article not in question:
+        if article == "부칙":
+            # 부칙의 적용례가 언급한 실제 조문이 답변에도 있는 경우에만 비교한다.
+            referenced = set(re.findall(r"제\s*\d+\s*조(?:\s*의\s*\d+)?", str(source.get("content") or "")))
+            if not any(ref in answer for ref in referenced):
+                continue
+        elif article not in answer and article not in question:
             continue
         effective = parse_date(source.get("effective_date"))
         if effective and target < effective:
