@@ -152,7 +152,7 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
             </div>
           ) : message.answer ? (
             <div className="chat-assistant-card" style={{ padding: '4px 0' }}>
-              {message.presentation?.schema_version === '1.0' && message.presentation.blocks.length > 0 ? (
+              {message.verification_status === 'PASS' && message.answer_status !== 'WITHHELD' && message.presentation?.schema_version === '1.0' && message.presentation.blocks.length > 0 && message.presentation.blocks.map((block) => block.markdown).join('') === message.answer ? (
                 <VerifiedPresentationView
                   presentation={message.presentation}
                   onEvidenceClick={onEvidenceClick}
