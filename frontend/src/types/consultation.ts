@@ -214,6 +214,15 @@ export interface ConsultationResponse {
   answer?: string;
   presentation?: ConsultationPresentation | null;
   presentation_origin?: 'FROZEN' | 'LEGACY_REBUILT' | 'INVALID_SNAPSHOT' | 'UNAVAILABLE' | null;
+  evidence_freshness?: {
+    status: 'CURRENT' | 'EVIDENCE_CHANGED' | 'UNKNOWN_BASELINE';
+    added: string[];
+    removed: string[];
+    modified: string[];
+    pending_count: number;
+    current_count: number;
+  } | null;
+  reanalysis_of_request_id?: string | null;
   sources: Source[];
   elapsed_ms?: number;
   usage_summary?: UsageSummary;

@@ -81,6 +81,30 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleSourceClick = (label: string, meta?: any) => {
+    const historical = Boolean(
+      message.case_id && message.evidence_freshness &&
+      message.evidence_freshness.status !== 'CURRENT'
+    );
+    if (!historical) {
+      onEvidenceClick(label, meta);
+      return;
+    }
+    const matching = (message.sources || []).filter((source) => {
+      if (meta?.evidenceId && source.evidence_id === meta.evidenceId) return true;
+      const names = [source.original_filename, source.document_name, source.filename,
+                     source.evidence_label, source.file].filter(Boolean);
+      return names.includes(label);
+    });
+    const frozen = matching.length === 1 ? matching[0] : undefined;
+    onEvidenceClick(label, {
+      ...meta, historicalMode: true,
+      historicalExcerpt: frozen?.text_excerpt || undefined,
+      historicalFileName: frozen?.original_filename || frozen?.document_name ||
+                          frozen?.filename || label,
+    });
+  };
+
   return (
     <div className="chat-assistant-row">
       <div className="chat-assistant-container">
@@ -156,19 +180,19 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
               {message.verification_status === 'PASS' && message.answer_status !== 'WITHHELD' && message.presentation?.schema_version === '1.0' && message.presentation.blocks.length > 0 && message.presentation.blocks.map((block) => block.markdown).join('') === message.answer ? (
                 <VerifiedPresentationView
                   presentation={message.presentation}
-                  onEvidenceClick={onEvidenceClick}
+                  onEvidenceClick={handleSourceClick}
                   claimCitations={message.claim_citations || (message.verification_result as any)?.claim_citations}
                 />
               ) : (
                 <LegalAnswerView
                   content={message.answer || ''}
-                  onEvidenceClick={onEvidenceClick}
+                  onEvidenceClick={handleSourceClick}
                   claimCitations={message.claim_citations || (message.verification_result as any)?.claim_citations}
                 />
               )}
 
               {message.sources && message.sources.length > 0 && (
-                <ConsultationSources sources={message.sources} onEvidenceClick={onEvidenceClick} />
+                <ConsultationSources sources={message.sources} onEvidenceClick={handleSourceClick} />
               )}
             </div>
           ) : null}

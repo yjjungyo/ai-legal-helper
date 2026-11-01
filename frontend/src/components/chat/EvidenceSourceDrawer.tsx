@@ -28,6 +28,9 @@ export interface EvidenceSourceDrawerProps {
   selectedClaimId?: string | null;
   /** 선택된 원문 발췌 스팬 UUID (있을 경우 하이라이트) */
   selectedSpanId?: string | null;
+  historicalMode?: boolean;
+  historicalExcerpt?: string | null;
+  historicalFileName?: string | null;
   /** 현재 사건 식별자 UUID */
   caseId: string;
   /** 현재 사건에 등록된 증거 문서 목록 */
@@ -111,6 +114,9 @@ export const EvidenceSourceDrawer: React.FC<EvidenceSourceDrawerProps> = ({
   selectedEvidenceId,
   selectedClaimId,
   selectedSpanId,
+  historicalMode = false,
+  historicalExcerpt,
+  historicalFileName,
   caseId,
   evidenceDocuments,
   onNavigateToEvidence,
@@ -157,7 +163,7 @@ export const EvidenceSourceDrawer: React.FC<EvidenceSourceDrawerProps> = ({
 
   // 대상 문서가 확정되면 해당 문서의 추출 클레임 및 스팬 목록 조회
   useEffect(() => {
-    if (!isOpen || !matchedDoc || !caseId) {
+    if (!isOpen || historicalMode || !matchedDoc || !caseId) {
       setClaims([]);
       setClaimError(null);
       return;
@@ -185,13 +191,15 @@ export const EvidenceSourceDrawer: React.FC<EvidenceSourceDrawerProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [isOpen, matchedDoc, caseId]);
+  }, [isOpen, historicalMode, matchedDoc, caseId]);
 
   if (!isOpen) {
     return null;
   }
 
-  const displayTag = matchedDoc?.original_filename || matchedDoc?.filename || selectedLabel || '증거 문서';
+  const displayTag = historicalMode
+    ? (historicalFileName || selectedLabel || '당시 증거 기록')
+    : (matchedDoc?.original_filename || matchedDoc?.filename || selectedLabel || '증거 문서');
 
   return (
     <>
@@ -235,7 +243,21 @@ export const EvidenceSourceDrawer: React.FC<EvidenceSourceDrawerProps> = ({
 
         {/* 바디 본문 */}
         <div className="evidence-drawer-body">
-          {matchedDoc ? (
+          {historicalMode ? (
+            <section className="chat-historical-evidence">
+              <strong>상담 당시 기록된 출처</strong>
+              <p>현재 증거 자료와 이 상담 당시 자료의 상태가 다를 수 있으므로, 최신 추출 사실을 당시 근거로 표시하지 않습니다.</p>
+              <p>원본 파일명: {displayTag}</p>
+              {historicalExcerpt ? (
+                <>
+                  <div>상담 당시 저장된 발췌:</div>
+                  <blockquote>{historicalExcerpt}</blockquote>
+                </>
+              ) : (
+                <p>이 상담의 출처 기록에서 정확한 원문 발췌를 찾을 수 없습니다. 당시 원문과 현재 원문이 같다고 확인할 수 없습니다.</p>
+              )}
+            </section>
+          ) : matchedDoc ? (
             <>
               {/* 문서 메타데이터 카드 */}
               <div
@@ -400,7 +422,7 @@ export const EvidenceSourceDrawer: React.FC<EvidenceSourceDrawerProps> = ({
 
         {/* 푸터 액션 */}
         <div className="evidence-drawer-footer">
-          {matchedDoc && onNavigateToEvidence && (
+          {!historicalMode && matchedDoc && onNavigateToEvidence && (
             <button
               type="button"
               onClick={() => {
