@@ -902,3 +902,52 @@
   .chat-legal-heading { font-size: 1rem; }
   .chat-presentation-lead { padding: 12px 12px !important; font-size: 1em; margin-bottom: 15px; }
 }
+
+
+/* P5.1: 한눈에 보는 상담 결과. 세부 분석은 요청 시에만 펼쳐진다. */
+.chat-consultation-digest { display: flex; flex-direction: column; gap: 0; min-width: 0; }
+.chat-digest-lead { padding: 18px 20px 19px; background: #f5f8fd; border: 1px solid #dfe8f5; border-left: 4px solid #315ecb; border-radius: 10px; }
+.chat-digest-eyebrow { display: flex; gap: 9px; align-items: center; color: #1c478e; font-size: .89rem; font-weight: 750; margin-bottom: 11px; }
+.chat-digest-eyebrow-dot { width: 7px; height: 7px; flex-shrink: 0; background: #315ecb; border-radius: 50%; }
+.chat-digest-original-note { margin-left: auto; font-size: .72rem; font-weight: 400; color: #6b7e9e; }
+.chat-digest-lead-text { font-size: 1.04rem; line-height: 1.75; font-weight: 500; color: #1b2a44; }
+.chat-digest-lead-text .chat-legal-section, .chat-digest-lead-text .chat-legal-section.has-heading { margin: 0; }
+.chat-digest-lead-text .chat-legal-content { font-size: 1em; color: #203251; line-height: 1.73; }
+.chat-digest-lead-text .chat-legal-answer { font-size: inherit; }
+.chat-digest-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 15px 0 0; }
+.chat-digest-summary { padding: 17px 18px; background: #fff; border: 1px solid #e2e7ef; border-radius: 10px; min-width: 0; }
+.chat-digest-summary-title { font-size: .96rem; font-weight: 750; letter-spacing: -.02em; line-height: 1.4; color: #1c2d47; margin: 0 0 12px; }
+.chat-digest-summary-list { margin: 0; padding-left: 17px; display: flex; flex-direction: column; gap: 10px; }
+.chat-digest-summary-list li { color: #344258; font-size: .87rem; line-height: 1.63; padding-left: 1px; overflow-wrap: anywhere; word-break: keep-all; }
+.chat-digest-summary-list li::marker { color: #7b95b7; }
+.chat-digest-action .chat-digest-summary-title { color: #216247; }
+.chat-digest-action .chat-digest-summary-list li::marker { color: #49916b; }
+.chat-digest-caution .chat-digest-summary-title { color: #9a5319; }
+.chat-digest-caution .chat-digest-summary-list li::marker { color: #bf8a57; }
+.chat-digest-grid > .chat-digest-summary:last-child:nth-child(odd) { grid-column: 1 / -1; }
+.chat-digest-full-answer { margin-top: 18px; border: 1px solid #dfe5ee; border-radius: 10px; background: #fff; }
+.chat-digest-full-answer > summary { min-height: 57px; display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 14px 18px; list-style: none; color: #203651; }
+.chat-digest-full-answer > summary::-webkit-details-marker { display: none; }
+.chat-digest-full-answer > summary:focus-visible { outline: 2px solid #315ecb; outline-offset: 3px; border-radius: 8px; }
+.chat-digest-expand-icon { color: #607b9c; transition: transform .16s ease; font-size: 1.1rem; }
+.chat-digest-full-answer[open] .chat-digest-expand-icon { transform: rotate(90deg); }
+.chat-digest-expand-title { font-weight: 730; font-size: .95rem; }
+.chat-digest-expand-hint { margin-left: auto; font-size: .78rem; color: #7e8c9e; font-weight: 400; }
+.chat-digest-full-content { border-top: 1px solid #e9edf3; padding: 23px 20px 25px; min-width: 0; }
+.chat-digest-full-content .chat-legal-answer { line-height: 1.75; }
+.chat-digest-full-content .chat-legal-section.has-heading { margin-top: 25px; }
+.chat-digest-full-content .chat-legal-heading { font-size: 1.06rem; }
+.chat-consultation-digest .chat-evidence-tag { max-width: 160px; display: inline-block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; vertical-align: middle; font-size: .74em; }
+.chat-digest-full-content .chat-evidence-tag { max-width: none; display: inline; white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
+.chat-verified-fallback { min-width: 0; }
+@media (max-width: 768px) {
+  .chat-digest-lead { padding: 15px 14px 16px; }
+  .chat-digest-lead-text { font-size: .99rem; }
+  .chat-digest-original-note { display: none; }
+  .chat-digest-grid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .chat-digest-summary { padding: 15px 14px; }
+  .chat-digest-grid > .chat-digest-summary:last-child:nth-child(odd) { grid-column: auto; }
+  .chat-digest-full-answer > summary { flex-wrap: wrap; padding: 12px 14px; }
+  .chat-digest-expand-hint { margin-left: 26px; width: 100%; }
+  .chat-digest-full-content { padding: 15px 12px 20px; }
+}
