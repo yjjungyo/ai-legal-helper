@@ -950,7 +950,11 @@ def run_verification(
     )
 
     # 단순 법령 질의이면서 결정론적 검사 ALL PASS인 경우: 불필요한 LLM 호출을 건너뛰고 조기 PASS 확정
-    if not qa_check.requires_llm_eval and qa_check.status == "PASS":
+    from ai_legal_helper.tools.statute_temporal import temporal_answer_errors
+    preliminary_temporal_errors = temporal_answer_errors(question, draft_answer, retrieved_sources)
+    if preliminary_temporal_errors:
+        logger.warning("[STATUTE_TEMPORAL] 경량 PASS 생략: 시행일/계약일 충돌 %d건", len(preliminary_temporal_errors))
+    if not qa_check.requires_llm_eval and qa_check.status == "PASS" and not preliminary_temporal_errors:
         logger.info("[VERIFICATION] 경량 검사 ALL PASS: LLM 검증 생략 및 초안 즉시 확정")
         from ai_legal_helper.rag.grounding_context import format_grounding_sources
         _, source_manifest = format_grounding_sources(retrieved_sources)
