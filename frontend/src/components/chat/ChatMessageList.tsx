@@ -79,6 +79,7 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
   const bottomAnchorRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const isFollowingRef = useRef(true);
+  const previousLastRequestRef = useRef<string | null>(null);
   const [showJump, setShowJump] = useState(false);
 
   const handleScroll = () => {
@@ -92,14 +93,24 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
   const jumpLatest = () => {
     isFollowingRef.current = true;
     setShowJump(false);
-    containerRef.current?.scrollTo({ top: containerRef.current.scrollHeight, behavior: 'smooth' });
+    containerRef.current?.scrollTo({ top: containerRef.current.scrollHeight, behavior: 'auto' });
   };
 
   // 사용자 스크롤을 존중: 답변을 읽고 있을 때 단계 폴링이 화면을 아래로 끌어내리지 않는다.
   useEffect(() => {
     const container = containerRef.current;
+    const last = messages[messages.length - 1];
+    const isNewRequest = Boolean(last?.request_id && previousLastRequestRef.current !== last.request_id);
+    if (isNewRequest) {
+      previousLastRequestRef.current = last.request_id;
+      // 질문 제출 시에는 새 메시지를 보여주되, 기존 요청의 진행 단계 변경으로는 읽던 위치를 바꾸지 않는다.
+      if (last.status === 'IN_PROGRESS') {
+        isFollowingRef.current = true;
+        setShowJump(false);
+      }
+    }
     if (isFollowingRef.current && container) {
-      container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+      container.scrollTo({ top: container.scrollHeight, behavior: 'auto' });
     }
   }, [messages.length, messages[messages.length - 1]?.status, messages[messages.length - 1]?.progress?.current_step]);
 
