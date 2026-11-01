@@ -639,7 +639,7 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
             with SessionLocal() as db_session:
                 rec = db_session.query(ConsultationRecord).filter(
                     ConsultationRecord.request_id == request_id
-                ).first()
+                ).with_for_update().first()
                 if rec:
                     rec.status = resp.status
                     rec.execution_status = getattr(resp, "execution_status", resp.status)
@@ -690,15 +690,22 @@ async def get_consultation(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    persisted = None
     if request_id in _consultations:
         resp = _consultations[request_id]
         if not AUTH_BYPASS and getattr(resp, "_user_id", None) != current_user.id:
             raise HTTPException(status_code=403, detail="해당 상담에 접근할 권한이 없습니다.")
-        if resp.progress is None:
-            resp.progress = _parse_or_build_progress(None, resp.status, resp.request_id, resp.created_at)
-        return _attach_presentation(resp)
-        
-    record = db.query(ConsultationRecord).filter(
+        # 중복 완료 처리나 저장 재시도 후의 메모리 응답보다 DB의 frozen 기록을 우선한다.
+        if resp.status == "SUCCESS" and resp.presentation_snapshot is None:
+            persisted = db.query(ConsultationRecord).filter(
+                ConsultationRecord.request_id == request_id
+            ).first()
+        if persisted is None or getattr(persisted, "presentation_snapshot", None) is None:
+            if resp.progress is None:
+                resp.progress = _parse_or_build_progress(None, resp.status, resp.request_id, resp.created_at)
+            return _attach_presentation(resp)
+
+    record = persisted or db.query(ConsultationRecord).filter(
         ConsultationRecord.request_id == request_id
     ).first()
     if not record:
@@ -1070,7 +1077,7 @@ async def process_consultation_resume(
             with SessionLocal() as db_session:
                 rec = db_session.query(ConsultationRecord).filter(
                     ConsultationRecord.request_id == request_id
-                ).first()
+                ).with_for_update().first()
                 if rec and request_id in _consultations:
                     resp = _consultations[request_id]
                     rec.status = resp.status
@@ -1117,10 +1124,8 @@ async def list_case_consultations(
     
     results = []
     for rec in records:
-        if rec.request_id in _consultations:
+        if rec.request_id in _consultations and getattr(rec, "presentation_snapshot", None) is None:
             live_resp = _consultations[rec.request_id]
-            if getattr(rec, "presentation_snapshot", None) is not None:
-                live_resp.presentation_snapshot = rec.presentation_snapshot
             if live_resp.progress is None:
                 live_resp.progress = _parse_or_build_progress(rec.progress, live_resp.status, rec.request_id, live_resp.created_at)
             results.append(live_resp)
