@@ -169,6 +169,20 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
                 {message.evidence_freshness.modified.length > 0 && `수정·검토 상태 변경 ${message.evidence_freshness.modified.length}건 · `}
                 {message.evidence_freshness.removed.length > 0 && `삭제 ${message.evidence_freshness.removed.length}건`}
               </span>
+              <details className="chat-evidence-change-files">
+                <summary>추가·변경된 증거 파일명 확인</summary>
+                <ul>
+                  {message.evidence_freshness.added.map((name, index) => (
+                    <li key={`add-${index}`}>추가: {name}</li>
+                  ))}
+                  {message.evidence_freshness.modified.map((name, index) => (
+                    <li key={`edit-${index}`}>수정·검토 변경: {name}</li>
+                  ))}
+                  {message.evidence_freshness.removed.map((name, index) => (
+                    <li key={`remove-${index}`}>삭제: {name}</li>
+                  ))}
+                </ul>
+              </details>
               {message.evidence_freshness.pending_count > 0 && (
                 <span>현재 처리 또는 검토 중인 증거 {message.evidence_freshness.pending_count}건이 있습니다. 가능하면 검토를 완료한 뒤 재분석하세요.</span>
               )}
