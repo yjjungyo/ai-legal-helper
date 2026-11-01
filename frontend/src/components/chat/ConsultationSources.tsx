@@ -18,13 +18,12 @@ type DisplaySource = {
   claimId?: string;
   spanId?: string;
   url?: string;
-  linkLabel?: string;
 };
 
 function presentSource(s: Source): DisplaySource | null {
   const rawFilename = (s.original_filename || s.document_name || s.filename || s.file_name || s.file || '').trim();
   const fileName = /^(?:EVIDENCE:|GRAPH:|VECTOR:|UNKNOWN$|\?$)/i.test(rawFilename) ? '' : rawFilename;
-  const isEvidence = s.source_type === 'CASE_EVIDENCE' || Boolean(s.evidence_id);
+  const isEvidence = s.source_type === 'CASE_EVIDENCE' || Boolean(s.evidence_id) || /^E\d{1,3}[_ .-]/i.test(fileName);
   const isStatute = s.source_type === 'STATUTE' || Boolean(s.statute_name);
   const isPrecedent = s.source_type === 'PRECEDENT' || Boolean(s.case_number);
   const kind: DisplaySource['kind'] = isEvidence ? 'evidence' : isStatute ? 'law' : isPrecedent ? 'precedent' : 'other';
@@ -42,8 +41,10 @@ function presentSource(s: Source): DisplaySource | null {
     label = s.title || fileName || '출처명 확인 필요';
   }
   const id = (s.source_id || s.document_id || '').trim();
+  // 같은 조문이라도 서로 다른 법령 시행 버전을 임의로 합치지 않는다.
+  const version = (s.effective_date || s.version_date || s.version_id || '').trim();
   const key = kind === 'evidence' ? `evidence:${s.evidence_id || fileName || id}` :
-    `${kind}:${label}`;
+    `${kind}:${label}:${version}`;
   return {
     key, label, kind,
     evidenceId: s.evidence_id || undefined,

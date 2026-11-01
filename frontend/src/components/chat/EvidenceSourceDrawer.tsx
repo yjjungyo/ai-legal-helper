@@ -339,7 +339,10 @@ export const EvidenceSourceDrawer: React.FC<EvidenceSourceDrawerProps> = ({
                           {/* 원문 발췌 스팬 */}
                           {hasSpans ? (
                             <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                              {claim.spans.map((span) => {
+                              {[...claim.spans].sort((a, b) =>
+                                Number(Boolean(selectedSpanId && b.id === selectedSpanId && isClaimActive)) -
+                                Number(Boolean(selectedSpanId && a.id === selectedSpanId && isClaimActive))
+                              ).map((span) => {
                                 const isSpanActive = Boolean(selectedSpanId && span.id === selectedSpanId);
                                 return (
                                   <div
