@@ -1,0 +1,45 @@
+name: Presentation Regression
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - 'backend/src/ai_legal_helper/presentation/**'
+      - 'backend/src/ai_legal_helper/api/schemas/consultation.py'
+      - 'backend/tests/unit/test_verified_presentation.py'
+      - 'backend/tests/unit/test_p4_presentation_semantics.py'
+      - 'backend/tests/unit/test_presentation_source_contract.py'
+      - '.github/workflows/presentation-regression.yml'
+  workflow_dispatch:
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install
+        run: npm ci
+        working-directory: frontend
+      - name: TypeScript and Vite build
+        run: npm run build
+        working-directory: frontend
+      - name: Presentation regression
+        run: node --test tests/legal-answer-view.test.cjs tests/presentation-layout.test.cjs tests/consultation-sources.test.cjs tests/presentation-semantics.test.cjs
+        working-directory: frontend
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install minimal Pydantic tests
+        run: python -m pip install 'pydantic>=2.5,<3' 'pytest>=8,<10'
+      - name: Verify lossless presentation and semantic contract
+        run: PYTHONPATH=backend/src python -m pytest backend/tests/unit/test_presentation_source_contract.py backend/tests/unit/test_verified_presentation.py backend/tests/unit/test_p4_presentation_semantics.py -q
