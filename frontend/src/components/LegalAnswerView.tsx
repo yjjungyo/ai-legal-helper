@@ -115,65 +115,52 @@ export function renderInlineMarkdown(
   return parts.map((part, index) => {
     if (!part) return null;
 
-    // 증거 번호 또는 파일명: [E01], [E01_주택임대차계약서.txt]
-    const evMatch = (part.match(/^\[E\d{1,3}/i) || part.match(/\.(pdf|docx|txt|png|jpg|jpeg)\]$/i) || part.match(/^\[.+\]$/))
-      ? part.match(/^\[(.*)\]$/)
-      : null;
-
-    if (evMatch) {
-      const rawLabel = evMatch[1].trim();
-      // 일반 시스템 태그(예: [잠정], [1. 핵심 결론], [검증 완료], 빈 라벨 등)는 버튼이 아닌 일반 텍스트로 처리
-      if (!rawLabel || /^(잠정|\d+\.|\*|■|근거|법률|필수|권장|검증|조건부|유보)/.test(rawLabel) || rawLabel.replace(/[,\s]/g, '') === '') {
-        return <span key={index}>{part}</span>;
-      }
+    // 대괄호 일반 텍스트와 실제 증거 인용을 명확히 분리한다.
+    // [잠정], [1. 핵심 결론] 같은 제목/표시는 클릭 가능한 증거가 아니다.
+    const bracketMatch = part.match(/^\[([^\]\n]+)\]$/);
+    const rawLabel = bracketMatch?.[1]?.trim() || '';
+    const isEvidenceLabel = /^E\d{1,3}(?:$|[_.\s-])/i.test(rawLabel);
+    const isEvidenceFilename = /\.(?:pdf|docx|txt|png|jpg|jpeg)$/i.test(rawLabel);
+    if (bracketMatch && (isEvidenceLabel || isEvidenceFilename)) {
+      const cleanUpper = rawLabel.toUpperCase();
       let meta: CitationMeta | undefined;
       let resolvedDocName = rawLabel;
 
       if (claimCitations && claimCitations.length > 0) {
-        const cleanUpper = rawLabel.replace(/[\[\]]/g, '').trim().toUpperCase();
-
-        // 1. 현재 문장/라인 컨텍스트와 매칭되는 ClaimCitation 우선 필터링 (동일 증거 다중 인용 충돌 방지)
+        // 정확히 같은 증거 라벨 또는 파일명으로만 연결한다. 부분 문자열/E01 vs E010 유사 매칭 금지.
+        const matchingRefs = claimCitations.flatMap((citation) =>
+          citation.evidence_refs
+            .filter((ref) =>
+              (Boolean(ref.evidence_label) && ref.evidence_label!.trim().toUpperCase() === cleanUpper) ||
+              (Boolean(ref.document_name) && ref.document_name!.trim().toUpperCase() === cleanUpper)
+            )
+            .map((ref) => ({ citation, ref }))
+        );
+        if (matchingRefs.length === 0) {
+          // 검증 인용 데이터가 있으나 연결에 실패했다면 다른 증거로 임의 연결하지 않는다.
+          return <span key={index}>{part}</span>;
+        }
         const ctx = (lineContext || text).trim();
-        const lineCitations = claimCitations.filter((c) => {
-          if (!c.claim_text) return false;
-          const cSnippet = c.claim_text.slice(0, 18);
-          const tSnippet = ctx.slice(0, 18);
-          return ctx.includes(cSnippet) || c.claim_text.includes(tSnippet);
-        });
+        const contextual = matchingRefs.filter(({ citation }) =>
+          Boolean(citation.claim_text) &&
+          (ctx.includes(citation.claim_text) || citation.claim_text.includes(ctx))
+        );
+        const selected = contextual.length === 1 ? contextual[0]
+          : matchingRefs.length === 1 ? matchingRefs[0] : undefined;
 
-        // 2. 현재 문장 전용 매칭 후보가 있으면 우선 사용, 없으면 전체 citations 풀 사용
-        const searchPool = lineCitations.length > 0 ? lineCitations : claimCitations;
-
-        const match = searchPool.find((c) => {
-          const tagUpper = (c.citation_tag || '').toUpperCase();
-          return (
-            tagUpper.includes(cleanUpper) ||
-            c.evidence_refs.some((r) => {
-              const rLbl = (r.evidence_label || '').toUpperCase();
-              const rName = (r.document_name || '').toUpperCase();
-              // 빈 파일명은 모든 문자열의 부분 문자열이므로 실제 이름이 있을 때만 비교한다.
-              return rLbl === cleanUpper || (!!rName && (rName === cleanUpper || rName.includes(cleanUpper) || cleanUpper.includes(rName)));
-            })
-          );
-        });
-
-        if (match && match.evidence_refs.length > 0) {
-          const ref =
-            match.evidence_refs.find((r) => {
-              const rLbl = (r.evidence_label || '').toUpperCase();
-              const rName = (r.document_name || '').toUpperCase();
-              // 이름 없는 다른 증거가 현재 인용의 원문으로 선택되지 않게 한다.
-              return rLbl === cleanUpper || (!!rName && (rName === cleanUpper || rName.includes(cleanUpper) || cleanUpper.includes(rName)));
-            }) || match.evidence_refs[0];
-
+        if (selected) {
           meta = {
-            evidenceId: ref.evidence_id,
-            claimId: ref.claim_id || undefined,
-            spanId: ref.span_id || undefined,
+            evidenceId: selected.ref.evidence_id,
+            claimId: selected.ref.claim_id || undefined,
+            spanId: selected.ref.span_id || undefined,
           };
-          if (ref.document_name) {
-            resolvedDocName = ref.document_name;
-          }
+          resolvedDocName = selected.ref.document_name || rawLabel;
+        } else {
+          // 동일 파일이 여러 주장에 연결될 때 임의 Claim/Span을 고르지 않는다.
+          const evidenceIds = [...new Set(matchingRefs.map(({ ref }) => ref.evidence_id).filter(Boolean))];
+          if (evidenceIds.length !== 1) return <span key={index}>{part}</span>;
+          meta = { evidenceId: evidenceIds[0] };
+          resolvedDocName = matchingRefs.find(({ ref }) => ref.document_name)?.ref.document_name || rawLabel;
         }
       }
 
@@ -183,7 +170,7 @@ export function renderInlineMarkdown(
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            onEvidenceClick?.(resolvedDocName || rawLabel, meta);
+            onEvidenceClick?.(resolvedDocName, meta);
           }}
           className="chat-evidence-tag"
           title={`증거 [${resolvedDocName}] 원문 및 발췌 확인`}

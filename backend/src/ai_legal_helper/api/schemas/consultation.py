@@ -101,6 +101,11 @@ class Source(BaseModel):
     law_id: Optional[str] = None
     statute_name: Optional[str] = None
     article: Optional[str] = None
+    article_title: Optional[str] = None
+    paragraph_no: Optional[str] = None
+    part: Optional[str] = None
+    chapter: Optional[str] = None
+    section: Optional[str] = None
     promulgation_date: Optional[str] = None
     promulgation_number: Optional[str] = None
     effective_date: Optional[str] = None
@@ -114,7 +119,12 @@ class Source(BaseModel):
     # 사건 증거(CASE_EVIDENCE) 및 일반 문서(DOCUMENT) 추가 필드
     evidence_id: Optional[str] = None
     evidence_label: Optional[str] = None
+    label: Optional[str] = None
     filename: Optional[str] = None
+    original_filename: Optional[str] = None
+    document_name: Optional[str] = None
+    file_name: Optional[str] = None
+    paragraph_index: Optional[int] = None
     category: Optional[str] = None
 
     # 원자적 증거 접지(Grounding) 필드 (P0-2)

@@ -47,3 +47,54 @@ test('출처 버튼을 제외한 텍스트에도 세 파일명이 남는다', ()
   const copyText = markup.replace(/<button\b[^>]*>[\s\S]*?<\/button>/g, '').replace(/<[^>]*>/g, '');
   for (const name of names) assert.ok(copyText.includes(name), name);
 });
+
+
+test('일반 대괄호 제목은 증거 버튼으로 변환하지 않는다', () => {
+  const nodes = renderInlineMarkdown('[잠정] [검증 완료] [1. 핵심 결론]');
+  assert.equal(nodes.filter((node) => node && node.type === 'button').length, 0);
+});
+
+test('유사한 E01/E010 라벨을 오인하지 않는다', () => {
+  let clicked;
+  const citations = [
+    { claim_text: 'E010 자료', citation_tag: '[E010]', evidence_refs: [
+      { evidence_id: 'e010-id', evidence_label: 'E010', document_name: 'E010_등기.txt' },
+    ] },
+    { claim_text: 'E01 자료', citation_tag: '[E01]', evidence_refs: [
+      { evidence_id: 'e01-id', evidence_label: 'E01', document_name: 'E01_계약서.txt' },
+    ] },
+  ];
+  const nodes = renderInlineMarkdown('[E01]', (name, meta) => { clicked = { name, meta }; }, citations);
+  const button = nodes.find((node) => node && node.type === 'button');
+  assert.ok(button);
+  button.props.onClick({ stopPropagation() {} });
+  assert.equal(clicked.meta.evidenceId, 'e01-id');
+  assert.equal(clicked.name, 'E01_계약서.txt');
+});
+
+test('매칭되지 않는 인용은 다른 문서의 ID로 연결하지 않는다', () => {
+  const citations = [
+    { claim_text: '다른 증거', citation_tag: '[E01]', evidence_refs: [
+      { evidence_id: 'wrong-id', evidence_label: 'E01', document_name: 'E01_계약서.txt' },
+    ] },
+  ];
+  const nodes = renderInlineMarkdown('[E02]', () => {}, citations);
+  assert.equal(nodes.filter((node) => node && node.type === 'button').length, 0);
+});
+
+test('동일한 증거의 여러 claim이 모호하면 Claim/Span을 임의 지정하지 않는다', () => {
+  const citations = [
+    { claim_text: '서로 다른 주장 1', citation_tag: '[E02]', evidence_refs: [
+      { evidence_id: 'same-document', evidence_label: 'E02', claim_id: 'claim-1', span_id: 'span-1', document_name: 'E02_입금.txt' },
+    ] },
+    { claim_text: '서로 다른 주장 2', citation_tag: '[E02]', evidence_refs: [
+      { evidence_id: 'same-document', evidence_label: 'E02', claim_id: 'claim-2', span_id: 'span-2', document_name: 'E02_입금.txt' },
+    ] },
+  ];
+  let clicked;
+  const nodes = renderInlineMarkdown('[E02]', (name, meta) => { clicked = { name, meta }; }, citations);
+  nodes.find((node) => node && node.type === 'button').props.onClick({ stopPropagation() {} });
+  assert.equal(clicked.meta.evidenceId, 'same-document');
+  assert.equal(clicked.meta.claimId, undefined);
+  assert.equal(clicked.meta.spanId, undefined);
+});
