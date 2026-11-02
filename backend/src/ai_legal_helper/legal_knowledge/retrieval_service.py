@@ -212,7 +212,13 @@ class LawRetrievalService:
                 if resolution.status in ("FOUND", "MULTIPLE", "SUGGESTED"):
                     selected = response.resolved_laws
                 elif resolution.status == "AMBIGUOUS":
+                    # 같은 별칭에 복수 법령ID가 연결되면 Vector 유사도로
+                    # 임의 법령을 채택하지 않는다. 검증 가능한 법령 후보가
+                    # 명확해진 후 별도 조회해야 한다.
+                    response.status = LawSourceStatus.SOURCE_MISSING
                     response.reason_codes.append("LAW_IDENTITY_AMBIGUOUS")
+                    response.official_search_recommended = True
+                    return response
             except Exception as exc:
                 # 신규 DB 테이블이 아직 마이그레이션되지 않았거나 DB가 잠시 불능이어도
                 # 기존 Vector 검색을 포기하지 않는다. 인증 URL/사건 자료는 로그에 남기지 않는다.
@@ -272,8 +278,21 @@ class LawRetrievalService:
                 logger.warning("[LAW_RETRIEVAL] 벡터 검색 장애 | collection=%s exception=%s",
                                collection, type(exc).__name__)
 
-        # 최신 공통 컬렉션을 우선 보존하되 기존 컬렉션도 검색한다.
-        response.sources = found[:k]
+        # 복합 질문에서 첫 번째 법령이 모든 slot을 채워 다른 법령을
+        # 누락시키지 않도록 요청 법령마다 최소 1건씩 먼저 배정한다.
+        # 동일 law/버전이 중복되어도 위 fingerprint로 이미 제거했다.
+        prioritized = []
+        if selected:
+            for law in selected:
+                candidate = next(
+                    (src for src in found
+                     if _source_matches_law(src, law) and src not in prioritized),
+                    None,
+                )
+                if candidate is not None:
+                    prioritized.append(candidate)
+        prioritized.extend(src for src in found if src not in prioritized)
+        response.sources = prioritized[:k]
         if unavailable:
             response.reason_codes.append("COLLECTION_MISSING")
         if failures:
@@ -319,11 +338,13 @@ class LawRetrievalService:
                     response.status = LawSourceStatus.SOURCE_PARTIAL
                     response.reason_codes.append("REQUIRED_ARTICLE_NOT_RETRIEVED")
                 elif any(
-                    law.get("current_mst") and any(
-                        _source_matches_law(src, law)
+                    not src.get("version_id") or (
+                        law.get("current_mst")
+                        and _source_matches_law(src, law)
                         and str(src.get("version_id") or "") != str(law["current_mst"])
-                        for src in response.sources
-                    ) for law in selected
+                    )
+                    for src in response.sources for law in selected
+                    if _source_matches_law(src, law)
                 ):
                     response.status = LawSourceStatus.SOURCE_VERSION_UNCONFIRMED
                     response.reason_codes.append("VERSION_NOT_CURRENTLY_CONFIRMED")
@@ -341,9 +362,10 @@ class LawRetrievalService:
             LawSourceStatus.RETRIEVAL_ERROR, LawSourceStatus.SOURCE_MISSING,
         ):
             if parse_legal_date(as_of_date) is None or any(
-                evaluate_statute_applicability(src, as_of_date).status
+                src.get("source_type") != "STATUTE"
+                or evaluate_statute_applicability(src, as_of_date).status
                 is not ApplicabilityStatus.APPLICABLE
-                for src in response.sources if src.get("source_type") == "STATUTE"
+                for src in response.sources
             ):
                 response.status = LawSourceStatus.SOURCE_TEMPORAL_UNCONFIRMED
                 response.reason_codes.append("TEMPORAL_LEGAL_REVIEW_REQUIRED")
@@ -355,7 +377,7 @@ class LawRetrievalService:
             LawSourceStatus.SOURCE_TEMPORAL_UNCONFIRMED,
         )
         # 인프라 오류는 '법령이 없다'가 아니므로 승인형 추가검색을 자동 권하지 않는다.
-        if response.status == LawSourceStatus.RETRIEVAL_ERROR:
+        if response.status == LawSourceStatus.RETRIEVAL_ERROR or failures:
             response.official_search_recommended = False
         logger.info(
             "[LAW_RETRIEVAL] status=%s category=%s source_count=%d "
