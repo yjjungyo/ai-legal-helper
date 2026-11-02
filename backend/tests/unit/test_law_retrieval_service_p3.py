@@ -293,3 +293,14 @@ def test_preselected_official_laws_do_not_require_runtime_catalog_db():
     )
     assert reply.status is LawSourceStatus.SOURCE_COMPLETE
     assert reply.catalog_status == "PROVIDED_BY_CALLER"
+
+
+def test_source_normalization_preserves_collection_provenance():
+    """검증 노드가 법령 출처를 다시 정규화해도 공통/레거시 출처가 유지된다."""
+    from ai_legal_helper.rag.source_schema import normalize_source_dict
+    backend = Backend(global_result=result(docs=[doc()]))
+    reply = service(backend).search("가상주택임대차보호법 제3조", category="civil")
+    normalized = normalize_source_dict(reply.sources[0])
+    assert normalized["retrieval_collection"] == GLOBAL_LAW_COLLECTION
+    assert normalized["law_id"] == "L1"
+    assert normalized["version_id"] == "MST-2"
