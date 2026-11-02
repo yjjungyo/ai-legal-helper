@@ -1,0 +1,32 @@
+name: Temporal Legal RAG P11 KPI harness
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/scripts/evaluation/temporal_rag_eval.py"
+      - "backend/scripts/evaluation/run_temporal_rag_p11.py"
+      - "backend/tests/unit/test_temporal_rag_evaluation_p11.py"
+      - "backend/tests/fixtures/temporal_rag_p11_fixture_gold.jsonl"
+      - ".github/workflows/temporal-legal-rag-p11.yml"
+  push:
+    branches: [main, feature/temporal-legal-rag-p11-evaluation-harness]
+    paths:
+      - "backend/scripts/evaluation/temporal_rag_eval.py"
+      - "backend/scripts/evaluation/run_temporal_rag_p11.py"
+      - "backend/tests/unit/test_temporal_rag_evaluation_p11.py"
+      - "backend/tests/fixtures/temporal_rag_p11_fixture_gold.jsonl"
+      - ".github/workflows/temporal-legal-rag-p11.yml"
+permissions:
+  contents: read
+jobs:
+  benchmark-integrity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install pytest
+      - name: Verify one-workflow-one-sample and no invented measurements
+        run: python -m pytest -q backend/tests/unit/test_temporal_rag_evaluation_p11.py
