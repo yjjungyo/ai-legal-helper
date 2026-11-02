@@ -1,0 +1,32 @@
+name: Temporal RAG P5 applicability
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/src/ai_legal_helper/legal_knowledge/temporal_resolver.py"
+      - "backend/tests/unit/test_temporal_law_resolver_p5.py"
+      - ".github/workflows/temporal-rag-p5.yml"
+  push:
+    branches: [main, feature/temporal-rag-p5-applicability]
+    paths:
+      - "backend/src/ai_legal_helper/legal_knowledge/temporal_resolver.py"
+      - "backend/tests/unit/test_temporal_law_resolver_p5.py"
+      - ".github/workflows/temporal-rag-p5.yml"
+permissions:
+  contents: read
+jobs:
+  applicability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install pytest
+      - name: Evaluate official addenda and event dates
+        env:
+          PYTHONPATH: backend/src
+          TESTING: "1"
+        run: |
+          python -m pytest -q backend/tests/unit/test_temporal_law_resolver_p5.py
