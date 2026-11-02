@@ -767,3 +767,38 @@ class LawCatalogSyncRun(Base):
     error_code = Column(String(100), nullable=True)
     started_at = Column(DateTime, default=get_kst_now, nullable=False)
     finished_at = Column(DateTime, nullable=True)
+
+
+# =============================================================================
+# Temporal Legal RAG P9 — 승인 후 공식 법령 전량 증분 인덱싱 작업 큐
+# =============================================================================
+class LawIndexJob(Base):
+    """법령ID+MST+목록 시행일별 멱등 증분 인덱싱 작업.
+
+    상담 답변 중 임베딩하지 않으며 별도 Worker가 claim/처리/확인한다.
+    PostgreSQL FOR UPDATE SKIP LOCKED로 동시 Worker 중복 실행을 방지한다.
+    """
+
+    __tablename__ = "law_index_jobs"
+    __table_args__ = (
+        UniqueConstraint(
+            "law_id", "version_id", "law_effective_date",
+            name="uq_law_index_job_version",
+        ),
+    )
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    law_id = Column(String(64), nullable=False, index=True)
+    law_name = Column(String(500), nullable=False)
+    law_type = Column(String(80), nullable=True)
+    version_id = Column(String(80), nullable=False)
+    law_effective_date = Column(String(10), nullable=False)
+    status = Column(String(20), nullable=False, default="PENDING", index=True)
+    attempt_count = Column(Integer, nullable=False, default=0)
+    indexed_chunk_count = Column(Integer, nullable=False, default=0)
+    indexed_content_hash = Column(String(64), nullable=True)
+    error_code = Column(String(100), nullable=True)
+    locked_at = Column(DateTime, nullable=True)
+    next_attempt_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=get_kst_now)
+    updated_at = Column(DateTime, nullable=False, default=get_kst_now, onupdate=get_kst_now)
