@@ -103,7 +103,10 @@ def make_fixed_retrieval_tool(tool_name: str, category_eng: str, label_ko: str) 
                 )
 
         if not sources:
-            return f"[검색결과 없음] '[{label_ko}]-[{rewritten_query}]' 관련 문서를 찾지 못했습니다."
+            no_match = f"[검색결과 없음] '[{label_ko}]-[{rewritten_query}]' 관련 문서를 찾지 못했습니다."
+            # P3: 동명 약칭 충돌, 조문 미확보, 버전 미확인 등 이유를
+            # '검색결과 없음' 뒤에 숨기지 않고 Agent에게 명확히 알린다.
+            return f"{no_match}\\n{status_note}" if status_note else no_match
 
         lines = []
         for std_src in sources[:MAX_DOCS]:
