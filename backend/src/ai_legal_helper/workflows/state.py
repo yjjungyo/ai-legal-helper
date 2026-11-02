@@ -71,6 +71,8 @@ class LegalState(MessagesState):
     statute_search_phase: Optional[str]  # PRE_ANALYSIS / POST_VERIFICATION
     # P5 구조화 판정은 출처 전체와 별도로 기록해 신법 오적용 추적 가능.
     temporal_resolution: Optional[Dict[str, Any]]
+    # P7: 공식/기존 Vector 법령 출처의 판정 포함 요약; 원본 출처와 별도 보존.
+    legal_evidence_bundle: Optional[Dict[str, Any]]
     statute_search_results: Optional[List[Dict[str, Any]]]
     statute_search_count: Optional[int]
     statute_search_history: Optional[List[str]]

@@ -534,6 +534,22 @@ async def run_agents_node(state: LegalState) -> Dict:
     case_ctx = state.get("case_context")
     if case_ctx:
         brief = f"{case_ctx}\n\n[이전 대화 요약]\n{brief}"
+    # P7: 사전 HILT 공식 검색 결과를 전문 Agent가 재사용하도록
+    # 근거ID/버전/부칙/판정이 붙은 제한된 Context를 제공한다.
+    # 원문 Source는 별도로 state/retrieved_sources에 보관한다.
+    prior_official = [
+        src for src in (state.get("retrieved_sources") or [])
+        if src.get("retrieval_method") == "OFFICIAL_STATUTE_SEARCH"
+    ]
+    if prior_official:
+        from ai_legal_helper.legal_knowledge.evidence_bundle import build_legal_evidence_bundle
+        context = build_legal_evidence_bundle(
+            prior_official,
+            temporal_resolution=state.get("temporal_resolution"),
+            max_chars=3200,
+        )
+        if context.digest:
+            brief = (brief[:1800] + "\n\n" + context.digest)
 
     results: Dict[str, str] = {}
     # 선행 승인 공식 원문은 Agent 실행 후에도 Verification에 계속 전달한다.
@@ -561,6 +577,25 @@ async def run_agents_node(state: LegalState) -> Dict:
     return {"results": results, "agent_results": results, "retrieved_sources": all_sources}
 
 @trace
+def legal_evidence_bundle_node(state: LegalState) -> Dict:
+    """P7 — 공식/Vector 법령 출처 및 P5 적용례 판정의 고정 근거 묶음 생성.
+
+    Source Registry 원문은 그대로 유지하고 LLM에 주입할 digest만 길이 제한.
+    """
+    set_node_name("legal_evidence_bundle")
+    from ai_legal_helper.legal_knowledge.evidence_bundle import build_legal_evidence_bundle
+    bundle = build_legal_evidence_bundle(
+        state.get("retrieved_sources"),
+        temporal_resolution=state.get("temporal_resolution"),
+    )
+    logger.info(
+        "[EVIDENCE_BUNDLE] statute_sources=%d warnings=%s truncated=%s",
+        bundle.source_count, bundle.warning_codes, bundle.truncated,
+    )
+    return {"legal_evidence_bundle": bundle.as_dict()}
+
+
+@trace
 def synthesize_node(state: LegalState) -> Dict:
     """문서 원문 또는 기존 전문 분석으로 초안을 작성한다.
 
@@ -581,6 +616,7 @@ def synthesize_node(state: LegalState) -> Dict:
         case_evidence_briefing=state.get("case_evidence_briefing"),
         issue_tasks=state.get("issue_tasks"),
         source_registry={s.get("evidence_label", s.get("source_id")): s for s in (state.get("case_evidence_sources") or []) if s},
+        legal_evidence_bundle=state.get("legal_evidence_bundle"),
     )
     draft = msgs[-1].content
     d_hash = hashlib.sha256(draft.encode("utf-8")).hexdigest()[:8]
@@ -2032,6 +2068,7 @@ def build_legal_graph(checkpointer: Optional[Any] = None):
     graph.add_node("plan", plan_node)
     graph.add_node("statute_search_plan", statute_search_plan_node)
     graph.add_node("run_agents", run_agents_node)
+    graph.add_node("legal_evidence_bundle", legal_evidence_bundle_node)
     graph.add_node("synthesize", synthesize_node)
     graph.add_node("verification", verification_node)
     graph.add_node("revise", revise_node)
@@ -2062,7 +2099,8 @@ def build_legal_graph(checkpointer: Optional[Any] = None):
         "statute_search_approval": "statute_search_approval",
         "run_agents": "run_agents",
     })
-    graph.add_edge("run_agents", "synthesize")
+    graph.add_edge("run_agents", "legal_evidence_bundle")
+    graph.add_edge("legal_evidence_bundle", "synthesize")
     graph.add_edge("synthesize", "verification")
 
     graph.add_conditional_edges("verification", verification_condition, {
