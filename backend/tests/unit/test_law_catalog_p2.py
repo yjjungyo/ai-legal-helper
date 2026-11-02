@@ -253,3 +253,17 @@ def test_missing_api_key_stops_before_any_network(db):
     with pytest.raises(ValueError, match="LAW_OPENAPI_KEY_MISSING"):
         sync_official_catalog(db, api_key="", fetch_xml=lambda url: called.append(url))
     assert called == []
+
+
+def test_duplicate_law_id_never_counts_as_complete_inventory(db):
+    """API 페이지 겹침으로 count만 맞아도 실제 법령 목록은 불완전할 수 있다."""
+    def fetch(url):
+        return _xml(page=1, total=2, entries=[
+            ("111", "테스트법", "", "법률"),
+            ("111", "테스트법", "", "법률"),
+        ])
+    summary = sync_official_catalog(db, api_key="mock-secret", fetch_xml=fetch)
+    assert summary.status == "PARTIAL"
+    assert summary.pages_completed == 1
+    assert summary.items_seen == 2
+    assert db.scalar(select(func.count()).select_from(LawCatalogEntry)) == 1
