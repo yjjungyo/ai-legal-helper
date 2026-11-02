@@ -8,6 +8,7 @@ on:
       - "backend/src/ai_legal_helper/database/models.py"
       - "backend/alembic/versions/90d4e30c2a71_add_official_law_catalog.py"
       - "backend/tests/unit/test_law_catalog_p2.py"
+      - "backend/tests/unit/test_law_catalog_migration_p2.py"
       - ".github/workflows/temporal-legal-rag-p2.yml"
   push:
     branches: [main, feature/temporal-legal-rag-p2-law-catalog]
@@ -35,10 +36,10 @@ jobs:
       - name: Install minimal offline-test dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pytest "sqlalchemy>=2.0" "psycopg[binary]>=3.1" python-dotenv "pydantic>=2.5" "alembic>=1.13"
+          python -m pip install pytest pytest-asyncio "sqlalchemy>=2.0" "psycopg[binary]>=3.1" python-dotenv "pydantic>=2.5" "alembic>=1.13"
       - name: P2 catalog and resolver regression
         env:
           PYTHONPATH: backend/src
           TESTING: "1"
         run: |
-          python -m pytest -q backend/tests/unit/test_law_catalog_p2.py
+          python -m pytest -q backend/tests/unit/test_law_catalog_p2.py backend/tests/unit/test_law_catalog_migration_p2.py
