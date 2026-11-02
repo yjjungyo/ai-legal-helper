@@ -129,7 +129,11 @@ class StatuteChunker:
                 "article": approx_art,
                 "article_title": "",
                 "page": "1",
-                "effective_date": meta.effective_date,
+                # 기존 PDF 파서는 파일명에서 날짜를 추출한다. 그 날짜는 조문 시행일로 확정할 수 없다.
+                # 공식 확인 전에는 검색 힌트로만 보관하고 3상 시점 판정에서는 사용하지 않는다.
+                "filename_date_hint": meta.effective_date,
+                "effective_date_basis": "FILENAME_INFERRED",
+                "temporal_status": "UNCONFIRMED",
                 "version_date": meta.effective_date,
                 "content_hash": chash,
                 "category": meta.category,
@@ -188,7 +192,11 @@ class StatuteChunker:
                     "article": article.article_no,
                     "article_title": article.article_title,
                     "page": str(article.start_page),
-                    "effective_date": meta.effective_date,
+                    # 기존 PDF 파서는 파일명에서 날짜를 추출한다. 그 날짜는 조문 시행일로 확정할 수 없다.
+                    # 공식 확인 전에는 검색 힌트로만 보관하고 3상 시점 판정에서는 사용하지 않는다.
+                    "filename_date_hint": meta.effective_date,
+                    "effective_date_basis": "FILENAME_INFERRED",
+                    "temporal_status": "UNCONFIRMED",
                     "version_date": meta.effective_date,
                     "content_hash": chash,
                     "category": meta.category,
@@ -221,7 +229,11 @@ class StatuteChunker:
                         "article": article.article_no,
                         "article_title": article.article_title,
                         "page": str(para.start_page),
-                        "effective_date": meta.effective_date,
+                        # 기존 PDF 파서는 파일명에서 날짜를 추출한다. 그 날짜는 조문 시행일로 확정할 수 없다.
+                        # 공식 확인 전에는 검색 힌트로만 보관하고 3상 시점 판정에서는 사용하지 않는다.
+                        "filename_date_hint": meta.effective_date,
+                        "effective_date_basis": "FILENAME_INFERRED",
+                        "temporal_status": "UNCONFIRMED",
                         "version_date": meta.effective_date,
                         "content_hash": chash,
                         "category": meta.category,
@@ -291,7 +303,11 @@ class StatuteChunker:
                     "article": article.article_no,
                     "article_title": article.article_title,
                     "page": str(article.start_page),
-                    "effective_date": meta.effective_date,
+                    # 기존 PDF 파서는 파일명에서 날짜를 추출한다. 그 날짜는 조문 시행일로 확정할 수 없다.
+                    # 공식 확인 전에는 검색 힌트로만 보관하고 3상 시점 판정에서는 사용하지 않는다.
+                    "filename_date_hint": meta.effective_date,
+                    "effective_date_basis": "FILENAME_INFERRED",
+                    "temporal_status": "UNCONFIRMED",
                     "version_date": meta.effective_date,
                     "content_hash": chash,
                     "category": meta.category,
@@ -332,7 +348,11 @@ class StatuteChunker:
                         "article": article.article_no,
                         "article_title": article.article_title,
                         "page": str(para.start_page),
-                        "effective_date": meta.effective_date,
+                        # 기존 PDF 파서는 파일명에서 날짜를 추출한다. 그 날짜는 조문 시행일로 확정할 수 없다.
+                        # 공식 확인 전에는 검색 힌트로만 보관하고 3상 시점 판정에서는 사용하지 않는다.
+                        "filename_date_hint": meta.effective_date,
+                        "effective_date_basis": "FILENAME_INFERRED",
+                        "temporal_status": "UNCONFIRMED",
                         "version_date": meta.effective_date,
                         "content_hash": chash,
                         "category": meta.category,
@@ -386,7 +406,11 @@ class StatuteChunker:
                         "article": article.article_no,
                         "article_title": article.article_title,
                         "page": str(para.start_page),
-                        "effective_date": meta.effective_date,
+                        # 기존 PDF 파서는 파일명에서 날짜를 추출한다. 그 날짜는 조문 시행일로 확정할 수 없다.
+                        # 공식 확인 전에는 검색 힌트로만 보관하고 3상 시점 판정에서는 사용하지 않는다.
+                        "filename_date_hint": meta.effective_date,
+                        "effective_date_basis": "FILENAME_INFERRED",
+                        "temporal_status": "UNCONFIRMED",
                         "version_date": meta.effective_date,
                         "content_hash": chash,
                         "category": meta.category,

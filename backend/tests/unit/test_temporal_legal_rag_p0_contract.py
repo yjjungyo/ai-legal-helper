@@ -11,11 +11,9 @@ Temporal Legal RAG P0: 기존 기능을 보호하기 위한 기준선 계약 테
 [주의]
 - 외부 OpenLaw·LLM·ChromaDB·PostgreSQL에 연결하지 않는 단위 테스트다.
 - 임의의 법령과 날짜는 테스트 픽스처이며 특정 실제 법령에 대한 판단이 아니다.
-- xfail은 해결된 기능이 아니다. 다음 Phase에서 정책 변경 후 정상 PASS로 전환한다.
+- P1에서 확인된 결함을 수정하여 xfail 표시를 제거하고 정상 PASS 대상으로 전환한다.
 """
 import xml.etree.ElementTree as ET
-
-import pytest
 
 from ai_legal_helper.agents.constants import (
     CATEGORIES,
@@ -108,22 +106,14 @@ def test_explicit_effective_date_checks_before_and_after():
     assert is_statute_applicable_to_date(source, "2027-02-01") is True
 
 
-@pytest.mark.xfail(
-    reason="P1 작업: 시행일·적용례 미확인은 True가 아닌 명시적 UNCONFIRMED여야 한다",
-    strict=False,
-)
 def test_unknown_effective_date_must_not_be_auto_applicable():
-    """현재 알려진 위험을 기록한다. P1에서 3상 판정 API로 교체 후 PASS로 전환."""
+    """시행일을 모르는 레거시 bool 조회는 True로 승인하지 않는다."""
     source = {"source_type": "STATUTE", "statute_name": "테스트법"}
     assert is_statute_applicable_to_date(source, "2026-11-01") is not True
 
 
-@pytest.mark.xfail(
-    reason="P1 작업: 파일명 날짜만으로 공식 조문 시행일을 확정하면 안 된다",
-    strict=False,
-)
 def test_filename_date_must_not_be_treated_as_verified_effective_date():
-    """PDF 파일명에서 유추한 날짜는 공식 확인된 시행일과 분리해야 한다."""
+    """PDF 파일명에서 유추한 날짜는 공식 확인된 시행일과 분리한다."""
     source = normalize_source_dict({
         "source_id": "legacy-test",
         "source_type": "STATUTE",

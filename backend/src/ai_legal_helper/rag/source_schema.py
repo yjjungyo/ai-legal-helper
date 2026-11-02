@@ -71,6 +71,24 @@ class StandardSource(BaseModel):
     effective_date: Optional[str] = None
     version_id: Optional[str] = None
 
+    # 2.1 법령 적용시점 판단용 확장 메타데이터 (Temporal Legal RAG P1)
+    # 법령 전체 시행일과 개별 조문 시행일은 서로 다를 수 있다.
+    # 공식 출처에서 검증하지 않은 날짜를 시행일로 승격시키지 않는다.
+    law_type: Optional[str] = None
+    law_effective_date: Optional[str] = None
+    article_effective_date: Optional[str] = None
+    effective_date_basis: Optional[str] = None
+    effective_to: Optional[str] = None
+    filename_date_hint: Optional[str] = None
+    addendum_id: Optional[str] = None
+    applicability_rule_id: Optional[str] = None
+    transitional_rule_id: Optional[str] = None
+    applicability_event_type: Optional[str] = None
+    retroactivity_review_required: Optional[bool] = None
+    temporal_status: Optional[str] = None
+    metadata_confidence: Optional[str] = None
+    content_hash: Optional[str] = None
+
     # 3. 판례(PRECEDENT) 전용 필드
     court: Optional[str] = None
     case_number: Optional[str] = None
@@ -157,6 +175,10 @@ def build_source_from_chroma_doc(
     section = str(meta.get("section") or "").strip() or None
     promulgation_number = str(meta.get("promulgation_number") or "").strip() or None
     effective_date = _format_yyyymmdd(meta.get("effective_date"))
+    # 최신 공식 메타데이터는 별도 필드에 기록하고, 기존 effective_date는 호환을 위해 유지한다.
+    law_effective_date = _format_yyyymmdd(meta.get("law_effective_date"))
+    article_effective_date = _format_yyyymmdd(meta.get("article_effective_date"))
+    filename_date_hint = _format_yyyymmdd(meta.get("filename_date_hint"))
 
     court = meta.get("court")
     case_number = meta.get("case_number")
@@ -174,8 +196,9 @@ def build_source_from_chroma_doc(
                 parsed_date = _format_yyyymmdd(m_stat.group(4))
                 if not version_date:
                     version_date = parsed_date
-                if not effective_date:
-                    effective_date = parsed_date
+                # PDF 파일명은 법령 제목이나 인덱스 버전의 힌트일 뿐 공식 조문 시행일이 아니다.
+                if not filename_date_hint:
+                    filename_date_hint = parsed_date
 
     # 본문에서 확인되는 조문, 조문제목 또는 판례 번호 추출 (임의 추론 금지, 정규식 완전 매칭만 허용)
     if not article and content:
@@ -287,6 +310,23 @@ def build_source_from_chroma_doc(
         section=section,
         promulgation_number=promulgation_number,
         effective_date=effective_date,
+        law_id=str(meta.get("law_id")).strip() if meta.get("law_id") else None,
+        version_id=str(meta.get("version_id")).strip() if meta.get("version_id") else None,
+        promulgation_date=_format_yyyymmdd(meta.get("promulgation_date")),
+        law_type=meta.get("law_type"),
+        law_effective_date=law_effective_date if source_type == "STATUTE" else None,
+        article_effective_date=article_effective_date if source_type == "STATUTE" else None,
+        effective_date_basis=(meta.get("effective_date_basis") or "LEGACY_UNVERIFIED") if effective_date and source_type == "STATUTE" else meta.get("effective_date_basis"),
+        effective_to=_format_yyyymmdd(meta.get("effective_to")) if source_type == "STATUTE" else None,
+        filename_date_hint=filename_date_hint if source_type == "STATUTE" else None,
+        addendum_id=meta.get("addendum_id") if source_type == "STATUTE" else None,
+        applicability_rule_id=meta.get("applicability_rule_id") if source_type == "STATUTE" else None,
+        transitional_rule_id=meta.get("transitional_rule_id") if source_type == "STATUTE" else None,
+        applicability_event_type=meta.get("applicability_event_type") if source_type == "STATUTE" else None,
+        retroactivity_review_required=meta.get("retroactivity_review_required") if source_type == "STATUTE" else None,
+        temporal_status=(meta.get("temporal_status") or "UNCONFIRMED") if source_type == "STATUTE" else None,
+        metadata_confidence=meta.get("metadata_confidence") if source_type == "STATUTE" else None,
+        content_hash=meta.get("content_hash") if source_type == "STATUTE" else None,
         court=court,
         case_number=case_number,
         decision_date=decision_date,
@@ -481,6 +521,7 @@ def normalize_source_dict(raw: Any) -> Dict[str, Any]:
     promulgation_number = str(raw.get("promulgation_number") or "").strip() or None
     version_date = _format_yyyymmdd(raw.get("version_date"))
     effective_date = _format_yyyymmdd(raw.get("effective_date"))
+    filename_date_hint = _format_yyyymmdd(raw.get("filename_date_hint"))
     if filename and source_type == "STATUTE":
         m_stat = _STATUTE_FILENAME_RE.match(filename)
         if m_stat:
@@ -490,7 +531,8 @@ def normalize_source_dict(raw: Any) -> Dict[str, Any]:
             if m_stat.group(4):
                 parsed_dt = _format_yyyymmdd(m_stat.group(4))
                 version_date = version_date or parsed_dt
-                effective_date = effective_date or parsed_dt
+                # 날짜가 파일명에서만 유추되면 시행일로 채우지 않고 힌트로만 보관한다.
+                filename_date_hint = filename_date_hint or parsed_dt
 
     content = raw.get("content")
     article = raw.get("article")
@@ -558,6 +600,20 @@ def normalize_source_dict(raw: Any) -> Dict[str, Any]:
         promulgation_number=promulgation_number if source_type == "STATUTE" else None,
         effective_date=effective_date if source_type == "STATUTE" else None,
         version_id=str(raw.get("version_id")).strip() if raw.get("version_id") else None,
+        law_type=raw.get("law_type") if source_type == "STATUTE" else None,
+        law_effective_date=_format_yyyymmdd(raw.get("law_effective_date")) if source_type == "STATUTE" else None,
+        article_effective_date=_format_yyyymmdd(raw.get("article_effective_date")) if source_type == "STATUTE" else None,
+        effective_date_basis=(raw.get("effective_date_basis") or ("LEGACY_UNVERIFIED" if effective_date else None)) if source_type == "STATUTE" else None,
+        effective_to=_format_yyyymmdd(raw.get("effective_to")) if source_type == "STATUTE" else None,
+        filename_date_hint=filename_date_hint if source_type == "STATUTE" else None,
+        addendum_id=raw.get("addendum_id") if source_type == "STATUTE" else None,
+        applicability_rule_id=raw.get("applicability_rule_id") if source_type == "STATUTE" else None,
+        transitional_rule_id=raw.get("transitional_rule_id") if source_type == "STATUTE" else None,
+        applicability_event_type=raw.get("applicability_event_type") if source_type == "STATUTE" else None,
+        retroactivity_review_required=raw.get("retroactivity_review_required") if source_type == "STATUTE" else None,
+        temporal_status=(raw.get("temporal_status") or "UNCONFIRMED") if source_type == "STATUTE" else None,
+        metadata_confidence=raw.get("metadata_confidence") if source_type == "STATUTE" else None,
+        content_hash=raw.get("content_hash") if source_type == "STATUTE" else None,
         court=raw.get("court") if source_type == "PRECEDENT" else None,
         case_number=raw.get("case_number") if source_type == "PRECEDENT" else None,
         decision_date=raw.get("decision_date") if source_type == "PRECEDENT" else None,
@@ -579,42 +635,26 @@ def normalize_source_dict(raw: Any) -> Dict[str, Any]:
 
 
 def is_statute_applicable_to_date(source_dict: Dict[str, Any], target_date_str: str) -> bool:
-    """주어진 법령 출처가 사건 발생일(또는 계약/해지 기준일)에 시행 중이었는지 검증한다.
+    """레거시 호출용 '명시 시행일 이후인가' 날짜 비교. 새 법률 적용 판정에는 사용하지 않는다.
 
-    Args:
-        source_dict: 법령 출처 정보 딕셔너리 (effective_date, promulgation_date, version_date 등 포함).
-        target_date_str: 사건 발생일 또는 계약/해지 기준일자 (예: '2026-10-17' 또는 '20261017').
-
-    Returns:
-        bool: 사건 발생일 기준 시행 중인 법령이면 True, 미시행 법령이면 False.
-              날짜 정보가 없거나 파싱 불가능한 경우 안전하게 True를 반환한다.
+    [P1 안전성 조치]
+    - 기존 bool API와 이름을 유지해 과거 호출자의 반환 타입을 깨지 않는다.
+    - 날짜가 없거나 파일명에서 유추한 값만 존재하면 True 대신 False를 반환한다.
+    - 이 반환값의 True는 '법률 적용 가능 확정'이 아니라 단순 날짜 비교 결과다.
+      부칙·적용례·경과규정은 반드시 evaluate_statute_applicability()로 확인한다.
+    - 모호한 상황을 false로 축약하는 구 API를 새 코드에서 사용하지 말 것.
     """
-    if not source_dict or not target_date_str:
-        return True
+    from ai_legal_helper.rag.temporal_applicability import parse_legal_date
 
-    def _parse_clean_date(d: Any) -> Optional[datetime]:
-        if not d:
-            return None
-        s = str(d).strip().replace(".", "-").replace("/", "-")
-        if len(s) == 8 and s.isdigit():
-            s = f"{s[:4]}-{s[4:6]}-{s[6:8]}"
-        try:
-            return datetime.strptime(s[:10], "%Y-%m-%d")
-        except Exception:
-            return None
-
-    target_dt = _parse_clean_date(target_date_str)
-    if not target_dt:
-        return True
-
-    eff_str = source_dict.get("effective_date") or source_dict.get("version_date")
-    eff_dt = _parse_clean_date(eff_str)
-    if eff_dt:
-        return target_dt >= eff_dt
-
-    prom_str = source_dict.get("promulgation_date")
-    prom_dt = _parse_clean_date(prom_str)
-    if prom_dt:
-        return target_dt >= prom_dt
-
-    return True
+    if not source_dict or source_dict.get("source_type", "STATUTE") != "STATUTE":
+        return False
+    target = parse_legal_date(target_date_str)
+    # 기존 실제 운영 소스의 effective_date 값은 보존하되 파일명 유래 값은 신뢰하지 않는다.
+    if source_dict.get("effective_date_basis") == "FILENAME_INFERRED":
+        return False
+    effective = parse_legal_date(
+        source_dict.get("article_effective_date") or source_dict.get("effective_date")
+    )
+    if target is None or effective is None:
+        return False
+    return target >= effective

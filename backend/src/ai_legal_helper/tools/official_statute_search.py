@@ -34,7 +34,7 @@ from dataclasses import dataclass, field
 from ai_legal_helper.observability.decorators import trace
 from ai_legal_helper.observability.logging_config import get_logger
 from ai_legal_helper.rag.source_schema import normalize_source_dict
-from ai_legal_helper.tools.statute_temporal import extract_addenda, iso_date, _effective_from_addendum
+from ai_legal_helper.tools.statute_temporal import extract_addenda, iso_date, _effective_from_addendum, article_effective_date
 
 logger = get_logger(__name__)
 
@@ -464,11 +464,17 @@ def search_official_statutes(
 
                 article_references = _article_references(full_article_text)
 
+                # 공포번호에 해당하는 부칙과 조문 고유 시행일을 함께 평가한다.
+                # 법령 목록의 공통 시행일은 개별 조문의 확정 시행일로 승격하지 않는다.
+                confirmed_date, date_basis = article_effective_date(
+                    node, article_label, matched_addenda
+                )
                 candidate_articles[article_label] = {
                     "article_label": article_label,
                     "article_title": art_title,
                     "content": full_article_text,
-                    "article_effective_date": iso_date(node.findtext("조문시행일자")),
+                    "article_effective_date": confirmed_date,
+                    "effective_date_basis": date_basis,
                     "explicit_score": explicit_score,
                     "title_score": title_score,
                     "body_score": body_score,
@@ -516,11 +522,16 @@ def search_official_statutes(
                 first_no = first_node.findtext("조문번호") or "1"
                 first_label = f"제{first_no}조"
                 first_content = (first_node.findtext("조문내용") or "").strip()
+                confirmed_date, date_basis = article_effective_date(
+                    first_node, first_label, matched_addenda
+                )
                 selected_articles = [{
                     "total_score": 0.0,
                     "article_label": first_label,
                     "article_title": first_node.findtext("조문제목") or "",
                     "content": first_content,
+                    "article_effective_date": confirmed_date,
+                    "effective_date_basis": date_basis,
                     "reasons": ["기본 조문(총칙) 기본값"],
                 }]
 
@@ -557,7 +568,10 @@ def search_official_statutes(
                 art_label = item["article_label"]
                 art_title = (item.get("article_title") or "").strip()
                 art_full = f"{art_label}({art_title})" if art_title else art_label
-                article_effective = item.get("article_effective_date") or effective_date_str
+                # 미확인 조문 시행일을 법령 공통 시행일로 대체하지 않는다.
+                article_effective = item.get("article_effective_date")
+                effective_basis = item.get("effective_date_basis") or "UNCONFIRMED"
+                # 레거시 출처 파일명 규약은 유지하되 날짜 확인 여부가 제목에 반영되도록 한다.
                 filename_effective = (article_effective or "").replace("-", "")
                 if law_no_disp and filename_effective:
                     doc_filename = f"{official_law_name}({law_type_name or '법률'})({law_no_disp})({filename_effective}).pdf"
@@ -585,8 +599,15 @@ def search_official_statutes(
                     "article_title": art_title or None,
                     "law_id": law_id or None,
                     "version_id": mst or None,
+                    "law_type": law_type_name or None,
                     "promulgation_date": promulgation_date_str or None,
                     "promulgation_number": law_no_disp or None,
+                    "law_effective_date": effective_date_str or None,
+                    "article_effective_date": article_effective,
+                    "effective_date_basis": effective_basis,
+                    # 조문 시행일을 확보했어도 적용례·경과규정 검증 전에는 적용 가능 확정 금지.
+                    "temporal_status": "EFFECTIVE_DATE_VERIFIED" if article_effective else "UNCONFIRMED",
+                    "metadata_confidence": "OFFICIAL_SOURCE",
                     "content": item["content"],
                     "retrieval_method": "OFFICIAL_STATUTE_SEARCH",
                     "chunk_id": f"statute-{mst}-{art_label}",
@@ -628,8 +649,14 @@ def search_official_statutes(
                         "article_title": "시행일 및 적용례",
                         "law_id": law_id or None,
                         "version_id": mst,
+                        "law_type": law_type_name or None,
+                        "law_effective_date": effective_date_str or None,
                         "promulgation_date": addendum.promulgation_date or promulgation_date_str or None,
                         "promulgation_number": law_no_disp or None,
+                        "addendum_id": f"{mst}:{law_no}",
+                        "effective_date_basis": "ADDENDUM_EFFECTIVE_DATE" if addendum_effective else "UNCONFIRMED",
+                        "temporal_status": "EFFECTIVE_DATE_VERIFIED" if addendum_effective else "UNCONFIRMED",
+                        "metadata_confidence": "OFFICIAL_SOURCE",
                         "content": addendum.content,
                         "retrieval_method": "OFFICIAL_STATUTE_SEARCH",
                         "chunk_id": f"statute-{mst}-addendum-{law_no}",
