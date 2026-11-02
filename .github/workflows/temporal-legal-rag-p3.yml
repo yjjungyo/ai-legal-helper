@@ -1,0 +1,71 @@
+name: Temporal Legal RAG P3 regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/src/ai_legal_helper/legal_knowledge/retrieval_service.py"
+      - "backend/src/ai_legal_helper/rag/retrieval_factory.py"
+      - "backend/src/ai_legal_helper/rag/source_schema.py"
+      - "backend/src/ai_legal_helper/agents/legal/base_agent.py"
+      - "backend/tests/unit/test_law_retrieval_service_p3.py"
+      - "backend/tests/unit/test_law_retrieval_tool_p3.py"
+      - ".github/workflows/temporal-legal-rag-p3.yml"
+  push:
+    branches: [main, feature/temporal-legal-rag-p3-common-retrieval]
+    paths:
+      - "backend/src/ai_legal_helper/legal_knowledge/retrieval_service.py"
+      - "backend/src/ai_legal_helper/rag/retrieval_factory.py"
+      - "backend/src/ai_legal_helper/rag/source_schema.py"
+      - "backend/src/ai_legal_helper/agents/legal/base_agent.py"
+      - "backend/tests/unit/test_law_retrieval_service_p3.py"
+      - "backend/tests/unit/test_law_retrieval_tool_p3.py"
+      - ".github/workflows/temporal-legal-rag-p3.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  retrieval-service:
+    name: Shared retrieval policy (offline)
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install isolated service test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest pytest-asyncio "sqlalchemy>=2.0" "psycopg[binary]>=3.1" python-dotenv "pydantic>=2.5" "alembic>=1.13"
+      - name: Run P3 service + P2 catalog regressions
+        env:
+          PYTHONPATH: backend/src
+          TESTING: "1"
+          LANGFUSE_ENABLED: "false"
+        run: |
+          python -m pytest -q backend/tests/unit/test_law_retrieval_service_p3.py backend/tests/unit/test_law_catalog_p2.py
+
+  retrieval-tool-adapter:
+    name: Existing 8-Agent Tool adapter (mock LLM/Chroma)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r backend/requirements.txt
+      - name: Run tool integration without external API keys
+        env:
+          PYTHONPATH: backend/src
+          TESTING: "1"
+          LANGFUSE_ENABLED: "false"
+          LEGAL_GLOBAL_RETRIEVAL_ENABLED: "1"
+          LEGAL_CATALOG_RESOLUTION_ENABLED: "1"
+        run: |
+          python -m pytest -q backend/tests/unit/test_law_retrieval_tool_p3.py backend/tests/unit/test_temporal_legal_rag_p0_contract.py backend/tests/unit/test_top10_audit_fixes.py::test_issue_1_agent_executor_injects_tool_observation_and_chat_brief backend/tests/unit/test_top10_audit_fixes.py::test_additional_1_retrieval_factory_guide_has_no_hardcoded_filename

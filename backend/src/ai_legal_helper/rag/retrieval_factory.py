@@ -1,13 +1,23 @@
 # -*- coding: utf-8 -*-
 """
-RAG 검색 도구 팩토리 (Retrieval Factory) 모듈
+P3 공통 법령 검색 Tool 어댑터 (기존 Agent 8개 Tool 이름 유지).
 
-이 모듈은 특화된 법률 분야(민법, 형법 등)별로 고정된 컬렉션을 조회하는 LangChain Tool을 동적으로 생성한다.
-P2.1 검증 단계에서 전문 에이전트(AgentExecutor)가 도구의 반환값을 내부적으로 소모하여 
-워크플로우 외부로 전달하지 못하는 문제를 해결하기 위해, 검색이 성공할 때마다 
-`contextvars` 기반의 `add_retrieved_source`를 호출하여 실제 참조된 문헌 정보를 추적한다.
+[주요 변경]
+- 기존 law_docs_{분야} 단일 Vector 검색 대신 LawRetrievalService가
+  law_docs_global + 기존 분야별 컬렉션을 통합 검색한다.
+- 문서 원문 전체를 컨텍스트 출처 Registry에 기록한다. LLM에는 간단한
+  근거 미리보기만 전달하여 긴 조문을 중복해서 소모하지 않도록 한다.
+- 법령 버전/조문/시행일이 불완전할 때 검증 완료라고 표현하지 않는다.
+- 공식 OpenLaw 호출은 하지 않으며 기존 HILT를 우회하지 않는다.
+
+[호환성]
+- Tool 이름·입력/출력 형식 및 8개 Agent 팩토리 호출 계약 유지.
+- LEGAL_GLOBAL_RETRIEVAL_ENABLED=0은 기존 단일 분야 Vector로 되돌린다.
+- 기존 테스트에서 _retrieve 함수를 Mock으로 교체하는 호환 경로는 유지.
 """
 import os
+import unittest.mock
+
 from langchain_core.tools import Tool
 
 from ai_legal_helper.observability.decorators import trace
@@ -20,86 +30,123 @@ logger = get_logger(__name__)
 MAX_DOCS = 2
 SNIP = 240
 
+
 @trace
 def make_fixed_retrieval_tool(tool_name: str, category_eng: str, label_ko: str) -> Tool:
-    """
-    특정 법률 분야 전용 RAG 검색 도구(LangChain Tool)를 생성하여 반환한다.
+    """기존 Agent Tool 계약을 유지하되 내부 구현을 공통 법령 검색으로 위임한다."""
 
-    생성된 도구는 검색어 재작성(Rewrite)을 거쳐 Chroma DB에서 연관 문서를 검색하며, 
-    검색된 각 문서는 `add_retrieved_source`를 통해 현재 실행 컨텍스트에 저장된다.
-    이를 통해 상위 Supervisor 노드나 Verification 에이전트가 어떤 문서를 근거로 답변이 작성되었는지 파악할 수 있다.
-
-    Args:
-        tool_name (str): 생성될 도구의 이름 (예: "search_civil_law")
-        category_eng (str): Chroma DB 컬렉션 식별을 위한 영문 카테고리 (예: "civil")
-        label_ko (str): 검색어 재작성 및 로깅에 사용될 한글 분야명 (예: "민법")
-
-    Returns:
-        Tool: LangChain Agent에서 사용할 수 있는 Tool 인스턴스
-    """
     @trace
     def _run(query: str) -> str:
+        """공통 Vector 결과를 근거 Registry와 Observation으로 전달한다.
+
+        검색 장애는 법령 없음과 구분하여 표시하며, 검색 상태를 이유로
+        임의의 법률조문이나 출처를 만들어 답변하지 않는다.
         """
-        실제 검색 도구가 호출될 때 실행되는 함수.
-        
-        흐름:
-        1. 검색어 재작성 (rewrite_query)
-        2. Chroma 문서 검색 (retrieve)
-        3. 검색된 결과를 컨텍스트 변수에 저장 (add_retrieved_source)
-        4. LLM이 이해하기 쉬운 문자열 형태로 요약하여 반환
-        """
-        logger.debug(f"[법률 검색 도구 호출] 도구={tool_name}, 분야={label_ko}({category_eng}), 질의길이={len(query or '')}자")
-        
+        logger.debug(
+            "[LAW_TOOL] tool=%s category=%s question_len=%d",
+            tool_name, category_eng, len(query or ""),
+        )
         rewritten_query = rewrite_query(query or "", label_ko, max_terms=2)
-        
+
         from ai_legal_helper.observability.context import add_retrieved_source
         from ai_legal_helper.rag.source_schema import build_source_from_chroma_doc
         from ai_legal_helper.rag.retrieval import retrieve_with_status, RetrievalStatus
-        import unittest.mock
 
-        # 하위 호환 및 단위 테스트 mock 지원: _retrieve가 패치된 경우 이를 우선 호출
-        if isinstance(_retrieve, (unittest.mock.Mock, unittest.mock.MagicMock)):
+        sources = []
+        status_note = ""
+        # 기존 코드/테스트의 _retrieve Mock 계약을 보존한다.
+        if isinstance(_retrieve, unittest.mock.Mock):
             raw_docs = _retrieve(query=rewritten_query, k=MAX_DOCS, category=category_eng)
-            if not raw_docs:
-                return f"[검색결과 없음] '[{label_ko}]-[{rewritten_query}]' 관련 문서를 찾지 못했습니다."
-            docs = raw_docs
+            sources = [
+                build_source_from_chroma_doc(
+                    doc, category=category_eng, retrieval_method="CHROMA_VECTOR"
+                )
+                for doc in (raw_docs or [])[:MAX_DOCS]
+            ]
+        elif os.getenv("LEGAL_GLOBAL_RETRIEVAL_ENABLED", "1") == "0":
+            # 긴급 롤백 시 신규 Service/DB/공통 컬렉션을 전혀 사용하지 않는다.
+            legacy = retrieve_with_status(
+                query=rewritten_query, k=MAX_DOCS, category=category_eng,
+            )
+            if legacy.status == RetrievalStatus.COLLECTION_MISSING:
+                return f"[검색 인프라 장애: 컬렉션 부재] '{label_ko}' 인덱스 컬렉션을 찾지 못했습니다."
+            if legacy.status in (
+                RetrievalStatus.RETRIEVER_UNAVAILABLE,
+                RetrievalStatus.EMBEDDING_ERROR,
+                RetrievalStatus.CONFIGURATION_ERROR,
+            ):
+                return f"[검색 인프라 장애: 서비스 연결 오류] '{label_ko}' Vector 검색에 실패했습니다."
+            sources = [
+                build_source_from_chroma_doc(
+                    doc, category=category_eng, retrieval_method="CHROMA_VECTOR"
+                ) for doc in legacy.documents[:MAX_DOCS]
+            ]
         else:
-            ret_res = retrieve_with_status(query=rewritten_query, k=MAX_DOCS, category=category_eng)
-            if ret_res.status == RetrievalStatus.COLLECTION_MISSING:
-                return f"[검색 인프라 장애: 컬렉션 부재] '{label_ko}' 인덱스 컬렉션이 데이터베이스에 존재하지 않습니다."
-            elif ret_res.status in (RetrievalStatus.RETRIEVER_UNAVAILABLE, RetrievalStatus.EMBEDDING_ERROR):
-                return f"[검색 인프라 장애: 서비스 연결 오류] '{label_ko}' 벡터 검색 서버 연결에 실패했습니다 ({ret_res.error_detail})."
-            elif not ret_res.documents:
-                return f"[검색결과 없음] '[{label_ko}]-[{rewritten_query}]' 관련 문서를 찾지 못했습니다."
-            docs = ret_res.documents
+            from ai_legal_helper.legal_knowledge.retrieval_service import (
+                LawRetrievalService, LawSourceStatus,
+            )
+            result = LawRetrievalService().search(
+                query=rewritten_query,
+                original_question=query,
+                category=category_eng,
+                k=MAX_DOCS,
+            )
+            sources = result.sources
+            if result.status == LawSourceStatus.RETRIEVAL_ERROR and not sources:
+                return f"[검색 인프라 장애: 서비스 연결 오류] '{label_ko}' Vector 검색을 완료하지 못했습니다."
+            if result.status != LawSourceStatus.SOURCE_COMPLETE:
+                # 검색 결과가 존재해도 시행일/버전/필수 조문을 검증한 것은 아니다.
+                status_note = (
+                    f"[SOURCE_STATUS] {result.status.value}; "
+                    f"reason={','.join(result.reason_codes) or 'UNCONFIRMED'}. "
+                    "법령 적용 여부를 확정하지 말고 검증 노드에서 추가 근거를 확인하세요."
+                )
+
+        if not sources:
+            no_match = f"[검색결과 없음] '[{label_ko}]-[{rewritten_query}]' 관련 문서를 찾지 못했습니다."
+            # P3: 동명 약칭 충돌, 조문 미확보, 버전 미확인 등 이유를
+            # '검색결과 없음' 뒤에 숨기지 않고 Agent에게 명확히 알린다.
+            return f"{no_match}\n{status_note}" if status_note else no_match
 
         lines = []
-        for d in docs[:MAX_DOCS]:
-            std_src = build_source_from_chroma_doc(
-                d,
-                category=category_eng,
-                retrieval_method="CHROMA_VECTOR",
-            )
-            fn = std_src.get("filename") or "?"
-            page_disp = std_src.get("page") or "?"
-            snip = (std_src.get("content") or "").strip().replace("\n", " ")
-            std_src["content"] = snip
-
-            # P2.1: AgentExecutor가 출처를 숨기는 문제를 우회하기 위해 전역 컨텍스트에 표준 Source 스키마로 기록
+        for std_src in sources[:MAX_DOCS]:
+            # 원문은 줄이지 않고 Registry에 저장한다. 요약은 LLM용 표시 문자열뿐이다.
             add_retrieved_source(std_src)
+            raw_content = (std_src.get("content") or "").strip()
+            snippet = raw_content.replace("\n", " ")
+            if len(snippet) > SNIP:
+                snippet = f"{snippet[:SNIP]}...(+{len(snippet)-SNIP})"
 
-            if len(snip) > SNIP:
-                snip = f"{snip[:SNIP]}...(+{len(d.page_content)-SNIP})"
+            filename = std_src.get("filename")
+            page = std_src.get("page")
+            statute_name = std_src.get("statute_name")
+            article = std_src.get("article")
+            source_url = std_src.get("source_url")
+            if filename and page:
+                citation = f"({filename}, p.{page})"
+            elif statute_name and article and source_url:
+                # 공식 XML 원문은 파일/페이지가 없으므로 PDF와 페이지를 지어내지 않는다.
+                citation = f"({statute_name} {article}, {source_url})"
+            else:
+                citation = f"(출처ID: {std_src.get('source_id')})"
+            lines.append(f"[CITE] {citation}\n{snippet}")
 
-            # 표준 출처 형식: (파일명.pdf, p.페이지)
-            lines.append(f"[CITE] ({fn}, p.{page_disp})\n{snip}")
-
-        # 하드코딩된 법령 파일명 예시로 인한 LLM 출처 환각을 방지하기 위해 위 [CITE] 항목만 인용하도록 안내
-        lines.append("[GUIDE] 위 [CITE] 문서를 근거로 즉시 최종 답변을 작성하세요. 인용한 법령 출처는 반드시 위 [CITE]에 제시된 실제 '(파일명.pdf, p.페이지)' 형식으로만 명시하고, 검색 결과에 없는 파일명은 절대 기재하지 마세요. 추가 검색 금지.")
+        if status_note:
+            lines.append(status_note)
+        lines.append(
+            "[GUIDE] 위 [CITE]에 실제 제시된 출처에만 근거하여 간결히 답하세요. "
+            "검색되지 않은 조문·파일명·페이지·법률 효과를 지어내지 마세요. "
+            "법령 시행일과 적용례가 미확인되면 단정하지 말고 조건부로 작성하세요. "
+            "추가 공식 검색은 승인된 워크플로에서만 가능합니다."
+        )
         return "\n".join(lines)
 
     return Tool(
         name=tool_name,
-        description=f"'{label_ko}' 전용 RAG 검색도구(컬렉션 law_docs_{category_eng}).",
+        description=(
+            f"'{label_ko}' 법률 분석용 공통 RAG 검색도구"
+            "(전국 법령 공통 인덱스 + 기존 분야별 인덱스; "
+            "공식 법령 외부 검색은 사용자 승인 후 별도 수행)."
+        ),
         func=_run,
     )

@@ -52,6 +52,8 @@ class StandardSource(BaseModel):
     title: Optional[str] = None
     content: Optional[str] = None
     retrieval_method: Optional[str] = None
+    # P3: 공통/레거시 어느 인덱스에서 실제 조회되었는지 구별해 Trace와 감사에 보존.
+    retrieval_collection: Optional[str] = None
     chunk_id: Optional[str] = None
     source_url: Optional[str] = None
     version_date: Optional[str] = None
@@ -297,6 +299,7 @@ def build_source_from_chroma_doc(
         title=title,
         content=content or None,
         retrieval_method=retrieval_method,
+        retrieval_collection=meta.get("retrieval_collection"),
         chunk_id=chunk_id,
         source_url=source_url,
         version_date=version_date,
@@ -585,6 +588,7 @@ def normalize_source_dict(raw: Any) -> Dict[str, Any]:
             else "CHROMA_VECTOR"
         ),
         chunk_id=raw.get("chunk_id") or (f"{source_id}#chunk" if source_id != "UNKNOWN" else None),
+        retrieval_collection=raw.get("retrieval_collection"),
         source_url=raw.get("source_url"),
         version_date=version_date,
         retrieved_at=raw.get("retrieved_at") or _utc_now_iso(),
