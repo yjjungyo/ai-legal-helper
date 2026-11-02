@@ -123,7 +123,8 @@ def resolve_event(
     candidates: list[LegalEvent] = []
     question = question or ""
     # 줄/절 중심 짧은 구문에서 날짜와 대응 사건을 확인한다.
-    for match in _DATE.finditer(question):
+    dates = list(_DATE.finditer(question))
+    for index, match in enumerate(dates):
         try:
             parsed = parse_legal_date(
                 f"{int(match.group(1)):04d}-{int(match.group(2)):02d}-{int(match.group(3)):02d}"
@@ -132,15 +133,18 @@ def resolve_event(
             parsed = None
         if parsed is None:
             continue
-        before = question[max(0, match.start()-32):match.start()]
-        after = question[match.end():match.end()+36]
-        # 바로 날짜를 수식하는 공포/시행일은 계약/통지 이벤트로 오인하지 않는다.
-        immediate = before[-8:] + after[:8]
-        if any(term in immediate for term in ("공포일", "공포한", "시행일", "개정일")):
+        # 다른 날짜의 사건 동사가 현재 날짜에 연결되지 않도록 인접 날짜 경계에서
+        # 구문을 자른다. 날짜 뒤의 명시 동사를 우선 사용하고, 없을 때만 앞을 본다.
+        preceding_boundary = dates[index - 1].end() if index else 0
+        following_boundary = dates[index + 1].start() if index + 1 < len(dates) else len(question)
+        before = question[max(preceding_boundary, match.start()-28):match.start()]
+        after = question[match.end():min(following_boundary, match.end()+28)]
+        immediate = before[-6:] + after[:10]
+        if any(term in immediate for term in ("공포", "시행일", "개정일")):
             continue
-        window = before + " " + after
+        local = after if any(token in after for terms in _EVENT_TERMS.values() for token in terms) else before
         hits = [name for name, terms in _EVENT_TERMS.items()
-                if any(term in window for term in terms)]
+                if any(term in local for term in terms)]
         # 복수 이벤트가 하나의 날짜에 섞인 경우 자동 선정하지 않는다.
         if len(hits) == 1:
             candidates.append(LegalEvent(parsed.isoformat(), hits[0]))
