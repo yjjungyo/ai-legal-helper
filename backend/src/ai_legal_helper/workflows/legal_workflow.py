@@ -642,7 +642,21 @@ def verification_node(state: LegalState) -> Dict:
     """
     set_node_name("verification")
     if state.get("answer_mode") == DOCUMENT_MODE:
-        return verify_answer(state)
+        # P8: 원문 기반 상담도 시행예정 규정을 실제 적용 근거로 단정하면
+        # LLM Verifier PASS와 무관하게 차단한다.
+        from ai_legal_helper.legal_knowledge.temporal_verification import (
+            evaluate_temporal_answer_gate, apply_temporal_gate_to_verification,
+        )
+        output = verify_answer(state)
+        gate = evaluate_temporal_answer_gate(
+            state.get("question", ""), state.get("draft_answer", ""),
+            output.get("retrieved_sources") or state.get("retrieved_sources") or [],
+            temporal_resolution=state.get("temporal_resolution"),
+        )
+        output["verification_result"] = apply_temporal_gate_to_verification(
+            output.get("verification_result") or {}, gate,
+        )
+        return output
     from ai_legal_helper.agents.verification import run_verification
     from ai_legal_helper.rag.graph_rag import (
         graph_paths_to_sources,
@@ -750,6 +764,16 @@ def verification_node(state: LegalState) -> Dict:
 
     result["warnings"] = warnings
     result["graph_checks"] = graph_checks
+
+    # P8: 버전별 조문 시행일/부칙의 3상 판단을 LLM의 최종 PASS 위에
+    # 배치한다. 시점 확정 근거가 없으면 긍정 적용 단정을 고객에게 전달 금지.
+    from ai_legal_helper.legal_knowledge.temporal_verification import (
+        evaluate_temporal_answer_gate, apply_temporal_gate_to_verification,
+    )
+    temporal_gate = evaluate_temporal_answer_gate(
+        q, draft, combined_sources, temporal_resolution=state.get("temporal_resolution"),
+    )
+    result = apply_temporal_gate_to_verification(result, temporal_gate)
 
     # Source Registry에서 검증 통과된 표준 출처 목록 보존
     verified_sources = result.get("citation_audit", {}).get("verified_sources", combined_sources)
@@ -862,6 +886,12 @@ def verification_condition(state: LegalState) -> str:
     Returns:
         str: 다음 실행할 노드 이름 ('finalize', 'statute_search_approval', 'revise', 'insufficient').
     """
+    # Temporal P8 차단은 기존 쟁점 부분 답변 및 DOCUMENT_MODE 검증보다
+    # 우선하여 미확인 개정법의 확정적 적용 오류를 최종 답변으로 전달하지 않는다.
+    checked = state.get("verification_result", {}) or {}
+    if (checked.get("temporal_gate") or {}).get("status") == "BLOCK":
+        logger.warning("[VERIFY_ROUTING] 법령 적용시점 안전 게이트 차단 -> insufficient")
+        return "insufficient"
     if state.get("answer_mode") == DOCUMENT_MODE:
         return next_verification_step(state)
     ver_res = state.get("verification_result", {}) or {}
@@ -1193,7 +1223,11 @@ def insufficient_node(state: LegalState) -> Dict:
     case_ctx_text = state.get("case_context", "")
 
     # 부족 사유별 동적 원인 설명
-    if reason_code in ("LEGAL_SOURCE_MISSING", "LEGAL_SOURCE_INSUFFICIENT"):
+    if reason_code == "TEMPORAL_APPLICABILITY_UNCONFIRMED":
+        lead_reason = ("계약 또는 사건 발생일을 기준으로 개정 법령의 조문 시행일, "
+                       "부칙 적용례와 경과규정을 충분히 확인하지 못하여 "
+                       "신법의 적용 여부를 확정할 수 없습니다.")
+    elif reason_code in ("LEGAL_SOURCE_MISSING", "LEGAL_SOURCE_INSUFFICIENT"):
         lead_reason = "질문하신 사안의 권리 관계를 확정하기 위해 공식 법령 조문 또는 관련 판례 법리의 추가적인 확인 및 검토가 필요한 상태입니다."
     elif reason_code == "CASE_EVIDENCE_MISSING":
         lead_reason = "법률적 권리를 확정적으로 행사하기 위해 필수적인 구체적 사실관계(일자, 통지 도달 여부 등)나 객관적 입증 증빙이 아직 충분히 확인되지 않았습니다."
