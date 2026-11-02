@@ -6,6 +6,7 @@ on:
     paths:
       - "backend/src/ai_legal_helper/legal_knowledge/retrieval_service.py"
       - "backend/src/ai_legal_helper/rag/retrieval_factory.py"
+      - "backend/src/ai_legal_helper/rag/source_schema.py"
       - "backend/src/ai_legal_helper/agents/legal/base_agent.py"
       - "backend/tests/unit/test_law_retrieval_service_p3.py"
       - "backend/tests/unit/test_law_retrieval_tool_p3.py"
@@ -15,6 +16,7 @@ on:
     paths:
       - "backend/src/ai_legal_helper/legal_knowledge/retrieval_service.py"
       - "backend/src/ai_legal_helper/rag/retrieval_factory.py"
+      - "backend/src/ai_legal_helper/rag/source_schema.py"
       - "backend/src/ai_legal_helper/agents/legal/base_agent.py"
       - "backend/tests/unit/test_law_retrieval_service_p3.py"
       - "backend/tests/unit/test_law_retrieval_tool_p3.py"
@@ -66,4 +68,4 @@ jobs:
           LEGAL_GLOBAL_RETRIEVAL_ENABLED: "1"
           LEGAL_CATALOG_RESOLUTION_ENABLED: "1"
         run: |
-          python -m pytest -q backend/tests/unit/test_law_retrieval_tool_p3.py backend/tests/unit/test_temporal_legal_rag_p0_contract.py
+          python -m pytest -q backend/tests/unit/test_law_retrieval_tool_p3.py backend/tests/unit/test_temporal_legal_rag_p0_contract.py backend/tests/unit/test_top10_audit_fixes.py::test_issue_1_agent_executor_injects_tool_observation_and_chat_brief backend/tests/unit/test_top10_audit_fixes.py::test_additional_1_retrieval_factory_guide_has_no_hardcoded_filename
