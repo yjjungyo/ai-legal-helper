@@ -90,6 +90,11 @@ class StandardSource(BaseModel):
     temporal_status: Optional[str] = None
     metadata_confidence: Optional[str] = None
     content_hash: Optional[str] = None
+    # P4: 특정 사건 기준일의 연혁조회 결과. 버전 검색 후보와 법률상 적용 확정 구분.
+    requested_as_of_date: Optional[str] = None
+    version_relation: Optional[str] = None
+    version_lookup_status: Optional[str] = None
+    history_code: Optional[str] = None
 
     # 3. 판례(PRECEDENT) 전용 필드
     court: Optional[str] = None
@@ -330,6 +335,10 @@ def build_source_from_chroma_doc(
         temporal_status=(meta.get("temporal_status") or "UNCONFIRMED") if source_type == "STATUTE" else None,
         metadata_confidence=meta.get("metadata_confidence") if source_type == "STATUTE" else None,
         content_hash=meta.get("content_hash") if source_type == "STATUTE" else None,
+        requested_as_of_date=_format_yyyymmdd(meta.get("requested_as_of_date")) if source_type == "STATUTE" else None,
+        version_relation=meta.get("version_relation") if source_type == "STATUTE" else None,
+        version_lookup_status=meta.get("version_lookup_status") if source_type == "STATUTE" else None,
+        history_code=meta.get("history_code") if source_type == "STATUTE" else None,
         court=court,
         case_number=case_number,
         decision_date=decision_date,
@@ -618,6 +627,10 @@ def normalize_source_dict(raw: Any) -> Dict[str, Any]:
         temporal_status=(raw.get("temporal_status") or "UNCONFIRMED") if source_type == "STATUTE" else None,
         metadata_confidence=raw.get("metadata_confidence") if source_type == "STATUTE" else None,
         content_hash=raw.get("content_hash") if source_type == "STATUTE" else None,
+        requested_as_of_date=_format_yyyymmdd(raw.get("requested_as_of_date")) if source_type == "STATUTE" else None,
+        version_relation=raw.get("version_relation") if source_type == "STATUTE" else None,
+        version_lookup_status=raw.get("version_lookup_status") if source_type == "STATUTE" else None,
+        history_code=raw.get("history_code") if source_type == "STATUTE" else None,
         court=raw.get("court") if source_type == "PRECEDENT" else None,
         case_number=raw.get("case_number") if source_type == "PRECEDENT" else None,
         decision_date=raw.get("decision_date") if source_type == "PRECEDENT" else None,
