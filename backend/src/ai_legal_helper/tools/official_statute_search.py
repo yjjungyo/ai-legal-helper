@@ -23,6 +23,7 @@
 import os
 import re
 import time
+import hashlib
 import urllib.request
 import urllib.parse
 import urllib.error
@@ -237,6 +238,8 @@ def search_official_statutes(
     effective_date: Optional[str] = None,
     missing_issues: Optional[List[str]] = None,
     max_articles_per_law: int = 10,
+    *,
+    as_of_date: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """법제처 국가법령정보공동활용 API를 호출하여 공식 법령 조문 원문을 실시간 검색한다.
 
@@ -253,7 +256,9 @@ def search_official_statutes(
     Args:
         query: 검색 목적이 되는 법률 질문 원문.
         candidate_laws: 공식 법령 후보 목록. 조문·제목이 붙은 입력도 분리하여 처리한다.
-        effective_date: 특정 시행일자 기준 조회 시 지정 (옵션).
+        effective_date: 기존 호출자를 위한 사건 기준일 별칭 (옵션). 법령 공포일이 아니다.
+        as_of_date: 사건의 법률 적용 판단 기준일. 명시된 경우 법제처 eflaw 연혁 경로 사용.
+        두 날짜가 모두 지정되면 반드시 일치해야 하며, 미확인 경우 임의 선택 금지.
         missing_issues: 법률검증 Agent가 식별한 핵심 누락 쟁점 목록 (옵션).
         max_articles_per_law: 법령당 추출할 최대 조문 청크 수 (기본값: 10).
 
@@ -273,6 +278,27 @@ def search_official_statutes(
     if not candidate_laws:
         logger.debug("[OFFICIAL_STATUTE] 검색할 candidate_laws 목록이 비어 있습니다.")
         return []
+
+    # [P4] 사용자가 승인한 검색 대상에 명시적인 사건 기준일이 들어온 경우
+    # 현재/최신 버전의 MST를 단순 조회해서 오판정하는 레거시 경로를 사용하지 않는다.
+    # 법령의 버전(공포/시행예정/연혁)을 확인한 뒤 조문별 시행일과 부칙을
+    # 연결하여 반환한다. 기준일이 없는 질의의 기존 검색 동작은 보존한다.
+    if as_of_date is not None or effective_date is not None:
+        resolved_date = as_of_date if as_of_date is not None else effective_date
+        if as_of_date is not None and effective_date is not None and as_of_date != effective_date:
+            logger.warning("[OFFICIAL_P4] 서로 다른 사건 기준일이 지정되어 검색을 중단합니다.")
+            return []
+        from ai_legal_helper.tools.official_statute_asof import (
+            search_official_statutes_by_date,
+        )
+        return search_official_statutes_by_date(
+            query=query,
+            candidate_laws=candidate_laws,
+            as_of_date=resolved_date,
+            api_key=api_key,
+            missing_issues=missing_issues,
+            max_articles_per_law=max_articles_per_law,
+        )
 
     missing_text = " ".join(missing_issues or []).strip()
     full_query_text = f"{query or ''} {missing_text}".strip()
@@ -571,13 +597,10 @@ def search_official_statutes(
                 # 미확인 조문 시행일을 법령 공통 시행일로 대체하지 않는다.
                 article_effective = item.get("article_effective_date")
                 effective_basis = item.get("effective_date_basis") or "UNCONFIRMED"
-                # 레거시 출처 파일명 규약은 유지하되 날짜 확인 여부가 제목에 반영되도록 한다.
-                filename_effective = (article_effective or "").replace("-", "")
-                if law_no_disp and filename_effective:
-                    doc_filename = f"{official_law_name}({law_type_name or '법률'})({law_no_disp})({filename_effective}).pdf"
-                else:
-                    doc_filename = f"{official_law_name}.pdf"
-
+                # 공식 API의 XML은 PDF가 아니다. 파일명·페이지를 만들어 인용하면
+                # 실제 존재하지 않는 근거를 제시하므로 공식 법령명·조문·URL만 보존한다.
+                article_hash = hashlib.sha256(item["content"].encode("utf-8")).hexdigest()
+                doc_reference = f"OFFICIAL:{law_id or official_law_name}:{mst}"
                 meta_parts = [
                     p for p in (
                         law_type_name,
@@ -587,12 +610,12 @@ def search_official_statutes(
                 ]
                 meta_suffix = f" [{', '.join(meta_parts)}]" if meta_parts else ""
                 detailed_title = f"{official_law_name} {art_full}{meta_suffix}"
-                source_id = detailed_title
+                source_id = f"{doc_reference}:{art_label}:{article_hash[:16]}"
 
                 source_dict = {
                     "source_id": source_id,
                     "source_type": "STATUTE",
-                    "document_id": doc_filename,
+                    "document_id": doc_reference,
                     "title": detailed_title,
                     "statute_name": official_law_name,
                     "article": art_label,
@@ -607,8 +630,11 @@ def search_official_statutes(
                     "effective_date_basis": effective_basis,
                     # 조문 시행일을 확보했어도 적용례·경과규정 검증 전에는 적용 가능 확정 금지.
                     "temporal_status": "EFFECTIVE_DATE_VERIFIED" if article_effective else "UNCONFIRMED",
-                    "metadata_confidence": "OFFICIAL_SOURCE",
+                    "metadata_confidence": "OFFICIAL_LIST_MST_REQUESTED",
+                    "version_relation": "LATEST_LIST_CANDIDATE",
+                    "version_lookup_status": "DATE_NOT_SPECIFIED",
                     "content": item["content"],
+                    "content_hash": article_hash,
                     "retrieval_method": "OFFICIAL_STATUTE_SEARCH",
                     "chunk_id": f"statute-{mst}-{art_label}",
                     "source_url": f"https://www.law.go.kr/법령/{urllib.parse.quote(official_law_name)}/{art_label}",
@@ -618,10 +644,10 @@ def search_official_statutes(
                     "case_number": None,
                     "decision_date": None,
                     "evidence_id": None,
-                    "filename": doc_filename,
-                    "file": doc_filename,
-                    "file_name": doc_filename,
-                    "page": "1",
+                    "filename": None,
+                    "file": None,
+                    "file_name": None,
+                    "page": None,
                     "category": "civil",
                     "retrieved_at": _get_kst_iso(),
                     "verified": False,
@@ -634,15 +660,16 @@ def search_official_statutes(
                 for addendum in matched_addenda:
                     addendum_effective = _effective_from_addendum(addendum, "")
                     addendum_title = f"{official_law_name} 부칙 [공포번호 {law_no_disp}]"
+                    addendum_hash = hashlib.sha256(addendum.content.encode("utf-8")).hexdigest()
                     logger.info(
                         "[STATUTE_TEMPORAL] 부칙 확보 | 법령=%s | 공포=%s | 기본시행일=%s | 원문길이=%d",
                         official_law_name, addendum.promulgation_date,
                         addendum_effective or "UNCONFIRMED", len(addendum.content),
                     )
                     retrieved_sources.append(normalize_source_dict({
-                        "source_id": addendum_title,
+                        "source_id": f"OFFICIAL:{law_id or official_law_name}:{mst}:부칙:{addendum_hash[:16]}",
                         "source_type": "STATUTE",
-                        "document_id": f"{official_law_name}_부칙_{law_no}.txt",
+                        "document_id": f"OFFICIAL:{law_id or official_law_name}:{mst}",
                         "title": addendum_title,
                         "statute_name": official_law_name,
                         "article": "부칙",
@@ -656,18 +683,21 @@ def search_official_statutes(
                         "addendum_id": f"{mst}:{law_no}",
                         "effective_date_basis": "ADDENDUM_EFFECTIVE_DATE" if addendum_effective else "UNCONFIRMED",
                         "temporal_status": "EFFECTIVE_DATE_VERIFIED" if addendum_effective else "UNCONFIRMED",
-                        "metadata_confidence": "OFFICIAL_SOURCE",
+                        "metadata_confidence": "OFFICIAL_LIST_MST_REQUESTED",
+                        "version_relation": "LATEST_LIST_CANDIDATE",
+                        "version_lookup_status": "DATE_NOT_SPECIFIED",
                         "content": addendum.content,
+                        "content_hash": addendum_hash,
                         "retrieval_method": "OFFICIAL_STATUTE_SEARCH",
                         "chunk_id": f"statute-{mst}-addendum-{law_no}",
                         "source_url": f"https://www.law.go.kr/법령/{urllib.parse.quote(official_law_name)}",
                         # 부칙 기본 시행일. 예외 조항은 반드시 부칙 원문으로 별도 확인.
                         "version_date": addendum_effective,
                         "effective_date": addendum_effective,
-                        "filename": f"{official_law_name}_부칙_{law_no}.txt",
-                        "file": f"{official_law_name}_부칙_{law_no}.txt",
-                        "file_name": f"{official_law_name}_부칙_{law_no}.txt",
-                        "page": "1",
+                        "filename": None,
+                        "file": None,
+                        "file_name": None,
+                        "page": None,
                         "category": "civil",
                         "retrieved_at": _get_kst_iso(),
                         "verified": False,
