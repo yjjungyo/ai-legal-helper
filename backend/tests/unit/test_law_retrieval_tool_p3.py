@@ -163,3 +163,24 @@ def test_agent_executor_receives_common_tool_observation_without_extra_tool(monk
     assert "[CITE] (가상임대차법.pdf, p.3)" in prompt_text
     assert "사건 요약" in prompt_text
     assert len(get_retrieved_sources()) == 1
+
+
+def test_no_sources_exposes_ambiguous_law_status_to_agent(monkeypatch):
+    """공식 약칭 충돌 시 근거 없음만 표시하지 않고 모호성 사유를 전달한다."""
+    monkeypatch.setenv("LEGAL_GLOBAL_RETRIEVAL_ENABLED", "1")
+    reset_retrieved_sources()
+    response_data = LawRetrievalResponse(
+        status=LawSourceStatus.SOURCE_MISSING,
+        sources=[],
+        reason_codes=["LAW_IDENTITY_AMBIGUOUS"],
+        official_search_recommended=True,
+    )
+    with patch("ai_legal_helper.rag.retrieval_factory.rewrite_query", return_value="공식 약칭"), patch(
+        "ai_legal_helper.legal_knowledge.retrieval_service.LawRetrievalService.search",
+        return_value=response_data,
+    ):
+        output = _make_tool().func("주택임대차보호법상?")
+    assert "[검색결과 없음]" in output
+    assert "[SOURCE_STATUS] SOURCE_MISSING" in output
+    assert "LAW_IDENTITY_AMBIGUOUS" in output
+    assert get_retrieved_sources() == []
