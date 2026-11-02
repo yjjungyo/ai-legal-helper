@@ -223,6 +223,59 @@ def process_next_job(
     return {"status": job.status, "job_id": job.id, "chunk_count": job.chunk_count}
 
 
+
+def enqueue_approved_sources(sources: list[dict]) -> dict:
+    """기존 HILT 승인 완료 후 확보한 P4 공식 버전만 백그라운드 작업으로 등록.
+
+    이 함수는 API/Chroma/임베딩을 호출하지 않는다. 작업등록 실패는 상담
+    답변을 중단하지 않고 작업 등록 실패 개수만 기록한다.
+    """
+    from ai_legal_helper.database.session import SessionLocal
+
+    candidates = {}
+    for source in sources or []:
+        if not isinstance(source, dict):
+            continue
+        if source.get("source_type") != "STATUTE":
+            continue
+        if source.get("version_lookup_status") != "HISTORY_COMPLETE":
+            continue
+        if source.get("metadata_confidence") != "OFFICIAL_BODY_MST_CONFIRMED":
+            continue
+        law_id = str(source.get("law_id") or "")
+        mst = str(source.get("version_id") or "")
+        name = str(source.get("statute_name") or "")
+        date = source.get("law_effective_date")
+        if not (law_id and mst and name and date):
+            continue
+        prom_no = str(source.get("promulgation_number") or "").strip()
+        if prom_no.startswith("제") and prom_no.endswith("호"):
+            prom_no = prom_no[1:-1]
+        candidates[(law_id, mst)] = OfficialLawVersion(
+            law_id=law_id, law_name=name, mst=mst,
+            law_type=str(source.get("law_type") or ""),
+            promulgation_date=source.get("promulgation_date"),
+            promulgation_number=prom_no,
+            list_effective_date=date,
+        )
+    registered = 0
+    duplicate = 0
+    failed = 0
+    for candidate in candidates.values():
+        try:
+            with SessionLocal() as session:
+                _, created = enqueue_version(session, candidate)
+            if created:
+                registered += 1
+            else:
+                duplicate += 1
+        except Exception as exc:
+            failed += 1
+            logger.warning("[OFFICIAL_INDEX] 작업 등록 실패 | law_id=%s mst=%s type=%s",
+                           candidate.law_id, candidate.mst, type(exc).__name__)
+    return {"registered": registered, "duplicate": duplicate, "failed": failed}
+
+
 def run_worker_once() -> dict:
     """관리자 CLI 실행용. 자동 기동/승인 없는 백그라운드 실행은 하지 않는다."""
     from ai_legal_helper.database.session import SessionLocal
