@@ -151,7 +151,7 @@ def test_invalid_identifiers_and_missing_xml_rejected():
     with pytest.raises(ValueError):
         official_xml_chunks(b"", v)
     with pytest.raises(ValueError):
-        official_xml_chunks(b"<!DOCTYPE law><법령 />", v)
+        official_xml_chunks("<!DOCTYPE law><법령 />".encode("utf-8"), v)
 
 
 def test_queue_schema_has_strict_unique_key(db):
