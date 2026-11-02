@@ -147,7 +147,7 @@ def test_article_missing_is_partial_not_complete():
     backend = Backend(global_result=result(docs=[doc(article="제4조")]))
     reply = service(backend).search("가상주택임대차보호법 제3조", category="civil")
     assert reply.status is LawSourceStatus.SOURCE_PARTIAL
-    assert reply.missing_articles == ["제3조"]
+    assert reply.missing_articles == ["가상주택임대차보호법:제3조"]
 
 
 def test_version_absent_or_stale_requires_confirmation():
@@ -304,3 +304,16 @@ def test_source_normalization_preserves_collection_provenance():
     assert normalized["retrieval_collection"] == GLOBAL_LAW_COLLECTION
     assert normalized["law_id"] == "L1"
     assert normalized["version_id"] == "MST-2"
+
+
+def test_article_coverage_cannot_be_borrowed_from_another_statute():
+    """복합 질문에서 A법의 조문만 있으면 B법의 동일 조문이 확보된 것은 아니다."""
+    backend = Backend(global_result=result(docs=[
+        doc(law_id="L1", name="가상주택임대차보호법", article="제3조"),
+        doc(law_id="L2", name="가상민법", version="MST-7", article="제4조"),
+    ]))
+    reply = service(backend, laws=(LAW, OTHER)).search(
+        "가상주택임대차보호법과 가상민법 제3조", category="civil",
+    )
+    assert reply.status is LawSourceStatus.SOURCE_PARTIAL
+    assert reply.missing_articles == ["가상민법:제3조"]
