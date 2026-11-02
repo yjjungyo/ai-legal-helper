@@ -1,0 +1,42 @@
+name: Temporal RAG P7 evidence bundle
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/src/ai_legal_helper/legal_knowledge/evidence_bundle.py"
+      - "backend/src/ai_legal_helper/workflows/legal_workflow.py"
+      - "backend/src/ai_legal_helper/workflows/state.py"
+      - "backend/src/ai_legal_helper/agents/synthesizer.py"
+      - "backend/tests/unit/test_legal_evidence_bundle_p7.py"
+      - ".github/workflows/temporal-rag-p7.yml"
+  push:
+    branches: [main, feature/temporal-rag-p7-evidence-bundle]
+    paths:
+      - "backend/src/ai_legal_helper/legal_knowledge/evidence_bundle.py"
+      - "backend/src/ai_legal_helper/workflows/legal_workflow.py"
+      - "backend/src/ai_legal_helper/workflows/state.py"
+      - "backend/src/ai_legal_helper/agents/synthesizer.py"
+      - "backend/tests/unit/test_legal_evidence_bundle_p7.py"
+      - ".github/workflows/temporal-rag-p7.yml"
+permissions:
+  contents: read
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r backend/requirements.txt
+      - name: P7 Evidence + P6 HILT regressions
+        env:
+          PYTHONPATH: backend/src
+          TESTING: "1"
+          LANGFUSE_ENABLED: "false"
+          CHECKPOINTER_TYPE: memory
+        run: |
+          python -m pytest -q             backend/tests/unit/test_legal_evidence_bundle_p7.py             backend/tests/unit/test_temporal_hilt_workflow_p6.py             backend/tests/unit/test_temporal_law_resolver_p5.py
