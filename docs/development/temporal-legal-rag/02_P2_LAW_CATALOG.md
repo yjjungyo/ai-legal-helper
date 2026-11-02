@@ -123,14 +123,14 @@ Temporal Law RAG 품질 검증이 완료된 것으로 표시하지 않는다.
 
 ### 5.4 재동기화
 
-동일 법령 ID는 Upsert하고 공식 약칭을 갱신한다. 기존 검토 승인 별칭은 유지한다.
+동일 법령 ID는 Upsert하고 공식 약칭을 갱신한다. 여러 페이지에서 동일 법령 ID가 반복 발견되면 전수 누락 가능성이 있으므로 전체 수집 COMPLETE 판정을 금지한다. 기존 검토 승인 별칭은 유지한다.
 과거의 공식 별칭이 변경되면 현재 공식 목록에 없는 별칭은 자동으로 검색하지 않는다.
 
 ## 6. 테스트·검증 증빙
 
 - CI 워크플로: `Temporal Legal RAG P2 regression`
 - GitHub Actions 최초 실행: 18 PASS
-- P2 신규 Alembic 업그레이드·롤백 테스트 추가 후: **19 PASS**
+- P2 신규 Alembic 업그레이드·롤백 및 중복 법령ID 검사 추가 후: **20 PASS**
 - 네트워크/유료 LLM/운영 DB 접근 없이 Mock XML·SQLite로 통과
 - 간헐적으로 pytest-asyncio 설정 및 GitHub Node.js 런타임 관련 경고 발생하나 테스트 실패는 없음
 
