@@ -15,8 +15,6 @@ Temporal Legal RAG P0: 기존 기능을 보호하기 위한 기준선 계약 테
 """
 import xml.etree.ElementTree as ET
 
-import pytest
-
 from ai_legal_helper.agents.constants import (
     CATEGORIES,
     collection_name_for,
