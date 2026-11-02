@@ -361,3 +361,37 @@ def test_unknown_history_date_is_not_cured_by_current_law_search(monkeypatch):
     assert out == []
     assert len(accessed) == 1
     assert "target=eflaw" in accessed[0]
+
+
+def test_undated_legacy_official_xml_no_longer_fabricates_pdf_page(monkeypatch):
+    """기존 target=law 호출도 API XML을 가짜 PDF, p.1로 인용하지 않는다."""
+    monkeypatch.setenv("LAW_OPENAPI_KEY", "fake-secret")
+    calls = []
+    def fetch(url, **kwargs):
+        calls.append(parse_qs(urlsplit(url).query))
+        if "lawSearch.do" in url:
+            return (
+                "<LawSearch><law><법령명한글>" + NAME +
+                "</법령명한글><법령ID>110</법령ID>"
+                "<법령일련번호>100</법령일련번호>"
+                "<공포번호>12345</공포번호><공포일자>20231201</공포일자>"
+                "<시행일자>20240101</시행일자></law></LawSearch>"
+            ).encode("utf-8")
+        return body_xml(version())
+    monkeypatch.setattr(
+        "ai_legal_helper.tools.official_statute_search._fetch_xml_with_retry", fetch
+    )
+    out = search_official_statutes(
+        query="법령의 조문을 알려줘", candidate_laws=[f"{NAME} 제36조"],
+    )
+    assert len(out) == 1
+    article = out[0]
+    assert article["article"] == "제36조"
+    assert article["filename"] is None
+    assert article["file_name"] is None
+    assert article["page"] is None
+    assert article["source_id"].startswith("OFFICIAL:110:100:제36조:")
+    assert len(article["content_hash"]) == 64
+    assert article["version_lookup_status"] == "DATE_NOT_SPECIFIED"
+    assert article["version_relation"] == "LATEST_LIST_CANDIDATE"
+    assert all(c["target"] == ["law"] for c in calls)
