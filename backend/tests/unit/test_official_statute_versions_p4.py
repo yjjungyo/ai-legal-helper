@@ -352,7 +352,7 @@ def test_unknown_history_date_is_not_cured_by_current_law_search(monkeypatch):
     monkeypatch.setenv("LAW_OPENAPI_KEY", "fake-secret")
     monkeypatch.setattr(
         "ai_legal_helper.tools.official_statute_search._fetch_xml_with_retry",
-        lambda url, **k: accessed.append(url) or b"<LawSearch><totalCnt>1</totalCnt><page>1</page><law><법령명한글>가상 계약법 시행령</법령명한글><법령ID>110</법령ID><법령일련번호>100</법령일련번호></law></LawSearch>",
+        lambda url, **k: accessed.append(url) or "<LawSearch><totalCnt>1</totalCnt><page>1</page><law><법령명한글>가상 계약법 시행령</법령명한글><법령ID>110</법령ID><법령일련번호>100</법령일련번호></law></LawSearch>".encode("utf-8"),
     )
     out = search_official_statutes(
         query="질의", candidate_laws=[NAME], as_of_date="2026-11-01",
