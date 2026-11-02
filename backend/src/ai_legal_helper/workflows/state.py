@@ -66,6 +66,11 @@ class LegalState(MessagesState):
     approval_request: Optional[Dict[str, Any]]
     approval_status: Optional[str]  # NONE, PENDING, APPROVED, REJECTED, EXPIRED
     approved_statute_laws: Optional[List[str]]
+    # P6: 기존 HILT와 재개 상태에 보존되는 사건일별 사전 공식 검색 계획.
+    law_search_plan: Optional[Dict[str, Any]]
+    statute_search_phase: Optional[str]  # PRE_ANALYSIS / POST_VERIFICATION
+    # P5 구조화 판정은 출처 전체와 별도로 기록해 신법 오적용 추적 가능.
+    temporal_resolution: Optional[Dict[str, Any]]
     statute_search_results: Optional[List[Dict[str, Any]]]
     statute_search_count: Optional[int]
     statute_search_history: Optional[List[str]]
