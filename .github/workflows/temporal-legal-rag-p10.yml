@@ -1,0 +1,31 @@
+name: Temporal Legal RAG P10 legacy migration
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/src/ai_legal_helper/legal_knowledge/legacy_migration.py"
+      - "backend/tests/unit/test_legacy_vector_migration_p10.py"
+      - ".github/workflows/temporal-legal-rag-p10.yml"
+  push:
+    branches: [main, feature/temporal-legal-rag-p10-legacy-vector-migration]
+    paths:
+      - "backend/src/ai_legal_helper/legal_knowledge/legacy_migration.py"
+      - "backend/tests/unit/test_legacy_vector_migration_p10.py"
+      - ".github/workflows/temporal-legal-rag-p10.yml"
+permissions:
+  contents: read
+jobs:
+  no-loss-migration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install pytest
+      - name: Staging only and temporal metadata quarantine
+        env:
+          PYTHONPATH: backend/src
+          TESTING: "1"
+        run: python -m pytest -q backend/tests/unit/test_legacy_vector_migration_p10.py
