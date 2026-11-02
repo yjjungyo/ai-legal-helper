@@ -148,6 +148,7 @@ def sync_official_catalog(
     seen = 0
     pages = 0
     failures = 0
+    seen_law_ids: set[str] = set()
     error_code: Optional[str] = None
     limit = max_pages or 1000
     status = "PARTIAL"
@@ -163,6 +164,12 @@ def sync_official_catalog(
                 raise CatalogError("CATALOG_TOTAL_CHANGED")
             if page.skipped_count:
                 failures += page.skipped_count
+            # 페이지가 겹치거나 동일 법령 ID가 중복 제공되면 전체 목록 일부가
+            # 누락되었을 수 있으므로 totalCnt에 도달해도 COMPLETE로 확정하지 않는다.
+            for item in page.items:
+                if item.law_id in seen_law_ids:
+                    failures += 1
+                seen_law_ids.add(item.law_id)
             # 건수가 남았는데 빈 페이지가 오면 무한 루프/잘못된 완료 처리 금지.
             if page.returned_count == 0 and expected and seen < expected:
                 raise CatalogError("PREMATURE_EMPTY_PAGE")
