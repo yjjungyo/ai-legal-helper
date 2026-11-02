@@ -139,10 +139,12 @@ def resolve_event(
         following_boundary = dates[index + 1].start() if index + 1 < len(dates) else len(question)
         before = question[max(preceding_boundary, match.start()-28):match.start()]
         after = question[match.end():min(following_boundary, match.end()+28)]
-        immediate = before[-6:] + after[:10]
-        if any(term in immediate for term in ("공포", "시행일", "개정일")):
+        following_event = any(token in after for terms in _EVENT_TERMS.values() for token in terms)
+        if any(term in after[:10] for term in ("공포", "시행일", "개정일")):
             continue
-        local = after if any(token in after for terms in _EVENT_TERMS.values() for token in terms) else before
+        if not following_event and any(term in before[-6:] for term in ("공포", "시행일", "개정일")):
+            continue
+        local = after if following_event else before
         hits = [name for name, terms in _EVENT_TERMS.items()
                 if any(term in local for term in terms)]
         # 복수 이벤트가 하나의 날짜에 섞인 경우 자동 선정하지 않는다.
