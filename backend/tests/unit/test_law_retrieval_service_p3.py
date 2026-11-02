@@ -114,7 +114,10 @@ def test_deduplicate_across_collections_but_keep_full_source_content():
     )
     reply = service(backend).search("가상주택임대차보호법 제3조", category="civil")
     assert len(reply.sources) == 1
-    assert reply.sources[0]["content"] == body
+    # 기존 StandardSource는 본문 앞뒤의 불필요한 공백만 strip한다.
+    # 임의의 중간 절삭·LLM용 240자 미리보기로 덮어쓰는 것은 금지한다.
+    assert reply.sources[0]["content"] == body.strip()
+    assert len(reply.sources[0]["content"]) > 240
     assert reply.sources[0]["retrieval_collection"] == GLOBAL_LAW_COLLECTION
 
 
@@ -271,10 +274,10 @@ def test_search_does_not_automatically_call_external_law_api(monkeypatch):
     backend = Backend()
     def forbidden(*_, **__):
         raise AssertionError("OpenLaw network MUST NOT be invoked by P3")
-    monkeypatch.setattr(
-        "ai_legal_helper.tools.statute_resolver.resolve_statute_candidates",
-        forbidden,
-    )
+    # 외부 국가법령정보/LLM을 건드리지 않도록 표준 네트워크 입구를 봉쇄한다.
+    # 최소 의존성 CI에서도 별도 tools 패키지를 import하지 않는다.
+    import urllib.request
+    monkeypatch.setattr(urllib.request, "urlopen", forbidden)
     reply = service(backend, laws=()).search("단순 계약 분쟁", category="civil")
     assert reply.status in (LawSourceStatus.SOURCE_MISSING, LawSourceStatus.RETRIEVAL_ERROR)
 
