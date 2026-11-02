@@ -1,0 +1,71 @@
+name: Temporal Legal RAG P4 official version regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/src/ai_legal_helper/tools/official_statute_versions.py"
+      - "backend/src/ai_legal_helper/tools/official_statute_asof.py"
+      - "backend/src/ai_legal_helper/tools/official_statute_search.py"
+      - "backend/src/ai_legal_helper/rag/source_schema.py"
+      - "backend/tests/unit/test_official_statute_versions_p4.py"
+      - "docs/development/temporal-legal-rag/04_P4_OFFICIAL_VERSION_SEARCH.md"
+      - ".github/workflows/temporal-legal-rag-p4.yml"
+  push:
+    branches: [main, feature/temporal-legal-rag-p4-official-versioned-search]
+    paths:
+      - "backend/src/ai_legal_helper/tools/official_statute_versions.py"
+      - "backend/src/ai_legal_helper/tools/official_statute_asof.py"
+      - "backend/src/ai_legal_helper/tools/official_statute_search.py"
+      - "backend/src/ai_legal_helper/rag/source_schema.py"
+      - "backend/tests/unit/test_official_statute_versions_p4.py"
+      - "docs/development/temporal-legal-rag/04_P4_OFFICIAL_VERSION_SEARCH.md"
+      - ".github/workflows/temporal-legal-rag-p4.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  official-history:
+    name: Official history / MST / addenda (Mock API)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r backend/requirements.txt
+      - name: P4 version and P1 temporal regressions
+        env:
+          PYTHONPATH: backend/src
+          TESTING: "1"
+          LANGFUSE_ENABLED: "false"
+          LAW_OPENAPI_KEY: "fixture-only"
+        run: |
+          python -m pytest -q             backend/tests/unit/test_official_statute_versions_p4.py             backend/tests/unit/test_official_statute_temporal_metadata_p1.py             backend/tests/unit/test_statute_temporal_p0_law_02.py             backend/tests/unit/test_temporal_legal_rag_p0_contract.py             backend/tests/unit/test_temporal_legal_rag_p1.py
+
+  official-hilt:
+    name: Existing HILT / official search compat (Mock API)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r backend/requirements.txt
+      - name: HILT approval and official search regression
+        env:
+          PYTHONPATH: backend/src
+          TESTING: "1"
+          LANGFUSE_ENABLED: "false"
+          LAW_OPENAPI_KEY: "fixture-only"
+        run: |
+          python -m pytest -q             backend/tests/unit/test_hilt_statute_search.py::test_t01_normal_pass_bypasses_hilt             backend/tests/unit/test_hilt_statute_search.py::test_t02_missing_statute_triggers_hilt_approval             backend/tests/unit/test_hilt_statute_search.py::test_t03_user_approval_executes_search_and_re_analyzes             backend/tests/unit/test_hilt_statute_search.py::test_t04_user_rejection_routes_to_insufficient             backend/tests/unit/test_hilt_statute_search.py::test_t05_empty_search_results_routes_to_insufficient             backend/tests/unit/test_step3_statute_search.py             backend/tests/unit/test_statute_search_reference_normalization.py
