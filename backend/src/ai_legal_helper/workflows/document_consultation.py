@@ -325,12 +325,13 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
         except Exception:
             snapshot_valid = False
 
-    valid = snapshot_valid and result.get("status") == "PASS"
+    temporal_blocked = (result.get("temporal_gate") or {}).get("status") == "BLOCK"
+    valid = snapshot_valid and result.get("status") == "PASS" and not temporal_blocked
     limited_used = False
 
     # 전체 답변이 PASS에 이르지 못했으나 원문 스냅샷·검증 무결성이 유효한 경우,
     # 확인된 사실과 조건부 설명만 남긴 제한 답변을 새로 생성하고 동일 검증기로 재검증한다.
-    if snapshot_valid and not valid and result.get("claims"):
+    if snapshot_valid and not valid and result.get("claims") and not temporal_blocked:
         try:
             history = [m.content for m in (state.get("messages") or [])[:-1]
                        if isinstance(m, HumanMessage) and isinstance(m.content, str)]
@@ -384,7 +385,10 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
         missing = _sanitize_client_missing_items(raw_missing)
         detail = "\n" + "\n".join(f"- {item}" for item in missing) if missing else ""
         final = "질문에 대한 답변을 확정할 만큼 근거 확인을 마치지 못했습니다."
-        if result.get("reason_code") == "VERIFICATION_ERROR":
+        if temporal_blocked:
+            final += (" 계약 또는 사건 발생일에 적용되는 개정 법령의 시행일·부칙·적용례 "
+                      "확인이 부족하여 단정적인 법률 판단을 보류합니다.")
+        elif result.get("reason_code") == "VERIFICATION_ERROR":
             final += " 등록 자료와 답변을 대조하는 과정에 문제가 있어 다시 확인해야 합니다."
         elif detail:
             final += " 추가로 확인할 사항은 다음과 같습니다.\n" + detail
