@@ -13,10 +13,8 @@ P2 법령명 카탈로그 영속화·증분 동기화 (PostgreSQL SQLAlchemy).
 from __future__ import annotations
 
 import logging
-import math
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Callable, Optional
 
 from sqlalchemy import select
@@ -27,7 +25,6 @@ from ai_legal_helper.database.models import (
 )
 from ai_legal_helper.legal_knowledge.law_catalog import (
     CatalogError,
-    LawCatalogItem,
     LawCatalogPage,
     fetch_law_catalog_page,
     normalize_law_name,
@@ -93,15 +90,26 @@ class LawCatalogStore:
             row.updated_at = now
             # 공식 약칭 변경 시 이전 공식 약칭은 더 이상 자동 검색에 이용하지 않는다.
             # REVIEWED(관리자가 명시 승인) 별칭은 API 갱신으로 삭제하지 않는다.
+            existing_official = {
+                a.alias_key: a for a in row.aliases if a.source == "OFFICIAL"
+            }
             kept = [a for a in row.aliases if a.source != "OFFICIAL"]
             valid = normalize_law_name(item.short_name)
             if valid and valid != item.name_key:
-                kept.append(LawCatalogAlias(
-                    law_id=item.law_id,
-                    alias_name=item.short_name,
-                    alias_key=valid,
-                    source="OFFICIAL",
-                ))
+                # 동일 공식 별칭을 업데이트할 때 기존 행을 재사용한다.
+                # 삭제 후 같은 unique 키로 다시 INSERT하면 flush 순서에 따라
+                # UniqueConstraint 오류가 발생할 수 있으므로 반드시 reuse 한다.
+                entry = existing_official.get(valid)
+                if entry is None:
+                    entry = LawCatalogAlias(
+                        law_id=item.law_id,
+                        alias_name=item.short_name,
+                        alias_key=valid,
+                        source="OFFICIAL",
+                    )
+                else:
+                    entry.alias_name = item.short_name
+                kept.append(entry)
             row.aliases = kept
         return len(page.items)
 
