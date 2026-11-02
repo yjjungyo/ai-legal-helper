@@ -694,3 +694,76 @@ class FactComparisonAudit(Base):
 
     case = relationship("Case", back_populates="comparison_audits")
 
+
+
+# =============================================================================
+# Temporal Legal RAG P2 — 공식 법령명 카탈로그 (사건 정보와 물리적으로 분리)
+# =============================================================================
+# 법령명/약칭/목록 버전은 공식 목록 조회를 통해 확인한 **검색 메타정보**다.
+# 해당 시행일을 조문별 적용 가능 날짜로 간주하지 않으며 Temporal Law Resolver가
+# 별도 공식 조문·부칙을 검증할 때까지 법적 효력 판단에 사용하지 않는다.
+
+
+class LawCatalogEntry(Base):
+    """법제처의 지속 식별자(법령ID)별 정식 법령명·법령종류·목록 정보를 기록한다.
+
+    법령일련번호(MST)는 특정 시점/본문 버전의 식별자다.
+    MST로 법령 자체를 식별하면 개정 시 레코드가 중복되므로 law_id를 PK로 사용한다.
+    """
+
+    __tablename__ = "law_catalog"
+
+    law_id = Column(String(64), primary_key=True)
+    official_name = Column(String(500), nullable=False)
+    name_key = Column(String(500), nullable=False, index=True)
+    law_type = Column(String(80), nullable=True)
+    current_mst = Column(String(80), nullable=True)
+    short_name = Column(String(500), nullable=True)
+    promulgation_date = Column(String(10), nullable=True)
+    list_effective_date = Column(String(10), nullable=True)
+    promulgation_number = Column(String(80), nullable=True)
+    ministry_name = Column(String(200), nullable=True)
+    history_code = Column(String(30), nullable=True)
+    detail_url = Column(Text, nullable=True)
+    source_target = Column(String(20), nullable=False, default="law")
+    last_seen_at = Column(DateTime, default=get_kst_now, nullable=False)
+    created_at = Column(DateTime, default=get_kst_now, nullable=False)
+    updated_at = Column(DateTime, default=get_kst_now, onupdate=get_kst_now, nullable=False)
+
+    aliases = relationship("LawCatalogAlias", back_populates="law", cascade="all, delete-orphan")
+
+
+class LawCatalogAlias(Base):
+    """공식 법령약칭 또는 검토 승인된 별칭. 동일 약칭의 여러 법령 연결을 허용한다.
+
+    검색 시 별칭 하나가 서로 다른 법령ID에 매핑되면 모호함을 반환해야 하므로
+    alias_key를 전역 unique로 두지 않는다.
+    """
+
+    __tablename__ = "law_catalog_aliases"
+    __table_args__ = (UniqueConstraint("law_id", "alias_key", name="uq_law_catalog_alias_law_key"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    law_id = Column(String(64), ForeignKey("law_catalog.law_id", ondelete="CASCADE"), nullable=False, index=True)
+    alias_name = Column(String(500), nullable=False)
+    alias_key = Column(String(500), nullable=False, index=True)
+    source = Column(String(20), nullable=False, default="OFFICIAL")
+
+    law = relationship("LawCatalogEntry", back_populates="aliases")
+
+
+class LawCatalogSyncRun(Base):
+    """관리자 동기화의 전체/부분 완료를 구분하는 감사 기록."""
+
+    __tablename__ = "law_catalog_sync_runs"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    target = Column(String(20), nullable=False, default="law")
+    query_text = Column(String(500), nullable=True)
+    total_expected = Column(Integer, nullable=True)
+    items_seen = Column(Integer, nullable=False, default=0)
+    pages_completed = Column(Integer, nullable=False, default=0)
+    status = Column(String(20), nullable=False, default="RUNNING")  # COMPLETE/PARTIAL/FAILED
+    error_code = Column(String(100), nullable=True)
+    started_at = Column(DateTime, default=get_kst_now, nullable=False)
+    finished_at = Column(DateTime, nullable=True)
