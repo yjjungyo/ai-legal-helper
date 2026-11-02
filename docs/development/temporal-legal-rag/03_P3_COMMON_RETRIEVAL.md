@@ -84,14 +84,14 @@ API를 옵션 `as_of_date`로 적용하되, 이를 실제 사건 날짜에서 �
 
 ## 5. 필수 안전 정책
 
-1. 복수 법령 질문은 요구 법령별 최소 한 건을 우선하여 상위 K개 결과를 구성한다.
+1. 복수 법령 질문은 요구 법령별 최소 한 건을 우선하여 상위 K개 결과를 구성하며, 동일 조문번호라도 법령ID별 근거 유무를 개별 판정한다.
 2. 법령 ID가 서로 다르면 법령명이 같아도 임의로 동일 출처로 취급하지 않는다.
 3. 동일 법령/동일 조문의 다른 MST 버전은 별도로 보존한다.
 4. 동일 법령/버전/조문/내용이 공통 및 레거시 컬렉션에 중복되면 한 번만 반환한다.
 5. 약칭 충돌(`AMBIGUOUS`) 시 Vector 유사도로 법령ID를 임의 선정하지 않는다.
 6. 검색 결과가 없다는 이유만으로 '해당 법령이 존재하지 않는다'고 주장하지 않는다.
 7. 공식 출처에 PDF 파일/페이지가 없다면 법령명·조문·URL로 인용한다.
-8. 원문 전체를 Source Registry에 등록하고, Tool Observation만 240자 미리보기로 줄인다.
+8. 원문 전체를 Source Registry에 등록하고, Tool Observation만 240자 미리보기로 줄인다. 공통/레거시 실제 검색 컬렉션명(`retrieval_collection`)도 정규화 이후 보존한다.
 9. OpenLaw 추가 검색·외부 요청 및 임베딩은 P3에서 호출하지 않는다.
 10. 기존 `AgentExecutor.tools[0]` 사용 방식 및 각 Agent Tool 이름은 그대로 유지한다.
 11. 로컬 Law Catalog DB에 접근 불가해도 기존 Vector 검색이 실행될 수 있도록 한다.
@@ -138,7 +138,16 @@ cd backend
 python -m pytest -q tests/unit/test_law_retrieval_tool_p3.py tests/unit/test_temporal_legal_rag_p0_contract.py
 ```
 
-CI `Temporal Legal RAG P3 regression`의 2개 Job을 모두 통과해야 한다.
+CI `Temporal Legal RAG P3 regression`의 2개 Job 결과:
+
+- **공통 검색 정책·P2 카탈로그 회귀:** 42건 PASS
+- **8개 Agent Tool·AgentExecutor·기존 검색 Tool 회귀:** 17건 PASS
+- **합계: 59건 PASS**, 실패 0건 (경고는 pytest-asyncio와 기존 패키지의 비권장 API 알림)
+- 추가 P2 회귀 Workflow도 성공
+- 실제 Chroma/PostgreSQL/OpenLaw 및 Langfuse E2E는 수행하지 않았음
+
+이번 CI는 Mock LLM과 Mock Vector/SQLite/가상 법령명 기반이므로
+실제 사용자 질문의 법률 정답률을 검증한 결과로 혼동하지 않는다.
 
 후속 실제 환경의 A/B 성능 기준은 동일 질문 및 동일 Vector 인덱스를 기준으로
 `LEGAL_GLOBAL_RETRIEVAL_ENABLED=0/1`을 비교한다.
