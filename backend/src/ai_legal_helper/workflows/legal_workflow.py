@@ -459,6 +459,37 @@ def plan_node(state: LegalState) -> Dict:
     )
     return {"plan": plan, "analysis_plan": plan}
 
+
+@trace
+def statute_search_plan_node(state: LegalState) -> Dict:
+    """P6 — 전문 Agent 실행 전에 로컬 카탈로그에서 시행일 검색 계획만 수립한다.
+
+    법령명/사건일 확정 실패 또는 DB 장애 시 기존 Vector 상담으로 복귀한다.
+    이 노드는 승인 전 외부 법령 API에 접근하지 않는다.
+    """
+    set_node_name("statute_search_plan")
+    from ai_legal_helper.workflows.temporal_search_plan import build_temporal_search_plan
+
+    plan = build_temporal_search_plan(state.get("question", ""))
+    logger.info(
+        "[TEMPORAL_PLAN] status=%s candidate_count=%d reason=%s",
+        plan["status"], len(plan["candidate_laws"]), plan["reason_code"],
+    )
+    return {
+        "law_search_plan": plan,
+        "statute_search_phase": "PRE_ANALYSIS" if plan["status"] == "READY" else None,
+    }
+
+
+def statute_search_plan_condition(state: LegalState) -> str:
+    """계획된 기준일 검색만 HILT 승인 요청. 일반 질의는 Agent로 바로 진행."""
+    plan = state.get("law_search_plan") or {}
+    if (plan.get("status") == "READY" and plan.get("candidate_laws")
+            and not state.get("hilt_executed")):
+        return "statute_search_approval"
+    return "run_agents"
+
+
 @trace
 async def run_agents_node(state: LegalState) -> Dict:
     """문서 사건은 법률 자료만 검색하고, 일반 상담은 기존 전문 에이전트를 실행한다.
@@ -474,7 +505,8 @@ async def run_agents_node(state: LegalState) -> Dict:
         from ai_legal_helper.rag.retrieval import retrieve_with_status
         from ai_legal_helper.rag.source_schema import build_source_from_chroma_doc
 
-        sources = []
+        # 선행 HILT 공식 검색 결과를 문서 상담 Vector 검색으로 덮어쓰지 않는다.
+        sources = list(state.get("retrieved_sources", []) or [])
         retrieval_warnings = []
         for category in (state.get("categories") or [None])[:2]:
             try:
@@ -504,7 +536,8 @@ async def run_agents_node(state: LegalState) -> Dict:
         brief = f"{case_ctx}\n\n[이전 대화 요약]\n{brief}"
 
     results: Dict[str, str] = {}
-    all_sources: list[dict] = []
+    # 선행 승인 공식 원문은 Agent 실행 후에도 Verification에 계속 전달한다.
+    all_sources: list[dict] = list(state.get("retrieved_sources", []) or [])
     
     if not cats:
         return {"results": results, "agent_results": results, "retrieved_sources": all_sources}
@@ -1466,9 +1499,15 @@ def statute_search_approval_node(state: LegalState) -> Dict:
     from ai_legal_helper.observability.context import get_case_id, get_trace_id, get_request_id
 
     ver_res = state.get("verification_result", {}) or {}
-    candidate_laws = ver_res.get("candidate_laws", [])
-    missing_issues = ver_res.get("missing_legal_issues", []) or ver_res.get("missing_issues", [])
-    reason_code = ver_res.get("reason_code", "LEGAL_SOURCE_MISSING")
+    plan = state.get("law_search_plan") or {}
+    preflight = state.get("statute_search_phase") == "PRE_ANALYSIS" and plan.get("status") == "READY"
+    candidate_laws = list(plan.get("candidate_laws") or []) if preflight else ver_res.get("candidate_laws", [])
+    missing_issues = (
+        [f"사건 기준일 {plan.get('as_of_date')}, 유형 {plan.get('event_type')}의 법령 적용시점 확인"]
+        if preflight else
+        (ver_res.get("missing_legal_issues", []) or ver_res.get("missing_issues", []))
+    )
+    reason_code = "TEMPORAL_STATUTE_PRECHECK" if preflight else ver_res.get("reason_code", "LEGAL_SOURCE_MISSING")
     explanation_raw = ver_res.get("explanation", "현재 검색된 법률 자료만으로는 해당 쟁점을 충분히 검증할 수 없습니다.")
     explanation = _format_client_approval_explanation(explanation_raw, candidate_laws, missing_issues)
 
@@ -1488,6 +1527,10 @@ def statute_search_approval_node(state: LegalState) -> Dict:
         "missing_issue": ", ".join(missing_issues) if missing_issues else "관련 법령 조문 확인 필요",
         "missing_legal_issues": missing_issues,
         "candidate_laws": candidate_laws,
+        # HILT 화면에 실제 조회할 기준일/법령/단계를 명시한다.
+        "as_of_date": plan.get("as_of_date") if preflight else None,
+        "event_type": plan.get("event_type") if preflight else None,
+        "search_phase": "PRE_ANALYSIS" if preflight else "POST_VERIFICATION",
         "search_scope": "공식 법령 원문 (국가법령정보공동활용 open.law.go.kr)",
         "approval_required": True,
     }
@@ -1559,8 +1602,24 @@ def execute_statute_search_node(state: LegalState) -> Dict:
     from ai_legal_helper.workflows.document_search import execute_document_search, law_names
 
     ver_res = state.get("verification_result", {}) or {}
-    candidate_laws = list(ver_res.get("candidate_laws", []) or [])
-    if state.get("answer_mode") == DOCUMENT_MODE:
+    plan = state.get("law_search_plan") or {}
+    preflight = (state.get("statute_search_phase") == "PRE_ANALYSIS"
+                 and plan.get("status") == "READY")
+    candidate_laws = (
+        list(plan.get("candidate_laws") or []) if preflight
+        else list(ver_res.get("candidate_laws", []) or [])
+    )
+    # HILT 거절·미승인 시 공식 OpenLaw 호출은 엄격히 차단한다.
+    if state.get("approval_status") != "APPROVED":
+        return {"statute_search_results": [],
+                "warnings": list(state.get("warnings") or [])
+                + ["공식 법령 원문 검색은 사용자 승인 후에만 가능합니다."]}
+    from ai_legal_helper.workflows.temporal_search_plan import authorized_plan
+    if preflight and authorized_plan(dict(state)) is None:
+        return {"statute_search_results": [], "warnings":
+                list(state.get("warnings") or [])
+                + ["승인된 법령명·시점 검색 범위가 확인되지 않아 외부 검색을 실행하지 않았습니다."]}
+    if state.get("answer_mode") == DOCUMENT_MODE and not preflight:
         search_state = dict(state)
         if search_state.get("approval_status") == "APPROVED" and not search_state.get("approved_statute_laws"):
             raw_refs = list(candidate_laws) + [
@@ -1590,11 +1649,24 @@ def execute_statute_search_node(state: LegalState) -> Dict:
 
     # 특별법 우선 정렬: 일반법(민법, 형법 등)보다 특별법(주택임대차보호법 등)을 1순위로 탐색
     candidate_laws.sort(key=lambda law: 1 if law in ("민법", "형법", "상법", "민사소송법") else 0)
+    # 원래 Post-Verification 경로에서도 승인 후 내부 키워드로 추가한 민법을
+    # 사용자 승인 없이 원격 조회하는 결함을 차단한다.
+    approved_laws = state.get("approved_statute_laws")
+    if approved_laws is not None:
+        authorized_names = set(law_names(list(approved_laws)))
+        candidate_laws = [
+            name for name in candidate_laws if law_names([name])
+            and law_names([name])[0] in authorized_names
+        ]
+    if not candidate_laws:
+        return {"statute_search_results": [], "warnings":
+                list(state.get("warnings") or [])
+                + ["승인된 공식 법령 검색 대상이 없어 외부 검색을 실행하지 않았습니다."]}
 
     statute_sources = search_official_statutes(
         query=q,
         candidate_laws=candidate_laws,
-        effective_date=None,
+        effective_date=plan.get("as_of_date") if preflight else None,
         missing_issues=missing_issues,
         max_articles_per_law=10,
     )
@@ -1617,9 +1689,21 @@ def execute_statute_search_node(state: LegalState) -> Dict:
         f"누적출처수={len(merged_sources)} | 후보법령={candidate_laws}"
     )
 
+    temporal_result = None
+    if preflight and statute_sources:
+        from ai_legal_helper.legal_knowledge.temporal_resolver import evaluate_temporal_sources
+        temporal_result = evaluate_temporal_sources(
+            q, statute_sources,
+            event_date=plan.get("as_of_date"),
+            event_type=plan.get("event_type"),
+        ).as_dict()
+        logger.info("[TEMPORAL_P5] preflight decisions=%d status=%s",
+                    len(temporal_result.get("decisions") or []),
+                    temporal_result.get("status"))
     return {
         "statute_search_results": statute_sources,
         "retrieved_sources": merged_sources,
+        "temporal_resolution": temporal_result,
         "warnings": warnings,
     }
 
@@ -1633,6 +1717,10 @@ def statute_search_result_condition(state: LegalState) -> str:
     Returns:
         str: 're_analyze' (법령 조회 성공 시) 또는 'insufficient' (조회 실패 시).
     """
+    # 선행 HILT 검색 결과가 없거나 API가 장애여도 기존 Vector 검색 및
+    # Verification을 진행한다. 후속 P8 시점 오류 방어는 별도로 적용.
+    if state.get("statute_search_phase") == "PRE_ANALYSIS":
+        return "run_agents"
     results = state.get("statute_search_results", [])
     if results:
         return "re_analyze"
@@ -1942,6 +2030,7 @@ def build_legal_graph(checkpointer: Optional[Any] = None):
     graph.add_node("followup_action", followup_action_node)
     graph.add_node("route", route_node)
     graph.add_node("plan", plan_node)
+    graph.add_node("statute_search_plan", statute_search_plan_node)
     graph.add_node("run_agents", run_agents_node)
     graph.add_node("synthesize", synthesize_node)
     graph.add_node("verification", verification_node)
@@ -1968,7 +2057,11 @@ def build_legal_graph(checkpointer: Optional[Any] = None):
         "routing_exit": "routing_exit",
     })
     graph.add_edge("routing_exit", END)
-    graph.add_edge("plan", "run_agents")
+    graph.add_edge("plan", "statute_search_plan")
+    graph.add_conditional_edges("statute_search_plan", statute_search_plan_condition, {
+        "statute_search_approval": "statute_search_approval",
+        "run_agents": "run_agents",
+    })
     graph.add_edge("run_agents", "synthesize")
     graph.add_edge("synthesize", "verification")
 
@@ -1986,6 +2079,7 @@ def build_legal_graph(checkpointer: Optional[Any] = None):
     })
 
     graph.add_conditional_edges("execute_statute_search", statute_search_result_condition, {
+        "run_agents": "run_agents",
         "re_analyze": "re_analyze",
         "insufficient": "insufficient"
     })
