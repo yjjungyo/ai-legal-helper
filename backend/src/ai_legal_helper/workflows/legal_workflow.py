@@ -1741,6 +1741,16 @@ def execute_statute_search_node(state: LegalState) -> Dict:
         max_articles_per_law=10,
     )
 
+    # P9: 실제 승인된 공식 검색의 확인된 법령 버전만 작업 큐에 추가한다.
+    # 상담 스레드에서 XML 재조회·임베딩은 절대 수행하지 않는다.
+    import os
+    if (state.get("approval_status") == "APPROVED"
+            and os.getenv("LEGAL_BACKGROUND_INDEX_ENABLED", "0") == "1"
+            and statute_sources):
+        from ai_legal_helper.legal_knowledge.index_worker import enqueue_approved_sources
+        queue_result = enqueue_approved_sources(statute_sources)
+        logger.info("[OFFICIAL_INDEX] approved enqueue result=%s", queue_result)
+
     merged_sources = list(state.get("retrieved_sources", []) or [])
     existing_ids = {s.get("source_id") for s in merged_sources if s.get("source_id")}
 
