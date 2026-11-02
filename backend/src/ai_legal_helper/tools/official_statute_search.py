@@ -237,6 +237,8 @@ def search_official_statutes(
     effective_date: Optional[str] = None,
     missing_issues: Optional[List[str]] = None,
     max_articles_per_law: int = 10,
+    *,
+    as_of_date: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """법제처 국가법령정보공동활용 API를 호출하여 공식 법령 조문 원문을 실시간 검색한다.
 
@@ -253,7 +255,9 @@ def search_official_statutes(
     Args:
         query: 검색 목적이 되는 법률 질문 원문.
         candidate_laws: 공식 법령 후보 목록. 조문·제목이 붙은 입력도 분리하여 처리한다.
-        effective_date: 특정 시행일자 기준 조회 시 지정 (옵션).
+        effective_date: 기존 호출자를 위한 사건 기준일 별칭 (옵션). 법령 공포일이 아니다.
+        as_of_date: 사건의 법률 적용 판단 기준일. 명시된 경우 법제처 eflaw 연혁 경로 사용.
+        두 날짜가 모두 지정되면 반드시 일치해야 하며, 미확인 경우 임의 선택 금지.
         missing_issues: 법률검증 Agent가 식별한 핵심 누락 쟁점 목록 (옵션).
         max_articles_per_law: 법령당 추출할 최대 조문 청크 수 (기본값: 10).
 
@@ -273,6 +277,27 @@ def search_official_statutes(
     if not candidate_laws:
         logger.debug("[OFFICIAL_STATUTE] 검색할 candidate_laws 목록이 비어 있습니다.")
         return []
+
+    # [P4] 사용자가 승인한 검색 대상에 명시적인 사건 기준일이 들어온 경우
+    # 현재/최신 버전의 MST를 단순 조회해서 오판정하는 레거시 경로를 사용하지 않는다.
+    # 법령의 버전(공포/시행예정/연혁)을 확인한 뒤 조문별 시행일과 부칙을
+    # 연결하여 반환한다. 기준일이 없는 질의의 기존 검색 동작은 보존한다.
+    if as_of_date is not None or effective_date is not None:
+        resolved_date = as_of_date if as_of_date is not None else effective_date
+        if as_of_date is not None and effective_date is not None and as_of_date != effective_date:
+            logger.warning("[OFFICIAL_P4] 서로 다른 사건 기준일이 지정되어 검색을 중단합니다.")
+            return []
+        from ai_legal_helper.tools.official_statute_asof import (
+            search_official_statutes_by_date,
+        )
+        return search_official_statutes_by_date(
+            query=query,
+            candidate_laws=candidate_laws,
+            as_of_date=resolved_date,
+            api_key=api_key,
+            missing_issues=missing_issues,
+            max_articles_per_law=max_articles_per_law,
+        )
 
     missing_text = " ".join(missing_issues or []).strip()
     full_query_text = f"{query or ''} {missing_text}".strip()
