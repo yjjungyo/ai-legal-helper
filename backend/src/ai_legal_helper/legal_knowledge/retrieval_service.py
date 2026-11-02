@@ -330,10 +330,17 @@ class LawRetrievalService:
                 requested_articles = {
                     _normalized_article(x) for x in _ARTICLE_PATTERN.findall(question)
                 }
-                found_articles = {
-                    _normalized_article(src.get("article")) for src in response.sources
-                }
-                response.missing_articles = sorted(requested_articles - found_articles)
+                # 복수 법령 질문에서 A법의 제3조를 찾았다고 B법의 제3조까지
+                # 확보된 것으로 간주하지 않는다. 법령ID × 조문 단위로 점검한다.
+                response.missing_articles = sorted({
+                    f"{law.get('law_name') or law.get('law_id')}:{article}"
+                    for law in selected for article in requested_articles
+                    if not any(
+                        _source_matches_law(src, law)
+                        and _normalized_article(src.get("article")) == article
+                        for src in response.sources
+                    )
+                })
                 if response.missing_articles:
                     response.status = LawSourceStatus.SOURCE_PARTIAL
                     response.reason_codes.append("REQUIRED_ARTICLE_NOT_RETRIEVED")
