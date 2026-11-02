@@ -47,7 +47,10 @@ def enqueue_version(session, version: OfficialLawVersion) -> tuple[str, bool]:
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     job = OfficialLawIndexJob(
         id=str(uuid.uuid4()), law_id=version.law_id, law_name=version.law_name,
-        mst=version.mst, list_effective_date=version.list_effective_date,
+        mst=version.mst, law_type=version.law_type,
+        promulgation_date=version.promulgation_date,
+        promulgation_number=version.promulgation_number,
+        list_effective_date=version.list_effective_date,
         status="PENDING", attempts=0, chunk_count=0, created_at=now, updated_at=now,
     )
     session.add(job)
@@ -176,7 +179,8 @@ def process_next_job(
         return {"status": "EMPTY"}
     v = OfficialLawVersion(
         law_id=job.law_id, law_name=job.law_name, mst=job.mst,
-        law_type="", promulgation_date=None, promulgation_number="",
+        law_type=job.law_type or "", promulgation_date=job.promulgation_date,
+        promulgation_number=job.promulgation_number or "",
         list_effective_date=job.list_effective_date,
     )
     try:
