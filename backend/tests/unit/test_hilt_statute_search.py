@@ -137,6 +137,10 @@ def test_t05_empty_search_results_routes_to_insufficient():
     """T-05: 외부 법령 검색 결과가 비어있는 경우 무리하게 답변하지 않고 insufficient로 종료되는지 검증한다."""
     state: LegalState = {
         "question": "미지의 법률에 관한 질의",
+        # P6 이후 실제 외부 검색은 HILT 승인이 있는 경우에만 허용한다.
+        # 이 테스트는 '승인된 검색에서도 결과가 비어 있을 때'의 안전 종료를 검증한다.
+        "approval_status": "APPROVED",
+        "approved_statute_laws": ["가상의법률"],
         "verification_result": {"candidate_laws": ["가상의법률"], "missing_legal_issues": ["존재하지 않는 규정"]},
         "retrieved_sources": [],
         "warnings": [],
