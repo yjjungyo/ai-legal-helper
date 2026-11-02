@@ -86,9 +86,9 @@ def test_full_statute_xml_indexes_every_article_in_incremental_batches():
         fetch_xml=lambda _: xml(v),
         chroma_collection=collection, embeddings=FakeVectors(), batch_size=2,
     )
-    assert count == 6
-    assert len(collection.items) == 6
-    assert collection.calls == 3
+    assert count == 7
+    assert len(collection.items) == 7
+    assert collection.calls == 4
     assert {x[2]["version_id"] for x in collection.items.values()} == {"100"}
     assert all(x[2]["law_id"] == "1" for x in collection.items.values())
     assert all(x[2]["temporal_status"] != "VERIFIED" for x in collection.items.values())
@@ -102,8 +102,8 @@ def test_same_article_two_mst_do_not_overwrite():
             v, api_key="mock",
             fetch_xml=lambda _, v=v: xml(v),
             chroma_collection=collection, embeddings=FakeVectors(),
-        ) == 6
-    assert len(collection.items) == 12
+        ) == 7
+    assert len(collection.items) == 14
     assert {x[2]["version_id"] for x in collection.items.values()} == {"100", "200"}
 
 
@@ -136,7 +136,7 @@ def test_retry_after_failure_and_ready_after_recovery(db):
         chroma_collection=collection, embeddings=FakeVectors(),
     )
     assert second["status"] == "READY"
-    assert second["chunk_count"] == 6
+    assert second["chunk_count"] == 7
     assert process_next_job(
         db, worker_id="worker-c", api_key="mock",
         fetch_xml=lambda _: xml(v),
