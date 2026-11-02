@@ -211,7 +211,8 @@ def test_incomplete_history_page_cap_never_claims_full():
 
 
 def test_same_name_different_law_ids_is_not_merged():
-    v = version(law_id="999")
+    # 서로 다른 법령ID임을 검사하므로 MST 자체는 별도로 구성한다.
+    v = version(mst="201", law_id="999")
     out = lookup_versions_for_date(
         law_name=NAME, as_of_date="2026-11-01", api_key="fake-secret",
         fetch_xml=lambda u: history_xml([version(), v]),
