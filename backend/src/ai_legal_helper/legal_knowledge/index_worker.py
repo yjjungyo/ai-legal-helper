@@ -129,6 +129,28 @@ def official_xml_chunks(xml_bytes: bytes, version: OfficialLawVersion) -> list[d
                 "retrieval_collection": COLLECTION_NAME,
             }
         })
+    # 부칙은 해당 MST의 법적 효력 판단에 필요하므로 일반 조문과 별도 청크로 보존한다.
+    # 같은 버전의 부칙이 여러 개면 idx/원문 해시로 각각 식별한다.
+    for idx, addendum in enumerate(addenda):
+        checksum = hashlib.sha256(addendum.content.encode("utf-8")).hexdigest()
+        chunks.append({
+            "id": f"official:{version.law_id}:{version.mst}:addendum:{idx}:{checksum[:16]}",
+            "content": addendum.content,
+            "metadata": {
+                "source_type": "STATUTE", "law_id": version.law_id,
+                "law_name": version.law_name, "statute_name": version.law_name,
+                "version_id": version.mst, "article": "부칙",
+                "content_hash": checksum,
+                "law_effective_date": version.list_effective_date,
+                "article_effective_date": "",
+                "effective_date_basis": "UNCONFIRMED",
+                "temporal_status": "UNCONFIRMED",
+                "promulgation_date": addendum.promulgation_date or "",
+                "promulgation_number": version.promulgation_number,
+                "addendum_id": f"{version.mst}:{version.promulgation_number}:{idx}",
+                "retrieval_collection": COLLECTION_NAME,
+            },
+        })
     if not chunks:
         raise ValueError("OFFICIAL_XML_HAS_NO_ARTICLES")
     return chunks
