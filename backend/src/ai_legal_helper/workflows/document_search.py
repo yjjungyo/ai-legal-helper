@@ -10,6 +10,7 @@ from typing import Any
 
 from ai_legal_helper.tools.official_statute_search import _prepare_search_targets, _article_references
 from ai_legal_helper.observability.logging_config import get_logger
+from ai_legal_helper.rag.temporal_applicability import ApplicabilityStatus, evaluate_statute_applicability
 
 logger = get_logger(__name__)
 
@@ -85,8 +86,19 @@ def pending_searches(state: dict[str, Any]) -> list[dict[str, Any]]:
                 "issue": issue_str,
                 "question_part": question_str,
             })
-    known = {(s.get("statute_name"), s.get("article")) for s in state.get("retrieved_sources") or []
-             if s.get("source_type") == "STATUTE" and s.get("content")}
+    # 기존 검색 결과가 있더라도 사건일 적용성이 검증되지 않았다면 확보 조문으로 간주하지 않는다.
+    reference_date = (
+        (state.get("case_evidence_briefing") or {}).get("as_of_date")
+        or (state.get("temporal_resolution") or {}).get("as_of_date")
+    )
+    known = {
+        (src.get("statute_name"), src.get("article"))
+        for src in state.get("retrieved_sources") or []
+        if isinstance(src, dict) and src.get("source_type") == "STATUTE"
+        and src.get("content")
+        and evaluate_statute_applicability(src, reference_date).status
+        is ApplicabilityStatus.APPLICABLE
+    }
     history = set(state.get("statute_search_history") or [])
     norm_question = " ".join(str(state.get("question") or "").split())
     pending = []
@@ -150,7 +162,8 @@ def _verified_local_fallback(state: dict[str, Any], requests: list[dict[str, Any
                 continue
             if src.get("statute_name") != request["law_name"] or not src.get("content"):
                 continue
-            if src.get("temporal_status") != "EFFECTIVE_DATE_VERIFIED":
+            # 공식 원문이라는 사실이나 시행일 메타만으로 적용 확정하지 않는다.
+            if evaluate_statute_applicability(src, reference_date).status is not ApplicabilityStatus.APPLICABLE:
                 continue
             if not (src.get("version_id") and src.get("content_hash")):
                 continue
