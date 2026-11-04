@@ -1878,6 +1878,7 @@ def execute_statute_search_node(state: LegalState) -> Dict:
             q, statute_sources,
             event_date=plan.get("as_of_date") or state.get("event_date"),
             event_type=plan.get("event_type") or state.get("event_type"),
+            llm_addendum_interpretation=True,
         ).as_dict()
         logger.info("[TEMPORAL_P5] decisions=%d status=%s",
                     len(temporal_result.get("decisions") or []),
