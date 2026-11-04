@@ -58,40 +58,35 @@ def extract_event_with_llm(question: str, invoke_fn: Optional[Callable[[str], st
         parsed_date = parse_legal_date(date_text)
         if parsed_date is None:
             raise ValueError("INVALID_DATE")
-        # 근거 인용의 한국어/ISO 날짜를 정규화하여 LLM 날짜와 대조한다.
-        # 단순 문자열 검색이나 공포일과의 우연한 일치를 허용하지 않는다.
-        candidates = re.finditer(
-            r"(?<!\d)(20\d{2})\s*(?:년|[-./])\s*(\d{1,2})\s*(?:월|[-./])\s*(\d{1,2})\s*일?(?!\d)",
-            evidence,
-        )
-        grounded_dates = []
-        for match in candidates:
-            grounded = parse_legal_date(
-                f"{int(match.group(1)):04d}-{int(match.group(2)):02d}-{int(match.group(3)):02d}"
-            )
-            if grounded:
-                grounded_dates.append((grounded, match.start(), match.end()))
-        if not any(d == parsed_date for d, _, _ in grounded_dates):
-            raise ValueError("DATE_NOT_IN_EVIDENCE")
-        # 같은 인용에 공포일과 사건일이 함께 있으면, 법령 날짜를 사건일로
-        # 잘못 선택하지 않았는지 해당 날짜 바로 뒤의 문맥을 검사한다.
-        for d, start, end in grounded_dates:
-            if d != parsed_date:
-                continue
-            trailing = evidence[end:end + 20]
-            leading = evidence[max(0, start - 12):start]
-            if re.match(r"\s*(?:공포|개정|시행|발효|제정)", trailing) or re.search(
-                r"(?:공포일|개정일|시행일)\s*$", leading
-            ):
-                raise ValueError("STATUTE_DATE_NOT_EVENT")
         supported = {"CONTRACT_SIGNED", "CONTRACT_RENEWED", "CONTRACT_MODIFIED", "NOTICE_GIVEN", "MOVE_OUT"}
         if kind not in supported:
             raise ValueError("UNSUPPORTED_EVENT_TYPE")
-        # 인용 구간이 법령의 공포·시행·개정일만 설명하는 경우 사건일로 사용하지 않는다.
+        # 날짜 의미는 LLM이 해석한다. Python은 근거의 존재와 명백한 모순만 검사한다.
+        # 근거의 날짜 표기를 재파싱하여 특정 연도 형식으로 제한하지 않는다.
+        # 다만 근거에 명시된 4자리 연도와 결과 연도가 다르면 확정할 수 없다.
+        explicit_years = set(re.findall(r"(?<!\\d)(?:19|20)\\d{2}(?=\\s*(?:년|[-./]))", evidence))
+        if explicit_years and str(parsed_date.year) not in explicit_years:
+            raise ValueError("YEAR_CONFLICT_IN_EVIDENCE")
+        # 공포·시행일만을 근거로 사건일을 만들지 않는다.
         if re.search(r"(?:공포일|시행일|개정일|공포된|시행되는|개정된)", evidence) and not re.search(
             r"(?:계약|체결|갱신|재계약|통지|퇴거|이사|변경)", evidence
         ):
             raise ValueError("STATUTE_DATE_NOT_EVENT")
+        # 복수 날짜를 포함한 인용 전체는 날짜별 근거를 특정할 수 없으므로 보류.
+        # LLM이 해당 행위에 연결된 짧은 원문 구간을 인용하도록 한다.
+        date_mentions = re.findall(
+            r"(?<!\\d)\\d{2,4}\\s*(?:년|[-./])\\s*\\d{1,2}\\s*(?:월|[-./])\\s*\\d{1,2}\\s*일?",
+            evidence,
+        )
+        if len(date_mentions) != 1:
+            raise ValueError("AMBIGUOUS_EVENT_EVIDENCE")
+        # 2자리 연도의 세기 해석은 LLM이 담당하며, 날짜가 모호하면 보류한다.
+        # 근거에 있는 월/일 숫자만 확인하여 명백한 환각을 차단한다.
+        numeric_parts = re.findall(r"\\d+", date_mentions[0])
+        if len(numeric_parts) != 3 or (int(numeric_parts[1]), int(numeric_parts[2])) != (
+            parsed_date.month, parsed_date.day
+        ):
+            raise ValueError("DATE_COMPONENT_CONFLICT")
         event = LegalEvent(parsed_date.isoformat(), kind, "LLM_EXTRACTED")
         return EventResolution("RESOLVED", events=[event], selected=event)
     except Exception as exc:
@@ -133,10 +128,9 @@ def build_temporal_search_plan(
         return empty
     # 법령 적용 시점 질문은 규칙의 오확정을 피하기 위해 LLM 의미 추출을 우선한다.
     # 명시적으로 확인된 사건일/유형 쌍은 재추출하지 않는다.
-    # 날짜가 없는 질문에는 불필요한 LLM 호출을 하지 않는다.
+    # 날짜 표기는 LLM이 해석하므로 정규식으로 사전 차단하지 않는다.
     explicit_pair = event_date is not None and event_type is not None
-    has_date = bool(re.search(r"20\d{2}\s*(?:년|[-./])\s*\d{1,2}\s*(?:월|[-./])\s*\d{1,2}", question))
-    if llm_event_extraction and not explicit_pair and has_date:
+    if llm_event_extraction and not explicit_pair:
         event = extract_event_with_llm(question, invoke_fn=event_invoke_fn)
         if event.selected is not None and event_date is not None:
             explicit_date = parse_legal_date(event_date)
