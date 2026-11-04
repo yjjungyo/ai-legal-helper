@@ -52,6 +52,7 @@ class ConsultationIntent(str, Enum):
     NEW_LEGAL_ANALYSIS = "NEW_LEGAL_ANALYSIS"      # 신규 법률 쟁점 분석 또는 첫 법률 검토
     DOCUMENT_REQUEST = "DOCUMENT_REQUEST"          # 내용증명, 소장 등 법률 문서 작성 요청
     GENERAL_CONVERSATION = "GENERAL_CONVERSATION"  # 인사, 감사, 단순 대화 ("안녕하세요", "고맙습니다")
+    OUT_OF_SCOPE = "OUT_OF_SCOPE"  # 법률 상담 범위 밖의 요청
     NEEDS_CLARIFICATION = "NEEDS_CLARIFICATION"    # 질문 맥락 부족으로 추가 정보 필요
 
 
