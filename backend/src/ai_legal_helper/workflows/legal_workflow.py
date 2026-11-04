@@ -1642,10 +1642,10 @@ def statute_search_approval_node(state: LegalState) -> Dict:
         raw_law_refs = list(candidate_laws or [])
     else:
         raw_law_refs = list(candidate_laws or []) + [
-        r.get("law_name", "")
-        for r in (ver_res.get("legal_search_requests") or [])
-        if isinstance(r, dict) and r.get("law_name")
-    ]
+            r.get("law_name", "")
+            for r in (ver_res.get("legal_search_requests") or [])
+            if isinstance(r, dict) and r.get("law_name")
+        ]
     approved_laws = law_names(raw_law_refs) if approved else []
     if approved and state.get("answer_mode") == DOCUMENT_MODE and not preflight:
         approved_laws = list(dict.fromkeys(law_names(state.get("approved_statute_laws") or []) + approved_laws))
