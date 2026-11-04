@@ -1815,7 +1815,7 @@ def statute_search_result_condition(state: LegalState) -> str:
     # Verification을 진행한다. 후속 P8 시점 오류 방어는 별도로 적용.
     if state.get("statute_search_phase") == "PRE_ANALYSIS":
         return "run_agents"
-    if state.get("synthesis_law_gate", {}).get("status") == "NEED_MORE_LAW":
+    if (state.get("synthesis_law_gate") or {}).get("status") == "NEED_MORE_LAW":
         return "run_agents" if state.get("statute_search_results") else "insufficient"
     results = state.get("statute_search_results", [])
     if results:
