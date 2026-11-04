@@ -97,7 +97,20 @@ def evaluate_temporal_answer_gate(
     if provided and isinstance(provided.get("decisions"), list):
         decisions = [d for d in provided["decisions"] if isinstance(d, dict)]
         event_date = recorded_date if parse_legal_date(recorded_date) else None
-        event_type = recorded_type if isinstance(recorded_type, str) else None
+        event_type = recorded_type if isinstance(recorded_type, str) and recorded_type else None
+        # 판정 스냅샷과 선택 사건이 서로 다르면 기존 판정을 신뢰하지 않는다.
+        # LLM의 별도 재추론 대신 UNCONFIRMED로 내려 안전 게이트에 전달한다.
+        if any(
+            (not event_date or not event_type
+             or d.get("event_date") != event_date
+             or d.get("event_type") != event_type
+             or d.get("status") not in ("APPLICABLE", "NOT_APPLICABLE", "UNCONFIRMED"))
+            for d in decisions
+        ):
+            decisions = [
+                {**d, "status": "UNCONFIRMED", "reason_code": "TEMPORAL_SNAPSHOT_INCONSISTENT"}
+                for d in decisions
+            ]
         if not event_date:
             # 판정 스냅샷에 사건일이 없으면 호출자 날짜로 임의 보충하지 않는다.
             event_date = None
