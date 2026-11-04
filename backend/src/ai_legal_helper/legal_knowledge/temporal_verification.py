@@ -86,25 +86,27 @@ def evaluate_temporal_answer_gate(
     if not _temporal_question(question):
         return TemporalGateResult("NOT_REQUIRED")
     provided = temporal_resolution if isinstance(temporal_resolution, Mapping) else None
-    if event_date:
-        events = resolve_event(question, event_date=event_date, event_type=event_type)
-        event_date = events.selected.date if events.selected else event_date
-    elif provided and isinstance(provided.get("event"), Mapping):
-        recorded = provided.get("event", {})
-        selected = recorded.get("selected") or {}
-        event_date = selected.get("date")
-        events = resolve_event(question, event_date=event_date, event_type=selected.get("event_type"))
-    else:
-        events = resolve_event(question)
-        event_date = events.selected.date if events.selected else None
-
+    recorded_event = provided.get("event") if provided else None
+    selected = recorded_event.get("selected") if isinstance(recorded_event, Mapping) else None
+    verified_selected = selected if isinstance(selected, Mapping) else None
+    recorded_date = verified_selected.get("date") if verified_selected else None
+    recorded_type = verified_selected.get("event_type") if verified_selected else None
+    # 공식 검색 단계의 동일 판정을 재사용한다. 원문을 키워드로 재해석하면
+    # LLM 추출 사건일과 Verification 사건일이 달라질 수 있다.
     if provided and isinstance(provided.get("decisions"), list):
         decisions = [d for d in provided["decisions"] if isinstance(d, dict)]
+        event_date = recorded_date if parse_legal_date(recorded_date) else None
+        event_type = recorded_type if isinstance(recorded_type, str) else None
+        if not event_date:
+            # 판정 스냅샷에 사건일이 없으면 호출자 날짜로 임의 보충하지 않는다.
+            event_date = None
     else:
+        events = resolve_event(question, event_date=event_date, event_type=event_type)
+        event_date = events.selected.date if events.selected else None
+        event_type = events.selected.event_type if events.selected else None
         decisions = evaluate_temporal_sources(
             question, sources, event_date=event_date, event_type=event_type,
         ).as_dict()["decisions"]
-
     # 질의 또는 답변 초안에서 다루어지는 조문 및 인용 출처와 관련된 판정을 선별한다.
     # 키워드 검색으로 대량 수집된 비관련 조문(본문·질의에 미언급)의 미확인 상태가
     # 적법하게 검증된 답변의 게이트 차단을 유발하지 않도록 격리한다.
