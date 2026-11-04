@@ -61,7 +61,7 @@ def extract_event_with_llm(question: str, invoke_fn: Optional[Callable[[str], st
         # 근거 인용의 한국어/ISO 날짜를 정규화하여 LLM 날짜와 대조한다.
         # 단순 문자열 검색이나 공포일과의 우연한 일치를 허용하지 않는다.
         candidates = re.finditer(
-            r"(?<!\\d)(20\\d{2})\\s*(?:년|[-./])\\s*(\\d{1,2})\\s*(?:월|[-./])\\s*(\\d{1,2})\\s*일?(?!\\d)",
+            r"(?<!\d)(20\d{2})\s*(?:년|[-./])\s*(\d{1,2})\s*(?:월|[-./])\s*(\d{1,2})\s*일?(?!\d)",
             evidence,
         )
         grounded_dates = []
@@ -80,8 +80,8 @@ def extract_event_with_llm(question: str, invoke_fn: Optional[Callable[[str], st
                 continue
             trailing = evidence[end:end + 20]
             leading = evidence[max(0, start - 12):start]
-            if re.match(r"\\s*(?:공포|개정|시행|발효|제정)", trailing) or re.search(
-                r"(?:공포일|개정일|시행일)\\s*$", leading
+            if re.match(r"\s*(?:공포|개정|시행|발효|제정)", trailing) or re.search(
+                r"(?:공포일|개정일|시행일)\s*$", leading
             ):
                 raise ValueError("STATUTE_DATE_NOT_EVENT")
         supported = {"CONTRACT_SIGNED", "CONTRACT_RENEWED", "CONTRACT_MODIFIED", "NOTICE_GIVEN", "MOVE_OUT"}
