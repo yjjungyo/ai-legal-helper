@@ -159,7 +159,13 @@ def write_document_answer(
             "형식으로 반환하세요. NEED_MORE_LAW일 때 답변 초안을 생성하지 마세요."
         )
     response = get_llm(temperature=0.0).invoke([
-        SystemMessage(content=DOCUMENT_ANSWER_SYSTEM),
+        SystemMessage(content=DOCUMENT_ANSWER_SYSTEM + (
+            "\\n[최초 작성 구조화 출력 최우선 규약]\\n"
+            "이번 호출에서는 최종 사용자 답변을 직접 출력하지 말고, 반드시 JSON 객체 한 개만 출력하세요. "
+            "법령 근거가 충분하면 status=READY 및 answer 필드에 사용자용 마크다운 답변을 넣으세요. "
+            "법령 원문이 핵심 쟁점에 부족하면 status=NEED_MORE_LAW, missing_laws 배열, answer 빈 문자열을 반환하세요. "
+            "앞선 'JSON을 출력하지 마세요' 지시는 이번 구조화 응답에 한해 적용하지 않습니다."
+        ) if integrated else DOCUMENT_ANSWER_SYSTEM),
         HumanMessage(content=json.dumps(payload, ensure_ascii=False) + "\n\n[전체 근거 원문]\n" + context),
     ])
     answer = response.content
