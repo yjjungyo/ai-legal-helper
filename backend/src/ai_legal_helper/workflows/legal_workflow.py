@@ -585,7 +585,17 @@ def synthesize_node(state: LegalState) -> Dict:
     """
     set_node_name("synthesize")
     if state.get("answer_mode") == DOCUMENT_MODE:
-        return generate_answer(state)
+        out = generate_answer(state)
+        gate = out.get("synthesis_law_gate") or {}
+        if gate.get("status") == "NEED_MORE_LAW":
+            out["verification_result"] = {
+                **gate, "status": "INSUFFICIENT", "reason_code": "LEGAL_SOURCE_MISSING",
+                "explanation": "최초 초안 작성 전 필요한 법령 원문을 확인합니다.",
+            }
+            out["statute_search_phase"] = "POST_VERIFICATION"
+        else:
+            out["synthesis_law_gate"] = {"status": "READY"}
+        return out
     intent_val = state.get("intent")
     msgs = synthesize(
         state.get("messages", []),
