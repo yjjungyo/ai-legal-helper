@@ -196,37 +196,9 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
     case_evidence_sources = []
     issue_tasks_dict = []
 
-    if case_id:
-        db = SessionLocal()
-        try:
-            case = db.query(Case).filter(Case.id == case_id).first()
-            if case:
-                from ai_legal_helper.case_intelligence.case_briefing import build_case_evidence_briefing
-                from ai_legal_helper.workflows.issue_planner import plan_legal_issues
+    # 상세 증거 조회는 Intent에서 CASE_EVIDENCE로 분류된 뒤 실행한다.
+    # 일반 법률 질문·법률 무관 질문은 DB/GraphRAG/쟁점 계획 비용을 발생시키지 않는다.
 
-                briefing_obj = build_case_evidence_briefing(db, case_id, q or "")
-                issue_tasks_obj = plan_legal_issues(q or "", briefing_obj)
-
-                briefing_dict = briefing_obj.model_dump()
-                issue_tasks_dict = [t.model_dump() for t in issue_tasks_obj]
-                case_evidence_sources = list(briefing_obj.source_registry.values())
-
-                # 정규화된 사건 증거 브리핑 텍스트를 case_context 기본값으로 사용
-                case_context = briefing_obj.formatted_summary
-                
-                # [Structured Evidence GraphRAG v2.0 통합]
-                # PostgreSQL 구조화 증거 검색 + Neo4j 그래프 관계 탐색 → PostgreSQL 대조 검증 → 컨텍스트 추가.
-                # Neo4j 장애/미구성 시에도 PostgreSQL 기반 사건 증거 검색 결과를 그대로 활용한다.
-                graph_evidence = _collect_graph_evidence(db, case_id, q or "")
-                graph_text = graph_evidence.pop("context_text", "")
-                if graph_text:
-                    case_context += "\n\n" + graph_text
-                    
-        except Exception as e:
-            logger.warning(f"[INIT] 사건 증거 브리핑 구축 중 예외: {e}")
-        finally:
-            db.close()
-            
     # 대화 맥락이 존재하는 경우 case_context 전두부에 대화 이력 요약 결합
     if conv_ctx:
         try:
@@ -1954,6 +1926,50 @@ def intent_analysis_node(state: LegalState) -> Dict:
         f"복원질의길이={len(decision.resolved_query)} | 사유={sanitize_diagnostic_text(decision.reason, max_len=100)}"
     )
 
+    # [지연 로딩] 질문의 법률성·사건 자료 필요 여부를 먼저 판단한다.
+    # CASE_EVIDENCE만 승인된 원문을 포함한 사건 브리핑과 GraphRAG를 읽는다.
+    # 원본 질문은 그대로 두고, 복원된 질의를 검색에 사용한다.
+    if decision.consultation_mode == ConsultationMode.CASE_EVIDENCE and decision.intent not in (
+        ConsultationIntent.OUT_OF_SCOPE, ConsultationIntent.GENERAL_CONVERSATION,
+        ConsultationIntent.NEEDS_CLARIFICATION,
+    ):
+        from ai_legal_helper.database.session import SessionLocal
+        from ai_legal_helper.database.models import Case
+        from ai_legal_helper.observability.context import get_case_id, set_case_id
+        case_id = get_case_id() or state.get("case_id") or (
+            conv_ctx.get("case_id") if isinstance(conv_ctx, dict) else getattr(conv_ctx, "case_id", None)
+        )
+        if case_id:
+            set_case_id(case_id)
+            db = SessionLocal()
+            try:
+                if db.query(Case).filter(Case.id == case_id).first():
+                    from ai_legal_helper.case_intelligence.case_briefing import build_case_evidence_briefing
+                    from ai_legal_helper.workflows.issue_planner import plan_legal_issues
+                    briefing = build_case_evidence_briefing(db, case_id, decision.resolved_query or q)
+                    tasks = plan_legal_issues(decision.resolved_query or q, briefing)
+                    graph = _collect_graph_evidence(db, case_id, decision.resolved_query or q)
+                    graph_text = graph.pop("context_text", "")
+                    case_ctx = briefing.formatted_summary
+                    if graph_text:
+                        case_ctx += "\n\n" + graph_text
+                    # 대화 요약은 사건 원문과 구분하여 컨텍스트에 유지한다.
+                    history_ctx = state.get("case_context") or ""
+                    if history_ctx:
+                        case_ctx = history_ctx + "\n\n" + case_ctx
+                    state = {
+                        **state,
+                        "case_context": case_ctx,
+                        "case_evidence_briefing": briefing.model_dump(),
+                        "case_evidence_sources": list(briefing.source_registry.values()),
+                        "graph_evidence": graph,
+                        "issue_tasks": [task.model_dump() for task in tasks],
+                    }
+            except Exception as exc:
+                logger.warning("[INTENT_EVIDENCE] 사건 증거 지연 로딩 실패: %s", type(exc).__name__)
+            finally:
+                db.close()
+
     # [핵심 불변식] '문서가 등록됨'과 '이번 질문에 증거가 필요함'은 서로 다르다.
     # GENERAL_LEGAL은 법령·판례 일반 설명 경로로 보내고 사건 자료를 근거에서
     # 제거한다. CASE_EVIDENCE는 기존 원문 작성/검증 경로를 그대로 사용한다.
@@ -1961,6 +1977,11 @@ def intent_analysis_node(state: LegalState) -> Dict:
     has_case_documents = bool((state.get("case_evidence_briefing") or {}).get("source_documents"))
     selected_answer_mode = DOCUMENT_MODE if needs_case_evidence and has_case_documents else None
     updates: Dict[str, Any] = {
+        "case_context": state.get("case_context", ""),
+        "case_evidence_briefing": state.get("case_evidence_briefing"),
+        "case_evidence_sources": state.get("case_evidence_sources", []),
+        "graph_evidence": state.get("graph_evidence", {}),
+        "issue_tasks": state.get("issue_tasks", []),
         "intent": decision.intent.value,
         "resolved_query": decision.resolved_query,
         "intent_decision": decision.model_dump(),
