@@ -454,14 +454,14 @@ def statute_search_plan_node(state: LegalState) -> Dict:
     from ai_legal_helper.workflows.temporal_search_plan import build_temporal_search_plan
 
     q_target = state.get("resolved_query") or state.get("question", "")
-    try:
-        plan = build_temporal_search_plan(
-            q_target,
-            event_date=state.get("event_date"),
-            event_type=state.get("event_type"),
-        )
-    except TypeError:
-        plan = build_temporal_search_plan(q_target)
+    # 기존 규칙에서 사건일이 미확정인 시점 질의만 LLM으로 보완한다.
+    # 실패 시에는 검색 계획 SKIP으로 복귀하고 법령 적용을 추정하지 않는다.
+    plan = build_temporal_search_plan(
+        q_target,
+        event_date=state.get("event_date"),
+        event_type=state.get("event_type"),
+        llm_event_extraction=True,
+    )
     logger.info(
         "[TEMPORAL_PLAN] status=%s candidate_count=%d reason=%s",
         plan["status"], len(plan["candidate_laws"]), plan["reason_code"],
