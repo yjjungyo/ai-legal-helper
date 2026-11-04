@@ -134,6 +134,40 @@ def search_is_approved(state: dict[str, Any], requests: list[dict[str, Any]]) ->
             and all(r["law_name"] in approved for r in requests))
 
 
+def _verified_local_fallback(state: dict[str, Any], requests: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """이미 확보된 공식 원문 중 요청 법령·조문·시점이 검증된 것만 재사용한다.
+
+    일반 벡터 유사도 결과나 시행일 미확인 문서는 fallback으로 승격하지 않는다.
+    """
+    reference_date = (state.get("case_evidence_briefing") or {}).get("as_of_date")
+    if not reference_date:
+        return []
+    matched = []
+    for request in requests:
+        candidates = []
+        for src in state.get("retrieved_sources") or []:
+            if not isinstance(src, dict) or src.get("source_type") != "STATUTE":
+                continue
+            if src.get("statute_name") != request["law_name"] or not src.get("content"):
+                continue
+            if src.get("temporal_status") != "EFFECTIVE_DATE_VERIFIED":
+                continue
+            if not (src.get("version_id") and src.get("content_hash")):
+                continue
+            if src.get("version_lookup_status") in ("DATE_NOT_SPECIFIED", "UNCONFIRMED", "FAILED"):
+                continue
+            if src.get("version_date") and str(src["version_date"]) > str(reference_date):
+                continue
+            articles = request.get("articles") or []
+            if articles and src.get("article") not in articles:
+                continue
+            candidates.append(src)
+        if not candidates:
+            return []
+        matched.extend(candidates)
+    return list({src["source_id"]: src for src in matched if src.get("source_id")}.values())
+
+
 def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
     """승인된 새 조문만 검색하고 결과·조회 이력을 상태 갱신값으로 반환한다.
 
@@ -180,6 +214,11 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
         except Exception as exc:
             # 공식 API 장애를 그래프 전체 실패로 전파하지 않는다. 법령을 임의로 생성하지 않는다.
             logger.warning("[DOCUMENT_SEARCH] 공식 검색 실패 law=%s error=%s", name, type(exc).__name__)
+    fallback = []
+    if not found:
+        fallback = _verified_local_fallback(state, requests)
+        if fallback:
+            logger.info("[DOCUMENT_SEARCH] 공식 검색 실패 후 시점 검증된 기존 공식 원문 %d건 재사용", len(fallback))
     merged = list(state.get("retrieved_sources") or [])
     seen = {s.get("source_id") for s in merged}
     for source in found:
@@ -191,7 +230,8 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
         len(found),
         len(merged),
     )
-    return {"statute_search_results": found, "retrieved_sources": merged,
+    return {"statute_search_results": found or fallback, "retrieved_sources": merged,
+            "statute_search_status": "OFFICIAL_SUCCESS" if found else ("VERIFIED_LOCAL_FALLBACK" if fallback else "UNAVAILABLE"),
             "statute_search_count": (state.get("statute_search_count") or 0) + 1,
             "statute_search_history": list(dict.fromkeys(
                 (state.get("statute_search_history") or []) + [r["key"] for r in requests]))}
