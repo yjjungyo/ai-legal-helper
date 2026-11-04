@@ -425,7 +425,8 @@ def evaluate_temporal_sources(
                 # 복수 사건 유형은 기존 단일 유형 기반 엔진에서 확정하지 않는다.
                 if structured_rule and len(structured_rule["event_types"]) == 1:
                     candidate_type = structured_rule["event_types"][0]
-                    if candidate_type == current_type:
+                    if (candidate_type == current_type
+                            and structured_rule["condition"] == "ON_OR_AFTER_EFFECTIVE_DATE"):
                         rule_type = candidate_type
                         reason = "LLM_ADDENDUM_CONDITION_GROUNDED"
             parsed_cur_date = parse_legal_date(current_date)
