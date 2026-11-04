@@ -605,6 +605,16 @@ def synthesize_node(state: LegalState) -> Dict:
     # don't append to messages yet, just save to draft_answer
     return {"draft_answer": draft}
 
+def synthesis_law_gate_condition(state: LegalState) -> str:
+    """초안이 없고 법령 보강이 필요한 경우 검증 대신 공식 검색으로 이동한다."""
+    gate = state.get("synthesis_law_gate") or {}
+    if gate.get("status") == "NEED_MORE_LAW":
+        if (state.get("statute_search_count") or 0) >= 2 or state.get("hilt_executed"):
+            return "insufficient"
+        return "statute_search_approval"
+    return "verification"
+
+
 @trace
 def verification_node(state: LegalState) -> Dict:
     """초안 답변을 법령 출처 + 검증된 증거 그래프 경로와 대조하여 검증한다.
@@ -1557,7 +1567,7 @@ def statute_search_approval_node(state: LegalState) -> Dict:
     set_node_name("statute_search_approval")
     from ai_legal_helper.observability.context import get_case_id, get_trace_id, get_request_id
 
-    ver_res = state.get("verification_result", {}) or {}
+    ver_res = (state.get("synthesis_law_gate") or state.get("verification_result") or {})
     plan = state.get("law_search_plan") or {}
     preflight = state.get("statute_search_phase") == "PRE_ANALYSIS" and plan.get("status") == "READY"
     candidate_laws = list(plan.get("candidate_laws") or []) if preflight else ver_res.get("candidate_laws", [])
@@ -1660,7 +1670,7 @@ def execute_statute_search_node(state: LegalState) -> Dict:
     from ai_legal_helper.tools.official_statute_search import search_official_statutes
     from ai_legal_helper.workflows.document_search import execute_document_search, law_names
 
-    ver_res = state.get("verification_result", {}) or {}
+    ver_res = (state.get("synthesis_law_gate") or state.get("verification_result") or {})
     plan = state.get("law_search_plan") or {}
     preflight = (state.get("statute_search_phase") == "PRE_ANALYSIS"
                  and plan.get("status") == "READY")
@@ -1790,6 +1800,8 @@ def statute_search_result_condition(state: LegalState) -> str:
     # Verification을 진행한다. 후속 P8 시점 오류 방어는 별도로 적용.
     if state.get("statute_search_phase") == "PRE_ANALYSIS":
         return "run_agents"
+    if state.get("synthesis_law_gate", {}).get("status") == "NEED_MORE_LAW":
+        return "run_agents" if state.get("statute_search_results") else "insufficient"
     results = state.get("statute_search_results", [])
     if results:
         return "re_analyze"
@@ -2211,8 +2223,6 @@ def build_legal_graph(checkpointer: Optional[Any] = None):
     graph.add_node("plan", plan_node)
     graph.add_node("statute_search_plan", statute_search_plan_node)
     graph.add_node("run_agents", run_agents_node)
-    from ai_legal_helper.workflows.pre_synthesis_coverage import check_legal_coverage, coverage_next
-    graph.add_node("legal_coverage_check", check_legal_coverage)
     graph.add_node("legal_evidence_bundle", legal_evidence_bundle_node)
     graph.add_node("synthesize", synthesize_node)
     graph.add_node("verification", verification_node)
@@ -2246,13 +2256,13 @@ def build_legal_graph(checkpointer: Optional[Any] = None):
         "statute_search_approval": "statute_search_approval",
         "run_agents": "run_agents",
     })
-    graph.add_edge("run_agents", "legal_coverage_check")
-    graph.add_conditional_edges("legal_coverage_check", coverage_next, {
-        "statute_search_approval": "statute_search_approval",
-        "legal_evidence_bundle": "legal_evidence_bundle",
-    })
+    graph.add_edge("run_agents", "legal_evidence_bundle")
     graph.add_edge("legal_evidence_bundle", "synthesize")
-    graph.add_edge("synthesize", "verification")
+    graph.add_conditional_edges("synthesize", synthesis_law_gate_condition, {
+        "verification": "verification",
+        "statute_search_approval": "statute_search_approval",
+        "insufficient": "insufficient",
+    })
 
     graph.add_conditional_edges("verification", supervisor_verification_decision, {
         "finalize": "finalize",
