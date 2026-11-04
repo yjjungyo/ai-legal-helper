@@ -140,7 +140,7 @@ def write_document_answer(
                "수정 중 보존할 설명(원문과 재대조)": preserved_points or []}
     if rag_only_notice:
         payload["공식 법령 검색 결과"] = (
-            "공식 OpenLaw에서 요청 법령을 찾지 못했습니다. 현재 확보된 RAG 근거만으로 "
+            "공식 OpenLaw에서 요청한 법령의 일부 또는 전부를 찾지 못했습니다. 확보된 공식 법령과 RAG 근거만으로 "
             "확인 가능한 범위에서 답변하세요. 답변 첫 부분에 공식 검색 미확인 사실을 명시하고, "
             "미확인 법령의 조문이나 시행일을 확정하지 마세요. 추가 공식 검색 요청을 반복하지 마세요."
         )
@@ -181,8 +181,8 @@ def write_document_answer(
         raise ValueError("EMPTY_DOCUMENT_ANSWER")
     answer_text = answer.strip()
     if rag_only_notice:
-        answer_text = ("**안내:** 공식 법령 검색에서 요청한 법령을 찾지 못해, "
-                       "현재 확보된 RAG 자료만으로 검토한 답변입니다. "
+        answer_text = ("**안내:** 공식 법령 검색에서 요청한 법령의 일부 또는 전부를 확인하지 못해, "
+                       "현재 확보된 공식 법령 및 RAG 자료로 검토한 답변입니다. "
                        "법령의 최신성 및 적용 시점은 추가 확인이 필요합니다.\\n\\n"
                        + answer_text)
     if integrated:
