@@ -303,3 +303,35 @@ def test_t08_server_restart_preserves_pending_approval():
         db.rollback()
         db.close()
         raise e
+
+
+def test_t09_hilt_post_reanalyze_allows_revise_and_high_support_soft_landing():
+    """T-09 (Trace d6f26e28 회귀 방지): HILT 법령 검색 후(re_analyze) 초안에 1회 재검토(revise) 기회를 부여하고, 고비율 지지 시 CAUTIONARY로 확정한다."""
+    from ai_legal_helper.workflows.legal_workflow import supervisor_verification_decision
+
+    # 1. re_analyze 완료 직후(revision_count=1) REVISE 발생 시 revise 노드로 라우팅 검증
+    claims = [
+        {"claim": f"검증된 법률 주장 {i}", "claim_type": "LEGAL_RULE", "grounding_status": "SUPPORTED"}
+        for i in range(19)
+    ] + [
+        {"claim": "시행일은 2027.4.27.경으로 보입니다.", "claim_type": "LEGAL_RULE", "grounding_status": "UNSUPPORTED"}
+    ]
+    state_after_reanalyze = {
+        "hilt_executed": True,
+        "revision_count": 1,
+        "verification_result": {
+            "status": "REVISE",
+            "reason_code": "ANSWER_REVISION_REQUIRED",
+            "claims": claims,
+            "citation_audit": {"unverified_citations": [], "unsupported_citations": []},
+        },
+        "retrieved_sources": [{"source_id": "OFFICIAL:1", "statute_name": "민간임대주택에 관한 특별법 시행령"}],
+    }
+    assert supervisor_verification_decision(state_after_reanalyze) == "revise", "HILT 완료 후 첫 검증 REVISE 시 revise 노드로 수정 기회를 부여해야 한다."
+
+    # 2. revise 완료 후(revision_count=2) 85% 이상 고비율 지지 및 무결함 시 finalize(CAUTIONARY) 소프트랜딩 검증
+    state_after_revise = {
+        **state_after_reanalyze,
+        "revision_count": 2,
+    }
+    assert supervisor_verification_decision(state_after_revise) == "finalize", "재검토 한도 도달 후에도 95% 법리 지지 시 전량 폐기(WITHHELD)하지 않고 finalize(CAUTIONARY)로 확정해야 한다."

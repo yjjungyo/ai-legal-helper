@@ -592,3 +592,56 @@ def test_trace_3bc30893_list_inference_basis_does_not_cause_verification_error(d
 
 
 
+
+
+def test_trace_0e4d5603_soft_landing_preserves_high_support_limited_answer(document_state):
+    """Trace 0e4d5603 회귀 방지: 제한 답변 검증이 REVISE라도 80% 이상 입증되고 치명적 결함이 없으면 CAUTIONARY로 정상 인도된다.
+
+    [검증 목적]
+    - 재작성 한도 도달 후 생성된 제한 답변(Limited Answer)이 12개 중 10개(83.3%) 주장을 입증했을 때,
+      단 2개의 경미한 정황 문구 지적으로 REVISE가 발생하더라도 답변을 전량 폐기(WITHHELD)하지 않고
+      CAUTIONARY(조건부 안내)로 정상 인도하는지 검증한다.
+    """
+    draft = "원문 초안입니다. [E01_계약서.txt]"
+    _, manifest = format_grounding_sources(consultation.document_sources(document_state))
+    failed_ver = {
+        **verification_reply(
+            status="REVISE",
+            reason_code="ANSWER_REVISION_REQUIRED",
+            missing_issues=[],
+            missing_legal_issues=[],
+        ),
+        "verified_answer_sha256": hashlib.sha256(draft.encode()).hexdigest(),
+        "source_manifest": manifest,
+    }
+    state = {**document_state, "draft_answer": draft, "verification_result": failed_ver}
+
+    limited_draft = "임대인 갑과 임차인 을이 계약했다. [E01_계약서.txt] 보증금은 3억원이고 적법하게 종료되었습니다."
+    # 12 claims 중 10개 지지(83.3%), 2개 미흡 (정황 문구) -> REVISE 상황 모사
+    claims = [
+        {"claim": f"검증된 사실 {i}", "claim_type": "CASE_FACT", "fact_status": "VERIFIED_FACT",
+         "source_ids": ["E01_계약서.txt"], "grounding_status": "SUPPORTED"}
+        for i in range(10)
+    ] + [
+        {"claim": f"정황 추론 {i}", "claim_type": "CASE_INFERENCE", "fact_status": "INFERENCE",
+         "source_ids": ["E01_계약서.txt"], "grounding_status": "UNSUPPORTED"}
+        for i in range(2)
+    ]
+    limited_ver = {
+        "status": "REVISE",
+        "reason_code": "ANSWER_REVISION_REQUIRED",
+        "claims": claims,
+        "missing_issues": ["종료 시점 구분 필요"],
+        "missing_legal_issues": [],
+        "contradictions": [],
+        "citation_audit": {"unverified_citations": []},
+    }
+
+    with patch.object(consultation, "validate_document_snapshot"), \
+            patch.object(consultation, "write_document_answer", return_value={"draft_answer": limited_draft}), \
+            patch("ai_legal_helper.agents.verification.run_verification", return_value=limited_ver):
+        out = consultation.finish_answer(state)
+
+    assert out["final_disposition"] == "CAUTIONARY"
+    assert out["final_answer"] == limited_draft
+    assert len(out["sources"]) >= 1

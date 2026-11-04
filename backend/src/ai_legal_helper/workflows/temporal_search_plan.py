@@ -29,6 +29,8 @@ def _local_law_resolve(question: str) -> Any:
 def build_temporal_search_plan(
     question: str,
     *,
+    event_date: Optional[str] = None,
+    event_type: Optional[str] = None,
     resolver_fn: Optional[Callable[[str], Any]] = None,
     max_laws: int = 3,
 ) -> dict[str, Any]:
@@ -45,7 +47,7 @@ def build_temporal_search_plan(
     }
     if not isinstance(question, str) or not _LAW_HINT.search(question):
         return empty
-    event = resolve_event(question)
+    event = resolve_event(question, event_date=event_date, event_type=event_type)
     if event.selected is None:
         return {**empty, "reason_code": event.reason_code}
     try:

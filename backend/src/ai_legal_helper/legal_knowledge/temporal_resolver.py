@@ -115,9 +115,9 @@ def resolve_event(
     """
     if event_date is not None:
         parsed = parse_legal_date(event_date)
-        if parsed is None or event_type not in _EVENT_TERMS:
+        if parsed is None or (event_type is not None and event_type not in _EVENT_TERMS):
             return EventResolution("UNCONFIRMED", reason_code="EXPLICIT_EVENT_INVALID")
-        event = LegalEvent(parsed.isoformat(), event_type, "CALLER_VERIFIED")
+        event = LegalEvent(parsed.isoformat(), event_type or "CONTRACT_SIGNED", "CALLER_VERIFIED")
         return EventResolution("RESOLVED", events=[event], selected=event)
 
     candidates: list[LegalEvent] = []
@@ -133,17 +133,55 @@ def resolve_event(
             parsed = None
         if parsed is None:
             continue
-        # 다른 날짜의 사건 동사가 현재 날짜에 연결되지 않도록 인접 날짜 경계에서
-        # 구문을 자른다. 날짜 뒤의 명시 동사를 우선 사용하고, 없을 때만 앞을 본다.
+        # 다른 날짜나 다른 문장의 사건 동사가 현재 날짜에 오염 연결되지 않도록
+        # 인접 날짜 및 문장 종결 부호(마침표, 물음표, 느낌표, 개행) 경계에서 구문을 자른다.
         preceding_boundary = dates[index - 1].end() if index else 0
         following_boundary = dates[index + 1].start() if index + 1 < len(dates) else len(question)
-        before = question[max(preceding_boundary, match.start()-28):match.start()]
-        after = question[match.end():min(following_boundary, match.end()+28)]
-        following_event = any(token in after for terms in _EVENT_TERMS.values() for token in terms)
-        if any(term in after[:10] for term in ("공포", "시행일", "개정일")):
+
+        last_sent_break = max(
+            question.rfind('.', 0, match.start()),
+            question.rfind('!', 0, match.start()),
+            question.rfind('?', 0, match.start()),
+            question.rfind('\n', 0, match.start()),
+        )
+        start_pos = max(preceding_boundary, last_sent_break + 1, match.start() - 28)
+        before = question[start_pos:match.start()]
+
+        next_sent_break = len(question)
+        for p in (
+            question.find('.', match.end(), following_boundary),
+            question.find('!', match.end(), following_boundary),
+            question.find('?', match.end(), following_boundary),
+            question.find('\n', match.end(), following_boundary),
+        ):
+            if p != -1 and p < next_sent_break:
+                next_sent_break = p
+        end_pos = min(following_boundary, next_sent_break, match.end() + 28)
+        after = question[match.end():end_pos]
+
+        # 법령 시점 수식어 식별:
+        # 날짜 바로 뒤 또는 앞에 개정/공포/시행일/제정/신설/고시/발효 등 법령의 시점 변경 동사/수식어가 결합된 경우,
+        # 사건 발생일(계약일 등)이 아닌 법령 시점이므로 사건일 후보에서 제외한다.
+        # 주의: 날짜 뒤에 사건 행위(예: '계약 체결')가 먼저 나오고 그 뒤에 법령이 언급된 경우는 사건일이므로 제외하지 않는다.
+        _STATUTE_ACTION_MARKER = re.compile(
+            r'(?:공포|개정|제정|폐지|신설|고시|발효|바뀐|입법예고|시행일|시행된|시행(?:일|된|한|하는|하기))'
+        )
+        statute_match = _STATUTE_ACTION_MARKER.search(after[:10])
+        event_match_pos = None
+        for terms in _EVENT_TERMS.values():
+            for token in terms:
+                pos = after.find(token)
+                if pos != -1 and (event_match_pos is None or pos < event_match_pos):
+                    event_match_pos = pos
+
+        following_event = event_match_pos is not None
+        # 법령 시점 수식어가 사건 행위 단어보다 먼저 나오면 법령 시점으로 스킵
+        if statute_match and (event_match_pos is None or statute_match.start() < event_match_pos):
             continue
-        if not following_event and any(term in before[-6:] for term in ("공포", "시행일", "개정일")):
+        # 날짜 뒤에 사건 행위가 없고, 날짜 직전에 법령 시점 수식어가 붙어있는 경우 스킵
+        if not following_event and _STATUTE_ACTION_MARKER.search(before[-6:]):
             continue
+
         local = after if following_event else before
         hits = [name for name, terms in _EVENT_TERMS.items()
                 if any(term in local for term in terms)]
@@ -167,6 +205,9 @@ def _norm_article(value: Any) -> str:
 
 def _same_version(source: Mapping[str, Any], addon: Mapping[str, Any]) -> bool:
     """부칙·조문 출처가 공식 동일 법령ID+MST인지 확인한다."""
+    if str(source.get("version_relation") or "") and str(addon.get("version_relation") or ""):
+        if source.get("version_relation") != addon.get("version_relation"):
+            return False
     return (
         bool(source.get("law_id")) and bool(source.get("version_id"))
         and str(source["law_id"]) == str(addon.get("law_id") or "")
@@ -285,10 +326,31 @@ def evaluate_temporal_sources(
         else:
             selected_addendum, span = matching_rules[0]
             rule_type, reason = _machine_rule(span)
+            parsed_cur_date = parse_legal_date(current_date)
+            is_before_effective = bool(parsed_cur_date and effective and parsed_cur_date < effective)
+
+            # 복수 사건 유형(예: 체결하거나 갱신하는 경우)을 포괄하는 적용례라도
+            # 사건일이 시행일 이전(current_date < effective)이고 '시행 이후' 체결/갱신/변경 적용 규정이면
+            # 해당 모든 사건 유형에 대해 시행일 전 불적용(NOT_APPLICABLE)임이 명백하다.
+            if reason == "MULTI_EVENT_APPLICATION_RULE" and is_before_effective:
+                types = [e for e, tokens in _STRICT_EVENT_TERMS.items()
+                         if any(token in span for token in tokens)]
+                if current_type in types:
+                    rule_type = current_type
+                    reason = "MATCHED_EVENT_APPLICATION_RULE"
+
             # 명시된 적용례 외에 동일 부칙에 과도규정/경과조치가 있으면
-            # 이 조문에 불리한 조건이 있는지 자동 판정할 수 없으므로 보류.
+            # 이 조문에 불리한 조건이 있는지 자동 판정할 수 없으므로 보류한다.
+            # 단, 사건일이 시행일 이전(current_date < effective)이고 부칙에 소급적용 규정이 없으며
+            # 적용례가 '시행 이후'로 한정된 경우, 통상적인 경과조치(과태료·벌칙 등)는
+            # 미시행 법령의 사전 효력을 발생시키지 않으므로 시행일 전 불적용 판정을 차단하지 않는다.
             full_addendum = " ".join(str(a.get("content") or "") for a in related)
-            if any(x in full_addendum for x in ("경과조치", "종전의 규정", "소급 적용")):
+            has_retro = "소급" in full_addendum
+            has_transitional = any(x in full_addendum for x in ("경과조치", "종전의 규정"))
+
+            if has_retro:
+                reason = "TRANSITIONAL_REVIEW_REQUIRED"
+            elif has_transitional and not is_before_effective:
                 reason = "TRANSITIONAL_REVIEW_REQUIRED"
             elif rule_type and current_type != rule_type:
                 reason = "EVENT_TYPE_MISMATCH"

@@ -75,6 +75,20 @@ class VersionLookup:
     pages_fetched: int = 0
     reason_code: str = ""
 
+    def get_role(self, version: OfficialLawVersion) -> str:
+        """후보 버전의 역할(AS_OF_CANDIDATE / NEXT_EFFECTIVE_CANDIDATE)을 반환한다.
+
+        동일한 개정 법령(MST) 내에서 다단계 시행일(예: 공포일 즉시시행 조항과 6개월 후 시행 조항)로
+        인해 동일 MST가 과거 기준일 후보와 미래 시행예정 후보로 동시 선별된 경우에도,
+        선별 순서(candidates)를 기반으로 정확한 역할을 구분하여 반환한다.
+        """
+        if self.candidates:
+            if version == self.candidates[0]:
+                return "AS_OF_CANDIDATE"
+            if len(self.candidates) > 1 and version == self.candidates[1]:
+                return "NEXT_EFFECTIVE_CANDIDATE"
+        return self.roles.get(version.mst, "AS_OF_CANDIDATE")
+
 
 def _valid_date(value: str | None) -> str | None:
     parsed = parse_legal_date(value)
@@ -239,7 +253,8 @@ def select_versions_at_date(
             return VersionLookup("UNCONFIRMED", versions=versions,
                                  reason_code="MULTIPLE_FUTURE_VERSIONS_SAME_DATE")
         chosen.append(future[0])
-        roles[future[0].mst] = "NEXT_EFFECTIVE_CANDIDATE"
+        if future[0].mst != anchors[0].mst:
+            roles[future[0].mst] = "NEXT_EFFECTIVE_CANDIDATE"
 
     return VersionLookup(
         status="CANDIDATES_FOUND", versions=versions, candidates=chosen,
@@ -267,7 +282,7 @@ def lookup_versions_for_date(
     total_expected: int | None = None
     seen_count = 0
     skipped_count = 0
-    seen_mst: set[str] = set()
+    seen_version_keys: set[tuple[str, str]] = set()
     pages = 0
     limit = min(max(1, max_pages), _MAX_PAGES)
     for page in range(1, limit + 1):
@@ -286,9 +301,13 @@ def lookup_versions_for_date(
             if row_count == 0 and seen_count < total:
                 raise ValueError("HISTORY_PREMATURE_EMPTY_PAGE")
             for item in items:
-                if item.mst in seen_mst:
+                # 동일 MST라도 시행일자(list_effective_date)가 다른 행(공포일 즉시 시행 규정과 6개월 후 시행 규정 등
+                # 다단계 시행일이 부칙에 규정된 경우)은 대한민국 법제처 OpenLaw eflaw 목록의 정상적인 연혁 분기다.
+                # 단, 동일 MST와 동일 시행일자가 중복 수집되면 페이지네이션 오동작 또는 중복 응답으로 차단한다.
+                version_key = (item.mst, item.list_effective_date)
+                if version_key in seen_version_keys:
                     raise ValueError("DUPLICATE_MST_IN_OFFICIAL_HISTORY")
-                seen_mst.add(item.mst)
+                seen_version_keys.add(version_key)
                 versions.append(item)
             skipped_count += skipped
             seen_count += row_count

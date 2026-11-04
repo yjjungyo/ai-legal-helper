@@ -293,8 +293,9 @@ def search_official_statutes_by_date(
         version_sources: list[dict[str, Any]] = []
         okay = True
         for version in lookup.candidates:
+            relation = lookup.get_role(version) if hasattr(lookup, "get_role") else lookup.roles.get(version.mst, "AS_OF_CANDIDATE")
             sources = _version_sources(
-                version=version, relation=lookup.roles[version.mst],
+                version=version, relation=relation,
                 as_of_date=as_of_date, requested_articles=target.articles,
                 query=" ".join([query, *(missing_issues or [])]),
                 api_key=api_key, fetch_xml=fetch_xml,

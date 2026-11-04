@@ -1519,8 +1519,19 @@ def run_verification(
         from ai_legal_helper.tools.statute_temporal import temporal_answer_errors
         temporal_errors = temporal_answer_errors(question, draft_answer, retrieved_sources)
         if temporal_errors:
-            result.status = "REVISE"
-            result.reason_code = "ANSWER_REVISION_REQUIRED"
+            # 1. 기존 판정이 이미 INSUFFICIENT(근거 부재 등)인 경우 REVISE로 승격시키지 않고 유지한다.
+            if result.status != "INSUFFICIENT":
+                result.status = "REVISE"
+
+            # 2. 부칙이나 개정 법령 원문이 검색 출처에 전혀 없는 경우:
+            #    단순한 초안 문구 교정(ANSWER_REVISION_REQUIRED)이 아니라
+            #    법령 원문 자체가 부재(LEGAL_SOURCE_MISSING)한 것이므로 정확한 사유코드를 부여한다.
+            has_missing_source = any("원문이 검색 출처에 없습니다" in err for err in temporal_errors)
+            if has_missing_source:
+                result.reason_code = "LEGAL_SOURCE_MISSING"
+            elif result.reason_code not in ("LEGAL_SOURCE_MISSING", "LEGAL_SOURCE_INSUFFICIENT"):
+                result.reason_code = "ANSWER_REVISION_REQUIRED"
+
             result.recommended_action = "REVISE_DRAFT"
             result.revision_instructions.extend(temporal_errors)
             result.warnings.append("법령 개정 조문의 시행일과 계약 기준일이 일치하지 않아 법률 판단을 재검증해야 합니다.")

@@ -23,7 +23,7 @@ def _state():
         "case_context": "사건의 민감한 사실관계",
         "case_evidence_briefing": {
             "case_type": "임대차",
-            "source_documents": [{"document_name": "계약서.txt", "content": "원문"}],
+            "source_documents": [{"document_name": "계약서.txt", "content": "원문", "review_status": "APPROVED"}],
         },
         "case_evidence_sources": [{"source_id": "계약서.txt"}],
         "graph_evidence": {"valid_paths": [{"id": "private"}]},

@@ -82,6 +82,13 @@ class LegalState(MessagesState):
     hilt_executed: Optional[bool]
     preserved_points: Optional[List[str]]
 
+    # P8/P0-LAW 시점 확정 및 법령-사건 날짜 분리 필드
+    # 질문 또는 사건에서 확정된 의뢰인의 행위 기준일(계약일, 인도일 등)을 보존하여
+    # 하위 노드(Temporal Plan, RAG, Verifier Gate)가 불안정한 정규식 재파싱 없이 일관되게 참조한다.
+    event_date: Optional[str] = None
+    event_type: Optional[str] = None
+    statute_mention_date: Optional[str] = None
+
     # Router v2.0 분류 상태 관리 필드
     router_status: Optional[str] = None
     router_reason: Optional[str] = None

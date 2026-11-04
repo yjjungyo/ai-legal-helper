@@ -81,6 +81,19 @@ class IntentDecision(BaseModel):
     requires_full_analysis: bool = Field(default=True, description="5단계 심층 의견서 형식 필요 여부")
     referenced_previous_turn_ids: List[str] = Field(default_factory=list, description="참조한 이전 턴 ID 목록")
     reason: str = Field(default="", description="의도 분류 및 실행 경로 선택 사유")
+    # P8/P0-LAW: 질문 내 의뢰인 행위 기준일(계약일 등)과 법령 시점(개정/공포일 등) 분리 보존
+    event_date: Optional[str] = Field(
+        default=None,
+        description="질문에서 식별된 의뢰인의 실제 법률 행위 기준일(계약 체결일, 인도일, 통지일 등. 형식: YYYY-MM-DD). 법령 개정/공포일은 제외",
+    )
+    event_type: Optional[str] = Field(
+        default=None,
+        description="식별된 사건 행위 유형 (CONTRACT_SIGNED, NOTICE_GIVEN, MOVE_OUT 등)",
+    )
+    statute_mention_date: Optional[str] = Field(
+        default=None,
+        description="질문에서 언급된 법령 개정일, 공포일, 시행일 (형식: YYYY-MM-DD)",
+    )
 
 
 INTENT_PROMPT = PromptTemplate.from_template(
@@ -124,6 +137,12 @@ INTENT_PROMPT = PromptTemplate.from_template(
 - 판단 근거는 사용자 질문의 의미와 대화 맥락입니다. 법률 분야별 키워드 규칙을 만들지 마세요.
 - 법률과 무관한 정보 요청은 intent=OUT_OF_SCOPE로 분류하세요. 법률 쟁점으로 억지 해석하지 마세요.
 
+#### [질문 내 날짜의 법률적 역할 분리 (매우 중요)]
+- 질문에 날짜가 등장하는 경우, 해당 날짜의 법률적 역할을 명확히 구분하세요:
+  1. event_date: 의뢰인의 실제 법률 행위 기준일 (예: 계약 체결일, 통지일, 입금일, 퇴거일 등. 형식: YYYY-MM-DD). 법령이 개정/공포된 날짜는 절대로 event_date로 지정하지 마세요.
+  2. event_type: 식별된 행위 유형 ("CONTRACT_SIGNED", "CONTRACT_RENEWED", "CONTRACT_MODIFIED", "NOTICE_GIVEN", "MOVE_OUT" 등 또는 null)
+  3. statute_mention_date: 질문자가 언급한 법령·시행령·규칙의 개정일, 공포일, 시행일 (예: "2026년 10월 27일 개정된 시행령" -> 2026-10-27). 날짜가 없으면 null.
+
 #### [대화 맥락]
 {conversation_context}
 
@@ -142,7 +161,10 @@ INTENT_PROMPT = PromptTemplate.from_template(
   "requires_retrieval": true/false,
   "requires_verification": true/false,
   "requires_full_analysis": true/false,
-  "reason": "분류 사유 (1~2문장)"
+  "reason": "분류 사유 (1~2문장)",
+  "event_date": "YYYY-MM-DD 또는 null",
+  "event_type": "CONTRACT_SIGNED | NOTICE_GIVEN | MOVE_OUT | null",
+  "statute_mention_date": "YYYY-MM-DD 또는 null"
 }}
 """
 )
@@ -343,6 +365,16 @@ def analyze_consultation_intent(
             except (ValueError, TypeError):
                 consultation_mode = ConsultationMode.CASE_EVIDENCE
 
+            event_d = parsed.get("event_date")
+            event_t = parsed.get("event_type")
+            statute_d = parsed.get("statute_mention_date")
+            if not event_d:
+                from ai_legal_helper.legal_knowledge.temporal_resolver import resolve_event
+                auto_ev = resolve_event(question)
+                if auto_ev.selected:
+                    event_d = auto_ev.selected.date
+                    event_t = auto_ev.selected.event_type
+
             decision = IntentDecision(
                 intent=intent_enum,
                 consultation_mode=consultation_mode,
@@ -352,6 +384,9 @@ def analyze_consultation_intent(
                 requires_verification=requires_ver,
                 requires_full_analysis=requires_full,
                 reason=reason_str,
+                event_date=event_d,
+                event_type=event_t,
+                statute_mention_date=statute_d,
             )
     except Exception as e:
         logger.warning(f"[INTENT_ANALYZER] LLM 질문 의도 분석 실패(규칙 폴백 적용): {e}")

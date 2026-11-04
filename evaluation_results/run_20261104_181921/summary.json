@@ -1,0 +1,27 @@
+{
+  "run_id": "run_20261104_181921",
+  "case_id": "fa8f215a-1c55-44e6-9af8-50f336a85717",
+  "dataset_name": "sc001_dev",
+  "started_at": "2026-11-04T18:19:21.889267",
+  "completed_at": "2026-11-04T18:19:45.464232",
+  "duration_seconds": 23.57,
+  "total_scenarios": 1,
+  "passed_scenarios": 0,
+  "pass_rate": 0.0,
+  "critical_failures_count": 0,
+  "average_overall_score": 0.25,
+  "disposition_distribution": {
+    "WITHHELD": 1
+  },
+  "kpis": {
+    "fact_recall": 0.0,
+    "fact_precision": 1.0,
+    "issue_detection": 0.6667,
+    "statute_retrieval_accuracy": 0.0,
+    "citation_coverage": 0.0,
+    "legal_application_accuracy": 0.0,
+    "next_action_coverage": 0.25,
+    "safety_compliance": 1.0
+  },
+  "output_directory": "C:\\myprjs\\ai-legal-helper\\evaluation_results\\run_20261104_181921"
+}
