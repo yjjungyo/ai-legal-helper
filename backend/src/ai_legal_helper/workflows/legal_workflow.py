@@ -866,8 +866,8 @@ def verification_node(state: LegalState) -> Dict:
         "issue_results": issue_results_list,
     }
 
-def verification_condition(state: LegalState) -> str:
-    """법률 답변의 검증 결과에 따라 다음 실행 단계(Node)를 결정한다.
+def supervisor_verification_decision(state: LegalState) -> str:
+    """Supervisor가 Verification의 결과를 해석해 다음 실행 단계를 결정한다.
 
     등록 문서가 있는 사건은 질문 충족 검증을 포함한 별도 원문 정책을 우선 적용한다.
     아래 쟁점별 조건부 확정 정책은 문서 원문이 없는 기존 일반 상담에만 적용한다.
@@ -890,7 +890,14 @@ def verification_condition(state: LegalState) -> str:
     # 우선하여 미확인 개정법의 확정적 적용 오류를 최종 답변으로 전달하지 않는다.
     checked = state.get("verification_result", {}) or {}
     if (checked.get("temporal_gate") or {}).get("status") == "BLOCK":
-        logger.warning("[VERIFY_ROUTING] 법령 적용시점 안전 게이트 차단 -> insufficient")
+        # 검증 Agent는 근거 부족만 보고한다. 재검색 여부는 Supervisor 정책에서 결정한다.
+        # 동일 검색의 무한 반복을 막기 위해 공식 법령 검색은 한 번만 승인 요청한다.
+        # 법령 후보가 없는 경우에는 검색 대상이 불명확하므로 기존 안전 종료를 유지한다.
+        candidate_laws = checked.get("candidate_laws") or []
+        if candidate_laws and not state.get("hilt_executed", False):
+            logger.warning("[SUPERVISOR_DECISION] 적용시점 근거 부족 -> 공식 법령 검색 승인 요청")
+            return "statute_search_approval"
+        logger.warning("[SUPERVISOR_DECISION] 적용시점 근거 미확보 또는 재검색 완료 -> insufficient")
         return "insufficient"
     if state.get("answer_mode") == DOCUMENT_MODE:
         return next_verification_step(state)
@@ -1054,6 +1061,10 @@ def verification_condition(state: LegalState) -> str:
     logger.info(f"[VERIFY_ROUTING] 기본 안전 게이팅 분기 -> insufficient (status={status}, reason_code={reason_code})")
     return "insufficient" 
 
+
+
+# 이전 호출자 및 테스트 호환용 별칭. 그래프의 신규 라우팅은 Supervisor 정책을 직접 사용한다.
+verification_condition = supervisor_verification_decision
 
 @trace
 def revise_node(state: LegalState) -> Dict:
@@ -2147,7 +2158,7 @@ def build_legal_graph(checkpointer: Optional[Any] = None):
     graph.add_edge("legal_evidence_bundle", "synthesize")
     graph.add_edge("synthesize", "verification")
 
-    graph.add_conditional_edges("verification", verification_condition, {
+    graph.add_conditional_edges("verification", supervisor_verification_decision, {
         "finalize": "finalize",
         "statute_search_approval": "statute_search_approval",
         "execute_statute_search": "execute_statute_search",
