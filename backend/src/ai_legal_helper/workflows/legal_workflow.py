@@ -2211,6 +2211,8 @@ def build_legal_graph(checkpointer: Optional[Any] = None):
     graph.add_node("plan", plan_node)
     graph.add_node("statute_search_plan", statute_search_plan_node)
     graph.add_node("run_agents", run_agents_node)
+    from ai_legal_helper.workflows.pre_synthesis_coverage import check_legal_coverage, coverage_next
+    graph.add_node("legal_coverage_check", check_legal_coverage)
     graph.add_node("legal_evidence_bundle", legal_evidence_bundle_node)
     graph.add_node("synthesize", synthesize_node)
     graph.add_node("verification", verification_node)
@@ -2244,7 +2246,11 @@ def build_legal_graph(checkpointer: Optional[Any] = None):
         "statute_search_approval": "statute_search_approval",
         "run_agents": "run_agents",
     })
-    graph.add_edge("run_agents", "legal_evidence_bundle")
+    graph.add_edge("run_agents", "legal_coverage_check")
+    graph.add_conditional_edges("legal_coverage_check", coverage_next, {
+        "statute_search_approval": "statute_search_approval",
+        "legal_evidence_bundle": "legal_evidence_bundle",
+    })
     graph.add_edge("legal_evidence_bundle", "synthesize")
     graph.add_edge("synthesize", "verification")
 
