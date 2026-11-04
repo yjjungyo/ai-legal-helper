@@ -2016,6 +2016,10 @@ def intent_analysis_node(state: LegalState) -> Dict:
 def intent_condition(state: LegalState) -> str:
     """의도 분석 결과에 따라 워크플로우 분기 경로를 결정한다."""
     intent_val = state.get("intent")
+    if intent_val == ConsultationIntent.OUT_OF_SCOPE.value:
+        # 법률 무관 요청은 기존 일반 대화 종료 노드를 재사용한다.
+        # 별도 Router/Agent/RAG/Verifier 실행 없이 END로 연결된다.
+        return "general_conversation"
     if intent_val == ConsultationIntent.GENERAL_CONVERSATION.value:
         return "general_conversation"
     if intent_val == ConsultationIntent.NEEDS_CLARIFICATION.value:
@@ -2031,6 +2035,31 @@ def general_conversation_node(state: LegalState) -> Dict:
     set_node_name("general_conversation")
     q = state.get("question", "")
     
+    # 사건 자료가 등록되어 있더라도 범위 밖 질문에는 증거·법령을 조회하지 않는다.
+    # 검증된 법률 의견이 아니므로 Verification PASS를 주장하지 않고
+    # 단순 범위 안내 응답만 전달한다.
+    if state.get("intent") == ConsultationIntent.OUT_OF_SCOPE.value:
+        answer = (
+            "AI Legal Helper는 법률 상담을 지원하는 서비스입니다. "
+            "날씨 등 법률과 무관한 질문은 지원하지 않습니다. "
+            "법률 문제나 사건 관련 질문을 입력해 주세요."
+        )
+        return {
+            "final_answer": answer,
+            "answer": answer,
+            "draft_answer": answer,
+            "final_disposition": "DELIVERED",
+            "verification_status": "UNVERIFIED",
+            "verification_result": {},
+            "categories": [],
+            "selected_agents": [],
+            "sources": [],
+            "cited_sources": [],
+            "retrieved_sources": [],
+            "warnings": [],
+            "messages": [AIMessage(content=answer)],
+        }
+
     # 간결하고 정중한 인사말 생성
     if any(k in q for k in ["감사", "고마", "수고"]):
         answer = "도움이 되어 기쁩니다. 사건 관련하여 추가로 궁금하신 쟁점이나 절차상 확인이 필요한 사항이 있으시면 언제든지 질문해 주시기 바랍니다."
