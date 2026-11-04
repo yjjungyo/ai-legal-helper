@@ -429,7 +429,9 @@ def routing_exit_node(state: LegalState) -> Dict:
 def plan_node(state: LegalState) -> Dict:
     set_node_name("plan")
     cats = state.get("categories", [])
-    plan = plan_tools(cats)
+    # 문서 상담은 Specialist를 실행하지 않으므로 Agent 실행 계획을 만들지 않는다.
+    # 실제 법률 검색은 statute_search_plan 및 run_agents에서 수행한다.
+    plan = [] if state.get("answer_mode") == DOCUMENT_MODE else plan_tools(cats)
     logger.info(
         f"[PLAN] 실행 계획 수립 완료 | 선정도구={plan} | categories={cats}"
     )
@@ -446,7 +448,7 @@ def statute_search_plan_node(state: LegalState) -> Dict:
     set_node_name("statute_search_plan")
     from ai_legal_helper.workflows.temporal_search_plan import build_temporal_search_plan
 
-    plan = build_temporal_search_plan(state.get("question", ""))
+    plan = build_temporal_search_plan(state.get("resolved_query") or state.get("question", ""))
     logger.info(
         "[TEMPORAL_PLAN] status=%s candidate_count=%d reason=%s",
         plan["status"], len(plan["candidate_laws"]), plan["reason_code"],
