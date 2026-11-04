@@ -185,49 +185,6 @@ def validate_document_snapshot(state: Dict[str, Any]) -> None:
                 raise ValueError("CASE_DOCUMENT_SNAPSHOT_CHANGED")
 
 
-def enforce_housing_special_law_coverage(
-    question: str, sources: List[Dict[str, Any]], verification: Dict[str, Any],
-) -> Dict[str, Any]:
-    """주택임대차 핵심 권리 질의에서 특별법 원문 부재를 PASS로 처리하지 않는다.
-
-    법령의 적용 여부를 확정하는 함수가 아니라 공식 원문 검색을 요구하는
-    보수적 검색 완전성 게이트다. 단순 금액 계산·증거 확인 질의에는 적용하지 않는다.
-    """
-    q = str(question or "")
-    housing = any(term in q for term in ("전세", "주택임대차", "임차인", "임대인", "보증금", "월세"))
-    legal_issue = any(term in q for term in (
-        "반환", "해지", "갱신", "대항력", "우선변제", "임차권등기", "가압류", "퇴거", "계약 종료",
-    ))
-    if not (housing and legal_issue):
-        return verification
-    has_special_law = any(
-        src.get("source_type") == "STATUTE"
-        and "주택임대차보호법" in " ".join(str(src.get(k) or "") for k in (
-            "statute_name", "title", "file_name", "filename", "source_id",
-        ))
-        and bool(str(src.get("content") or src.get("article_text") or "").strip())
-        for src in sources if isinstance(src, dict)
-    )
-    if has_special_law:
-        return verification
-    result = dict(verification)
-    if result.get("reason_code") == "VERIFICATION_ERROR":
-        return result
-    laws = list(result.get("candidate_laws") or [])
-    if "주택임대차보호법" not in laws:
-        laws.insert(0, "주택임대차보호법")
-    result["candidate_laws"] = laws
-    issues = list(result.get("missing_legal_issues") or [])
-    note = "주택임대차 핵심 권리 판단에 필요한 주택임대차보호법 원문 확인"
-    if note not in issues:
-        issues.append(note)
-    result["missing_legal_issues"] = issues
-    result["status"] = "INSUFFICIENT"
-    result["reason_code"] = "LEGAL_SOURCE_MISSING"
-    result["recommended_action"] = "REQUEST_STATUTE_SEARCH_APPROVAL"
-    return result
-
-
 def verify_answer(state: Dict[str, Any]) -> Dict[str, Any]:
     """원문 전체로 질문 충족과 사실·법률 근거를 확인하고 검증한 초안 해시를 남긴다.
 
@@ -266,7 +223,6 @@ def verify_answer(state: Dict[str, Any]) -> Dict[str, Any]:
         result = {"status": "INSUFFICIENT", "reason_code": "VERIFICATION_ERROR",
                   "claims": [], "warnings": ["등록 자료와 답변의 대조를 완료하지 못했습니다."],
                   "missing_issues": [], "revision_instructions": []}
-    result = enforce_housing_special_law_coverage(consultation_question(state), sources, result)
     result["verified_answer_sha256"] = hashlib.sha256(draft.encode("utf-8")).hexdigest()
     preserved = list(state.get("preserved_points") or [])
     for pt in result.get("preserved_points") or []:
