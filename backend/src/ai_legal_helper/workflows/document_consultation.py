@@ -399,7 +399,10 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
         missing = _sanitize_client_missing_items(raw_missing)
         detail = "\n" + "\n".join(f"- {item}" for item in missing) if missing else ""
         final = "질문에 대한 답변을 확정할 만큼 근거 확인을 마치지 못했습니다."
-        if temporal_blocked:
+        if state.get("statute_search_status") == "API_ERROR":
+            final = ("공식 법령 검색 API 호출 중 오류가 발생하여 법령 확인을 완료하지 못했습니다. "
+                     "정확한 법률 판단을 위해 현재 상담을 종료합니다. 잠시 후 다시 시도해 주세요.")
+        elif temporal_blocked:
             final += (" 계약 또는 사건 발생일에 적용되는 개정 법령의 시행일·부칙·적용례 "
                       "확인이 부족하여 단정적인 법률 판단을 보류합니다.")
         elif result.get("reason_code") == "VERIFICATION_ERROR":
