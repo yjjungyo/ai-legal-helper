@@ -46,7 +46,7 @@ def check_legal_coverage(state: dict) -> dict:
             part = str(item.get("question_part") or "").strip()
             articles = item.get("articles") or []
             if name and issue and part and isinstance(articles, list):
-                requests.append({"law_name": name, "issue": issue, "question_part": part,
+                requests.append({"law_name": name, "issue": issue, "question_part": str(state.get("question") or question),
                                  "articles": [str(a) for a in articles if isinstance(a, str)]})
         if not requests:
             return {"pre_coverage_checked": True}
