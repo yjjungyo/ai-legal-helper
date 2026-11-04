@@ -247,6 +247,7 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
         "statute_search_results": [],
         "statute_search_count": 0,
         "statute_search_history": [],
+        "synthesis_law_gate": None,
         "hilt_executed": False,
         "preserved_points": [],
     }
@@ -593,6 +594,8 @@ def synthesize_node(state: LegalState) -> Dict:
                 "explanation": "최초 초안 작성 전 필요한 법령 원문을 확인합니다.",
             }
             out["statute_search_phase"] = "POST_VERIFICATION"
+        elif out.get("answer_generation_error") or not (out.get("draft_answer") or "").strip():
+            out["synthesis_law_gate"] = {"status": "ERROR"}
         else:
             out["synthesis_law_gate"] = {"status": "READY"}
         return out
@@ -618,6 +621,8 @@ def synthesize_node(state: LegalState) -> Dict:
 def synthesis_law_gate_condition(state: LegalState) -> str:
     """초안이 없고 법령 보강이 필요한 경우 검증 대신 공식 검색으로 이동한다."""
     gate = state.get("synthesis_law_gate") or {}
+    if gate.get("status") == "ERROR":
+        return "insufficient"
     if gate.get("status") == "NEED_MORE_LAW":
         if (state.get("statute_search_count") or 0) >= 2 or state.get("hilt_executed"):
             return "insufficient"
