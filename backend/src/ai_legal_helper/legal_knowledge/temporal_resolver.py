@@ -273,6 +273,55 @@ def _machine_rule(provision: str) -> tuple[str | None, str]:
     return types[0], "SIMPLE_EVENT_APPLICATION_RULE"
 
 
+def interpret_addendum_with_llm(
+    provision: str,
+    article: str,
+    *,
+    invoke_fn: Optional[Any] = None,
+) -> tuple[str | None, str]:
+    """부칙 적용례의 사건 유형을 LLM으로 추출하되 원문 근거를 확인한다.
+
+    이 함수는 의미 추출만 담당한다. 추출 결과만으로 소급효/경과조치 검토가
+    완료되거나 적용례가 VERIFIED로 승격되지는 않는다.
+    """
+    import json
+    prompt = (
+        "법령 부칙 적용례에서 해당 조문에 관한 적용 시작 사건 유형을 추출하세요. "
+        "원문에 없는 조건은 추측하지 마세요. 복수 유형이나 예외·경과규정이 "
+        "있으면 단일 유형을 선택하지 마세요. JSON만 반환하세요. "
+        '{"event_type":"CONTRACT_SIGNED|CONTRACT_RENEWED|CONTRACT_MODIFIED|NOTICE_GIVEN|MOVE_OUT 또는 null",'
+        '"evidence":"부칙 원문에서 연속된 정확한 인용",'
+        '"has_exception":true,"has_transition":true}'
+        "\\n대상 조문: " + article + "\\n부칙: " + provision
+    )
+    try:
+        if invoke_fn is None:
+            from ai_legal_helper.llm.gateway import get_llm
+            from langchain_core.messages import SystemMessage, HumanMessage
+            response = get_llm(temperature=0.0).invoke([
+                SystemMessage(content="법률 부칙 구조화 추출기입니다. JSON만 반환하고 불명확하면 null을 반환하세요."),
+                HumanMessage(content=prompt),
+            ])
+            raw = response.content
+        else:
+            raw = invoke_fn(prompt)
+        data = json.loads(raw) if isinstance(raw, str) else None
+        if not isinstance(data, dict):
+            return None, "LLM_ADDENDUM_INVALID_OUTPUT"
+        kind = data.get("event_type")
+        span = data.get("evidence")
+        if not isinstance(span, str) or not span.strip() or span not in provision:
+            return None, "LLM_ADDENDUM_UNGROUNDED"
+        if data.get("has_exception") is not False or data.get("has_transition") is not False:
+            return None, "LLM_ADDENDUM_COMPLEX_RULE"
+        if kind not in _EVENT_TERMS:
+            return None, "LLM_ADDENDUM_UNSUPPORTED_EVENT"
+        # 부칙에서 확인한 근거가 대상 조문과 연결되는지는 상위 resolver가 검사한다.
+        return kind, "LLM_ADDENDUM_EVENT_EXTRACTED"
+    except Exception:
+        return None, "LLM_ADDENDUM_EXTRACTION_FAILED"
+
+
 def evaluate_temporal_sources(
     question: str,
     sources: Iterable[Mapping[str, Any]],
