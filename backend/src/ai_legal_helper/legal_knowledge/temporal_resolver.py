@@ -416,7 +416,8 @@ def evaluate_temporal_sources(
             # 미지원 문장만 LLM으로 해석하되, LLM의 의미 추출만으로
             # 법적 적용 여부를 VERIFIED로 승격시키지 않는다.
             structured_rule = None
-            if rule_type is None and llm_addendum_interpretation:
+            if (rule_type is None and llm_addendum_interpretation
+                    and reason not in ("COMPLEX_TRANSITIONAL_PROVISION",)):
                 structured_rule, extraction_reason = interpret_addendum_with_llm(
                     span, article, invoke_fn=addendum_invoke_fn,
                 )
