@@ -90,6 +90,35 @@ DOCUMENT_ANSWER_SYSTEM = """당신은 등록 자료를 읽고 사용자의 현�
 """
 
 
+def apply_verified_draft_patches(previous_draft: str, raw_response: str) -> str:
+    """모델이 지정한 원문 구간만 치환한다. 불일치·중복·겹침은 전체 재작성을 막는다."""
+    try:
+        parsed = json.loads(raw_response.strip())
+    except (ValueError, TypeError) as exc:
+        raise ValueError("INVALID_PARTIAL_REVISION_FORMAT") from exc
+    patches = parsed.get("patches") if isinstance(parsed, dict) else None
+    if not isinstance(patches, list) or not patches or len(patches) > 12:
+        raise ValueError("INVALID_PARTIAL_REVISION_PATCHES")
+    spans = []
+    for patch in patches:
+        if not isinstance(patch, dict):
+            raise ValueError("INVALID_PARTIAL_REVISION_PATCH")
+        old, new = patch.get("old_text"), patch.get("new_text")
+        if not isinstance(old, str) or not old.strip() or not isinstance(new, str) or not new.strip():
+            raise ValueError("INVALID_PARTIAL_REVISION_PATCH")
+        if old == new or previous_draft.count(old) != 1:
+            raise ValueError("AMBIGUOUS_PARTIAL_REVISION_TARGET")
+        start = previous_draft.index(old)
+        spans.append((start, start + len(old), new))
+    spans.sort()
+    if any(left[1] > right[0] for left, right in zip(spans, spans[1:])):
+        raise ValueError("OVERLAPPING_PARTIAL_REVISION_PATCHES")
+    revised = previous_draft
+    for start, end, new in reversed(spans):
+        revised = revised[:start] + new + revised[end:]
+    return revised
+
+
 def write_document_answer(
     question: str, sources: List[Dict[str, Any]], *,
     user_history: List[str] | None = None, previous_draft: str = "",
@@ -165,6 +194,16 @@ def write_document_answer(
             '{"status":"READY","missing_laws":[],"answer":"근거 기반 완성 답변"} '
             "형식으로 반환하세요. NEED_MORE_LAW일 때 답변 초안을 생성하지 마세요."
         )
+    partial_repair = bool(previous_draft) and not limited
+    if partial_repair:
+        payload["부분 수정 출력 규약"] = (
+            "기존 초안에서 검증 실패 또는 근거 부족으로 변경이 필요한 최소한의 연속된 원문 구간만 선택하세요. "
+            "다른 문장, 제목, 검증 통과 부분은 절대 수정하지 마세요. "
+            "반드시 JSON 객체 {\\"patches\\":[{\\"old_text\\":\\"기존 초안에서 정확히 복사한 유일한 원문\\","
+            "\\"new_text\\":\\"근거에 맞게 수정한 문장\\"}]} 하나만 출력하세요. "
+            "old_text는 기존 초안에 정확히 한 번 나타나는 문자열이어야 합니다. "
+            "검증 지적과 무관한 부분은 패치에 넣지 마세요. 기존 초안 전체를 출력하지 마세요."
+        )
     response = get_llm(temperature=0.0).invoke([
         SystemMessage(content=DOCUMENT_ANSWER_SYSTEM + (
             "\\n[최초 작성 구조화 출력 최우선 규약]\\n"
@@ -172,7 +211,7 @@ def write_document_answer(
             "법령 근거가 충분하면 status=READY 및 answer 필드에 사용자용 마크다운 답변을 넣으세요. "
             "법령 원문이 핵심 쟁점에 부족하면 status=NEED_MORE_LAW, missing_laws 배열, answer 빈 문자열을 반환하세요. "
             "앞선 'JSON을 출력하지 마세요' 지시는 이번 구조화 응답에 한해 적용하지 않습니다."
-        ) if integrated else DOCUMENT_ANSWER_SYSTEM),
+        ) if integrated else (DOCUMENT_ANSWER_SYSTEM + ("\n[부분 수정 JSON 출력 규약]\n이번 호출은 최종 답변 대신 patches JSON만 출력하세요. 앞선 JSON 출력 금지는 이 호출에 적용하지 않습니다." if partial_repair else ""))),
         HumanMessage(content=json.dumps(payload, ensure_ascii=False) + "\n\n[전체 근거 원문]\n" + context),
     ])
     answer = response.content
@@ -180,7 +219,9 @@ def write_document_answer(
         logger.error("[DOCUMENT_ANSWER] LLM 답변 생성 결과가 비어 있습니다 (EMPTY_DOCUMENT_ANSWER)")
         raise ValueError("EMPTY_DOCUMENT_ANSWER")
     answer_text = answer.strip()
-    if rag_only_notice:
+    if partial_repair:
+        answer_text = apply_verified_draft_patches(previous_draft, answer_text)
+    if rag_only_notice and not (partial_repair and previous_draft.startswith("**안내:**")):
         answer_text = ("**안내:** 공식 법령 검색에서 요청한 법령의 일부 또는 전부를 확인하지 못해, "
                        "현재 확보된 공식 법령 및 RAG 자료로 검토한 답변입니다. "
                        "법령의 최신성 및 적용 시점은 추가 확인이 필요합니다.\\n\\n"
