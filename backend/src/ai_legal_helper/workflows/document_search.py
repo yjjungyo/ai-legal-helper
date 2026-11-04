@@ -228,6 +228,12 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
         fallback = _verified_local_fallback(state, requests)
         if fallback:
             logger.info("[DOCUMENT_SEARCH] 공식 검색 실패 후 시점 검증된 기존 공식 원문 %d건 재사용", len(fallback))
+    # 일부 법령만 확보했더라도 전체 검색 성공으로 오인하지 않는다.
+    found_laws = {str(src.get("statute_name") or "") for src in found}
+    requested_laws = set(grouped)
+    partial = bool(found) and not requested_laws.issubset(found_laws)
+    if partial:
+        logger.warning("[DOCUMENT_SEARCH] 일부 법령만 확보: %d/%d", len(found_laws & requested_laws), len(requested_laws))
     merged = list(state.get("retrieved_sources") or [])
     seen = {s.get("source_id") for s in merged}
     for source in found:
@@ -241,6 +247,7 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
     )
     return {"statute_search_results": found or fallback, "retrieved_sources": merged,
             "statute_search_status": ("API_ERROR" if api_error else
+                "PARTIAL_SUCCESS" if partial else
                 "OFFICIAL_SUCCESS" if found else
                 "VERIFIED_LOCAL_FALLBACK" if fallback else "NOT_FOUND"),
             "statute_search_count": (state.get("statute_search_count") or 0) + 1,
