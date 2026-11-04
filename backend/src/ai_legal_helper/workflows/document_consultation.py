@@ -152,7 +152,14 @@ def generate_answer(
     except Exception as exc:
         # 모델 오류나 원문 누락을 성공 답변으로 바꾸지 않으며 상담 원문/예외 본문은 기록하지 않는다.
         logger.warning("문서 답변 작성 실패: %s", type(exc).__name__)
-        result.update(draft_answer="", answer_generation_error=type(exc).__name__)
+        # 수정 실패 시 기존 초안을 파괴하지 않는다. 실패 상태를 명시하여
+        # Verification/Finalize가 이를 검증 통과 답변으로 취급하지 못하게 한다.
+        if repair and state.get("draft_answer"):
+            result.update(draft_answer=state["draft_answer"],
+                          answer_source_manifest=state.get("answer_source_manifest"),
+                          answer_generation_error=type(exc).__name__)
+        else:
+            result.update(draft_answer="", answer_generation_error=type(exc).__name__)
     return result
 
 
