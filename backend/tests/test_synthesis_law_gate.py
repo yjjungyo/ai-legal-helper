@@ -50,3 +50,49 @@ def test_document_writer_missing_law_returns_no_draft(monkeypatch):
     out = module.write_document_answer("질문", [])
     assert out["draft_answer"] == ""
     assert out["synthesis_law_gate"]["status"] == "NEED_MORE_LAW"
+
+
+def test_synthesis_missing_law_skips_verification(monkeypatch):
+    from ai_legal_helper.workflows import legal_workflow as workflow
+
+    monkeypatch.setattr(workflow, "generate_answer", lambda state: {
+        "draft_answer": "",
+        "answer_generation_error": None,
+        "synthesis_law_gate": {
+            "status": "NEED_MORE_LAW",
+            "candidate_laws": ["가상법"],
+            "legal_search_requests": [{
+                "law_name": "가상법", "issue": "쟁점", "question_part": "질문", "articles": []
+            }],
+        },
+    })
+    out = workflow.synthesize_node({"answer_mode": "DOCUMENT_GROUNDED", "question": "질문"})
+    assert out["draft_answer"] == ""
+    assert out["verification_result"]["reason_code"] == "LEGAL_SOURCE_MISSING"
+    assert workflow.synthesis_law_gate_condition(out) == "statute_search_approval"
+
+
+def test_synthesis_failure_does_not_become_ready(monkeypatch):
+    from ai_legal_helper.workflows import legal_workflow as workflow
+
+    monkeypatch.setattr(workflow, "generate_answer", lambda state: {
+        "draft_answer": "", "answer_generation_error": "INVALID_SYNTHESIS_GATE"
+    })
+    out = workflow.synthesize_node({"answer_mode": "DOCUMENT_GROUNDED"})
+    assert out["synthesis_law_gate"]["status"] == "ERROR"
+    assert workflow.synthesis_law_gate_condition(out) == "insufficient"
+
+
+def test_post_search_returns_to_retrieval_before_first_draft():
+    from ai_legal_helper.workflows.legal_workflow import statute_search_result_condition
+
+    assert statute_search_result_condition({
+        "statute_search_phase": "POST_VERIFICATION",
+        "synthesis_law_gate": {"status": "NEED_MORE_LAW"},
+        "statute_search_results": [{"source_id": "LAW:1", "content": "원문"}],
+    }) == "run_agents"
+    assert statute_search_result_condition({
+        "statute_search_phase": "POST_VERIFICATION",
+        "synthesis_law_gate": {"status": "NEED_MORE_LAW"},
+        "statute_search_results": [],
+    }) == "insufficient"
