@@ -171,10 +171,15 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
         if has_unnumbered or not references:
             references.append(name)
         # 쟁점별 검색으로 다른 법·인물·일반 질문 어휘가 관련성 점수를 오염시키지 않게 한다.
-        found.extend(search_official_statutes(
-            query=" ".join(r["issue"] for r in items), candidate_laws=references,
-            missing_issues=[r["issue"] for r in items], max_articles_per_law=max(len(articles), 4),
-        ))
+        try:
+            found.extend(search_official_statutes(
+                query=" ".join(r["issue"] for r in items), candidate_laws=references,
+                missing_issues=[r["issue"] for r in items], max_articles_per_law=max(len(articles), 4),
+                as_of_date=(state.get("case_evidence_briefing") or {}).get("as_of_date"),
+            ))
+        except Exception as exc:
+            # 공식 API 장애를 그래프 전체 실패로 전파하지 않는다. 법령을 임의로 생성하지 않는다.
+            logger.warning("[DOCUMENT_SEARCH] 공식 검색 실패 law=%s error=%s", name, type(exc).__name__)
     merged = list(state.get("retrieved_sources") or [])
     seen = {s.get("source_id") for s in merged}
     for source in found:
