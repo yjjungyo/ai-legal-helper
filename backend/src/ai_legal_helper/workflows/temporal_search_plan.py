@@ -66,9 +66,11 @@ def extract_event_with_llm(question: str, invoke_fn: Optional[Callable[[str], st
         supported = {"CONTRACT_SIGNED", "CONTRACT_RENEWED", "CONTRACT_MODIFIED", "NOTICE_GIVEN", "MOVE_OUT"}
         if kind not in supported:
             raise ValueError("UNSUPPORTED_EVENT_TYPE")
-        if len(set(_re.findall(r"20\\d{2}\\s*(?:년|[-./])\\s*\\d{1,2}\\s*(?:월|[-./])\\s*\\d{1,2}\\s*일?", question))) > 1:
-            # 복수 날짜 질의에서는 임의 선정 방지를 위해 호출자 검증을 요구한다.
-            raise ValueError("MULTIPLE_DATES_REQUIRE_CONFIRMATION")
+        # 인용 구간이 법령의 공포·시행·개정일만 설명하는 경우 사건일로 사용하지 않는다.
+        if _re.search(r"(?:공포일|시행일|개정일|공포된|시행되는|개정된)", evidence) and not _re.search(
+            r"(?:계약|체결|갱신|재계약|통지|퇴거|이사|변경)", evidence
+        ):
+            raise ValueError("STATUTE_DATE_NOT_EVENT")
         event = LegalEvent(parsed_date.isoformat(), kind, "LLM_EXTRACTED")
         return EventResolution("RESOLVED", events=[event], selected=event)
     except Exception as exc:
