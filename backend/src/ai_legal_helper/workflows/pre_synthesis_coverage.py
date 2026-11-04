@@ -19,6 +19,21 @@ def check_legal_coverage(state: dict) -> dict:
         "article": s.get("article"),
         "text_excerpt": str(s.get("content") or s.get("article_text") or "")[:400],
     } for s in statutes[:16]]
+    # 사건 브리핑은 이미 DB에서 판정한 사실만 재사용하며 증거 원문은 전송하지 않는다.
+    briefing = state.get("case_evidence_briefing") or {}
+    facts = briefing.get("facts") or []
+    timeline = briefing.get("timeline") or []
+    issues = state.get("issue_tasks") or []
+    def compact(items, limit, size):
+        return [json.dumps(x, ensure_ascii=False, default=str)[:size] for x in items[:limit] if isinstance(x, dict)]
+    case_input = {
+        "case_type": briefing.get("case_type"),
+        "reference_date": briefing.get("as_of_date"),
+        "facts": compact(facts, 12, 360),
+        "timeline": compact(timeline, 8, 220),
+        "legal_issues": compact(issues, 8, 300),
+        "evidence_gaps": compact(briefing.get("evidence_gaps") or [], 5, 200),
+    }
     from ai_legal_helper.llm.gateway import get_llm
     prompt = (
         "당신은 법률 상담의 초안 작성 전 법령 검색 충분성 점검자입니다. "
@@ -28,7 +43,8 @@ def check_legal_coverage(state: dict) -> dict:
         "순수 JSON만 반환하세요: "
         '{"missing_laws":[{"law_name":"정확한 법령명","issue":"누락 법률 쟁점","question_part":"질문 중 해당 부분","articles":[]}]} '
         "누락이 없다면 missing_laws는 빈 배열입니다. "
-        f"\\n질문: {question}\\n현재 법령 출처: {json.dumps(inventory, ensure_ascii=False)}"
+        f"\\n질문: {question}\\n사건 사실·쟁점(미확정은 확정하지 말 것): {json.dumps(case_input, ensure_ascii=False)}"
+        f"\\n현재 법령 출처: {json.dumps(inventory, ensure_ascii=False)}"
     )
     try:
         response = get_llm(temperature=0.0).invoke(prompt)
@@ -45,9 +61,11 @@ def check_legal_coverage(state: dict) -> dict:
             issue = str(item.get("issue") or "").strip()
             part = str(item.get("question_part") or "").strip()
             articles = item.get("articles") or []
-            if name and issue and part and isinstance(articles, list):
+            if name and issue and part and isinstance(articles, list) and all(isinstance(a, str) for a in articles):
                 requests.append({"law_name": name, "issue": issue, "question_part": str(state.get("question") or question),
                                  "articles": [str(a) for a in articles if isinstance(a, str)]})
+        if items and not requests:
+            raise ValueError("Invalid statute search requests")
         if not requests:
             return {"pre_coverage_checked": True}
         return {"pre_coverage_checked": True, "statute_search_phase": "PRE_ANALYSIS",
