@@ -97,6 +97,7 @@ def write_document_answer(
     as_of_date: str | None = None,
     preserved_points: List[str] | None = None,
     limited: bool = False,
+    rag_only_notice: bool = False,
 ) -> Dict[str, Any]:
     """원문 전체와 현재 질문으로 초안 또는 검증 지적을 반영한 답변을 작성한다.
 
@@ -137,6 +138,12 @@ def write_document_answer(
                "수정 대상(사실 출처 아님)": previous_draft,
                "검증 지적": repair_notes,
                "수정 중 보존할 설명(원문과 재대조)": preserved_points or []}
+    if rag_only_notice:
+        payload["공식 법령 검색 결과"] = (
+            "공식 OpenLaw에서 요청 법령을 찾지 못했습니다. 현재 확보된 RAG 근거만으로 "
+            "확인 가능한 범위에서 답변하세요. 답변 첫 부분에 공식 검색 미확인 사실을 명시하고, "
+            "미확인 법령의 조문이나 시행일을 확정하지 마세요. 추가 공식 검색 요청을 반복하지 마세요."
+        )
     if limited:
         # 미검증 초안을 잘라 공개하지 않고 새 제한 답변을 생성한 뒤 같은 검증기로 다시 대조한다.
         payload["답변 범위"] = (
@@ -147,7 +154,7 @@ def write_document_answer(
         )
     # 최초 작성에서만 동일 LLM 호출로 법령 충분성과 답변을 함께 판단한다.
     # 재작성/제한 답변은 기존 출력 계약을 유지한다.
-    integrated = not previous_draft and not limited and verification is None
+    integrated = not previous_draft and not limited and verification is None and not rag_only_notice
     if integrated:
         payload["출력 규약"] = (
             "반드시 JSON 객체만 출력하세요. 법령 원문이 현재 질문의 핵심 쟁점에 부족하면 "
@@ -173,6 +180,11 @@ def write_document_answer(
         logger.error("[DOCUMENT_ANSWER] LLM 답변 생성 결과가 비어 있습니다 (EMPTY_DOCUMENT_ANSWER)")
         raise ValueError("EMPTY_DOCUMENT_ANSWER")
     answer_text = answer.strip()
+    if rag_only_notice:
+        answer_text = ("**안내:** 공식 법령 검색에서 요청한 법령을 찾지 못해, "
+                       "현재 확보된 RAG 자료만으로 검토한 답변입니다. "
+                       "법령의 최신성 및 적용 시점은 추가 확인이 필요합니다.\\n\\n"
+                       + answer_text)
     if integrated:
         try:
             parsed = json.loads(answer_text[answer_text.index("{"):answer_text.rindex("}") + 1])
