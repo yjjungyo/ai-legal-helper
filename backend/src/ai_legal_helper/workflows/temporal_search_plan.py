@@ -32,7 +32,7 @@ def extract_event_with_llm(question: str, invoke_fn: Optional[Callable[[str], st
         "JSON만 출력: "
         '{"date":"YYYY-MM-DD 또는 null","event_type":"CONTRACT_SIGNED|CONTRACT_RENEWED|'
         'CONTRACT_MODIFIED|NOTICE_GIVEN|MOVE_OUT 또는 null","evidence":"질문 원문의 정확한 인용"}'
-        "\\n질문: " + question
+        "\n질문: " + question
     )
     try:
         if invoke_fn is None:
@@ -110,9 +110,15 @@ def build_temporal_search_plan(
     }
     if not isinstance(question, str) or not _LAW_HINT.search(question):
         return empty
-    event = resolve_event(question, event_date=event_date, event_type=event_type)
-    if event.selected is None and llm_event_extraction and event_date is None and event_type is None:
+    # 법령 적용 시점 질문은 규칙의 오확정을 피하기 위해 LLM 의미 추출을 우선한다.
+    # 명시적으로 확인된 사건일/유형 쌍은 재추출하지 않는다.
+    # 날짜가 없는 질문에는 불필요한 LLM 호출을 하지 않는다.
+    explicit_pair = event_date is not None and event_type is not None
+    has_date = bool(re.search(r"20\\d{2}\\s*(?:년|[-./])\\s*\\d{1,2}\\s*(?:월|[-./])\\s*\\d{1,2}", question))
+    if llm_event_extraction and not explicit_pair and has_date:
         event = extract_event_with_llm(question, invoke_fn=event_invoke_fn)
+    else:
+        event = resolve_event(question, event_date=event_date, event_type=event_type)
     if event.selected is None:
         return {**empty, "reason_code": event.reason_code}
     try:
