@@ -19,3 +19,10 @@ def test_verified_fallback_uses_rag_path():
              "statute_search_status": "VERIFIED_LOCAL_FALLBACK",
              "statute_search_results": [{"source_id": "OFFICIAL:1"}]}
     assert statute_search_result_condition(state) == "run_agents"
+
+
+def test_partial_search_continues_to_synthesis():
+    state = {"synthesis_law_gate": {"status": "NEED_MORE_LAW"},
+             "statute_search_status": "PARTIAL_SUCCESS",
+             "statute_search_results": [{"source_id": "OFFICIAL:1"}]}
+    assert statute_search_result_condition(state) == "run_agents"
