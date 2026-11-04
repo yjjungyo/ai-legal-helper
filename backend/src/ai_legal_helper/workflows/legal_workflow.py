@@ -1637,7 +1637,11 @@ def statute_search_approval_node(state: LegalState) -> Dict:
 
     from ai_legal_helper.workflows.document_search import law_names
 
-    raw_law_refs = list(candidate_laws or []) + [
+    if state.get("answer_mode") == DOCUMENT_MODE and not preflight and state.get("draft_answer"):
+        # 화면에 제시한 이번 신규 법령만 승인 범위로 추가한다.
+        raw_law_refs = list(candidate_laws or [])
+    else:
+        raw_law_refs = list(candidate_laws or []) + [
         r.get("law_name", "")
         for r in (ver_res.get("legal_search_requests") or [])
         if isinstance(r, dict) and r.get("law_name")
@@ -1819,17 +1823,21 @@ def statute_search_result_condition(state: LegalState) -> str:
     """
     # 선행 HILT 검색 결과가 없거나 API가 장애여도 기존 Vector 검색 및
     # Verification을 진행한다. 후속 P8 시점 오류 방어는 별도로 적용.
+    status = state.get("statute_search_status")
+    if status == "API_ERROR":
+        return "insufficient"
     if state.get("statute_search_phase") == "PRE_ANALYSIS":
         return "run_agents"
-    if (state.get("synthesis_law_gate") or {}).get("status") == "NEED_MORE_LAW":
-        status = state.get("statute_search_status")
-        if status == "API_ERROR":
-            return "insufficient"
+    # 기존 최초 초안이 없는 경우에만 Synthesis 법령 게이트를 사용한다.
+    # 초안이 존재하면 과거 NEED_MORE_LAW 상태로 재분석을 우회하지 않는다.
+    if not state.get("draft_answer") and (state.get("synthesis_law_gate") or {}).get("status") == "NEED_MORE_LAW":
         if status == "NOT_FOUND":
-            return "run_agents"  # 기존 RAG만 사용하여 제한 답변 생성 및 검증
+            return "run_agents"
         return "run_agents" if state.get("statute_search_results") else "insufficient"
-    results = state.get("statute_search_results", [])
-    if results:
+    results = state.get("statute_search_results") or []
+    if not state.get("draft_answer"):
+        return "run_agents" if results or status == "NOT_FOUND" else "insufficient"
+    if results or status in ("NOT_FOUND", "PARTIAL_SUCCESS"):
         return "re_analyze"
     return "insufficient"
 
