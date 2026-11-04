@@ -140,6 +140,7 @@ def generate_answer(
             verification=ver_res if repair else None,
             as_of_date=(state.get("case_evidence_briefing") or {}).get("as_of_date"),
             preserved_points=preserved if repair else None,
+            rag_only_notice=(state.get("statute_search_status") == "NOT_FOUND" and not repair),
         )
         result.update(written)
         draft_out = result.get("draft_answer", "")
