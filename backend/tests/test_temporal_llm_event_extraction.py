@@ -61,3 +61,22 @@ def test_promulgation_date_rejected_even_when_contract_appears_later():
         "evidence": q,
     }))
     assert result.status == "UNCONFIRMED"
+
+
+def test_two_digit_year_llm_grounded_event():
+    q = "26.11.06 신규 계약을 체결합니다. 개정 시행령 적용 여부를 알려주세요."
+    result = extract_event_with_llm(q, _invoke({
+        "date": "2026-11-06", "event_type": "CONTRACT_SIGNED",
+        "evidence": "26.11.06 신규 계약을 체결합니다.",
+    }))
+    assert result.status == "RESOLVED"
+    assert result.selected.date == "2026-11-06"
+
+
+def test_mismatched_month_day_is_rejected():
+    q = "26.11.06 계약을 체결합니다."
+    result = extract_event_with_llm(q, _invoke({
+        "date": "2026-11-07", "event_type": "CONTRACT_SIGNED",
+        "evidence": q,
+    }))
+    assert result.status == "UNCONFIRMED"
