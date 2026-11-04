@@ -40,6 +40,15 @@ def _sanitize_client_missing_items(items: List[str]) -> List[str]:
     return cleaned_list
 
 
+def consultation_question(state: Dict[str, Any]) -> str:
+    """원문 질문을 보존하면서 검색·작성·검증에 동일한 문맥 복원 질의를 사용한다.
+
+    resolved_query는 Intent 단계에서 확정된 현재 턴의 해석 질문이다.
+    값이 비었거나 없는 구형 상태에서는 원문 질문을 사용하여 호환성을 유지한다.
+    """
+    return str(state.get("resolved_query") or state.get("question") or "")
+
+
 def document_sources(state: Dict[str, Any]) -> List[Dict[str, Any]]:
     """승인된 현재 사건 원문과 검색 법률 자료를 작성·검증 공통 목록으로 만든다.
 
@@ -122,7 +131,7 @@ def generate_answer(
     )
     try:
         written = write_document_answer(
-            state.get("question", ""), sources, user_history=history[-4:],
+            consultation_question(state), sources, user_history=history[-4:],
             previous_draft=state.get("draft_answer", "") if repair else "",
             verification=ver_res if repair else None,
             as_of_date=(state.get("case_evidence_briefing") or {}).get("as_of_date"),
@@ -203,7 +212,7 @@ def verify_answer(state: Dict[str, Any]) -> Dict[str, Any]:
                    "검토 승인은 내용의 진실성 확인이 아닙니다.")
         # 검증 함수의 반환값은 추적 SDK가 비동기로 직렬화한다. 추적 중인 딕셔너리에
         # 해시·명세를 추가하면 순회 중 변경 오류로 관측값이 유실될 수 있어 새 객체를 만든다.
-        result = {**run_verification(state.get("question", ""), draft, sources, context,
+        result = {**run_verification(consultation_question(state), draft, sources, context,
                                      require_question_coverage=True), "source_manifest": manifest}
     except Exception as exc:
         logger.warning("문서 원문 검증 실패: %s", type(exc).__name__)
@@ -341,7 +350,7 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
                 + list(result.get("preserved_points") or [])
             ))
             limited_written = write_document_answer(
-                state.get("question", ""),
+                consultation_question(state),
                 sources_list,
                 user_history=history[-4:],
                 previous_draft=draft,
@@ -357,7 +366,7 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
                     "검토 승인은 내용의 진실성 확인이 아닙니다."
                 )
                 limited_ver = run_verification(
-                    state.get("question", ""),
+                    consultation_question(state),
                     limited_draft,
                     sources_list,
                     context,
