@@ -1583,10 +1583,13 @@ def statute_search_approval_node(state: LegalState) -> Dict:
     set_node_name("statute_search_approval")
     from ai_legal_helper.observability.context import get_case_id, get_trace_id, get_request_id
 
-    ver_res = (state.get("synthesis_law_gate") or state.get("verification_result") or {})
+    ver_res = ((state.get("verification_result") or {}) if state.get("draft_answer") else (state.get("synthesis_law_gate") or state.get("verification_result") or {}))
     plan = state.get("law_search_plan") or {}
     preflight = state.get("statute_search_phase") == "PRE_ANALYSIS" and plan.get("status") == "READY"
     candidate_laws = list(plan.get("candidate_laws") or []) if preflight else ver_res.get("candidate_laws", [])
+    if state.get("answer_mode") == DOCUMENT_MODE and not preflight and state.get("draft_answer"):
+        from ai_legal_helper.workflows.document_search import pending_searches
+        candidate_laws = list(dict.fromkeys(r["law_name"] for r in pending_searches(state)))
     missing_issues = (
         [f"사건 기준일 {plan.get('as_of_date')}, 유형 {plan.get('event_type')}의 법령 적용시점 확인"]
         if preflight else
@@ -1640,6 +1643,8 @@ def statute_search_approval_node(state: LegalState) -> Dict:
         if isinstance(r, dict) and r.get("law_name")
     ]
     approved_laws = law_names(raw_law_refs) if approved else []
+    if approved and state.get("answer_mode") == DOCUMENT_MODE and not preflight:
+        approved_laws = list(dict.fromkeys(law_names(state.get("approved_statute_laws") or []) + approved_laws))
 
     safe_user_reason = sanitize_diagnostic_text(user_reason, max_len=100) if user_reason else "(없음)"
     logger.info(
@@ -1686,7 +1691,7 @@ def execute_statute_search_node(state: LegalState) -> Dict:
     from ai_legal_helper.tools.official_statute_search import search_official_statutes
     from ai_legal_helper.workflows.document_search import execute_document_search, law_names
 
-    ver_res = (state.get("synthesis_law_gate") or state.get("verification_result") or {})
+    ver_res = ((state.get("verification_result") or {}) if state.get("draft_answer") else (state.get("synthesis_law_gate") or state.get("verification_result") or {}))
     plan = state.get("law_search_plan") or {}
     preflight = (state.get("statute_search_phase") == "PRE_ANALYSIS"
                  and plan.get("status") == "READY")
