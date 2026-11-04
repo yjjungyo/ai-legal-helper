@@ -117,7 +117,17 @@ def resolve_event(
         parsed = parse_legal_date(event_date)
         if parsed is None or (event_type is not None and event_type not in _EVENT_TERMS):
             return EventResolution("UNCONFIRMED", reason_code="EXPLICIT_EVENT_INVALID")
-        event = LegalEvent(parsed.isoformat(), event_type or "CONTRACT_SIGNED", "CALLER_VERIFIED")
+        # 날짜만 전달된 경우 사건 유형을 '계약 체결'로 추정하지 않는다.
+        # 호출자가 사건 유형을 구조화해 제공하거나 질문에서 명확하게
+        # 확인할 수 있는 경우에만 RESOLVED로 승격한다.
+        if event_type is None:
+            extracted = resolve_event(question)
+            matches = [e for e in extracted.events if e.date == parsed.isoformat()]
+            if len(matches) != 1:
+                return EventResolution("UNCONFIRMED", events=matches,
+                                       reason_code="EXPLICIT_EVENT_TYPE_MISSING")
+            event_type = matches[0].event_type
+        event = LegalEvent(parsed.isoformat(), event_type, "CALLER_VERIFIED")
         return EventResolution("RESOLVED", events=[event], selected=event)
 
     candidates: list[LegalEvent] = []
