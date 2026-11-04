@@ -390,9 +390,10 @@ def route_condition(state: LegalState) -> str:
     - ROUTER_ERROR: 기술적 오류로 시스템 오류 안내 노드('routing_exit')로 전이.
     """
     from ai_legal_helper.agents.router import RouterStatus
-    # 문서 질문의 답변 가능 여부는 분야 분류가 아니라 원문 작성 후 검증에서 결정한다.
+    # 문서 상담도 Router 실패 시 임의의 법률 분야로 진행하지 않는다.
+    # 분류 성공일 때만 검색 계획을 수립하며 실패 시 기존 안전 종료 경로로 보낸다.
     if state.get("answer_mode") == DOCUMENT_MODE:
-        return "plan"
+        return "plan" if state.get("router_status") == RouterStatus.CLASSIFIED.value and state.get("categories") else "routing_exit"
     status = state.get("router_status")
     if status == RouterStatus.CLASSIFIED.value or (not status and state.get("categories")):
         return "plan"
@@ -514,7 +515,7 @@ async def run_agents_node(state: LegalState) -> Dict:
         for category in (state.get("categories") or [None])[:2]:
             try:
                 retrieved = await asyncio.to_thread(
-                    retrieve_with_status, query=state.get("question", ""), category=category, k=6,
+                    retrieve_with_status, query=state.get("resolved_query") or state.get("question", ""), category=category, k=6,
                 )
                 sources.extend(build_source_from_chroma_doc(
                     doc, category=category, retrieval_method="CHROMA_VECTOR",
