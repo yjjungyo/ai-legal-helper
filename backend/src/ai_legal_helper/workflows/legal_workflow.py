@@ -40,7 +40,7 @@
 - 비동기 `run_agents_node` 호출 시 ContextVar의 복제 동작을 위해 파이썬 내장 `asyncio.to_thread`를 사용한다.
 """
 from typing import Dict, List, Any, Optional
-from ai_legal_helper.agents.intent_analyzer import analyze_consultation_intent, ConsultationIntent
+from ai_legal_helper.agents.intent_analyzer import analyze_consultation_intent, ConsultationIntent, ConsultationMode
 import os
 import uuid
 import hashlib
@@ -238,7 +238,10 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
         except Exception as e:
             logger.warning(f"[INIT] 대화 맥락 포맷팅 중 예외: {e}")
 
-    ans_mode = DOCUMENT_MODE if briefing_dict and briefing_dict.get("source_documents") else "STANDARD"
+    # [설계 변경] 문서 존재 여부는 상담 모드를 결정할 수 없다.
+    # 사건 중심 서비스이므로 브리핑 조회는 유지하되, 이번 질문에서 실제 증거를
+    # 사용할지는 다음 Intent Analyzer가 의미 기반으로 결정한다.
+    ans_mode = "PENDING_INTENT"
     logger.info(
         f"[SUPERVISOR_INIT] 초기화 완료 | 답변모드={ans_mode} | case_id={case_id or '(없음)'} | "
         f"등록문서수={len(briefing_dict.get('source_documents', [])) if briefing_dict else 0} | "
@@ -254,7 +257,7 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
         "turn_index": turn_idx,
         "question": q or "(질문 미확인)",
         # 등록 문서가 있는 사건은 파생 Fact 기반 다중 작성 대신 원문 작성 경로로 보낸다.
-        "answer_mode": DOCUMENT_MODE if briefing_dict and briefing_dict.get("source_documents") else None,
+        "answer_mode": None,  # Intent 이전에는 문서 상담 경로를 확정하지 않는다.
         "answer_generation_error": None,
         "answer_source_manifest": None,
         "revision_count": 0,
@@ -1927,22 +1930,10 @@ def intent_analysis_node(state: LegalState) -> Dict:
     graph_evidence 및 case_context에 반영한다.
     """
     set_node_name("intent_analysis")
-    # 문서 사건은 질문을 변형하거나 과거 AI 결론에 따라 답변 종류를 고정하지 않는다.
-    # 지시어 해석에 필요한 이전 사용자 발언은 원문 작성자가 진술로 구분하여 읽는다.
-    if state.get("answer_mode") == DOCUMENT_MODE:
-        # 순수 인사·감사까지 법률 주장 검증에 넣으면 주장 부재로 불필요하게 답변이 보류된다.
-        # 전체 문장 일치만 허용하여 '감사합니다. 그런데 계약은?' 같은 실제 질문은 원문 경로로 남긴다.
-        pure_greeting = re.fullmatch(
-            r"(?:안녕하세요|안녕|감사합니다|고맙습니다|고마워요|고마워|수고하세요|수고하셨습니다|네|알겠습니다|알겠어요)[.!?~\s]*",
-            state.get("question", "").strip(),
-        )
-        intent = ConsultationIntent.GENERAL_CONVERSATION if pure_greeting else ConsultationIntent.NEW_LEGAL_ANALYSIS
-        logger.info(
-            f"[INTENT_ANALYSIS] 문서상담 빠른판정 | 의도={intent.value} | "
-            f"순수인사여부={bool(pure_greeting)} | 질의길이={len(state.get('question', ''))}"
-        )
-        return {"intent": intent.value,
-                "resolved_query": state.get("question", ""), "intent_decision": {}}
+    # [변경 이유] 기존에는 등록 문서가 하나라도 있으면 Intent LLM을 우회하고
+    # 모든 질문을 NEW_LEGAL_ANALYSIS로 강제했다. 사건을 선택한 사용자가
+    # 일반 법률 설명을 요청해도 사건 원문 상담이 실행되는 결함을 제거한다.
+    # 매 턴 질문+대화 맥락을 분석하되 Supervisor가 수집한 사건 정보는 유지한다.
     q = state.get("question", "")
     conv_ctx = state.get("conversation_context")
     case_ctx = state.get("case_context") or ""
@@ -1962,17 +1953,42 @@ def intent_analysis_node(state: LegalState) -> Dict:
         f"복원질의길이={len(decision.resolved_query)} | 사유={sanitize_diagnostic_text(decision.reason, max_len=100)}"
     )
 
+    # [핵심 불변식] '문서가 등록됨'과 '이번 질문에 증거가 필요함'은 서로 다르다.
+    # GENERAL_LEGAL은 법령·판례 일반 설명 경로로 보내고 사건 자료를 근거에서
+    # 제거한다. CASE_EVIDENCE는 기존 원문 작성/검증 경로를 그대로 사용한다.
+    needs_case_evidence = decision.consultation_mode == ConsultationMode.CASE_EVIDENCE
+    has_case_documents = bool((state.get("case_evidence_briefing") or {}).get("source_documents"))
+    selected_answer_mode = DOCUMENT_MODE if needs_case_evidence and has_case_documents else None
     updates: Dict[str, Any] = {
         "intent": decision.intent.value,
         "resolved_query": decision.resolved_query,
         "intent_decision": decision.model_dump(),
+        "consultation_mode": decision.consultation_mode.value,
+        "answer_mode": selected_answer_mode,
     }
+    if not needs_case_evidence:
+        # 이미 조회된 사건 정보가 Standard Synthesizer/Verifier/Router로 새지 않도록
+        # 현재 턴의 분석 상태에서 격리한다. DB에 저장된 사건 자체는 변경하지 않는다.
+        updates.update({
+            "case_context": "",
+            "case_evidence_briefing": None,
+            "case_evidence_sources": [],
+            "graph_evidence": {},
+            "issue_tasks": [],
+        })
+    logger.info(
+        "[INTENT_MODE] mode=%s document_count=%d answer_mode=%s",
+        decision.consultation_mode.value,
+        len((state.get("case_evidence_briefing") or {}).get("source_documents") or []),
+        selected_answer_mode or "STANDARD",
+    )
 
     # resolved_query가 원문 질문과 다르고 법률/사실 검토가 필요한 경우 사건 증거 보강 검색 수행
     from ai_legal_helper.observability.context import get_case_id
     case_id = get_case_id()
     if (
         case_id
+        and needs_case_evidence
         and decision.resolved_query
         and decision.resolved_query.strip() != q.strip()
         and decision.intent not in (ConsultationIntent.GENERAL_CONVERSATION, ConsultationIntent.NEEDS_CLARIFICATION)
