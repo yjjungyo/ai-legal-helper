@@ -245,6 +245,7 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
         "approval_status": "NONE",
         "approved_statute_laws": [],
         "statute_search_results": [],
+        "statute_search_status": None,
         "statute_search_count": 0,
         "statute_search_history": [],
         "synthesis_law_gate": None,
