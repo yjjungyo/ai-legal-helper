@@ -339,13 +339,29 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
         except Exception:
             snapshot_valid = False
 
+    search_status = state.get("statute_search_status")
+    if search_status == "API_ERROR":
+        # 공식 API 장애는 이전 PASS 스냅샷이 남아 있어도 상담을 종료한다.
+        result["status"] = "INSUFFICIENT"
+        result["reason_code"] = "OFFICIAL_STATUTE_API_ERROR"
+        snapshot_valid = False
+    notice = (
+        "**안내:** 공식 법령 검색에서 요청한 법령의 일부 또는 전부를 확인하지 못했습니다. "
+        "확보된 공식 법령 및 RAG 자료를 바탕으로 검토했으며, "
+        "미확인 법령의 최신성 및 적용 시점은 추가 확인이 필요합니다."
+    ) if search_status in ("NOT_FOUND", "PARTIAL_SUCCESS") else ""
+    # 안내는 검증된 답변의 일부로 취급한다. 검증 이후 내용을 덧붙이지 않는다.
+    if notice and snapshot_valid and not draft.startswith("**안내:**"):
+        snapshot_valid = False
+        result["reason_code"] = "SEARCH_DISCLOSURE_NOT_VERIFIED"
+
     temporal_blocked = (result.get("temporal_gate") or {}).get("status") == "BLOCK"
     valid = snapshot_valid and result.get("status") == "PASS" and not temporal_blocked
     limited_used = False
 
     # 전체 답변이 PASS에 이르지 못했으나 원문 스냅샷·검증 무결성이 유효한 경우,
     # 확인된 사실과 조건부 설명만 남긴 제한 답변을 새로 생성하고 동일 검증기로 재검증한다.
-    if snapshot_valid and not valid and result.get("claims") and not temporal_blocked:
+    if snapshot_valid and not valid and result.get("claims") and not temporal_blocked and search_status != "API_ERROR":
         try:
             history = [m.content for m in (state.get("messages") or [])[:-1]
                        if isinstance(m, HumanMessage) and isinstance(m.content, str)]
@@ -363,6 +379,7 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
                 as_of_date=as_of,
                 preserved_points=preserved,
                 limited=True,
+                rag_only_notice=bool(notice),
             )
             limited_draft = limited_written.get("draft_answer", "")
             if limited_draft.strip():
@@ -399,7 +416,7 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
         missing = _sanitize_client_missing_items(raw_missing)
         detail = "\n" + "\n".join(f"- {item}" for item in missing) if missing else ""
         final = "질문에 대한 답변을 확정할 만큼 근거 확인을 마치지 못했습니다."
-        if state.get("statute_search_status") == "API_ERROR":
+        if search_status == "API_ERROR":
             final = ("공식 법령 검색 API 호출 중 오류가 발생하여 법령 확인을 완료하지 못했습니다. "
                      "정확한 법률 판단을 위해 현재 상담을 종료합니다. 잠시 후 다시 시도해 주세요.")
         elif temporal_blocked:
