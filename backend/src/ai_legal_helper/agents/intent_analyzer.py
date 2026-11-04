@@ -52,12 +52,28 @@ class ConsultationIntent(str, Enum):
     NEW_LEGAL_ANALYSIS = "NEW_LEGAL_ANALYSIS"      # 신규 법률 쟁점 분석 또는 첫 법률 검토
     DOCUMENT_REQUEST = "DOCUMENT_REQUEST"          # 내용증명, 소장 등 법률 문서 작성 요청
     GENERAL_CONVERSATION = "GENERAL_CONVERSATION"  # 인사, 감사, 단순 대화 ("안녕하세요", "고맙습니다")
+    OUT_OF_SCOPE = "OUT_OF_SCOPE"  # 법률 상담 범위 밖의 요청
     NEEDS_CLARIFICATION = "NEEDS_CLARIFICATION"    # 질문 맥락 부족으로 추가 정보 필요
+
+
+class ConsultationMode(str, Enum):
+    """질문의 답변 근거 범위. 사건 자료의 *존재*와 별개로 매 턴 결정한다.
+
+    GENERAL_LEGAL: 사건의 증거를 주장 근거로 사용하지 않는 일반 법률 설명.
+    CASE_EVIDENCE: 현재 사건의 사실·증거와 법률을 함께 적용하는 상담.
+    기존 상담과의 호환을 위해 누락/오류 시 사건 기반으로 보수적으로 처리한다.
+    """
+    GENERAL_LEGAL = "GENERAL_LEGAL"
+    CASE_EVIDENCE = "CASE_EVIDENCE"
 
 
 class IntentDecision(BaseModel):
     """질문 의도 분석 및 적응형 실행 계획 모델."""
     intent: ConsultationIntent = Field(description="판정된 질문 의도")
+    consultation_mode: ConsultationMode = Field(
+        default=ConsultationMode.CASE_EVIDENCE,
+        description="질문에서 현재 사건 증거를 실제 판단 근거로 사용할지 여부",
+    )
     resolved_query: str = Field(description="이전 대화 맥락이 연결되어 명확해진 내부 검색/작업 질의")
     requires_specialist: bool = Field(default=True, description="법률 Specialist 에이전트 실행 필요 여부")
     requires_retrieval: bool = Field(default=True, description="새로운 법령/판례 RAG 검색 실행 필요 여부")
@@ -86,6 +102,7 @@ INTENT_PROMPT = PromptTemplate.from_template(
 6. GENERAL_CONVERSATION: 인사말, 감사 표현, 법률 분석과 무관한 일상 대화인 경우
    - 예: "안녕하세요", "고마워요", "도움이 많이 되었습니다", "알겠습니다"
 7. NEEDS_CLARIFICATION: 질문이 지나치게 모호하여 과거 대화 맥락을 고려해도 질문의 의도를 전혀 파악할 수 없는 경우
+8. OUT_OF_SCOPE: 날씨, 스포츠 등 법률과 무관한 정보 요청. 사건 증거 유무와 관계없이 법률 상담 범위만 안내하고 종료
 
 #### [분류 원칙]
 - 현재 질문이 첫 번째 질문(이전 대화 없음)인 경우, FOLLOWUP_ACTION이나 FOLLOWUP_QUESTION으로 분류하지 마세요.
@@ -98,6 +115,15 @@ INTENT_PROMPT = PromptTemplate.from_template(
   * 예: 현재 질문 "집주인이 2천만 원을 입금했다고 합니다" (또는 "임대인이 일부 변제했습니다")
     → resolved_query: "의뢰인의 보증금 일부 입금/변제 주장에 따른 보증금 잔액 변동 및 입금 증거 확인 필요성 검토"
 
+#### [상담 근거 범위 판단: consultation_mode]
+- CASE_EVIDENCE: '내 사건', '등록된 자료', '계약서 분석', '앞선 사건에서' 등 현재 사건의 사실이나 증거를 적용해야 답할 수 있는 질문.
+- GENERAL_LEGAL: 법률 제도·조문·판례에 대한 일반적인 설명으로 충분하며 사건 사실을 적용해 달라는 요청이 없는 질문.
+- 사건에 증거가 존재한다는 사실만으로 CASE_EVIDENCE를 선택하지 마세요.
+- 법률 분야와 근거 범위는 별개입니다. 같은 민법 질문도 일반 설명이면 GENERAL_LEGAL입니다.
+- 모호한 후속 질문이 앞선 사건 상담을 가리키면 CASE_EVIDENCE로 판단하세요.
+- 판단 근거는 사용자 질문의 의미와 대화 맥락입니다. 법률 분야별 키워드 규칙을 만들지 마세요.
+- 법률과 무관한 정보 요청은 intent=OUT_OF_SCOPE로 분류하세요. 법률 쟁점으로 억지 해석하지 마세요.
+
 #### [대화 맥락]
 {conversation_context}
 
@@ -109,7 +135,8 @@ INTENT_PROMPT = PromptTemplate.from_template(
 
 #### [출력 형식 (반드시 유효한 JSON 하나만 출력)]
 {{
-  "intent": "FOLLOWUP_ACTION | FOLLOWUP_QUESTION | FACT_CLARIFICATION | NEW_LEGAL_ANALYSIS | DOCUMENT_REQUEST | GENERAL_CONVERSATION | NEEDS_CLARIFICATION",
+  "intent": "FOLLOWUP_ACTION | FOLLOWUP_QUESTION | FACT_CLARIFICATION | NEW_LEGAL_ANALYSIS | DOCUMENT_REQUEST | GENERAL_CONVERSATION | NEEDS_CLARIFICATION | OUT_OF_SCOPE",
+  "consultation_mode": "GENERAL_LEGAL | CASE_EVIDENCE",
   "resolved_query": "문맥이 연결되어 명확해진 내부 작업용 구체적 질의문",
   "requires_specialist": true/false,
   "requires_retrieval": true/false,
@@ -309,8 +336,16 @@ def analyze_consultation_intent(
             requires_full = bool(parsed.get("requires_full_analysis", True))
             reason_str = parsed.get("reason", "")
 
+            # 오래된 LLM 응답이 consultation_mode를 생략하면 사건 상담을 유지한다.
+            # 알 수 없는 값도 사건 증거를 버리는 방향으로 추측하지 않는다.
+            try:
+                consultation_mode = ConsultationMode(parsed.get("consultation_mode", "CASE_EVIDENCE"))
+            except (ValueError, TypeError):
+                consultation_mode = ConsultationMode.CASE_EVIDENCE
+
             decision = IntentDecision(
                 intent=intent_enum,
+                consultation_mode=consultation_mode,
                 resolved_query=resolved_q,
                 requires_specialist=requires_spec,
                 requires_retrieval=requires_ret,
@@ -323,11 +358,29 @@ def analyze_consultation_intent(
 
     # 2. LLM 실패 시 결정론적 휴리스틱 폴백 적용
     if decision is None:
-        decision = _heuristic_rule_fallback(question, has_history=has_history, case_context=case_context)
+        # [장애 안전 정책] LLM이 실패했을 때 단순히 글자 수만 보고
+        # 법률 분석으로 진입시키면 날씨 같은 비법률 요청이 Router로 전달된다.
+        # 명시적인 증거 검토 요청은 기존 규칙을 유지하고, 그 밖의 질문은
+        # 법률성 여부를 알 수 없으므로 확인 요청으로 종료한다.
+        # 법률성 분류를 특정 키워드 목록으로 하드코딩하지 않는다.
+        if is_evidence_review_request(question):
+            decision = _heuristic_rule_fallback(question, has_history=has_history, case_context=case_context)
+        else:
+            decision = IntentDecision(
+                intent=ConsultationIntent.NEEDS_CLARIFICATION,
+                consultation_mode=ConsultationMode.GENERAL_LEGAL,
+                resolved_query=question.strip(),
+                requires_specialist=False,
+                requires_retrieval=False,
+                requires_verification=False,
+                requires_full_analysis=False,
+                reason="의도 분석 실패: 법률 상담 대상 여부를 안전하게 확인할 수 없음",
+            )
 
     # LLM의 재작성도 원질문을 넘어 새 거래 사실을 만들 수 없도록 자료 분석 의도를 보존한다.
     if is_evidence_review_request(question):
         decision = _heuristic_rule_fallback(question, has_history=has_history, case_context=case_context)
+        decision.consultation_mode = ConsultationMode.CASE_EVIDENCE
 
     # 3. 코드 레벨의 엄격한 가드레일 정책 검증 (Deterministic Policy Verification)
     # 정책 A: 첫 번째 질문인데 FOLLOWUP 계열로 잘못 분류된 경우 신규 분석으로 강제 교정
@@ -346,7 +399,9 @@ def analyze_consultation_intent(
         decision.requires_full_analysis = False
 
     # 정책 C: GENERAL_CONVERSATION인 경우 모든 무거운 파이프라인 비활성화
-    if decision.intent == ConsultationIntent.GENERAL_CONVERSATION:
+    # 법률 무관 요청은 일반 인사와 별도 의도로 유지하고 무거운 분석을 중지한다.
+    if decision.intent in (ConsultationIntent.GENERAL_CONVERSATION, ConsultationIntent.OUT_OF_SCOPE):
+        decision.consultation_mode = ConsultationMode.GENERAL_LEGAL
         decision.requires_specialist = False
         decision.requires_retrieval = False
         decision.requires_verification = False

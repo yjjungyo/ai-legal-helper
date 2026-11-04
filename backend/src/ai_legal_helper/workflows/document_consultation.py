@@ -40,6 +40,15 @@ def _sanitize_client_missing_items(items: List[str]) -> List[str]:
     return cleaned_list
 
 
+def consultation_question(state: Dict[str, Any]) -> str:
+    """원문 질문을 보존하면서 검색·작성·검증에 동일한 문맥 복원 질의를 사용한다.
+
+    resolved_query는 Intent 단계에서 확정된 현재 턴의 해석 질문이다.
+    값이 비었거나 없는 구형 상태에서는 원문 질문을 사용하여 호환성을 유지한다.
+    """
+    return str(state.get("resolved_query") or state.get("question") or "")
+
+
 def document_sources(state: Dict[str, Any]) -> List[Dict[str, Any]]:
     """승인된 현재 사건 원문과 검색 법률 자료를 작성·검증 공통 목록으로 만든다.
 
@@ -57,6 +66,10 @@ def document_sources(state: Dict[str, Any]) -> List[Dict[str, Any]]:
             document.get("document_name") or document.get("filename") or document.get("evidence_id") or ""
         ).strip()
         doc_without_alias = {k: v for k, v in document.items() if k not in ("evidence_label", "label")}
+        # 승인되지 않은 원문은 출처 레지스트리에도 포함하지 않는다.
+        # 빈 내용의 문서가 인용 후보로 남으면 사실 근거로 오인될 수 있다.
+        if not str(usable_content or "").strip():
+            continue
         sources.append({
             **doc_without_alias,
             "content": usable_content,
@@ -122,11 +135,12 @@ def generate_answer(
     )
     try:
         written = write_document_answer(
-            state.get("question", ""), sources, user_history=history[-4:],
+            consultation_question(state), sources, user_history=history[-4:],
             previous_draft=state.get("draft_answer", "") if repair else "",
             verification=ver_res if repair else None,
             as_of_date=(state.get("case_evidence_briefing") or {}).get("as_of_date"),
             preserved_points=preserved if repair else None,
+            rag_only_notice=(state.get("statute_search_status") in ("NOT_FOUND", "PARTIAL_SUCCESS")),
         )
         result.update(written)
         draft_out = result.get("draft_answer", "")
@@ -138,7 +152,14 @@ def generate_answer(
     except Exception as exc:
         # 모델 오류나 원문 누락을 성공 답변으로 바꾸지 않으며 상담 원문/예외 본문은 기록하지 않는다.
         logger.warning("문서 답변 작성 실패: %s", type(exc).__name__)
-        result.update(draft_answer="", answer_generation_error=type(exc).__name__)
+        # 수정 실패 시 기존 초안을 파괴하지 않는다. 실패 상태를 명시하여
+        # Verification/Finalize가 이를 검증 통과 답변으로 취급하지 못하게 한다.
+        if repair and state.get("draft_answer"):
+            result.update(draft_answer=state["draft_answer"],
+                          answer_source_manifest=state.get("answer_source_manifest"),
+                          answer_generation_error=type(exc).__name__)
+        else:
+            result.update(draft_answer="", answer_generation_error=type(exc).__name__)
     return result
 
 
@@ -203,7 +224,7 @@ def verify_answer(state: Dict[str, Any]) -> Dict[str, Any]:
                    "검토 승인은 내용의 진실성 확인이 아닙니다.")
         # 검증 함수의 반환값은 추적 SDK가 비동기로 직렬화한다. 추적 중인 딕셔너리에
         # 해시·명세를 추가하면 순회 중 변경 오류로 관측값이 유실될 수 있어 새 객체를 만든다.
-        result = {**run_verification(state.get("question", ""), draft, sources, context,
+        result = {**run_verification(consultation_question(state), draft, sources, context,
                                      require_question_coverage=True), "source_manifest": manifest}
     except Exception as exc:
         logger.warning("문서 원문 검증 실패: %s", type(exc).__name__)
@@ -265,7 +286,8 @@ def next_verification_step(state: Dict[str, Any]) -> str:
                 target_node = "execute_statute_search"
                 route_reason = f"승인된 신규 법령 요청({len(requests)}건) 즉시 검색"
                 branched_statute = True
-            elif not state.get("hilt_executed"):
+            else:
+                # 과거 HILT 실행 여부가 아니라 이번 신규 검색 범위의 승인 여부로 판단한다.
                 target_node = "statute_search_approval"
                 route_reason = f"신규 법령({len(requests)}건) 사용자 승인(HILT) 요청"
                 branched_statute = True
@@ -325,13 +347,29 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
         except Exception:
             snapshot_valid = False
 
+    search_status = state.get("statute_search_status")
+    if search_status == "API_ERROR":
+        # 공식 API 장애는 이전 PASS 스냅샷이 남아 있어도 상담을 종료한다.
+        result["status"] = "INSUFFICIENT"
+        result["reason_code"] = "OFFICIAL_STATUTE_API_ERROR"
+        snapshot_valid = False
+    notice = (
+        "**안내:** 공식 법령 검색에서 요청한 법령의 일부 또는 전부를 확인하지 못했습니다. "
+        "확보된 공식 법령 및 RAG 자료를 바탕으로 검토했으며, "
+        "미확인 법령의 최신성 및 적용 시점은 추가 확인이 필요합니다."
+    ) if search_status in ("NOT_FOUND", "PARTIAL_SUCCESS") else ""
+    # 안내는 검증된 답변의 일부로 취급한다. 검증 이후 내용을 덧붙이지 않는다.
+    if notice and snapshot_valid and not draft.startswith("**안내:**"):
+        snapshot_valid = False
+        result["reason_code"] = "SEARCH_DISCLOSURE_NOT_VERIFIED"
+
     temporal_blocked = (result.get("temporal_gate") or {}).get("status") == "BLOCK"
     valid = snapshot_valid and result.get("status") == "PASS" and not temporal_blocked
     limited_used = False
 
     # 전체 답변이 PASS에 이르지 못했으나 원문 스냅샷·검증 무결성이 유효한 경우,
     # 확인된 사실과 조건부 설명만 남긴 제한 답변을 새로 생성하고 동일 검증기로 재검증한다.
-    if snapshot_valid and not valid and result.get("claims") and not temporal_blocked:
+    if snapshot_valid and not valid and result.get("claims") and not temporal_blocked and search_status != "API_ERROR":
         try:
             history = [m.content for m in (state.get("messages") or [])[:-1]
                        if isinstance(m, HumanMessage) and isinstance(m.content, str)]
@@ -341,7 +379,7 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
                 + list(result.get("preserved_points") or [])
             ))
             limited_written = write_document_answer(
-                state.get("question", ""),
+                consultation_question(state),
                 sources_list,
                 user_history=history[-4:],
                 previous_draft=draft,
@@ -349,6 +387,7 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
                 as_of_date=as_of,
                 preserved_points=preserved,
                 limited=True,
+                rag_only_notice=bool(notice),
             )
             limited_draft = limited_written.get("draft_answer", "")
             if limited_draft.strip():
@@ -357,7 +396,7 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
                     "검토 승인은 내용의 진실성 확인이 아닙니다."
                 )
                 limited_ver = run_verification(
-                    state.get("question", ""),
+                    consultation_question(state),
                     limited_draft,
                     sources_list,
                     context,
@@ -385,7 +424,10 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
         missing = _sanitize_client_missing_items(raw_missing)
         detail = "\n" + "\n".join(f"- {item}" for item in missing) if missing else ""
         final = "질문에 대한 답변을 확정할 만큼 근거 확인을 마치지 못했습니다."
-        if temporal_blocked:
+        if search_status == "API_ERROR":
+            final = ("공식 법령 검색 API 호출 중 오류가 발생하여 법령 확인을 완료하지 못했습니다. "
+                     "정확한 법률 판단을 위해 현재 상담을 종료합니다. 잠시 후 다시 시도해 주세요.")
+        elif temporal_blocked:
             final += (" 계약 또는 사건 발생일에 적용되는 개정 법령의 시행일·부칙·적용례 "
                       "확인이 부족하여 단정적인 법률 판단을 보류합니다.")
         elif result.get("reason_code") == "VERIFICATION_ERROR":

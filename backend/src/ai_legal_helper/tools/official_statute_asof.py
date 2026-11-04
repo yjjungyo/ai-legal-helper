@@ -256,6 +256,7 @@ def search_official_statutes_by_date(
     missing_issues: Optional[list[str]] = None,
     max_articles_per_law: int = 10,
     fetch_xml: Optional[Callable[[str], Optional[bytes]]] = None,
+    diagnostic: Optional[dict[str, Any]] = None,
 ) -> list[dict[str, Any]]:
     """승인된 법령명 목록을 시행일 시점 후보별로 조회하여 표준 Source 반환.
 
@@ -280,6 +281,11 @@ def search_official_statutes_by_date(
             law_name=target.law_name, as_of_date=as_of_date,
             api_key=api_key, fetch_xml=fetch_xml,
         )
+        if diagnostic is not None:
+            diagnostic.setdefault("lookups", []).append({
+                "law_name": target.law_name, "status": lookup.status,
+                "reason_code": lookup.reason_code,
+            })
         if lookup.status != "CANDIDATES_FOUND":
             logger.warning("[OFFICIAL_P4] 시행일 연혁 미확인 | law=%s status=%s reason=%s",
                            target.law_name, lookup.status, lookup.reason_code)
@@ -295,6 +301,8 @@ def search_official_statutes_by_date(
                 max_articles=max_articles_per_law,
             )
             if sources is None:
+                if diagnostic is not None:
+                    diagnostic["api_error"] = True
                 okay = False
                 break
             version_sources.extend(sources)
