@@ -58,16 +58,37 @@ def extract_event_with_llm(question: str, invoke_fn: Optional[Callable[[str], st
         parsed_date = parse_legal_date(date_text)
         if parsed_date is None:
             raise ValueError("INVALID_DATE")
-        # 인용한 구간 자체에 같은 날짜가 명시되어야 한다.
-        import re as _re
-        candidates = _re.findall(r"20\\d{2}\\s*(?:년|[-./])\\s*\\d{1,2}\\s*(?:월|[-./])\\s*\\d{1,2}\\s*일?", evidence)
-        if parsed_date not in [parse_legal_date(x) for x in candidates]:
+        # 근거 인용의 한국어/ISO 날짜를 정규화하여 LLM 날짜와 대조한다.
+        # 단순 문자열 검색이나 공포일과의 우연한 일치를 허용하지 않는다.
+        candidates = re.finditer(
+            r"(?<!\\d)(20\\d{2})\\s*(?:년|[-./])\\s*(\\d{1,2})\\s*(?:월|[-./])\\s*(\\d{1,2})\\s*일?(?!\\d)",
+            evidence,
+        )
+        grounded_dates = []
+        for match in candidates:
+            grounded = parse_legal_date(
+                f"{int(match.group(1)):04d}-{int(match.group(2)):02d}-{int(match.group(3)):02d}"
+            )
+            if grounded:
+                grounded_dates.append((grounded, match.start(), match.end()))
+        if not any(d == parsed_date for d, _, _ in grounded_dates):
             raise ValueError("DATE_NOT_IN_EVIDENCE")
+        # 같은 인용에 공포일과 사건일이 함께 있으면, 법령 날짜를 사건일로
+        # 잘못 선택하지 않았는지 해당 날짜 바로 뒤의 문맥을 검사한다.
+        for d, start, end in grounded_dates:
+            if d != parsed_date:
+                continue
+            trailing = evidence[end:end + 20]
+            leading = evidence[max(0, start - 12):start]
+            if re.match(r"\\s*(?:공포|개정|시행|발효|제정)", trailing) or re.search(
+                r"(?:공포일|개정일|시행일)\\s*$", leading
+            ):
+                raise ValueError("STATUTE_DATE_NOT_EVENT")
         supported = {"CONTRACT_SIGNED", "CONTRACT_RENEWED", "CONTRACT_MODIFIED", "NOTICE_GIVEN", "MOVE_OUT"}
         if kind not in supported:
             raise ValueError("UNSUPPORTED_EVENT_TYPE")
         # 인용 구간이 법령의 공포·시행·개정일만 설명하는 경우 사건일로 사용하지 않는다.
-        if _re.search(r"(?:공포일|시행일|개정일|공포된|시행되는|개정된)", evidence) and not _re.search(
+        if re.search(r"(?:공포일|시행일|개정일|공포된|시행되는|개정된)", evidence) and not re.search(
             r"(?:계약|체결|갱신|재계약|통지|퇴거|이사|변경)", evidence
         ):
             raise ValueError("STATUTE_DATE_NOT_EVENT")
