@@ -66,6 +66,10 @@ def document_sources(state: Dict[str, Any]) -> List[Dict[str, Any]]:
             document.get("document_name") or document.get("filename") or document.get("evidence_id") or ""
         ).strip()
         doc_without_alias = {k: v for k, v in document.items() if k not in ("evidence_label", "label")}
+        # 승인되지 않은 원문은 출처 레지스트리에도 포함하지 않는다.
+        # 빈 내용의 문서가 인용 후보로 남으면 사실 근거로 오인될 수 있다.
+        if not str(usable_content or "").strip():
+            continue
         sources.append({
             **doc_without_alias,
             "content": usable_content,
