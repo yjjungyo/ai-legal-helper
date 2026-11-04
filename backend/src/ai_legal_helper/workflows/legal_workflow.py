@@ -1974,7 +1974,12 @@ def intent_analysis_node(state: LegalState) -> Dict:
     # GENERAL_LEGAL은 법령·판례 일반 설명 경로로 보내고 사건 자료를 근거에서
     # 제거한다. CASE_EVIDENCE는 기존 원문 작성/검증 경로를 그대로 사용한다.
     needs_case_evidence = decision.consultation_mode == ConsultationMode.CASE_EVIDENCE
-    has_case_documents = bool((state.get("case_evidence_briefing") or {}).get("source_documents"))
+    # 미승인·반려 문서는 원문 근거로 사용하지 않는다.
+    # 문서가 존재한다는 사실만으로 DOCUMENT_MODE에 진입시키지 않는다.
+    has_case_documents = any(
+        doc.get("review_status") == "APPROVED" and bool(doc.get("content"))
+        for doc in ((state.get("case_evidence_briefing") or {}).get("source_documents") or [])
+    )
     selected_answer_mode = DOCUMENT_MODE if needs_case_evidence and has_case_documents else None
     updates: Dict[str, Any] = {
         "case_context": state.get("case_context", ""),
@@ -2005,33 +2010,8 @@ def intent_analysis_node(state: LegalState) -> Dict:
         selected_answer_mode or "STANDARD",
     )
 
-    # resolved_query가 원문 질문과 다르고 법률/사실 검토가 필요한 경우 사건 증거 보강 검색 수행
-    from ai_legal_helper.observability.context import get_case_id
-    case_id = get_case_id()
-    if (
-        case_id
-        and needs_case_evidence
-        and decision.resolved_query
-        and decision.resolved_query.strip() != q.strip()
-        and decision.intent not in (ConsultationIntent.GENERAL_CONVERSATION, ConsultationIntent.NEEDS_CLARIFICATION)
-    ):
-        from ai_legal_helper.database.session import SessionLocal
-        db = SessionLocal()
-        try:
-            refreshed_ev = _collect_graph_evidence(db, case_id, decision.resolved_query)
-            refreshed_text = refreshed_ev.pop("context_text", "")
-            prev_ev = dict(state.get("graph_evidence") or {})
-            if refreshed_ev.get("valid_paths") or refreshed_ev.get("structured_matches"):
-                updates["graph_evidence"] = refreshed_ev
-                if refreshed_text and refreshed_text not in case_ctx:
-                    updates["case_context"] = f"{case_ctx}\n\n{refreshed_text}" if case_ctx else refreshed_text
-            elif not prev_ev:
-                updates["graph_evidence"] = refreshed_ev
-        except Exception as e:
-            logger.warning(f"[NODE:intent_analysis] resolved_query 기반 증거 재검색 실패: {e}")
-        finally:
-            db.close()
-
+    # 지연 로딩 단계에서 이미 resolved_query로 GraphRAG를 조회했으므로
+    # 동일한 질문으로 다시 검색하지 않는다(중복 DB/Neo4j 호출 방지).
     return updates
 
 
