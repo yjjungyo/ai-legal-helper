@@ -328,6 +328,8 @@ def evaluate_temporal_sources(
     *,
     event_date: str | None = None,
     event_type: str | None = None,
+    llm_addendum_interpretation: bool = False,
+    addendum_invoke_fn: Optional[Any] = None,
 ) -> TemporalResolution:
     """공식 버전별 조문·부칙과 사건일을 매칭하고 3상 판정한다.
 
@@ -385,6 +387,16 @@ def evaluate_temporal_sources(
         else:
             selected_addendum, span = matching_rules[0]
             rule_type, reason = _machine_rule(span)
+            # 미지원 문장만 LLM으로 해석하되, LLM의 의미 추출만으로
+            # 법적 적용 여부를 VERIFIED로 승격시키지 않는다.
+            if rule_type is None and llm_addendum_interpretation:
+                extracted_type, extraction_reason = interpret_addendum_with_llm(
+                    span, article, invoke_fn=addendum_invoke_fn,
+                )
+                if extracted_type is not None:
+                    reason = "LLM_ADDENDUM_INTERPRETED_REVIEW_REQUIRED"
+                else:
+                    reason = extraction_reason
             parsed_cur_date = parse_legal_date(current_date)
             is_before_effective = bool(parsed_cur_date and effective and parsed_cur_date < effective)
 
