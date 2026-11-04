@@ -135,7 +135,7 @@ def build_temporal_search_plan(
     # 명시적으로 확인된 사건일/유형 쌍은 재추출하지 않는다.
     # 날짜가 없는 질문에는 불필요한 LLM 호출을 하지 않는다.
     explicit_pair = event_date is not None and event_type is not None
-    has_date = bool(re.search(r"20\\d{2}\\s*(?:년|[-./])\\s*\\d{1,2}\\s*(?:월|[-./])\\s*\\d{1,2}", question))
+    has_date = bool(re.search(r"20\d{2}\s*(?:년|[-./])\s*\d{1,2}\s*(?:월|[-./])\s*\d{1,2}", question))
     if llm_event_extraction and not explicit_pair and has_date:
         event = extract_event_with_llm(question, invoke_fn=event_invoke_fn)
         if event.selected is not None and event_date is not None:
