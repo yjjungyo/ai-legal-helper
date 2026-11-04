@@ -423,11 +423,11 @@ def evaluate_temporal_sources(
                 reason = extraction_reason
                 # LLM 해석은 검증 가능한 후보만 제공한다.
                 # 복수 사건 유형은 기존 단일 유형 기반 엔진에서 확정하지 않는다.
-                if structured_rule and len(structured_rule["event_types"]) == 1:
-                    candidate_type = structured_rule["event_types"][0]
-                    if (candidate_type == current_type
-                            and structured_rule["condition"] == "ON_OR_AFTER_EFFECTIVE_DATE"):
-                        rule_type = candidate_type
+                if structured_rule and current_type in structured_rule["event_types"]:
+                    # 복수 사건 유형도 해당 사건 유형이 근거에 명시되어 있으면 처리한다.
+                    # 단, 시행일 당일 포함이 확인된 조건만 기존 날짜 판정기에 전달한다.
+                    if structured_rule["condition"] == "ON_OR_AFTER_EFFECTIVE_DATE":
+                        rule_type = current_type
                         reason = "LLM_ADDENDUM_CONDITION_GROUNDED"
             parsed_cur_date = parse_legal_date(current_date)
             is_before_effective = bool(parsed_cur_date and effective and parsed_cur_date < effective)
