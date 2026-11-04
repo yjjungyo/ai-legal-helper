@@ -411,7 +411,7 @@ class LawRetrievalService:
                     response.reason_codes.append("REQUIRED_ARTICLE_NOT_RETRIEVED")
                 elif any(
                     not src.get("version_id") or (
-                        law.get("current_mst")
+                        not ready_mst and law.get("current_mst")
                         and _source_matches_law(src, law)
                         and str(src.get("version_id") or "") != str(law["current_mst"])
                     )
