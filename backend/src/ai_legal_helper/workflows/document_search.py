@@ -231,7 +231,17 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
     # 일부 법령만 확보했더라도 전체 검색 성공으로 오인하지 않는다.
     found_laws = {str(src.get("statute_name") or "") for src in found}
     requested_laws = set(grouped)
-    partial = bool(found) and not requested_laws.issubset(found_laws)
+    # 법령명만 일치해도 요청 조문이 빠졌다면 부분 성공으로 표시한다.
+    def _request_fulfilled(request: dict[str, Any]) -> bool:
+        matches = [src for src in found if src.get("statute_name") == request["law_name"]]
+        if not matches:
+            return False
+        articles = request.get("articles") or []
+        if not articles:
+            return True
+        return all(any(src.get("article") == article for src in matches) for article in articles)
+
+    partial = bool(found) and not all(_request_fulfilled(r) for r in requests)
     if partial:
         logger.warning("[DOCUMENT_SEARCH] 일부 법령만 확보: %d/%d", len(found_laws & requested_laws), len(requested_laws))
     merged = list(state.get("retrieved_sources") or [])
