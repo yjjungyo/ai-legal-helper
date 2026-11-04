@@ -145,6 +145,19 @@ def write_document_answer(
             "내부 검토 지적을 복사하거나 확인 필요만 나열하지 마세요. "
             "근거 없는 법률 결론은 삭제하되 기존에 검증된 설명은 보존하세요."
         )
+    # 최초 작성에서만 동일 LLM 호출로 법령 충분성과 답변을 함께 판단한다.
+    # 재작성/제한 답변은 기존 출력 계약을 유지한다.
+    integrated = not previous_draft and not limited and verification is None
+    if integrated:
+        payload["출력 규약"] = (
+            "반드시 JSON 객체만 출력하세요. 법령 원문이 현재 질문의 핵심 쟁점에 부족하면 "
+            '{"status":"NEED_MORE_LAW","missing_laws":[{"law_name":"법령명","issue":"쟁점",'
+            '"question_part":"질문 원문","articles":[]}],"answer":""} '
+            "형식으로 반환하세요. 부족한 법령은 추측하지 말고 실제로 필요한 것만 제안하세요. "
+            "현재 근거로 답변 가능하면 "
+            '{"status":"READY","missing_laws":[],"answer":"근거 기반 완성 답변"} '
+            "형식으로 반환하세요. NEED_MORE_LAW일 때 답변 초안을 생성하지 마세요."
+        )
     response = get_llm(temperature=0.0).invoke([
         SystemMessage(content=DOCUMENT_ANSWER_SYSTEM),
         HumanMessage(content=json.dumps(payload, ensure_ascii=False) + "\n\n[전체 근거 원문]\n" + context),
@@ -154,6 +167,35 @@ def write_document_answer(
         logger.error("[DOCUMENT_ANSWER] LLM 답변 생성 결과가 비어 있습니다 (EMPTY_DOCUMENT_ANSWER)")
         raise ValueError("EMPTY_DOCUMENT_ANSWER")
     answer_text = answer.strip()
+    if integrated:
+        try:
+            parsed = json.loads(answer_text[answer_text.index("{"):answer_text.rindex("}") + 1])
+            if parsed.get("status") == "NEED_MORE_LAW":
+                missing = parsed.get("missing_laws") or []
+                if not isinstance(missing, list) or not missing:
+                    raise ValueError("INVALID_MISSING_LAWS")
+                requests = []
+                for item in missing[:4]:
+                    if not isinstance(item, dict):
+                        raise ValueError("INVALID_LAW_REQUEST")
+                    name = item.get("law_name")
+                    issue = item.get("issue")
+                    articles = item.get("articles", [])
+                    if not isinstance(name, str) or not name.strip() or not isinstance(issue, str) or not issue.strip() or not isinstance(articles, list) or not all(isinstance(a, str) for a in articles):
+                        raise ValueError("INVALID_LAW_REQUEST")
+                    requests.append({"law_name": name.strip(), "issue": issue.strip(),
+                                     "question_part": question, "articles": articles})
+                return {"draft_answer": "", "answer_source_manifest": manifest,
+                        "answer_generation_error": None, "synthesis_law_gate": {
+                            "status": "NEED_MORE_LAW", "legal_search_requests": requests,
+                            "candidate_laws": list(dict.fromkeys(x["law_name"] for x in requests)),
+                            "missing_legal_issues": [x["issue"] for x in requests]}}
+            if parsed.get("status") != "READY" or not isinstance(parsed.get("answer"), str) or not parsed["answer"].strip():
+                raise ValueError("INVALID_SYNTHESIS_GATE")
+            answer_text = parsed["answer"].strip()
+        except (ValueError, TypeError, KeyError) as exc:
+            raise ValueError("INVALID_SYNTHESIS_GATE") from exc
+
     draft_hash = hashlib.sha256(answer_text.encode("utf-8")).hexdigest()[:16]
     logger.info(
         "[DOCUMENT_ANSWER] 답변 초안 작성 완료 (길이: %d자 | 해시: %s | 제한모드=%s)",
