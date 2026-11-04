@@ -16,6 +16,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping
 
+from ai_legal_helper.rag.temporal_applicability import parse_legal_date
 from ai_legal_helper.legal_knowledge.temporal_resolver import (
     evaluate_temporal_sources, resolve_event,
 )
