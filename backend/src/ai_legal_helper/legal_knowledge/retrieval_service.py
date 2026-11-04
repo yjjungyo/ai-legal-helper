@@ -363,20 +363,31 @@ class LawRetrievalService:
                     response.status = LawSourceStatus.SOURCE_PARTIAL
                     response.reason_codes.append("ARTICLE_SCOPE_UNCONFIRMED")
 
-        # as_of_date를 제공한 질문은 일반 벡터 검색 성공만으로 확정하지 않는다.
-        # P1 Temporal Applicability API로 정확한 버전/조문 시행일 검증을 요구한다.
-        if as_of_date and response.sources and response.status not in (
-            LawSourceStatus.RETRIEVAL_ERROR, LawSourceStatus.SOURCE_MISSING,
-        ):
-            if parse_legal_date(as_of_date) is None or any(
-                src.get("source_type") != "STATUTE"
-                or evaluate_statute_applicability(src, as_of_date).status
-                is not ApplicabilityStatus.APPLICABLE
-                for src in response.sources
+        # 모든 법령 검색 결과에 시점 검증 상태를 부여한다.
+        # 사건 기준일이 없는 경우에도 SOURCE_COMPLETE로 승격하지 않는다.
+        valid_as_of = parse_legal_date(as_of_date) if as_of_date else None
+        if response.sources:
+            temporal_unconfirmed = False
+            for src in response.sources:
+                if src.get("source_type") != "STATUTE":
+                    continue
+                src["requested_as_of_date"] = valid_as_of.isoformat() if valid_as_of else None
+                if valid_as_of is None:
+                    src["temporal_status"] = "UNCONFIRMED"
+                    temporal_unconfirmed = True
+                    continue
+                applicability = evaluate_statute_applicability(src, valid_as_of.isoformat())
+                src["temporal_status"] = _status_value(applicability.status)
+                if applicability.status is not ApplicabilityStatus.APPLICABLE:
+                    temporal_unconfirmed = True
+            if temporal_unconfirmed and response.status not in (
+                LawSourceStatus.RETRIEVAL_ERROR, LawSourceStatus.SOURCE_MISSING,
             ):
                 response.status = LawSourceStatus.SOURCE_TEMPORAL_UNCONFIRMED
-                response.reason_codes.append("TEMPORAL_LEGAL_REVIEW_REQUIRED")
-
+                response.reason_codes.append(
+                    "EVENT_DATE_REQUIRED" if valid_as_of is None
+                    else "TEMPORAL_LEGAL_REVIEW_REQUIRED"
+                )
         response.official_search_recommended = response.status in (
             LawSourceStatus.SOURCE_PARTIAL,
             LawSourceStatus.SOURCE_MISSING,
