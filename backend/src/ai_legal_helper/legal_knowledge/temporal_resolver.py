@@ -278,19 +278,18 @@ def interpret_addendum_with_llm(
     article: str,
     *,
     invoke_fn: Optional[Any] = None,
-) -> tuple[str | None, str]:
-    """부칙 적용례의 사건 유형을 LLM으로 추출하되 원문 근거를 확인한다.
-
-    이 함수는 의미 추출만 담당한다. 추출 결과만으로 소급효/경과조치 검토가
-    완료되거나 적용례가 VERIFIED로 승격되지는 않는다.
-    """
+) -> tuple[dict[str, Any] | None, str]:
+    """부칙의 적용 조건을 구조화한다. LLM 출력은 검증 전 후보일 뿐이다."""
     import json
     prompt = (
-        "법령 부칙 적용례에서 해당 조문에 관한 적용 시작 사건 유형을 추출하세요. "
-        "원문에 없는 조건은 추측하지 마세요. 복수 유형이나 예외·경과규정이 "
-        "있으면 단일 유형을 선택하지 마세요. JSON만 반환하세요. "
-        '{"event_type":"CONTRACT_SIGNED|CONTRACT_RENEWED|CONTRACT_MODIFIED|NOTICE_GIVEN|MOVE_OUT 또는 null",'
-        '"evidence":"부칙 원문에서 연속된 정확한 인용",'
+        "부칙의 적용례를 원문에만 근거하여 JSON으로 구조화하세요. "
+        "event_types는 CONTRACT_SIGNED, CONTRACT_RENEWED, CONTRACT_MODIFIED, "
+        "NOTICE_GIVEN, MOVE_OUT 중 해당하는 모든 유형의 배열입니다. "
+        "condition은 ON_OR_AFTER_EFFECTIVE_DATE, AFTER_EFFECTIVE_DATE, "
+        "ON_EFFECTIVE_DATE 중 하나 또는 null입니다. "
+        "event_evidence와 condition_evidence는 부칙 원문의 연속된 정확한 인용입니다. "
+        "예외·소급·경과조치 또는 조건이 불명확하면 has_exception/has_transition을 true로 표시하세요. "
+        'JSON: {"event_types":[],"condition":null,"event_evidence":"","condition_evidence":"",'
         '"has_exception":true,"has_transition":true}'
         "\\n대상 조문: " + article + "\\n부칙: " + provision
     )
@@ -299,7 +298,7 @@ def interpret_addendum_with_llm(
             from ai_legal_helper.llm.gateway import get_llm
             from langchain_core.messages import SystemMessage, HumanMessage
             response = get_llm(temperature=0.0).invoke([
-                SystemMessage(content="법률 부칙 구조화 추출기입니다. JSON만 반환하고 불명확하면 null을 반환하세요."),
+                SystemMessage(content="법률 부칙 구조화 추출기입니다. 원문에 없는 법적 효과를 추측하지 마세요."),
                 HumanMessage(content=prompt),
             ])
             raw = response.content
@@ -308,16 +307,43 @@ def interpret_addendum_with_llm(
         data = json.loads(raw) if isinstance(raw, str) else None
         if not isinstance(data, dict):
             return None, "LLM_ADDENDUM_INVALID_OUTPUT"
-        kind = data.get("event_type")
-        span = data.get("evidence")
-        if not isinstance(span, str) or not span.strip() or span not in provision:
+        types = data.get("event_types")
+        condition = data.get("condition")
+        event_span = data.get("event_evidence")
+        condition_span = data.get("condition_evidence")
+        supported = set(_EVENT_TERMS)
+        if (not isinstance(types, list) or not types or len(types) != len(set(map(str, types)))
+                or any(not isinstance(t, str) or t not in supported for t in types)):
+            return None, "LLM_ADDENDUM_UNSUPPORTED_EVENT"
+        if condition not in ("ON_OR_AFTER_EFFECTIVE_DATE", "AFTER_EFFECTIVE_DATE", "ON_EFFECTIVE_DATE"):
+            return None, "LLM_ADDENDUM_UNSUPPORTED_CONDITION"
+        if any(not isinstance(x, str) or not x.strip() or x not in provision
+               for x in (event_span, condition_span)):
             return None, "LLM_ADDENDUM_UNGROUNDED"
         if data.get("has_exception") is not False or data.get("has_transition") is not False:
             return None, "LLM_ADDENDUM_COMPLEX_RULE"
-        if kind not in _EVENT_TERMS:
-            return None, "LLM_ADDENDUM_UNSUPPORTED_EVENT"
-        # 부칙에서 확인한 근거가 대상 조문과 연결되는지는 상위 resolver가 검사한다.
-        return kind, "LLM_ADDENDUM_EVENT_EXTRACTED"
+        # 구조화 결과가 원문에서 지지되는지 별도 검사한다. LLM의 선언만 신뢰하지 않는다.
+        if any(x in provision for x in ("종전의 규정", "경과조치", "불구하고", "소급", "다만", "예외")):
+            return None, "COMPLEX_TRANSITIONAL_PROVISION"
+        if not re.search(r"경우부터\\s*적용", provision):
+            return None, "UNSUPPORTED_APPLICATION_RULE"
+        if condition == "AFTER_EFFECTIVE_DATE":
+            if not re.search(r"시행\\s*(?:일)?\\s*(?:이후|후)", condition_span):
+                return None, "LLM_ADDENDUM_CONDITION_MISMATCH"
+        elif condition == "ON_OR_AFTER_EFFECTIVE_DATE":
+            if not re.search(r"시행(?:한 날부터|일?\\s*이후)", condition_span):
+                return None, "LLM_ADDENDUM_CONDITION_MISMATCH"
+        else:
+            return None, "LLM_ADDENDUM_CONDITION_REVIEW_REQUIRED"
+        for kind in types:
+            if not any(token in event_span for token in _STRICT_EVENT_TERMS.get(kind, ())):
+                return None, "LLM_ADDENDUM_EVENT_MISMATCH"
+        return {
+            "event_types": types,
+            "condition": condition,
+            "event_evidence": event_span,
+            "condition_evidence": condition_span,
+        }, "LLM_ADDENDUM_STRUCTURED"
     except Exception:
         return None, "LLM_ADDENDUM_EXTRACTION_FAILED"
 
@@ -389,14 +415,19 @@ def evaluate_temporal_sources(
             rule_type, reason = _machine_rule(span)
             # 미지원 문장만 LLM으로 해석하되, LLM의 의미 추출만으로
             # 법적 적용 여부를 VERIFIED로 승격시키지 않는다.
+            structured_rule = None
             if rule_type is None and llm_addendum_interpretation:
-                extracted_type, extraction_reason = interpret_addendum_with_llm(
+                structured_rule, extraction_reason = interpret_addendum_with_llm(
                     span, article, invoke_fn=addendum_invoke_fn,
                 )
-                if extracted_type is not None:
-                    reason = "LLM_ADDENDUM_INTERPRETED_REVIEW_REQUIRED"
-                else:
-                    reason = extraction_reason
+                reason = extraction_reason
+                # LLM 해석은 검증 가능한 후보만 제공한다.
+                # 복수 사건 유형은 기존 단일 유형 기반 엔진에서 확정하지 않는다.
+                if structured_rule and len(structured_rule["event_types"]) == 1:
+                    candidate_type = structured_rule["event_types"][0]
+                    if candidate_type == current_type:
+                        rule_type = candidate_type
+                        reason = "LLM_ADDENDUM_CONDITION_GROUNDED"
             parsed_cur_date = parse_legal_date(current_date)
             is_before_effective = bool(parsed_cur_date and effective and parsed_cur_date < effective)
 
