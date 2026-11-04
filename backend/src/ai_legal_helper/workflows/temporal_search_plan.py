@@ -9,12 +9,71 @@ from __future__ import annotations
 
 import logging
 import re
+import json
 from typing import Any, Callable, Optional
 
-from ai_legal_helper.legal_knowledge.temporal_resolver import resolve_event
+from ai_legal_helper.legal_knowledge.temporal_resolver import resolve_event, EventResolution, LegalEvent
+from ai_legal_helper.rag.temporal_applicability import parse_legal_date
 
 logger = logging.getLogger(__name__)
 _LAW_HINT = re.compile(r"(법|시행령|시행규칙|령|규정)")
+
+
+def extract_event_with_llm(question: str, invoke_fn: Optional[Callable[[str], str]] = None) -> EventResolution:
+    """질문의 사건일 의미를 LLM으로 추출하되 원문·날짜·타입을 코드로 검증한다.
+
+    불확실하거나 기존 판정 엔진이 지원하지 않는 유형은 UNCONFIRMED.
+    법령의 공포/시행일은 사건일로 선택하지 않는다.
+    """
+    prompt = (
+        "다음 법률 질문에서 사건 당사자의 실제 행위 날짜 하나만 식별하세요. "
+        "법령 공포일, 개정일, 시행일은 사건일이 아닙니다. "
+        "날짜가 여러 개이고 기준 행위가 모호하면 선택하지 마세요. "
+        "JSON만 출력: "
+        '{"date":"YYYY-MM-DD 또는 null","event_type":"CONTRACT_SIGNED|CONTRACT_RENEWED|'
+        'CONTRACT_MODIFIED|NOTICE_GIVEN|MOVE_OUT 또는 null","evidence":"질문 원문의 정확한 인용"}'
+        "\\n질문: " + question
+    )
+    try:
+        if invoke_fn is None:
+            from ai_legal_helper.llm.gateway import get_llm
+            from langchain_core.messages import HumanMessage, SystemMessage
+            response = get_llm(temperature=0.0).invoke([
+                SystemMessage(content="법률 사건의 날짜·행위 추출기입니다. 추측하지 말고 JSON만 반환하세요."),
+                HumanMessage(content=prompt),
+            ])
+            raw = response.content
+        else:
+            raw = invoke_fn(prompt)
+        if not isinstance(raw, str):
+            raise ValueError("NON_TEXT_RESPONSE")
+        parsed = json.loads(raw.strip())
+        if not isinstance(parsed, dict):
+            raise ValueError("NOT_OBJECT")
+        date_text, kind, evidence = parsed.get("date"), parsed.get("event_type"), parsed.get("evidence")
+        if not isinstance(date_text, str) or not isinstance(kind, str) or not isinstance(evidence, str):
+            raise ValueError("MISSING_FIELDS")
+        if not evidence.strip() or evidence not in question:
+            raise ValueError("UNGROUNDED_EVENT_SPAN")
+        parsed_date = parse_legal_date(date_text)
+        if parsed_date is None:
+            raise ValueError("INVALID_DATE")
+        # 인용한 구간 자체에 같은 날짜가 명시되어야 한다.
+        import re as _re
+        candidates = _re.findall(r"20\\d{2}\\s*(?:년|[-./])\\s*\\d{1,2}\\s*(?:월|[-./])\\s*\\d{1,2}\\s*일?", evidence)
+        if parsed_date not in [parse_legal_date(x) for x in candidates]:
+            raise ValueError("DATE_NOT_IN_EVIDENCE")
+        supported = {"CONTRACT_SIGNED", "CONTRACT_RENEWED", "CONTRACT_MODIFIED", "NOTICE_GIVEN", "MOVE_OUT"}
+        if kind not in supported:
+            raise ValueError("UNSUPPORTED_EVENT_TYPE")
+        if len(set(_re.findall(r"20\\d{2}\\s*(?:년|[-./])\\s*\\d{1,2}\\s*(?:월|[-./])\\s*\\d{1,2}\\s*일?", question))) > 1:
+            # 복수 날짜 질의에서는 임의 선정 방지를 위해 호출자 검증을 요구한다.
+            raise ValueError("MULTIPLE_DATES_REQUIRE_CONFIRMATION")
+        event = LegalEvent(parsed_date.isoformat(), kind, "LLM_EXTRACTED")
+        return EventResolution("RESOLVED", events=[event], selected=event)
+    except Exception as exc:
+        logger.warning("[TEMPORAL_EVENT_LLM] 추출 미확정 | reason=%s", type(exc).__name__)
+        return EventResolution("UNCONFIRMED", reason_code="LLM_EVENT_EXTRACTION_UNCONFIRMED")
 
 
 def _local_law_resolve(question: str) -> Any:
@@ -33,6 +92,8 @@ def build_temporal_search_plan(
     event_type: Optional[str] = None,
     resolver_fn: Optional[Callable[[str], Any]] = None,
     max_laws: int = 3,
+    llm_event_extraction: bool = False,
+    event_invoke_fn: Optional[Callable[[str], str]] = None,
 ) -> dict[str, Any]:
     """사건일/공식 법령ID가 명시된 질의를 '검색 후보'로만 정규화한다.
 
@@ -48,6 +109,8 @@ def build_temporal_search_plan(
     if not isinstance(question, str) or not _LAW_HINT.search(question):
         return empty
     event = resolve_event(question, event_date=event_date, event_type=event_type)
+    if event.selected is None and llm_event_extraction and event_date is None and event_type is None:
+        event = extract_event_with_llm(question, invoke_fn=event_invoke_fn)
     if event.selected is None:
         return {**empty, "reason_code": event.reason_code}
     try:
