@@ -1980,6 +1980,9 @@ def intent_analysis_node(state: LegalState) -> Dict:
         doc.get("review_status") == "APPROVED" and bool(doc.get("content"))
         for doc in ((state.get("case_evidence_briefing") or {}).get("source_documents") or [])
     )
+    # 사건 증거 분석을 요청했는데 승인 원문이 없으면 일반 법률 답변으로
+    # 조용히 전환하지 않는다. 근거 부족을 사용자에게 명시하고 종료한다.
+    evidence_unavailable = needs_case_evidence and not has_case_documents
     selected_answer_mode = DOCUMENT_MODE if needs_case_evidence and has_case_documents else None
     updates: Dict[str, Any] = {
         "case_context": state.get("case_context", ""),
@@ -1992,6 +1995,7 @@ def intent_analysis_node(state: LegalState) -> Dict:
         "intent_decision": decision.model_dump(),
         "consultation_mode": decision.consultation_mode.value,
         "answer_mode": selected_answer_mode,
+        "evidence_unavailable": evidence_unavailable,
     }
     if not needs_case_evidence:
         # 이미 조회된 사건 정보가 Standard Synthesizer/Verifier/Router로 새지 않도록
@@ -2018,6 +2022,8 @@ def intent_analysis_node(state: LegalState) -> Dict:
 def intent_condition(state: LegalState) -> str:
     """의도 분석 결과에 따라 워크플로우 분기 경로를 결정한다."""
     intent_val = state.get("intent")
+    if state.get("evidence_unavailable"):
+        return "evidence_unavailable"
     if intent_val == ConsultationIntent.OUT_OF_SCOPE.value:
         # 법률 무관 요청은 기존 일반 대화 종료 노드를 재사용한다.
         # 별도 Router/Agent/RAG/Verifier 실행 없이 END로 연결된다.
@@ -2029,6 +2035,38 @@ def intent_condition(state: LegalState) -> str:
     if intent_val == ConsultationIntent.FOLLOWUP_ACTION.value:
         return "followup_action"
     return "route"
+
+
+@trace
+def evidence_unavailable_node(state: LegalState) -> Dict:
+    """사건 증거를 요청했지만 승인된 원문이 없으면 사실 판단을 유보한다.
+
+    일반 법률 설명은 GENERAL_LEGAL 경로에서 정상 처리한다.
+    미승인 문서·추출 실패·증거 부재를 법률적 사실로 간주하지 않는다.
+    """
+    set_node_name("evidence_unavailable")
+    briefing = state.get("case_evidence_briefing") or {}
+    documents = briefing.get("source_documents") or []
+    if documents:
+        answer = (
+            "등록된 사건 자료는 있지만 현재 분석에 사용할 수 있는 승인된 원문이 없습니다. "
+            "문서 검토·승인 상태와 텍스트 추출 결과를 확인한 뒤 다시 상담해 주세요. "
+            "자료가 확인되기 전에는 계약 사실이나 권리 성립 여부를 단정할 수 없습니다."
+        )
+    else:
+        answer = (
+            "현재 사건에서 분석에 사용할 수 있는 승인된 증거 원문을 확인하지 못했습니다. "
+            "관련 계약서·통지·거래 자료 등을 등록하고 승인 상태를 확인해 주세요. "
+            "자료 없이 사건의 사실관계나 법적 결론을 단정할 수 없습니다."
+        )
+    return {
+        "final_answer": answer, "answer": answer, "draft_answer": answer,
+        "final_disposition": "WITHHELD", "verification_status": "UNVERIFIED",
+        "verification_result": {}, "categories": [], "selected_agents": [],
+        "sources": [], "cited_sources": [], "retrieved_sources": [],
+        "warnings": ["사건 증거 원문 확인 필요"],
+        "messages": [AIMessage(content=answer)],
+    }
 
 
 @trace
@@ -2165,6 +2203,7 @@ def build_legal_graph(checkpointer: Optional[Any] = None):
     graph.add_node("supervisor_initialize", supervisor_initialize_node)
     graph.add_node("intent_analysis", intent_analysis_node)
     graph.add_node("general_conversation", general_conversation_node)
+    graph.add_node("evidence_unavailable", evidence_unavailable_node)
     graph.add_node("followup_action", followup_action_node)
     graph.add_node("route", route_node)
     graph.add_node("plan", plan_node)
@@ -2185,11 +2224,13 @@ def build_legal_graph(checkpointer: Optional[Any] = None):
     graph.add_edge("supervisor_initialize", "intent_analysis")
     graph.add_conditional_edges("intent_analysis", intent_condition, {
         "general_conversation": "general_conversation",
+        "evidence_unavailable": "evidence_unavailable",
         "routing_exit": "routing_exit",
         "followup_action": "followup_action",
         "route": "route",
     })
     graph.add_edge("general_conversation", END)
+    graph.add_edge("evidence_unavailable", END)
     graph.add_edge("followup_action", "verification")
     graph.add_conditional_edges("route", route_condition, {
         "plan": "plan",
