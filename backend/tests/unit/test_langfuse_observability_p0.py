@@ -1,7 +1,7 @@
 """Langfuse Observability 고도화 v2.0 (1차 정확성 확보: P0-1, P0-2, P0-3) 단위 테스트 모듈.
 
 본 모듈은 다음 6대 핵심 요구사항을 검증한다:
-- TC-01: 단일 워크플로우 실행 시 Trace 이름('LegalConsultation') 표준화 및 LLM 1회 호출당 Generation 1회 정확 기록 (P0-1, P0-3)
+- TC-01: 단일 워크플로우 실행 시 Trace 이름('LegalAgent') 표준화 및 LLM 1회 호출당 Generation 1회 정확 기록 (P0-1, P0-3)
 - TC-02: 서로 다른 상담(Trace A, Trace B) 동시 실행 시 동일 노드명 Span의 상호 오염 차단 및 격리 검증 (P0-2)
 - TC-03: 동일 워크플로우 내 중첩·반복 에이전트 호출 시 Span 이름 스택(Stack) 정상 동작 및 부모 복원 (P0-2)
 - TC-04: Git Commit SHA 및 시스템 식별자('LegalAgent')의 Trace/Generation 메타데이터 자동 주입 검증 (P0-3)
@@ -43,7 +43,7 @@ def clean_langfuse_state():
 
 
 def test_tc01_single_trace_and_generation_instrumentation():
-    """TC-01: 단일 Trace 표준 이름('LegalConsultation') 및 LLM 1회 호출당 1회 Generation 기록 검증."""
+    """TC-01: 단일 Trace 표준 이름('LegalAgent') 및 LLM 1회 호출당 1회 Generation 기록 검증."""
     mock_lf = MagicMock()
     mock_trace = MagicMock()
     mock_lf.trace.return_value = mock_trace
@@ -57,7 +57,7 @@ def test_tc01_single_trace_and_generation_instrumentation():
         # 1. 최상위 Trace 시작
         langfuse_client.start_trace(
             trace_id=trace_id,
-            name="LegalConsultation",
+            name="LegalAgent",
             session_id=case_id,
             metadata={"request_id": "req-tc01", "case_id": case_id},
         )
@@ -66,7 +66,7 @@ def test_tc01_single_trace_and_generation_instrumentation():
         mock_lf.trace.assert_called_once()
         trace_args, trace_kwargs = mock_lf.trace.call_args
         assert trace_kwargs.get("id") == trace_id
-        assert trace_kwargs.get("name") == "LegalConsultation"
+        assert trace_kwargs.get("name") == "LegalAgent"
         assert trace_kwargs.get("session_id") == case_id
         assert "LegalAgent" in trace_kwargs.get("tags", [])
         assert trace_kwargs.get("metadata", {}).get("git_commit") is not None
@@ -137,8 +137,8 @@ def test_tc02_concurrent_traces_span_isolation():
 
     with patch.object(langfuse_client, "get_langfuse", return_value=mock_lf):
         # 1. 두 개의 서로 다른 워크플로우 Trace 시작
-        langfuse_client.start_trace(trace_id="trace-A", name="LegalConsultation")
-        langfuse_client.start_trace(trace_id="trace-B", name="LegalConsultation")
+        langfuse_client.start_trace(trace_id="trace-A", name="LegalAgent")
+        langfuse_client.start_trace(trace_id="trace-B", name="LegalAgent")
 
         # 2. 동시 실행: Trace A에서 'supervisor_initialize' 시작
         langfuse_client.start_span(
@@ -189,7 +189,7 @@ def test_tc03_nested_span_stack_and_cleanup():
 
     with patch.object(langfuse_client, "get_langfuse", return_value=mock_lf):
         trace_id = "trace-nested-uuid"
-        langfuse_client.start_trace(trace_id=trace_id, name="LegalConsultation")
+        langfuse_client.start_trace(trace_id=trace_id, name="LegalAgent")
 
         # 1. 1차 'agent_loop' Span 시작
         langfuse_client.start_span(trace_id=trace_id, span_id="agent-loop-1", name="agent_loop")
@@ -232,7 +232,7 @@ def test_tc04_git_commit_and_system_metadata_injection():
     with patch.object(langfuse_client, "get_langfuse", return_value=mock_lf):
         langfuse_client.start_trace(
             trace_id="trace-tc04",
-            name="LegalConsultation",
+            name="LegalAgent",
             metadata={"custom_key": "custom_val"}
         )
 
@@ -252,7 +252,7 @@ def test_tc05_end_trace_memory_cleanup():
 
     with patch.object(langfuse_client, "get_langfuse", return_value=mock_lf):
         trace_id = "trace-tc05"
-        langfuse_client.start_trace(trace_id=trace_id, name="LegalConsultation")
+        langfuse_client.start_trace(trace_id=trace_id, name="LegalAgent")
 
         # 여러 개의 Span 추가
         langfuse_client.start_span(trace_id=trace_id, span_id="s1", name="node1")
@@ -291,7 +291,7 @@ def test_tc06_model_name_extraction_for_cost_calculation():
 
     with patch.object(langfuse_client, "get_langfuse", return_value=mock_lf):
         trace_id = "trace-tc06"
-        langfuse_client.start_trace(trace_id=trace_id, name="LegalConsultation")
+        langfuse_client.start_trace(trace_id=trace_id, name="LegalAgent")
 
         t_token = set_trace_id(trace_id)
         try:
@@ -362,8 +362,8 @@ def test_tc07_cross_trace_name_lookup_rejected():
     mock_lf.trace.side_effect = mock_trace_lookup
 
     with patch.object(langfuse_client, "get_langfuse", return_value=mock_lf):
-        langfuse_client.start_trace(trace_id="trace-A", name="LegalConsultation")
-        langfuse_client.start_trace(trace_id="trace-B", name="LegalConsultation")
+        langfuse_client.start_trace(trace_id="trace-A", name="LegalAgent")
+        langfuse_client.start_trace(trace_id="trace-B", name="LegalAgent")
 
         # Trace A에서만 'agent_alpha' 생성
         langfuse_client.start_span(trace_id="trace-A", span_id="span-A-alpha", name="agent_alpha")
@@ -409,8 +409,8 @@ def test_tc08_concurrent_same_name_nested_agents():
     mock_lf.trace.side_effect = mock_trace_lookup
 
     with patch.object(langfuse_client, "get_langfuse", return_value=mock_lf):
-        langfuse_client.start_trace(trace_id="trace-A", name="LegalConsultation")
-        langfuse_client.start_trace(trace_id="trace-B", name="LegalConsultation")
+        langfuse_client.start_trace(trace_id="trace-A", name="LegalAgent")
+        langfuse_client.start_trace(trace_id="trace-B", name="LegalAgent")
 
         # 1. Trace A와 Trace B에서 각각 'lease_agent' 시작
         langfuse_client.start_span(trace_id="trace-A", span_id="a-lease-1", name="lease_agent")
@@ -453,8 +453,8 @@ def test_tc09_cross_trace_uuid_parent_rejected():
     mock_lf.trace.side_effect = mock_trace_lookup
 
     with patch.object(langfuse_client, "get_langfuse", return_value=mock_lf):
-        langfuse_client.start_trace(trace_id="trace-A", name="LegalConsultation")
-        langfuse_client.start_trace(trace_id="trace-B", name="LegalConsultation")
+        langfuse_client.start_trace(trace_id="trace-A", name="LegalAgent")
+        langfuse_client.start_trace(trace_id="trace-B", name="LegalAgent")
 
         # Trace A에서 스팬 생성 (UUID: 'span-A-secret-uuid')
         langfuse_client.start_span(trace_id="trace-A", span_id="span-A-secret-uuid", name="node_a")
@@ -488,7 +488,7 @@ def test_tc10_delayed_callback_after_end_trace():
 
     with patch.object(langfuse_client, "get_langfuse", return_value=mock_lf):
         trace_id = "trace-tc10-ended"
-        langfuse_client.start_trace(trace_id=trace_id, name="LegalConsultation")
+        langfuse_client.start_trace(trace_id=trace_id, name="LegalAgent")
         assert mock_lf.trace.call_count == 1
 
         # 상담 정상 종료
@@ -536,7 +536,7 @@ def test_tc11_privacy_masking_default_when_env_unset():
     with patch.dict(os.environ, env_clean, clear=True):
         with patch.object(langfuse_client, "get_langfuse", return_value=mock_lf):
             trace_id = "trace-tc11-privacy"
-            langfuse_client.start_trace(trace_id=trace_id, name="LegalConsultation")
+            langfuse_client.start_trace(trace_id=trace_id, name="LegalAgent")
 
             langfuse_client.start_span(
                 trace_id=trace_id,

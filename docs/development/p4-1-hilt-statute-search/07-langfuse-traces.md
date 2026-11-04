@@ -9,7 +9,7 @@
 
 ### 2.1 Trace 계층 구조
 ```
-Trace: LegalConsultation (session_id=case_id, metadata={"question": ..., "request_id": ...})
+Trace: LegalAgent (session_id=case_id, metadata={"question": ..., "request_id": ...})
   ├── Span: supervisor_initialize
   ├── Span: route
   ├── Span: plan

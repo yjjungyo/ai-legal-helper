@@ -2,7 +2,7 @@
 
 - 검토일: 2026-11-01
 - 직접 질의: [LegalChat 1bf6c817](http://127.0.0.1:3001/project/cmv56sw2u00063wm9ivtyrtdj/traces/1bf6c817-665f-4fd7-bfbf-4b3d6c6712e1?observation=0e896025-7390-48c2-8489-b9ed09ebf409)
-- 동일 질문의 제품 실행: [LegalConsultation 6d8e258a](http://127.0.0.1:3001/project/cmv56sw2u00063wm9ivtyrtdj/traces/6d8e258a-a307-4991-a840-d0f940026bb0)
+- 동일 질문의 제품 실행: [LegalAgent 6d8e258a](http://127.0.0.1:3001/project/cmv56sw2u00063wm9ivtyrtdj/traces/6d8e258a-a307-4991-a840-d0f940026bb0)
 - 자료: 사용자가 첨부한 Pasted text.txt, 두 trace의 실제 generation 입력·출력과 노드 관측값, 현재 검증·분기 코드, 국가법령정보센터 조문.
 - 작업 범위: 읽기·비교 분석 및 문서 작성. 제품 코드 수정, 서버 재시작, 새 모델 호출, 사건 데이터 변경은 하지 않았다.
 

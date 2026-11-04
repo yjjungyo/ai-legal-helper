@@ -270,11 +270,11 @@ def start_trace(
 
     시스템 식별자(LANGFUSE_SYSTEM_NAME, 기본값 'LegalAgent') 및 Git Commit SHA를
     기본 태그와 메타데이터로 자동 주입한다. 이미 생성된 Trace가 있는 경우(예: HTTP 미들웨어에서
-    생성 후 비동기 태스크에서 'LegalConsultation'으로 구체화) 상태를 안전하게 업데이트한다 (P0-3).
+    생성 후 비동기 태스크에서 'LegalAgent'으로 구체화) 상태를 안전하게 업데이트한다 (P0-3).
 
     Args:
         trace_id: 고유 추적 ID
-        name: 워크플로우 또는 태스크 이름 (예: 'LegalConsultation')
+        name: 워크플로우 또는 태스크 이름 (예: 'LegalAgent')
         session_id: 상담 세션 또는 사건 식별자 (case_id 등)
         metadata: 부가 메타데이터
         tags: 태그 목록 (선택사항)

@@ -429,7 +429,7 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
     git_sha = get_git_commit()
     start_trace(
         trace_id=trace_id,
-        name="LegalConsultation",
+        name="LegalAgent",
         session_id=req.case_id,
         metadata={
             "question": mask_pii(req.question[:120]),
@@ -949,7 +949,7 @@ async def process_consultation_resume(
     git_sha = get_git_commit()
     start_trace(
         trace_id=trace_id,
-        name="LegalConsultation",
+        name="LegalAgent",
         session_id=case_id,
         metadata={
             "request_id": request_id,

@@ -143,7 +143,7 @@ def test_r22_langfuse_observability_integrity_and_span_hierarchy():
     t_id = "trace_gate3_eval_01"
     start_trace(
         trace_id=t_id,
-        name="LegalConsultation",
+        name="LegalAgent",
         session_id="case_test_gate3",
         metadata={"system": "LegalAgent", "gate": "Gate3"},
         tags=["LegalAgent", "Gate3Test"],

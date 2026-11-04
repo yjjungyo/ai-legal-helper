@@ -152,8 +152,8 @@ async def trace_context_middleware(request: Request, call_next):
 
     if not is_noise:
         sys_name = get_system_name()
-        # 상담 파이프라인(POST)은 시작부터 'LegalConsultation'으로 명명하여 Langfuse 추적 명확성 확보 (P0-3)
-        trace_name = "LegalConsultation" if is_consultation_post else f"HTTP:{request.method}_{path}"
+        # 상담 파이프라인(POST)은 시작부터 'LegalAgent'으로 명명하여 Langfuse 추적 명확성 확보 (P0-3)
+        trace_name = "LegalAgent" if is_consultation_post else f"HTTP:{request.method}_{path}"
         start_trace(
             trace_id=trace_id,
             name=trace_name,

@@ -44,7 +44,7 @@
 
 | 테스트 번호 | 대상 요구사항 | 검증 내용 | 결과 |
 |---|---|---|---|
-| TC-01 | P0-1, P0-3 | Trace 이름 `LegalConsultation`, LLM 1회 호출 시 1회 Generation 기록 및 태그/토큰 검증 | **PASS** |
+| TC-01 | P0-1, P0-3 | Trace 이름 `LegalAgent`, LLM 1회 호출 시 1회 Generation 기록 및 태그/토큰 검증 | **PASS** |
 | TC-02 | P0-2 | 동시 실행 상담 간 동일 노드명(`supervisor_initialize`) Span 상호 오염 차단 검증 | **PASS** |
 | TC-03 | P0-2 | 중첩·반복 에이전트 실행 시 Span 스택 관리 및 `end_span()` 시 부모 복원 검증 | **PASS** |
 | TC-04 | P0-3 | Git Commit SHA 및 `LegalAgent` 메타데이터 자동 주입 검증 | **PASS** |
@@ -69,7 +69,7 @@
 실제 사내 Azure OpenAI LLM 및 로컬 Langfuse 인스턴스(`http://localhost:3001`)를 대상으로 SC-001 상담 질의를 전송하고 Langfuse REST API로 조회한 실측 결과입니다:
 
 - **실측 Trace ID:** `sc001-live-1707d981`
-- **Trace Name:** `LegalConsultation`
+- **Trace Name:** `LegalAgent`
 - **Session ID:** `SC-001`
 - **Tags:** `['LegalAgent']`
 - **총 관측치 (Observations):** 34개 (Spans: 28개, Generations: 6개)
