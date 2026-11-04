@@ -75,6 +75,7 @@ class LegalState(MessagesState):
     legal_evidence_bundle: Optional[Dict[str, Any]]
     statute_search_results: Optional[List[Dict[str, Any]]]
     statute_search_count: Optional[int]
+    synthesis_law_gate: Optional[Dict[str, Any]]
     pre_coverage_checked: Optional[bool]
     statute_search_history: Optional[List[str]]
     hilt_executed: Optional[bool]
