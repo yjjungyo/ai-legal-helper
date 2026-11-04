@@ -37,3 +37,27 @@ def test_ungrounded_evidence_is_rejected():
 def test_invalid_json_fails_closed():
     result = extract_event_with_llm("2026년 11월 1일 계약 체결", lambda prompt: "not json")
     assert result.status == "UNCONFIRMED"
+
+
+def test_sc003_contract_date_not_promulgation_date():
+    q = (
+        "저는 120세대 규모의 등록 민간임대주택을 운영하는 임대사업자입니다. "
+        "2026년 11월 1일 임차인과 새로운 계약을 체결하려고 합니다. "
+        "2026년 10월 27일 개정된 시행령에 따라 관리비와 전기·수도료의 "
+        "부과금액 또는 산정방식을 임대차계약 신고에 반드시 포함해야 하나요?"
+    )
+    result = extract_event_with_llm(q, _invoke({
+        "date": "2026-11-01", "event_type": "CONTRACT_SIGNED",
+        "evidence": "2026년 11월 1일 임차인과 새로운 계약을 체결하려고 합니다.",
+    }))
+    assert result.status == "RESOLVED"
+    assert result.selected.date == "2026-11-01"
+
+
+def test_promulgation_date_rejected_even_when_contract_appears_later():
+    q = "2026년 10월 27일 개정된 시행령에 따라 2026년 11월 1일 계약을 체결합니다."
+    result = extract_event_with_llm(q, _invoke({
+        "date": "2026-10-27", "event_type": "CONTRACT_SIGNED",
+        "evidence": q,
+    }))
+    assert result.status == "UNCONFIRMED"
