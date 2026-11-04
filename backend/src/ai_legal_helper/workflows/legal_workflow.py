@@ -627,7 +627,7 @@ def verification_node(state: LegalState) -> Dict:
         )
         output = verify_answer(state)
         gate = evaluate_temporal_answer_gate(
-            state.get("question", ""), state.get("draft_answer", ""),
+            state.get("resolved_query") or state.get("question", ""), state.get("draft_answer", ""),
             output.get("retrieved_sources") or state.get("retrieved_sources") or [],
             temporal_resolution=state.get("temporal_resolution"),
         )
