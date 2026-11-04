@@ -279,7 +279,8 @@ def next_verification_step(state: Dict[str, Any]) -> str:
                 target_node = "execute_statute_search"
                 route_reason = f"승인된 신규 법령 요청({len(requests)}건) 즉시 검색"
                 branched_statute = True
-            elif not state.get("hilt_executed"):
+            else:
+                # 과거 HILT 실행 여부가 아니라 이번 신규 검색 범위의 승인 여부로 판단한다.
                 target_node = "statute_search_approval"
                 route_reason = f"신규 법령({len(requests)}건) 사용자 승인(HILT) 요청"
                 branched_statute = True
