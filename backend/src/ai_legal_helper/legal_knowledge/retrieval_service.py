@@ -373,11 +373,12 @@ class LawRetrievalService:
                     continue
                 src["requested_as_of_date"] = valid_as_of.isoformat() if valid_as_of else None
                 if valid_as_of is None:
-                    src["temporal_status"] = "UNCONFIRMED"
+                    src["applicability_status"] = "UNCONFIRMED"
                     temporal_unconfirmed = True
                     continue
                 applicability = evaluate_statute_applicability(src, valid_as_of.isoformat())
-                src["temporal_status"] = _status_value(applicability.status)
+                src["applicability_status"] = _status_value(applicability.status)
+                src["applicability_reason"] = applicability.reason_code
                 if applicability.status is not ApplicabilityStatus.APPLICABLE:
                     temporal_unconfirmed = True
             if temporal_unconfirmed and response.status not in (
