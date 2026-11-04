@@ -1817,6 +1817,11 @@ def statute_search_result_condition(state: LegalState) -> str:
     if state.get("statute_search_phase") == "PRE_ANALYSIS":
         return "run_agents"
     if (state.get("synthesis_law_gate") or {}).get("status") == "NEED_MORE_LAW":
+        status = state.get("statute_search_status")
+        if status == "API_ERROR":
+            return "insufficient"
+        if status == "NOT_FOUND":
+            return "run_agents"  # 기존 RAG만 사용하여 제한 답변 생성 및 검증
         return "run_agents" if state.get("statute_search_results") else "insufficient"
     results = state.get("statute_search_results", [])
     if results:
