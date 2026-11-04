@@ -198,6 +198,7 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
     for request in requests:
         grouped.setdefault(request["law_name"], []).append(request)
     found = []
+    diagnostics = []
     for name, items in grouped.items():
         articles = list(dict.fromkeys(a for r in items for a in r["articles"]))
         has_unnumbered = any(not r.get("articles") for r in items)
@@ -205,17 +206,25 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
         if has_unnumbered or not references:
             references.append(name)
         # 쟁점별 검색으로 다른 법·인물·일반 질문 어휘가 관련성 점수를 오염시키지 않게 한다.
+        diagnostic = {}
         try:
             found.extend(search_official_statutes(
                 query=" ".join(r["issue"] for r in items), candidate_laws=references,
                 missing_issues=[r["issue"] for r in items], max_articles_per_law=max(len(articles), 4),
                 as_of_date=(state.get("case_evidence_briefing") or {}).get("as_of_date"),
+                diagnostic=diagnostic,
             ))
         except Exception as exc:
             # 공식 API 장애를 그래프 전체 실패로 전파하지 않는다. 법령을 임의로 생성하지 않는다.
+            diagnostic["api_error"] = True
             logger.warning("[DOCUMENT_SEARCH] 공식 검색 실패 law=%s error=%s", name, type(exc).__name__)
+        diagnostics.append(diagnostic)
     fallback = []
-    if not found:
+    api_error = any(d.get("api_error") or any(
+        entry.get("reason_code") not in ("", "LAW_NOT_FOUND", "NO_MATCH", "NO_VERSIONS")
+        for entry in d.get("lookups", []) if entry.get("status") == "UNCONFIRMED"
+    ) for d in diagnostics)
+    if not found and not api_error:
         fallback = _verified_local_fallback(state, requests)
         if fallback:
             logger.info("[DOCUMENT_SEARCH] 공식 검색 실패 후 시점 검증된 기존 공식 원문 %d건 재사용", len(fallback))
@@ -231,7 +240,9 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
         len(merged),
     )
     return {"statute_search_results": found or fallback, "retrieved_sources": merged,
-            "statute_search_status": "OFFICIAL_SUCCESS" if found else ("VERIFIED_LOCAL_FALLBACK" if fallback else "UNAVAILABLE"),
+            "statute_search_status": ("API_ERROR" if api_error else
+                "OFFICIAL_SUCCESS" if found else
+                "VERIFIED_LOCAL_FALLBACK" if fallback else "NOT_FOUND"),
             "statute_search_count": (state.get("statute_search_count") or 0) + 1,
             "statute_search_history": list(dict.fromkeys(
                 (state.get("statute_search_history") or []) + [r["key"] for r in requests]))}
