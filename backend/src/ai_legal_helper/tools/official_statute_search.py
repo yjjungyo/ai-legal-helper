@@ -240,6 +240,7 @@ def search_official_statutes(
     max_articles_per_law: int = 10,
     *,
     as_of_date: Optional[str] = None,
+    diagnostic: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     """법제처 국가법령정보공동활용 API를 호출하여 공식 법령 조문 원문을 실시간 검색한다.
 
@@ -272,6 +273,8 @@ def search_official_statutes(
     """
     api_key = os.getenv("LAW_OPENAPI_KEY")
     if not api_key:
+        if diagnostic is not None:
+            diagnostic["api_error"] = True
         logger.warning("[OFFICIAL_STATUTE] LAW_OPENAPI_KEY 환경변수가 설정되지 않아 외부 법령 검색을 건너뜁니다.")
         return []
 
@@ -298,6 +301,7 @@ def search_official_statutes(
             api_key=api_key,
             missing_issues=missing_issues,
             max_articles_per_law=max_articles_per_law,
+            diagnostic=diagnostic,
         )
 
     missing_text = " ".join(missing_issues or []).strip()
@@ -327,6 +331,8 @@ def search_official_statutes(
 
             search_xml_bytes = _fetch_xml_with_retry(search_url, api_key=api_key)
             if not search_xml_bytes:
+                if diagnostic is not None:
+                    diagnostic["api_error"] = True
                 logger.warning(f"[OFFICIAL_STATUTE] '{clean_law_name}' 검색 응답 수신 실패")
                 continue
 
@@ -705,6 +711,8 @@ def search_official_statutes(
             logger.info(f"[OFFICIAL_STATUTE] '{official_law_name}'에서 조문 {len(selected_articles)}건 확보 완료 | 부칙 {len(matched_addenda) if date_sensitive else 0}건")
 
         except Exception as e:
+            if diagnostic is not None:
+                diagnostic["api_error"] = True
             masked_err = mask_api_key(f"{type(e).__name__}: {str(e)}", api_key)
             logger.error(f"[OFFICIAL_STATUTE] 법령 '{law_name}' 검색 중 오류: {masked_err}")
 
