@@ -68,6 +68,7 @@ class LawRetrievalResponse:
     catalog_status: str = "NOT_REQUESTED"
     reason_codes: list[str] = field(default_factory=list)
     official_search_recommended: bool = False
+    index_decisions: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def has_sources(self) -> bool:
@@ -130,6 +131,19 @@ def _should_query_catalog(question: str) -> bool:
     return bool(question and _CATALOG_SIGNAL.search(question))
 
 
+def _resolve_index_locally(*, law_id: str, event_date: str, event_type: str,
+                           article_ids: list[str]) -> Any:
+    """Read-only PostgreSQL preflight; no OpenLaw calls or embedding."""
+    from ai_legal_helper.database.session import SessionLocal
+    from ai_legal_helper.legal_knowledge.law_index_resolver import LawIndexResolver
+
+    with SessionLocal() as session:
+        return LawIndexResolver(session).resolve(
+            law_id=law_id, event_date=event_date, event_type=event_type,
+            article_ids=article_ids,
+        )
+
+
 def _resolve_catalog_locally(question: str) -> Any:
     """P2 로컬 카탈로그만 접근한다. DB 미설치 시 호출자가 기존 검색으로 복귀한다."""
     from ai_legal_helper.database.session import SessionLocal
@@ -154,12 +168,14 @@ class LawRetrievalService:
         catalog_fn: Optional[Callable[[str], Any]] = None,
         enable_global: Optional[bool] = None,
         enable_catalog: Optional[bool] = None,
+        index_fn: Optional[Callable[..., Any]] = None,
     ):
         if retrieval_fn is None:
             from ai_legal_helper.rag.retrieval import retrieve_with_status
             retrieval_fn = retrieve_with_status
         self.retrieval_fn = retrieval_fn
         self.catalog_fn = catalog_fn or _resolve_catalog_locally
+        self.index_fn = index_fn or _resolve_index_locally
         self.enable_global = (
             os.getenv("LEGAL_GLOBAL_RETRIEVAL_ENABLED", "1") == "1"
             if enable_global is None else bool(enable_global)
@@ -178,6 +194,7 @@ class LawRetrievalService:
         original_question: Optional[str] = None,
         as_of_date: Optional[str] = None,
         required_laws: Optional[list[dict[str, str]]] = None,
+        event_type: Optional[str] = None,
     ) -> LawRetrievalResponse:
         """관련 출처와 근거 불충분 상태를 계산한다.
 
@@ -228,6 +245,47 @@ class LawRetrievalService:
         elif not self.enable_catalog:
             response.catalog_status = "DISABLED"
 
+        # Index-first for explicitly resolved law identities and event semantics.
+        # Unresolved law names can still use Vector for *candidate discovery*,
+        # never as a verified legal basis.
+        ready_mst: dict[str, str] = {}
+        if selected:
+            requested_articles = list(dict.fromkeys(
+                _normalized_article(x) for x in _ARTICLE_PATTERN.findall(question)
+                if _normalized_article(x)
+            ))
+            if not as_of_date or not event_type:
+                response.status = LawSourceStatus.SOURCE_TEMPORAL_UNCONFIRMED
+                response.reason_codes.append("EVENT_DATE_OR_TYPE_MISSING")
+                response.official_search_recommended = True
+                return response
+            for law in selected:
+                law_id = str(law.get("law_id") or "").strip()
+                if not law_id:
+                    response.status = LawSourceStatus.SOURCE_VERSION_UNCONFIRMED
+                    response.reason_codes.append("LAW_ID_MISSING")
+                    response.official_search_recommended = True
+                    return response
+                try:
+                    decision = self.index_fn(
+                        law_id=law_id, event_date=as_of_date,
+                        event_type=event_type, article_ids=requested_articles,
+                    )
+                except Exception as exc:
+                    logger.warning("[LAW_RETRIEVAL] index unavailable type=%s",
+                                   type(exc).__name__)
+                    response.status = LawSourceStatus.SOURCE_VERSION_UNCONFIRMED
+                    response.reason_codes.append("LAW_INDEX_UNAVAILABLE")
+                    response.official_search_recommended = True
+                    return response
+                response.index_decisions.append(decision.as_dict())
+                if decision.status != "INDEX_READY_CANDIDATE" or not decision.mst:
+                    response.status = LawSourceStatus.SOURCE_VERSION_UNCONFIRMED
+                    response.reason_codes.extend(decision.reason_codes)
+                    response.official_search_recommended = True
+                    return response
+                ready_mst[law_id] = decision.mst
+
         collections = []
         if self.enable_global:
             collections.append(GLOBAL_LAW_COLLECTION)
@@ -264,6 +322,13 @@ class LawRetrievalService:
                     # 공식 법령 후보가 확인된 질문에서 검색 상위권에 나타난
                     # 무관한 법령이 근거로 유입되지 않도록 검사한다.
                     if selected and not any(_source_matches_law(src, law) for law in selected):
+                        continue
+                    if ready_mst and not any(
+                        _source_matches_law(src, law)
+                        and str(src.get("version_id") or "") == ready_mst.get(str(law.get("law_id") or ""))
+                        for law in selected
+                    ):
+                        # Similarity search must not reintroduce an outdated MST.
                         continue
                     src["retrieval_collection"] = collection
                     src["source_id"] = _canonical_source_id(src)
