@@ -102,6 +102,7 @@ INTENT_PROMPT = PromptTemplate.from_template(
 6. GENERAL_CONVERSATION: 인사말, 감사 표현, 법률 분석과 무관한 일상 대화인 경우
    - 예: "안녕하세요", "고마워요", "도움이 많이 되었습니다", "알겠습니다"
 7. NEEDS_CLARIFICATION: 질문이 지나치게 모호하여 과거 대화 맥락을 고려해도 질문의 의도를 전혀 파악할 수 없는 경우
+8. OUT_OF_SCOPE: 날씨, 스포츠 등 법률과 무관한 정보 요청. 사건 증거 유무와 관계없이 법률 상담 범위만 안내하고 종료
 
 #### [분류 원칙]
 - 현재 질문이 첫 번째 질문(이전 대화 없음)인 경우, FOLLOWUP_ACTION이나 FOLLOWUP_QUESTION으로 분류하지 마세요.
@@ -121,6 +122,7 @@ INTENT_PROMPT = PromptTemplate.from_template(
 - 법률 분야와 근거 범위는 별개입니다. 같은 민법 질문도 일반 설명이면 GENERAL_LEGAL입니다.
 - 모호한 후속 질문이 앞선 사건 상담을 가리키면 CASE_EVIDENCE로 판단하세요.
 - 판단 근거는 사용자 질문의 의미와 대화 맥락입니다. 법률 분야별 키워드 규칙을 만들지 마세요.
+- 법률과 무관한 정보 요청은 intent=OUT_OF_SCOPE로 분류하세요. 법률 쟁점으로 억지 해석하지 마세요.
 
 #### [대화 맥락]
 {conversation_context}
@@ -133,7 +135,7 @@ INTENT_PROMPT = PromptTemplate.from_template(
 
 #### [출력 형식 (반드시 유효한 JSON 하나만 출력)]
 {{
-  "intent": "FOLLOWUP_ACTION | FOLLOWUP_QUESTION | FACT_CLARIFICATION | NEW_LEGAL_ANALYSIS | DOCUMENT_REQUEST | GENERAL_CONVERSATION | NEEDS_CLARIFICATION",
+  "intent": "FOLLOWUP_ACTION | FOLLOWUP_QUESTION | FACT_CLARIFICATION | NEW_LEGAL_ANALYSIS | DOCUMENT_REQUEST | GENERAL_CONVERSATION | NEEDS_CLARIFICATION | OUT_OF_SCOPE",
   "consultation_mode": "GENERAL_LEGAL | CASE_EVIDENCE",
   "resolved_query": "문맥이 연결되어 명확해진 내부 작업용 구체적 질의문",
   "requires_specialist": true/false,
@@ -380,7 +382,8 @@ def analyze_consultation_intent(
         decision.requires_full_analysis = False
 
     # 정책 C: GENERAL_CONVERSATION인 경우 모든 무거운 파이프라인 비활성화
-    if decision.intent == ConsultationIntent.GENERAL_CONVERSATION:
+    # 법률 무관 요청은 일반 인사와 별도 의도로 유지하고 무거운 분석을 중지한다.
+    if decision.intent in (ConsultationIntent.GENERAL_CONVERSATION, ConsultationIntent.OUT_OF_SCOPE):
         decision.consultation_mode = ConsultationMode.GENERAL_LEGAL
         decision.requires_specialist = False
         decision.requires_retrieval = False
