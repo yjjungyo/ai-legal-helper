@@ -117,6 +117,12 @@ def build_temporal_search_plan(
     has_date = bool(re.search(r"20\\d{2}\\s*(?:년|[-./])\\s*\\d{1,2}\\s*(?:월|[-./])\\s*\\d{1,2}", question))
     if llm_event_extraction and not explicit_pair and has_date:
         event = extract_event_with_llm(question, invoke_fn=event_invoke_fn)
+        if event.selected is not None and event_date is not None:
+            explicit_date = parse_legal_date(event_date)
+            if explicit_date is None or event.selected.date != explicit_date.isoformat():
+                event = EventResolution("UNCONFIRMED", reason_code="EXPLICIT_DATE_MISMATCH")
+        if event.selected is not None and event_type is not None and event.selected.event_type != event_type:
+            event = EventResolution("UNCONFIRMED", reason_code="EXPLICIT_EVENT_TYPE_MISMATCH")
     else:
         event = resolve_event(question, event_date=event_date, event_type=event_type)
     if event.selected is None:
