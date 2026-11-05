@@ -469,18 +469,36 @@ class LawRetrievalService:
         # 동일 law/버전이 중복되어도 위 fingerprint로 이미 제거했다.
         prioritized = []
         if selected:
-            for law in selected:
-                candidate = next(
-                    (src for src in found
-                     if _source_matches_law(src, law) and src not in prioritized),
-                    None,
-                )
-                if candidate is not None:
-                    prioritized.append(candidate)
+            # Reserve a result for every explicitly requested (law, article)
+            # pair before filling remaining slots by similarity.
+            requested_article_order = list(dict.fromkeys(
+                _normalized_article(x) for x in _ARTICLE_PATTERN.findall(question)
+                if _normalized_article(x)
+            ))
+            if requested_article_order:
+                for law in selected:
+                    for article_id in requested_article_order:
+                        candidate = next(
+                            (src for src in found
+                             if _source_matches_law(src, law)
+                             and _normalized_article(src.get("article")) == article_id
+                             and src not in prioritized),
+                            None,
+                        )
+                        if candidate is not None:
+                            prioritized.append(candidate)
+            else:
+                for law in selected:
+                    candidate = next(
+                        (src for src in found
+                         if _source_matches_law(src, law) and src not in prioritized),
+                        None,
+                    )
+                    if candidate is not None:
+                        prioritized.append(candidate)
         prioritized.extend(src for src in found if src not in prioritized)
-        # A compound question must reserve at least one result slot per law.
-        # Otherwise k=2 with three resolved laws falsely reports one missing.
-        response.sources = prioritized[:max(k, len(selected))]
+        required_slots = len(selected) * len(requested_article_order) if selected and requested_article_order else len(selected)
+        response.sources = prioritized[:max(k, required_slots)]
         if unavailable:
             response.reason_codes.append("COLLECTION_MISSING")
         if failures:
