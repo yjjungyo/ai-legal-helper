@@ -1635,7 +1635,13 @@ def reconcile_case_conflicts(
                 # 두 값을 직접 비교하면 이미 올바른 링크도 매번 변경 대상으로 처리되고,
                 # DB에 미지원 타입(CONTRADICTION)을 기록하여 Neo4j 동기화에서 유실될 수 있다.
                 desired_link_type = (
-                    "CONTRADICTS" if decision.status == "CONTRADICTION" else decision.status
+                    "CONTRADICTS" if decision.status == "CONTRADICTION"
+                    else "SUPPORTS" if decision.status == "CONSISTENT"
+                    else "RESPONDS_TO" if (
+                        decision.reason_code == "PROPOSAL_VS_REJECTION"
+                        and link.link_type == "RESPONDS_TO"
+                    )
+                    else decision.status
                 )
                 logger.debug(
                     "[CONFLICT_RECONCILE] claim=%s fact=%s stored_link=%s detected=%s reason=%s expected_link=%s",
