@@ -160,6 +160,7 @@ def official_xml_chunks(xml_bytes: bytes, version: OfficialLawVersion) -> list[d
                 "version_id": version.mst,
                 "article": label,
                 "content_hash": checksum,
+                "vector_id": chunk_id,
                 "law_effective_date": version.list_effective_date,
                 "article_effective_date": effective or "",
                 "effective_date_basis": basis,
@@ -173,14 +174,16 @@ def official_xml_chunks(xml_bytes: bytes, version: OfficialLawVersion) -> list[d
     # 같은 버전의 부칙이 여러 개면 idx/원문 해시로 각각 식별한다.
     for idx, addendum in enumerate(addenda):
         checksum = hashlib.sha256(addendum.content.encode("utf-8")).hexdigest()
+        addendum_vector_id = f"official:{version.law_id}:{version.mst}:addendum:{idx}:{checksum[:16]}"
         chunks.append({
-            "id": f"official:{version.law_id}:{version.mst}:addendum:{idx}:{checksum[:16]}",
+            "id": addendum_vector_id,
             "content": addendum.content,
             "metadata": {
                 "source_type": "STATUTE", "law_id": version.law_id,
                 "law_name": version.law_name, "statute_name": version.law_name,
                 "version_id": version.mst, "article": "부칙",
                 "content_hash": checksum,
+                "vector_id": addendum_vector_id,
                 "law_effective_date": version.list_effective_date,
                 "article_effective_date": "",
                 "effective_date_basis": "UNCONFIRMED",
