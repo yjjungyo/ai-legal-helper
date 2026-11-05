@@ -502,22 +502,22 @@ class LawRetrievalService:
                     "EVENT_DATE_REQUIRED" if valid_as_of is None
                     else "TEMPORAL_LEGAL_REVIEW_REQUIRED"
                 )
-        response.official_search_recommended = response.status in (
-            LawSourceStatus.SOURCE_PARTIAL,
-            LawSourceStatus.SOURCE_MISSING,
-            LawSourceStatus.SOURCE_VERSION_UNCONFIRMED,
-            LawSourceStatus.SOURCE_TEMPORAL_UNCONFIRMED,
-        )
-        # 인프라 오류는 '법령이 없다'가 아니므로 승인형 추가검색을 자동 권하지 않는다.
-        if response.status == LawSourceStatus.RETRIEVAL_ERROR or failures:
-            if temporal_gate_unconfirmed and response.status not in (
+        if temporal_gate_unconfirmed and response.status not in (
             LawSourceStatus.RETRIEVAL_ERROR, LawSourceStatus.SOURCE_MISSING,
             LawSourceStatus.SOURCE_VERSION_UNCONFIRMED,
         ):
             response.status = LawSourceStatus.SOURCE_TEMPORAL_UNCONFIRMED
             response.reason_codes.append("ARTICLE_TEMPORAL_APPLICABILITY_NOT_CONFIRMED")
         response.reason_codes = list(dict.fromkeys(response.reason_codes))
-        response.official_search_recommended = False
+        response.official_search_recommended = response.status in (
+            LawSourceStatus.SOURCE_PARTIAL,
+            LawSourceStatus.SOURCE_MISSING,
+            LawSourceStatus.SOURCE_VERSION_UNCONFIRMED,
+            LawSourceStatus.SOURCE_TEMPORAL_UNCONFIRMED,
+        )
+        # Infrastructure failures are not proof that a law is absent.
+        if response.status == LawSourceStatus.RETRIEVAL_ERROR or failures:
+            response.official_search_recommended = False
         logger.info(
             "[LAW_RETRIEVAL] status=%s category=%s source_count=%d "
             "catalog=%s collection_statuses=%s reason_codes=%s",
