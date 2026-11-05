@@ -130,10 +130,8 @@ def test_general_civil_law_question_keeps_previous_path():
     assert gate.status == "NOT_REQUIRED"
 
 
-def test_guard_downgrades_llm_pass_and_preserves_reason():
-    gate = evaluate_temporal_answer_gate(
-        QUESTION, BAD, [source()], temporal_resolution=result(),
-    )
+def test_guard_routes_proven_semantic_contradiction_for_revision():
+    gate = gate_for(BAD)
     output = apply_temporal_gate_to_verification({"status": "PASS"}, gate)
     assert output["status"] == "REVISE"
     assert output["reason_code"] == "TEMPORAL_SEMANTIC_CONTRADICTION"
