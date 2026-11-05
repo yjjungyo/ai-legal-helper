@@ -507,11 +507,21 @@ class LawRetrievalService:
             response.status = LawSourceStatus.SOURCE_TEMPORAL_UNCONFIRMED
             response.reason_codes.append("ARTICLE_TEMPORAL_APPLICABILITY_NOT_CONFIRMED")
         response.reason_codes = list(dict.fromkeys(response.reason_codes))
-        response.official_search_recommended = response.status in (
-            LawSourceStatus.SOURCE_PARTIAL,
-            LawSourceStatus.SOURCE_MISSING,
-            LawSourceStatus.SOURCE_VERSION_UNCONFIRMED,
-            LawSourceStatus.SOURCE_TEMPORAL_UNCONFIRMED,
+        # Temporal legal review is not the same as missing official sources.
+        # Avoid repeatedly requesting the same official law when indexed
+        # article and addendum texts are already available locally.
+        local_temporal_review_only = bool(response.article_temporal_decisions) and all(
+            item.get("status") == "TEMPORAL_REVIEW_REQUIRED"
+            for item in response.article_temporal_decisions
+        ) and bool(response.sources) and not failures and not unavailable
+        response.official_search_recommended = (
+            response.status in (
+                LawSourceStatus.SOURCE_PARTIAL,
+                LawSourceStatus.SOURCE_MISSING,
+                LawSourceStatus.SOURCE_VERSION_UNCONFIRMED,
+                LawSourceStatus.SOURCE_TEMPORAL_UNCONFIRMED,
+            )
+            and not local_temporal_review_only
         )
         # Infrastructure failures are not proof that a law is absent.
         if response.status == LawSourceStatus.RETRIEVAL_ERROR or failures:
