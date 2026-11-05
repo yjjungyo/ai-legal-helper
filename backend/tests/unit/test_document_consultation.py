@@ -130,7 +130,7 @@ def test_verifier_cannot_turn_categorical_sentence_into_conditional_quote(docume
 def test_document_writer_uses_originals_without_prior_ai_or_fact_summary(document_state):
     """원문을 전송하되 기존 잘못된 AI 답변과 파생 요약이 새 답변의 근거가 되지 않는다."""
     llm = MagicMock()
-    llm.invoke.return_value.content = "임차인 을이 임대인 갑에게 지급한 내역입니다. [E02_입금.txt]"
+    llm.invoke.return_value.content = json.dumps({"status": "READY", "missing_laws": [], "answer": "임차인 을이 임대인 갑에게 지급한 내역입니다. [E02_입금.txt]"}, ensure_ascii=False)
     with patch("ai_legal_helper.agents.document_answer.get_llm", return_value=llm):
         written = workflow.synthesize_node(document_state)
     prompt = llm.invoke.call_args.args[0][1].content
@@ -190,9 +190,11 @@ def test_missing_article_search_is_not_skipped_by_same_law_name(document_state):
              "verification_result": {"status": "REVISE", "reason_code": "LEGAL_SOURCE_INSUFFICIENT",
                                      "candidate_laws": ["주택임대차보호법"]}}
     assert workflow.verification_condition(state) == "statute_search_approval"
-    assert workflow.verification_condition({**state, "hilt_executed": True}) == "revise"
-    assert workflow.verification_condition({**state, "hilt_executed": True, "revision_count": 2}) == "revise"
-    assert workflow.verification_condition({**state, "hilt_executed": True, "revision_count": 3}) == "insufficient"
+    # A previous approval does not automatically authorize a NEW law/article
+    # request. Each still-missing statutory source must be approved by scope.
+    assert workflow.verification_condition({**state, "hilt_executed": True}) == "statute_search_approval"
+    assert workflow.verification_condition({**state, "hilt_executed": True, "revision_count": 2}) == "statute_search_approval"
+    assert workflow.verification_condition({**state, "hilt_executed": True, "revision_count": 3}) == "statute_search_approval"
 
 
 def test_context_limit_fails_without_silent_omission():
@@ -220,7 +222,7 @@ def test_approved_document_changed_during_answer_is_rejected(document_state):
 def test_writer_verifier_manifest_match_and_new_source_is_rejected(document_state):
     """작성·검증 원문을 같은 해시로 확인하고 작성 후 바뀐 출처를 차단한다."""
     llm = MagicMock()
-    llm.invoke.side_effect = [SimpleNamespace(content="임대인 갑과 임차인 을이 계약했다. [E01_계약서.txt]"),
+    llm.invoke.side_effect = [SimpleNamespace(content=json.dumps({"status": "READY", "missing_laws": [], "answer": "임대인 갑과 임차인 을이 계약했다. [E01_계약서.txt]"}, ensure_ascii=False)),
                               SimpleNamespace(content=json.dumps(verification_reply(), ensure_ascii=False))]
     with patch("ai_legal_helper.agents.document_answer.get_llm", return_value=llm), \
             patch("ai_legal_helper.llm.gateway.get_llm", return_value=llm), \
@@ -260,7 +262,7 @@ def test_real_graph_document_mode_preserves_answer_despite_unclear_routing(docum
 
     answer = "임대인 갑과 임차인 을이 계약했다. [E01_계약서.txt]"
     llm = MagicMock()
-    llm.invoke.side_effect = [SimpleNamespace(content=answer),
+    llm.invoke.side_effect = [SimpleNamespace(content=json.dumps({"status": "READY", "missing_laws": [], "answer": answer}, ensure_ascii=False)),
                               SimpleNamespace(content=json.dumps(verification_reply(), ensure_ascii=False))]
     with patch.object(workflow, "supervisor_initialize_node", initialize), \
             patch("ai_legal_helper.agents.router.route_categories_detailed", return_value=RouterDecision(
@@ -285,7 +287,8 @@ def test_full_filename_source_ids_and_detailed_statute_metadata(document_state):
     from ai_legal_helper.rag.source_schema import build_source_from_chroma_doc
 
     doc_sources = consultation.document_sources(document_state)
-    assert [s["source_id"] for s in doc_sources] == ["E01_계약서.txt", "E02_입금.txt", "검토중.txt"]
+    # Unreviewed documents must NEVER be available to synthesis or verification.
+    assert [s["source_id"] for s in doc_sources] == ["E01_계약서.txt", "E02_입금.txt"]
     assert all("evidence_label" not in s for s in doc_sources)
 
     chroma_doc = SimpleNamespace(
@@ -595,12 +598,12 @@ def test_trace_3bc30893_list_inference_basis_does_not_cause_verification_error(d
 
 
 def test_trace_0e4d5603_soft_landing_preserves_high_support_limited_answer(document_state):
-    """Trace 0e4d5603 회귀 방지: 제한 답변 검증이 REVISE라도 80% 이상 입증되고 치명적 결함이 없으면 CAUTIONARY로 정상 인도된다.
+    """Trace: unsupported legal effect in limited draft must not be delivered.
 
     [검증 목적]
     - 재작성 한도 도달 후 생성된 제한 답변(Limited Answer)이 12개 중 10개(83.3%) 주장을 입증했을 때,
-      단 2개의 경미한 정황 문구 지적으로 REVISE가 발생하더라도 답변을 전량 폐기(WITHHELD)하지 않고
-      CAUTIONARY(조건부 안내)로 정상 인도하는지 검증한다.
+      실제 법률효과를 확정한 근거 없는 내용이 남으면 전달하지 않는다.
+      모델이 REVISE 판정한 초안은 지원율만으로 자동 승인하지 않는다.
     """
     draft = "원문 초안입니다. [E01_계약서.txt]"
     _, manifest = format_grounding_sources(consultation.document_sources(document_state))
@@ -642,9 +645,10 @@ def test_trace_0e4d5603_soft_landing_preserves_high_support_limited_answer(docum
             patch("ai_legal_helper.agents.verification.run_verification", return_value=limited_ver):
         out = consultation.finish_answer(state)
 
-    assert out["final_disposition"] == "CAUTIONARY"
-    assert out["final_answer"] == limited_draft
-    assert len(out["sources"]) >= 1
+    assert out["final_disposition"] == "WITHHELD"
+    assert out["final_answer"] != limited_draft
+    assert "적법하게 종료되었습니다" not in out["final_answer"]
+    assert out["sources"] == []
 
 
 def test_successful_document_repair_clears_previous_generation_error(document_state):
