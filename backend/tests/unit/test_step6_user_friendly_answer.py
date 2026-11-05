@@ -66,15 +66,22 @@ class TestDocumentPromptGroundingRegression:
     """
 
     def test_user_statement_not_promoted_to_verified_fact(self):
-        assert "반대 증거가 없다는 이유만으로 사용자 진술을 입증된 사실로 승격하지 마세요" in DOCUMENT_ANSWER_SYSTEM
-        assert "조건부 법률 설명이 가능하면 답변을 불필요하게 유보하지 마세요" in DOCUMENT_ANSWER_SYSTEM
+        assert "별도 증명서류가 없다는 이유만으로 그 진술을 부정하거나 판단 불가로 처리하지 마세요" in DOCUMENT_ANSWER_SYSTEM
+        assert "진술하지 않은 별개의 법률 요건" in DOCUMENT_ANSWER_SYSTEM
 
     def test_verification_independent_of_predefined_lease_conclusion(self):
         assert "특정 법률 결론을 사전에 정답으로 가정하지 마세요" in DOCUMENT_VERIFICATION_PROMPT
         assert "선순위 대항요건(인도+전입)과 확정일자를 갖추고" not in DOCUMENT_VERIFICATION_PROMPT
-        assert "반대 증거가 없다는 이유만으로 진술을 VERIFIED_FACT로 승격하지 마세요" in DOCUMENT_VERIFICATION_PROMPT
+        assert "USER_STATEMENT 자체는 결함이 아닙니다" in DOCUMENT_VERIFICATION_PROMPT
 
     def test_verification_keeps_output_contract_and_revise(self):
         for token in ("question_coverage", "claims", "consistency_checks", "preserved_points", "legal_search_requests", "REVISE"):
             assert token in DOCUMENT_VERIFICATION_PROMPT
         assert "수정 요청이 있으면 지적된 오류를 원문과 대조해 고치되" in DOCUMENT_ANSWER_SYSTEM
+
+
+def test_current_occupancy_statement_is_accepted_without_registration_document():
+    """현재 거주 진술은 점유 상담 전제로 인정하되 전입신고는 별도 요건이다."""
+    assert "현재 거주·점유" in DOCUMENT_ANSWER_SYSTEM
+    assert "전입신고, 확정일자" in DOCUMENT_ANSWER_SYSTEM
+    assert "증명서류가 없다는 이유만으로 해당 진술을 UNCERTAIN/UNSUPPORTED로 강등하거나 REVISE하지 마세요" in DOCUMENT_VERIFICATION_PROMPT
