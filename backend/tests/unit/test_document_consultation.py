@@ -703,3 +703,29 @@ def test_user_statement_normalization_is_conservative(
     assert result["claims"][0]["claim_type"] == expected_type
     if expected_type == "CASE_FACT":
         assert result["claims"][0]["grounding_status"] == "UNSUPPORTED"
+
+
+@pytest.mark.parametrize("claim,basis,equivalent,expected_type", [
+    ("현재 주택을 점유 중입니다.", "아직 전세집에서 살고 있어요", True, "USER_STATEMENT"),
+    ("현재 주택을 점유 중입니다.", "질문에 없는 문구", True, "CASE_FACT"),
+    ("현재 주택을 점유 중입니다.", "아직 전세집에서 살고 있어요", False, "CASE_FACT"),
+    ("전입신고도 마쳤습니다.", "", False, "CASE_FACT"),
+])
+def test_semantic_user_statement_requires_quoted_question_basis(
+    document_state, claim, basis, equivalent, expected_type
+):
+    """의미 동일성은 모델 판단과 실제 질문 원문 인용이 모두 있어야 허용한다."""
+    reply = verification_reply(claims=[{
+        "claim": claim, "claim_type": "CASE_FACT", "fact_status": "USER_STATEMENT",
+        "source_ids": [], "grounding_status": "SUPPORTED", "reason": "진술 대조",
+        "user_statement_basis": basis, "user_statement_equivalent": equivalent,
+    }])
+    llm = MagicMock()
+    llm.invoke.return_value.content = json.dumps(reply, ensure_ascii=False)
+    with patch("ai_legal_helper.llm.gateway.get_llm", return_value=llm):
+        result = run_verification("아직 전세집에서 살고 있어요", claim,
+                                  consultation.document_sources(document_state),
+                                  require_question_coverage=True)
+    assert result["claims"][0]["claim_type"] == expected_type
+    if expected_type == "CASE_FACT":
+        assert result["claims"][0]["grounding_status"] == "UNSUPPORTED"
