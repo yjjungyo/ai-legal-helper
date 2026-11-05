@@ -490,6 +490,12 @@ class LawRetrievalService:
                 applicability = evaluate_statute_applicability(src, valid_as_of.isoformat())
                 src["applicability_status"] = _status_value(applicability.status)
                 src["applicability_reason"] = applicability.reason_code
+                # A basic date comparison is not an addendum/transition review.
+                # Do not expose an APPLICABLE source label when the stricter
+                # article-level resolver has not established legal applicability.
+                if temporal_gate_unconfirmed and ready_mst:
+                    src["applicability_status"] = "UNCONFIRMED"
+                    src["applicability_reason"] = "ARTICLE_TRANSITION_REVIEW_REQUIRED"
                 if applicability.status is not ApplicabilityStatus.APPLICABLE:
                     temporal_unconfirmed = True
             if temporal_unconfirmed and response.status not in (
