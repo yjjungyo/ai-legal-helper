@@ -334,13 +334,20 @@ def _classify_amount_role(pre_window: str, immediate_window: str, context_window
     decision = classify_statement(
         full_text, task="MONEY_AMOUNT_SEMANTIC_ROLE", labels=labels,
         context=(
-            "현재 금액 주변 구절: " + context_window +
-            " | 금액 앞 문맥: " + pre_window +
-            " | 해당 금액만 분류. 제안/청구/잔액과 실제 반환 거래를 구분. "
-            "하나의 문장에 금액이 여럿이면 어떤 금액인지 불명확한 경우 UNKNOWN."
+            "분류해야 할 특정 금액 원문: " + immediate_window +
+            " | 앞 문맥: " + pre_window +
+            " | 양쪽 문맥: " + context_window +
+            " | 반드시 해당 금액의 의미적 역할만 분류하세요. "
+            "계약 보증금 총액, 계약금, 잔금, 실제 반환액은 동일 문장에 "
+            "함께 나타날 수 있으며 서로 다른 속성입니다. "
+            "근거 인용에는 반드시 분류 대상 금액이 포함되어야 합니다. "
+            "의미 불명확 시 UNKNOWN."
         ),
     )
-    return decision.label if decision.label != "UNKNOWN" else "GENERAL_AMOUNT"
+    if (decision.label != "UNKNOWN" and immediate_window
+            and immediate_window in decision.evidence_quote):
+        return decision.label
+    return "GENERAL_AMOUNT"
 
 
 def extract_amount_roles(text: str) -> Tuple[List[int], Dict[str, List[int]]]:
@@ -360,8 +367,6 @@ def extract_amount_roles(text: str) -> Tuple[List[int], Dict[str, List[int]]]:
     matches = list(_AMOUNT_EXPR_RE.finditer(text))
     if not matches:
         return amounts, roles
-    statement_role = _classify_amount_role("", "", "", text)
-
     for match in matches:
         num_part = (match.group(1) or "").strip()
         suffix = (match.group(2) or "").replace(" ", "").strip()
@@ -385,7 +390,15 @@ def extract_amount_roles(text: str) -> Tuple[List[int], Dict[str, List[int]]]:
         if val not in amounts:
             amounts.append(val)
 
-        role = statement_role
+        span = match.group(0)
+        # Interpret the legal role OF THIS SPECIFIC AMOUNT, not every
+        # monetary quantity in the sentence using a single global label.
+        role = _classify_amount_role(
+            text[max(0, match.start() - 48):match.start()],
+            span,
+            text[max(0, match.start() - 64):min(len(text), match.end() + 64)],
+            text,
+        )
         role_list = roles.setdefault(role, [])
         if val not in role_list:
             role_list.append(val)
@@ -448,8 +461,6 @@ def extract_dates_with_validation(text: str) -> Tuple[List[str], List[str], Dict
     date_matches = list(_DATE_FULL_RE.finditer(text))
     if not date_matches:
         return valid_dates, invalid_dates, date_roles
-    statement_role = _classify_date_role("", text)
-
     for m in date_matches:
         yyyy, mm, dd = int(m.group(1)), int(m.group(2)), int(m.group(3))
         raw_token = m.group(0).strip()
@@ -458,7 +469,10 @@ def extract_dates_with_validation(text: str) -> Tuple[List[str], List[str], Dict
             iso = valid_dt.isoformat()
             if iso not in valid_dates:
                 valid_dates.append(iso)
-            role = statement_role
+            role = _classify_date_role(
+                text[max(0, m.start() - 64):min(len(text), m.end() + 64)],
+                text,
+            )
             r_list = date_roles.setdefault(role, [])
             if iso not in r_list:
                 r_list.append(iso)
