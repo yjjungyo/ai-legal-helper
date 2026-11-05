@@ -177,135 +177,30 @@ def _heuristic_rule_fallback(
     has_history: bool,
     case_context: str = "",
 ) -> IntentDecision:
-    """LLM 파싱 실패 또는 네트워크 예외 시 작동하는 결정론적 규칙 기반 Fallback."""
-    q_clean = question.strip()
-    q_stripped = q_clean.rstrip("!?.~ ")
+    """Conservative fallback when intent LLM has failed.
 
-    # 자료 검토는 대화 유무와 무관하게 새 분석이다. '입금 자료'를 변제 진술로 바꾸지 않는다.
-    if is_evidence_review_request(q_clean):
+    Do NOT infer a repayment, legal issue, date correction, or immediate
+    surrender of possession from regex/keyword matches. The user question
+    remains intact for the next supported analysis path.
+    """
+    q = (question or "").strip()
+    if not q:
         return IntentDecision(
-            intent=ConsultationIntent.NEW_LEGAL_ANALYSIS,
-            resolved_query=q_clean,
-            requires_specialist=True,
-            requires_retrieval=True,
-            requires_verification=True,
-            requires_full_analysis=True,
-            reason="등록 자료에 대한 사실·권리 분석 요청",
+            intent=ConsultationIntent.NEEDS_CLARIFICATION,
+            resolved_query=q,
+            requires_specialist=False, requires_retrieval=False,
+            requires_verification=False, requires_full_analysis=False,
+            reason="원질문 미입력",
         )
-
-    # 1. 일반 인사 / 감사
-    general_keywords = ["감사", "고마", "고맙", "수고", "안녕", "좋은 하루", "반갑"]
-    general_patterns = [
-        r"^(안녕|감사|고마|수고|네|알겠|좋은|반가)",
-        r"(고마워|감사합니다|고맙습니다|수고하세요|수고하셨습니다)$",
-    ]
-    if (any(k in q_stripped for k in general_keywords) or any(re.search(pat, q_stripped) for pat in general_patterns)) and len(q_clean) <= 30:
-        return IntentDecision(
-            intent=ConsultationIntent.GENERAL_CONVERSATION,
-            resolved_query=q_clean,
-            requires_specialist=False,
-            requires_retrieval=False,
-            requires_verification=False,
-            requires_full_analysis=False,
-            reason="일상적 인사 또는 감사 표현으로 판정",
-        )
-
-    # 2. 첫 턴인 경우
-    if not has_history:
-        if len(q_clean) < 5:
-            return IntentDecision(
-                intent=ConsultationIntent.NEEDS_CLARIFICATION,
-                resolved_query=q_clean,
-                requires_specialist=False,
-                requires_retrieval=False,
-                requires_verification=False,
-                requires_full_analysis=False,
-                reason="첫 질문의 내용이 너무 짧아 법률 쟁점을 파악할 수 없음",
-            )
-        return IntentDecision(
-            intent=ConsultationIntent.NEW_LEGAL_ANALYSIS,
-            resolved_query=q_clean,
-            requires_specialist=True,
-            requires_retrieval=True,
-            requires_verification=True,
-            requires_full_analysis=True,
-            reason="신규 사건에 대한 첫 번째 심층 법률 상담",
-        )
-
-    # 3. 이전 대화가 있는 후속 턴
-    # 3-1. 조기 퇴거 / 점유 이전 / 이사 질의 (S05: "그럼 지금 이사를 가도 돼?")
-    moveout_keywords = ["이사", "퇴거", "열쇠", "비밀번호", "짐 빼", "방 빼", "나가도", "이사가도"]
-    if any(k in q_clean for k in moveout_keywords):
-        return IntentDecision(
-            intent=ConsultationIntent.FOLLOWUP_QUESTION,
-            resolved_query=f"보증금 미반환 및 임차권등기명령 완료 전 목적물 퇴거(이사/점유 이전) 시 대항력 및 우선변제권 유지 여부와 퇴거 안전 요건: {q_clean}",
-            requires_specialist=True,
-            requires_retrieval=True,
-            requires_verification=True,
-            requires_full_analysis=False,
-            reason="보증금 미반환 상태에서 이사/퇴거 및 점유 상실 시 대항력 상실 위험에 관한 세부 쟁점 질의",
-        )
-
-    # 3-2. 보증금 일부 변제 / 입금 주장 (e.g. "집주인이 2천만 원을 입금했어요", "5천만원 입금했다고 합니다")
-    if has_repayment_assertion(q_clean):
-        return IntentDecision(
-            intent=ConsultationIntent.FACT_CLARIFICATION,
-            resolved_query=f"의뢰인의 보증금 일부 입금/변제 주장에 따른 보증금 잔액 변동 및 입금 증거 확인 필요성 검토: {q_clean}",
-            requires_specialist=True,
-            requires_retrieval=False,
-            requires_verification=True,
-            requires_full_analysis=False,
-            reason="사용자의 보증금 일부 변제 주장 사실 진술",
-        )
-
-    # 3-3. 날짜 및 사실관계 정정 (S03: "통지일이 2024년 3월 20일이에요")
-    correction_keywords = ["날짜가 달라", "정정", "잘못 알았", "통지일이", "통지일은"]
-    if any(k in q_clean for k in correction_keywords):
-        return IntentDecision(
-            intent=ConsultationIntent.FACT_CLARIFICATION,
-            resolved_query=f"의뢰인의 기존 사실(통지일 등) 정정 진술과 기존 등록된 서면 증거 대조 및 법률효과 발생일 재검토: {q_clean}",
-            requires_specialist=True,
-            requires_retrieval=False,
-            requires_verification=True,
-            requires_full_analysis=False,
-            reason="사용자의 기존 사실 정정 진술",
-        )
-
-    action_keywords = ["뭘 해야", "어떻게 해야", "다음 조치", "다음 단계", "앞으로 뭘", "그다음은", "지금 해야", "취해야 할"]
-    if any(k in q_clean for k in action_keywords):
-        return IntentDecision(
-            intent=ConsultationIntent.FOLLOWUP_ACTION,
-            resolved_query=f"이전 법률 분석 결과를 바탕으로 의뢰인이 지금 즉시 실행해야 할 우선순위 조치 가이드: {q_clean}",
-            requires_specialist=False,
-            requires_retrieval=False,
-            requires_verification=True,
-            requires_full_analysis=False,
-            reason="이전 분석 결과에 기초한 후속 실행 조치 질의",
-        )
-
-    # 4. 사실관계 정정 및 추가 진술 키워드
-    fact_keywords = ["사실은", "확인해보니", "날짜는", "일자는", "확정일자", "금액은", "보증금", "계약일", "정정", "추가로", "있습니다", "없습니다"]
-    has_date = bool(re.search(r"\d{4}년|\d{1,2}월|\d{1,2}일", q_clean))
-    if (any(k in q_clean for k in fact_keywords) or has_date) and len(q_clean) < 80:
-        return IntentDecision(
-            intent=ConsultationIntent.FACT_CLARIFICATION,
-            resolved_query=f"기존 사실관계 보강 및 재검토: {q_clean}",
-            requires_specialist=True,
-            requires_retrieval=False,
-            requires_verification=True,
-            requires_full_analysis=False,
-            reason="사용자의 추가 사실 진술 및 정정",
-        )
-
-    # 기본 후속 질문
     return IntentDecision(
-        intent=ConsultationIntent.FOLLOWUP_QUESTION,
-        resolved_query=f"이전 상담 맥락에 기초한 세부 질의: {q_clean}",
+        intent=(ConsultationIntent.FOLLOWUP_QUESTION if has_history
+                else ConsultationIntent.NEW_LEGAL_ANALYSIS),
+        resolved_query=q,
         requires_specialist=True,
         requires_retrieval=True,
         requires_verification=True,
-        requires_full_analysis=False,
-        reason="이전 상담 맥락과 연결된 세부 후속 질의",
+        requires_full_analysis=not has_history,
+        reason="의도 모델 응답 불가: 질문 의미를 임의 추측하지 않고 전체 검토로 진행",
     )
 
 
@@ -370,12 +265,8 @@ def analyze_consultation_intent(
             event_d = parsed.get("event_date")
             event_t = parsed.get("event_type")
             statute_d = parsed.get("statute_mention_date")
-            if not event_d:
-                from ai_legal_helper.legal_knowledge.temporal_resolver import resolve_event
-                auto_ev = resolve_event(question)
-                if auto_ev.selected:
-                    event_d = auto_ev.selected.date
-                    event_t = auto_ev.selected.event_type
+            # If LLM did not identify an event, retain UNKNOWN.
+            # Keyword/date extraction must not invent a law-applicability date.
 
             decision = IntentDecision(
                 intent=intent_enum,
