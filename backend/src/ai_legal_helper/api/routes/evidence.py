@@ -252,6 +252,10 @@ def get_evidence_conflicts(
                     link.id, claim.id, fact.id, link.link_type,
                     decision.status, decision.reason_code,
                 )
+                # Stored conflict links are not evidence of a currently
+                # verified contradiction. Unreviewed or semantically
+                # unresolved pairs are removed from the actionable conflict
+                # list; they remain available in immutable evidence audits.
                 if decision.status not in ("CONTRADICTION", "POTENTIAL_CONFLICT"):
                     continue
                 conflict_status = decision.status

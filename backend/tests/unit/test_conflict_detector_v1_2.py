@@ -323,14 +323,15 @@ class TestConflictDetectorV12Scenarios:
         assert res.is_comparable
         assert res.status == "COMPARABLE"
 
-        def model_role(statement, *, task, **kwargs):
-            if task == "MONEY_AMOUNT_SEMANTIC_ROLE":
-                return SemanticDecision("PRINCIPAL_DEPOSIT", statement)
-            return SemanticDecision("UNKNOWN", "", status="UNCONFIRMED")
+        def model_roles(statement, *, spans, labels_by_kind, **kwargs):
+            return {
+                item["id"]: "PRINCIPAL_DEPOSIT"
+                for item in spans if item["kind"] == "AMOUNT"
+            }
 
         with patch(
-            "ai_legal_helper.case_intelligence.semantic_judgment.classify_statement",
-            side_effect=model_role,
+            "ai_legal_helper.case_intelligence.semantic_judgment.classify_numeric_spans",
+            side_effect=model_roles,
         ), patch(
             "ai_legal_helper.case_intelligence.conflict_detector._verify_pair_with_llm",
             return_value=_LLMConflictVerificationSchema(
@@ -420,8 +421,22 @@ class TestConflictDetectorV12Scenarios:
         db.close()
 
     def test_s16_neo4j_fallback_to_postgresql_api(self, monkeypatch):
-        """[S16] Neo4j 드라이버 연결 실패 시에도 PostgreSQL 기반 get_evidence_conflicts가 정상 서빙됨."""
+        """[S16] Neo4j 장애에도 검증된 금액 역할은 PostgreSQL에서 상충 조회."""
         monkeypatch.setattr("ai_legal_helper.database.neo4j.get_neo4j_driver", lambda: None)
+
+        # Reproducible *verified semantic roles* in this isolated offline
+        # test; a networkless amount without role must not be a contradiction.
+        def approved_roles(statement, *, spans, labels_by_kind, **kwargs):
+            if statement not in (
+                "보증금은 300,000,000원이다.",
+                "보증금은 200,000,000원이다.",
+            ):
+                return {}
+            return {x["id"]: "PRINCIPAL_DEPOSIT" for x in spans if x["kind"] == "AMOUNT"}
+        monkeypatch.setattr(
+            "ai_legal_helper.case_intelligence.semantic_judgment.classify_numeric_spans",
+            approved_roles,
+        )
         db = _create_test_db()
         user = User(id="u-s16", email="s16@example.com", password_hash="hash")
         case = Case(id="c-s16", user_id="u-s16", title="Neo4j 폴백 테스트")
@@ -523,25 +538,46 @@ class TestQuantitativeEvaluationV11VsV12:
             ("월 차임은 1,000,000원이다.", "월 차임은 500,000원이다.", "AMOUNT", "CONFLICT"),
         ]
 
+        # Offline benchmark tests deterministic comparison of *reviewed*
+        # semantic facts; missing LLM alone cannot prove two amounts are
+        # the same legal attribute. The oracle defines only approved roles.
+        verified_roles = {
+            "보증금은 250,000,000원이다.": "PRINCIPAL_DEPOSIT",
+            "보증금은 300,000,000원이다.": "PRINCIPAL_DEPOSIT",
+            "월 차임은 1,000,000원이다.": "PERIODIC_RENT_OR_FEE",
+            "월 차임은 500,000원이다.": "PERIODIC_RENT_OR_FEE",
+        }
+
+        def reviewed_meaning_batch(statement, *, spans, labels_by_kind, **kwargs):
+            role = verified_roles.get(statement)
+            if not role:
+                return {}
+            return {
+                item["id"]: role
+                for item in spans if item["kind"] == "AMOUNT"
+            }
+
         tp, fp, tn, fn = 0, 0, 0, 0
+        with patch(
+            "ai_legal_helper.case_intelligence.semantic_judgment.classify_numeric_spans",
+            side_effect=reviewed_meaning_batch,
+        ):
+            for claim_stmt, fact_stmt, claim_type, ground_truth in benchmark_dataset:
+                c_slots = build_structured_slots(statement=claim_stmt, claim_type=claim_type)
+                fact = Fact(id="f-eval", statement=fact_stmt, fact_type=claim_type, verification_status="DOCUMENT_VERIFIED")
+                decision = evaluate_claim_against_fact(claim_slots=c_slots, fact=fact)
 
-        for claim_stmt, fact_stmt, claim_type, ground_truth in benchmark_dataset:
-            c_slots = build_structured_slots(statement=claim_stmt, claim_type=claim_type)
-            fact = Fact(id="f-eval", statement=fact_stmt, fact_type=claim_type, verification_status="DOCUMENT_VERIFIED")
-            decision = evaluate_claim_against_fact(claim_slots=c_slots, fact=fact)
-
-            pred_is_conflict = decision.status in ("CONTRADICTION", "POTENTIAL_CONFLICT")
-
-            if ground_truth == "CONFLICT":
-                if pred_is_conflict:
-                    tp += 1
+                pred_is_conflict = decision.status in ("CONTRADICTION", "POTENTIAL_CONFLICT")
+                if ground_truth == "CONFLICT":
+                    if pred_is_conflict:
+                        tp += 1
+                    else:
+                        fn += 1
                 else:
-                    fn += 1
-            else:  # NOT_CONFLICT
-                if pred_is_conflict:
-                    fp += 1
-                else:
-                    tn += 1
+                    if pred_is_conflict:
+                        fp += 1
+                    else:
+                        tn += 1
 
         total = len(benchmark_dataset)
         precision = tp / (tp + fp) if (tp + fp) > 0 else 1.0

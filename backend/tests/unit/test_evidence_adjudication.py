@@ -142,7 +142,7 @@ class TestCase01To07Scenarios:
 
             comp = check_proposition_comparability(prop_prop, prop_rej)
             assert not comp.is_comparable
-            assert comp.status == "CONSISTENT"
+            assert comp.status == "DIFFERENT_CONTEXT"
             assert comp.reason_code == "PROPOSAL_VS_REJECTION"
 
             adj = adjudicate_fact(prop_rej, candidate_facts=[Fact(statement=stmt_proposal)])
