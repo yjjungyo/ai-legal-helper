@@ -60,8 +60,10 @@ def test_promulgation_is_not_effective_date_for_specific_reporting_rule():
     article = root.find(".//조문단위")
     assert len(addenda) == 1
     effective, provenance = article_effective_date(article, "제36조", addenda)
-    assert effective == "2027-04-28"
-    assert provenance == "ADDENDUM_EFFECTIVE_DATE"
+    # Search-stage source extraction cannot confirm a free-text addendum.
+    # The independent temporal resolver interprets it after retrieval.
+    assert effective is None
+    assert provenance == "UNCONFIRMED"
 
 
 def test_exception_article_is_not_assigned_default_effective_date():
@@ -117,7 +119,8 @@ def test_official_tool_includes_matching_addendum_and_correct_date(monkeypatch):
     )
     addenda = [s for s in sources if s.get("article") == "부칙"]
     assert len(addenda) == 1
-    assert addenda[0]["effective_date"] == "2027-04-28"
+    assert addenda[0]["effective_date"] is None
+    assert addenda[0]["content"] == ADDENDUM
     assert "제2조(임대차신고에 관한 적용례)" in addenda[0]["content"]
     # A complete official source is not itself a semantic verdict about an answer.
     assert temporal_answer_errors(QUESTION, BAD_ANSWER, sources) == []
