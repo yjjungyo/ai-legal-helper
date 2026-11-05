@@ -973,3 +973,8 @@
   .chat-legal-answer { gap: 12px; }
   .chat-legal-section.summary-section, .chat-legal-section.action-section { padding: 12px; }
 }
+
+.chat-legal-issues-toggle { width: 100%; display:flex; align-items:center; justify-content:space-between; gap:12px; border:0; border-bottom:1px solid #e2e8f0; padding:0 0 9px; background:transparent; cursor:pointer; text-align:left; color:#1e40af; font:inherit; }
+.chat-legal-issues-label { display:inline-flex; align-items:center; gap:7px; font-weight:700; }
+.chat-legal-issues-hint { flex-shrink:0; padding:4px 8px; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:5px; font-size:.8em; color:#475569; }
+@media(max-width:768px){ .chat-legal-issues-toggle { align-items:flex-start; } .chat-legal-issues-hint { white-space:normal; } }
