@@ -166,3 +166,20 @@ def test_rewrite_query_with_resolved_query():
     assert "이제 뭘 해야 하죠?" in rewritten
     assert "키워드: 임차권등기명령, 주택임대차보호법 제3조의3" in rewritten
 
+
+def test_rewrite_keeps_current_correction_separate_from_resolved_context():
+    """복원 질의가 과거 상태여도 현재 정정문을 별도 입력과 검색 원문으로 보존한다."""
+    question = "해고된 건 아니고 해고 예고만 받았어요. {정정}"
+    resolved = "해고된 근로자의 구제신청 방법"
+    mock_llm = MagicMock()
+    mock_llm.invoke.return_value.content = '{"terms": ["해고 예고", "해고 예정"]}'
+
+    with patch("ai_legal_helper.rag.query_rewrite.get_llm", return_value=mock_llm):
+        rewritten = rewrite_query(question, "노동", resolved_query=resolved, max_terms=2)
+
+    mock_llm.invoke.assert_called_once()
+    prompt = mock_llm.invoke.call_args.args[0]
+    assert f"[현재 사용자 질문]\n{question}" in prompt
+    assert f"[문맥 보완 질의 — 현재 질문을 대체하지 않는 참고 자료]\n{resolved}" in prompt
+    assert rewritten == f"{question}\n키워드: 해고 예고, 해고 예정"
+
