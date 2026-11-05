@@ -300,11 +300,22 @@ class LawRetrievalService:
             response.searched_collections.append(collection)
             source_category = "global" if collection == GLOBAL_LAW_COLLECTION else category_eng
             try:
-                ret = self.retrieval_fn(
-                    query=query,
-                    category=source_category,
-                    k=max(k * 2, 4),
-                )
+                # Chroma WHERE applies *before* top-k. Without this filter,
+                # obsolete versions could occupy all result slots.
+                if ready_mst:
+                    clauses = [
+                        {"$and": [{"law_id": law_id}, {"version_id": mst}]}
+                        for law_id, mst in ready_mst.items()
+                    ]
+                    metadata_filter = clauses[0] if len(clauses) == 1 else {"$or": clauses}
+                    ret = self.retrieval_fn(
+                        query=query, category=source_category,
+                        k=max(k * 2, 4), metadata_filter=metadata_filter,
+                    )
+                else:
+                    ret = self.retrieval_fn(
+                        query=query, category=source_category, k=max(k * 2, 4),
+                    )
                 status = _status_value(getattr(ret, "status", "RETRIEVER_UNAVAILABLE"))
                 response.collection_statuses[collection] = status
                 if status == "COLLECTION_MISSING":
