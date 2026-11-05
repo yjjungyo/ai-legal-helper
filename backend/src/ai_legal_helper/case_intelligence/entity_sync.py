@@ -264,7 +264,7 @@ class _ExtractedPartyCandidate:
     contacts: List[str] = field(default_factory=list)
     related_fact_ids: List[str] = field(default_factory=list)
     related_claim_ids: List[str] = field(default_factory=list)
-    verification_status: str = "DOCUMENT_VERIFIED"
+    verification_status: str = "UNVERIFIED"
 
 
 def _clean_and_validate_party_name(raw_name: str) -> Optional[str]:
@@ -391,7 +391,8 @@ def _merge_trust_status(current: str, candidate_fact: Fact) -> str:
     if candidate_fact.source_type == "DOCUMENT_SUPPORTED" and fact_status == "UNVERIFIED":
         fact_status = "DOCUMENT_VERIFIED"
     elif candidate_fact.source_type == "USER_CLAIM" and fact_status == "UNVERIFIED":
-        fact_status = "VERIFIED"
+        # A party's assertion is NOT independent verification of identity.
+        fact_status = "PARTY_ASSERTED"
 
     return fact_status if priority.get(fact_status, 0) > priority.get(current, 0) else current
 
@@ -449,6 +450,26 @@ def extract_parties_from_facts(
         is_party_context = f_type in ("PARTY_INFO", "당사자정보")
         pairs = _extract_role_name_pairs_from_statement(stmt, allow_loose_space_pattern=is_party_context)
         for name, role, is_sub in pairs:
+            # Regex yields candidate spans only. Semantic meaning and actor
+            # attribution require independent evidence-based interpretation.
+            from ai_legal_helper.case_intelligence.semantic_judgment import classify_statement
+            actor_status = classify_statement(
+                stmt,
+                task="PARTY_ROLE_AND_ACTOR_ATTRIBUTION",
+                labels=("CONFIRMED_ROLE", "DIFFERENT_ROLE", "NOT_ENOUGH_CONTEXT"),
+                context=(
+                    "후보 이름: " + name + ", 후보 법적/소통 역할: " + role +
+                    ". 같은 문장의 다른 역할, 증거 작성자, 배우자 또는 대리인을 "
+                    "계약상 임대인으로 오인하지 마세요. 원문에서 해당 인물의 "
+                    "해당 역할이 명시되어야 CONFIRMED_ROLE."
+                ),
+            )
+            if actor_status.label != "CONFIRMED_ROLE":
+                logger.info(
+                    "[ENTITY_SYNC] candidate skipped pending semantic grounding: %s / %s",
+                    name, role,
+                )
+                continue
             if is_sub:
                 key = (name, role)
                 if key not in substantive_by_key:
