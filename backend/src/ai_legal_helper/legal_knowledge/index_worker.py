@@ -237,62 +237,81 @@ def persist_index_coverage(session, version: OfficialLawVersion, xml_bytes: byte
     row.indexed_at = now
     row.chunk_count = len(chunks)
 
-    # Re-index is idempotent. Remove only coverage for this exact MST;
-    # no other version, vector collection, or legal-history row is touched.
-    existing = list(session.scalars(select(LawArticleCoverage).where(
-        LawArticleCoverage.law_id == version.law_id,
-        LawArticleCoverage.mst == version.mst,
-    )).all())
-    for coverage in existing:
-        session.delete(coverage)
+    # Update in place: deleting and re-inserting identical unique keys in
+    # one flush can violate PostgreSQL uniqueness. Preserve reviewed metadata.
+    existing_coverage = {
+        c.vector_id: c for c in session.scalars(select(LawArticleCoverage).where(
+            LawArticleCoverage.law_id == version.law_id,
+            LawArticleCoverage.mst == version.mst,
+        )).all()
+    }
+    existing_articles = {
+        c.source_vector_id: c for c in session.scalars(select(LawArticleVersion).where(
+            LawArticleVersion.law_id == version.law_id,
+            LawArticleVersion.mst == version.mst,
+        )).all()
+    }
+    existing_rules = {
+        c.source_vector_id: c for c in session.scalars(select(LawTransitionRule).where(
+            LawTransitionRule.law_id == version.law_id,
+            LawTransitionRule.mst == version.mst,
+        )).all()
+    }
+    seen = set()
     for chunk in chunks:
         meta = chunk["metadata"]
-        session.add(LawArticleCoverage(
-            id=str(uuid.uuid4()), law_id=version.law_id, mst=version.mst,
-            article_id=meta["article"], content_hash=meta["content_hash"],
-            vector_id=chunk["id"],
-            article_effective_date=meta.get("article_effective_date") or None,
-            effective_date_basis=meta.get("effective_date_basis"),
-            applicability_review_status="UNCONFIRMED",
-            indexed_at=now,
-        ))
+        vector_id = chunk["id"]
+        if vector_id in seen:
+            raise ValueError("DUPLICATE_VECTOR_ID")
+        seen.add(vector_id)
+        coverage = existing_coverage.pop(vector_id, None)
+        if coverage is None:
+            coverage = LawArticleCoverage(
+                id=str(uuid.uuid4()), law_id=version.law_id, mst=version.mst,
+                vector_id=vector_id, indexed_at=now,
+            )
+            session.add(coverage)
+        coverage.article_id = meta["article"]
+        coverage.content_hash = meta["content_hash"]
+        coverage.article_effective_date = meta.get("article_effective_date") or None
+        coverage.effective_date_basis = meta.get("effective_date_basis")
+        coverage.indexed_at = now
 
-    # Article effective dates are provenance, not a legal applicability
-    # decision. Never invent effective_to from the next MST.
-    previous_articles = list(session.scalars(select(LawArticleVersion).where(
-        LawArticleVersion.law_id == version.law_id,
-        LawArticleVersion.mst == version.mst,
-    )).all())
-    for item in previous_articles:
-        session.delete(item)
-    previous_rules = list(session.scalars(select(LawTransitionRule).where(
-        LawTransitionRule.law_id == version.law_id,
-        LawTransitionRule.mst == version.mst,
-    )).all())
-    for item in previous_rules:
-        session.delete(item)
-    for chunk in chunks:
-        meta = chunk["metadata"]
         if meta["article"] == "부칙":
-            session.add(LawTransitionRule(
-                id=str(uuid.uuid4()), law_id=version.law_id, mst=version.mst,
-                rule_hash=meta["content_hash"], rule_text=chunk["content"],
-                promulgation_date=meta.get("promulgation_date") or None,
-                promulgation_number=meta.get("promulgation_number") or None,
-                rule_type="UNCLASSIFIED", applicability_status="REVIEW_REQUIRED",
-                source_vector_id=chunk["id"], indexed_at=now,
-            ))
+            rule = existing_rules.pop(vector_id, None)
+            if rule is None:
+                rule = LawTransitionRule(
+                    id=str(uuid.uuid4()), law_id=version.law_id, mst=version.mst,
+                    source_vector_id=vector_id, indexed_at=now,
+                )
+                session.add(rule)
+            rule.rule_hash = meta["content_hash"]
+            rule.rule_text = chunk["content"]
+            rule.promulgation_date = meta.get("promulgation_date") or None
+            rule.promulgation_number = meta.get("promulgation_number") or None
+            rule.indexed_at = now
         else:
-            effective = meta.get("article_effective_date") or None
-            session.add(LawArticleVersion(
-                id=str(uuid.uuid4()), law_id=version.law_id, mst=version.mst,
-                article_id=meta["article"], content_hash=meta["content_hash"],
-                effective_from=effective, effective_to=None,
-                effective_date_basis=meta.get("effective_date_basis"),
-                effective_date_status="SOURCE_DERIVED" if effective else "UNCONFIRMED",
-                source_vector_id=chunk["id"], indexed_at=now,
-            ))
-
+            article = existing_articles.pop(vector_id, None)
+            if article is None:
+                article = LawArticleVersion(
+                    id=str(uuid.uuid4()), law_id=version.law_id, mst=version.mst,
+                    source_vector_id=vector_id, indexed_at=now,
+                )
+                session.add(article)
+            article.article_id = meta["article"]
+            article.content_hash = meta["content_hash"]
+            # Preserve previously reviewed/candidate dates on re-index.
+            if not article.effective_from:
+                effective = meta.get("article_effective_date") or None
+                article.effective_from = effective
+                article.effective_date_basis = meta.get("effective_date_basis")
+                article.effective_date_status = (
+                    "SOURCE_DERIVED" if effective else "UNCONFIRMED"
+                )
+            article.indexed_at = now
+    for stale in (*existing_coverage.values(), *existing_articles.values(),
+                  *existing_rules.values()):
+        session.delete(stale)
 
 
 def enrich_article_dates_from_addenda(
