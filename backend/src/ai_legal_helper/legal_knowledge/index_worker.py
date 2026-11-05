@@ -342,8 +342,12 @@ def process_next_job(
     worker_id: str, api_key: str,
     fetch_xml: Callable[[str], Optional[bytes]],
     chroma_collection, embeddings,
+    article_date_llm_invoke=None,
 ) -> dict:
-    """한 번에 작업 하나만 실행. 실패 기록 뒤 재시도 가능 상태로 전환."""
+    """한 번에 작업 하나만 실행. 실패 기록 뒤 재시도 가능 상태로 전환.
+
+    article_date_llm_invoke is opt-in; a model is never invoked by default.
+    """
     job = claim_job(session, worker_id)
     if job is None:
         return {"status": "EMPTY"}
@@ -365,6 +369,13 @@ def process_next_job(
             chroma_collection=chroma_collection, embeddings=embeddings,
         )
         persist_index_coverage(session, v, payload, chunks)
+        # Flush first so the source rows are queryable in this transaction.
+        # A failed flush is rolled back by the surrounding error handler.
+        session.flush()
+        if article_date_llm_invoke is not None:
+            enrich_article_dates_from_addenda(
+                session, v, chunks, llm_invoke=article_date_llm_invoke,
+            )
         job.status = "READY"
         job.chunk_count = count
         job.error_code = None
