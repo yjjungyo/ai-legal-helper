@@ -28,6 +28,51 @@ QUESTION = (
 )
 
 
+@pytest.fixture(autouse=True)
+def semantic_case_statement_oracle(monkeypatch):
+    """Offline semantic model fixture, independent of wording heuristics.
+
+    Explicit user assertions remain USER_ALLEGED, not bank-verified facts.
+    """
+    from ai_legal_helper.case_intelligence.semantic_judgment import SemanticDecision
+
+    current_claims = {
+        "집주인이 2천만 원을 입금했어요. 남은 보증금은 얼마인가요?":
+            "2천만 원을 입금했어요",
+        "임대인이 5천만원을 입금했다고 합니다. 남은 보증금은 얼마인가요?":
+            "5천만원을 입금했다고 합니다",
+        "보증금 중 2천만 원을 돌려받았습니다.":
+            "2천만 원을 돌려받았습니다",
+        "집주인이 보증금 중 2천만 원을 돌려줬어요.":
+            "2천만 원을 돌려줬어요",
+        "임대인이 2026.10.20 2천만 원을 입금했어요.":
+            "2천만 원을 입금했어요",
+    }
+
+    def semantic_mock(stmt, *, task, **kwargs):
+        if task == "CONSULTATION_INTENT_AND_REPAYMENT_ASSERTION":
+            if stmt in current_claims:
+                return SemanticDecision("REPAYMENT_ASSERTED", current_claims[stmt])
+            if stmt == QUESTION:
+                return SemanticDecision("EVIDENCE_REVIEW", stmt)
+            return SemanticDecision("OTHER", stmt)
+        if task == "NEW_REPAYMENT_ASSERTION_AMOUNT_AND_EVENT":
+            if stmt in current_claims:
+                return SemanticDecision("NEW_REPAYMENT_ASSERTED", current_claims[stmt])
+            return SemanticDecision("NO_REPAYMENT_ASSERTION", stmt)
+        if task == "CONTRACT_DEPOSIT_PRINCIPAL_CLASSIFICATION":
+            if stmt == "보증금은 300,000,000원이다.":
+                return SemanticDecision("CONTRACT_PRINCIPAL", "300,000,000원")
+        if task == "CURRENT_USER_NEW_CASE_EVENT_OR_FOLLOWUP":
+            return SemanticDecision("OTHER", stmt)
+        return SemanticDecision("UNKNOWN", "", status="UNCONFIRMED")
+
+    monkeypatch.setattr(
+        "ai_legal_helper.case_intelligence.semantic_judgment.classify_statement",
+        semantic_mock,
+    )
+
+
 @pytest.fixture
 def subset_briefing():
     """통지·반환 자료가 없는 계약·지급·거주 기록 브리핑을 만든다.
