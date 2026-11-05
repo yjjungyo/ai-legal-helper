@@ -283,6 +283,13 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
   const [documents, setDocuments] = useState<EvidenceDocument[]>([]);
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [claims, setClaims] = useState<EvidenceClaim[]>([]);
+  const [selectedClaimIds, setSelectedClaimIds] = useState<string[]>([]);
+  const [bulkApproving, setBulkApproving] = useState(false);
+  const [bulkResult, setBulkResult] = useState('');
+  const pendingClaimIds = claims.filter((claim: any) =>
+    (claim.review_status || claim.status || 'PENDING') === 'PENDING'
+  ).map((claim: any) => String(claim.id || claim.claim_id)).filter((id) => id !== 'undefined');
+
   const [conflicts, setConflicts] = useState<any[]>([]);
   const [conflictError, setConflictError] = useState<string | null>(null);
   const [adjudications, setAdjudications] = useState<any[]>([]);
@@ -312,6 +319,8 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
   }, [caseId]);
 
   useEffect(() => {
+    setSelectedClaimIds([]);
+    setBulkResult('');
     if (selectedDocId) {
       loadClaims(selectedDocId);
     } else {
@@ -394,6 +403,7 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
     try {
       const data = await getEvidenceClaims(caseId, docId);
       setClaims(data);
+      setSelectedClaimIds((prev) => prev.filter((id) => data.some((claim: any) => String(claim.id || claim.claim_id) === id && (claim.review_status || claim.status || 'PENDING') === 'PENDING')));
     } catch (e) {
       console.error('추출 사실 로딩 실패:', e);
     }
@@ -454,7 +464,7 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
    * 사실 주장(Claim) 승인 처리 및 문서 상태·재분석 안내 갱신 (EVT-023)
    */
   const handleApprove = async (claimId: string) => {
-    if (!selectedDocId) return;
+    if (!selectedDocId || bulkApproving) return;
     try {
       await reviewEvidenceClaim(caseId, selectedDocId, claimId, { action: 'APPROVE' });
       await Promise.all([
@@ -467,6 +477,38 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
       onRefreshCase();
     } catch (err) {
       alert('승인 처리 실패');
+    }
+  };
+
+  const handleBulkApprove = async () => {
+    if (!selectedDocId || bulkApproving) return;
+    const docId = selectedDocId;
+    const targets = pendingClaimIds.filter((id) => selectedClaimIds.includes(id));
+    if (!targets.length) return;
+    if (!window.confirm('선택한 사실 ' + targets.length + '건을 승인하여 등록하시겠습니까?')) return;
+    setBulkApproving(true);
+    setBulkResult('');
+    let succeeded = 0;
+    const failed: string[] = [];
+    try {
+      for (const id of targets) {
+        try {
+          await reviewEvidenceClaim(caseId, docId, id, { action: 'APPROVE' });
+          succeeded++;
+        } catch {
+          failed.push(id);
+        }
+        setBulkResult('승인 처리 중: ' + (succeeded + failed.length) + '/' + targets.length + '건');
+      }
+      await Promise.all([loadClaims(docId), loadEvidences(), loadConflicts(), loadAdjudicationsAndGaps()]);
+      if (succeeded) {
+        setShowReanalyzePrompt(true);
+        onRefreshCase();
+      }
+      setSelectedClaimIds(failed);
+      setBulkResult('일괄 승인 결과: 성공 ' + succeeded + '건, 실패 ' + failed.length + '건');
+    } finally {
+      setBulkApproving(false);
     }
   };
 
@@ -771,6 +813,22 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
 
           {selectedDocId && claims.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {pendingClaimIds.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px', padding: '12px', background: 'var(--surface-alt)', borderRadius: '8px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <input type="checkbox" disabled={bulkApproving}
+                      checked={pendingClaimIds.every((id) => selectedClaimIds.includes(id))}
+                      onChange={(e) => setSelectedClaimIds(e.target.checked ? pendingClaimIds : [])} />
+                    전체 선택 (승인 대기 {pendingClaimIds.length}건)
+                  </label>
+                  <button type="button" className="btn btn-primary btn-sm"
+                    disabled={bulkApproving || selectedClaimIds.length === 0}
+                    onClick={handleBulkApprove}>
+                    {bulkApproving ? '일괄 승인 처리 중...' : '선택 사실 일괄 승인 (' + selectedClaimIds.length + '건)'}
+                  </button>
+                </div>
+              )}
+              {bulkResult && <div role="status" style={{ fontSize: '0.88em' }}>{bulkResult}</div>}
               {claims.map((claim: any) => {
                 const claimId = claim.id || claim.claim_id;
                 const rawType = claim.claim_type || claim.type;
