@@ -311,12 +311,10 @@ class LawRetrievalService:
                         event_type=event_type, article_ids=requested_articles,
                     )
                     response.article_temporal_decisions.append(temporal.as_dict())
-                    if temporal.status != "TEMPORAL_REVIEW_REQUIRED":
-                        temporal_gate_unconfirmed = True
-                        response.reason_codes.extend(temporal.reason_codes)
-                    else:
-                        temporal_gate_unconfirmed = True
-                        response.reason_codes.extend(temporal.reason_codes)
+                    # The resolver never asserts legal applicability; even a
+                    # matching article date still requires transition review.
+                    temporal_gate_unconfirmed = True
+                    response.reason_codes.extend(temporal.reason_codes)
                 except Exception as exc:
                     logger.warning("[LAW_RETRIEVAL] article temporal gate unavailable type=%s",
                                    type(exc).__name__)
