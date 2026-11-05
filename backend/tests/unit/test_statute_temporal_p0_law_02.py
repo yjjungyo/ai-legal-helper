@@ -86,10 +86,12 @@ def test_contract_date_not_confused_with_promulgation_date():
     assert find_contract_date(QUESTION).isoformat() == "2026-11-01"
 
 
-def test_wrong_applicability_is_blocked_by_official_addendum():
+def test_lightweight_temporal_qa_does_not_interpret_answer_polarity():
     source = {"source_type": "STATUTE", "statute_name": "민간임대주택에 관한 특별법 시행령",
               "article": "부칙", "content": ADDENDUM, "effective_date": "2027-04-28"}
-    assert temporal_answer_errors(QUESTION, BAD_ANSWER, [source])
+    # Assertion correctness is handled by semantic Temporal Verification,
+    # not by keyword patterns in this preliminary completeness check.
+    assert temporal_answer_errors(QUESTION, BAD_ANSWER, [source]) == []
     assert temporal_answer_errors(QUESTION, GOOD_ANSWER, [source]) == []
 
 
@@ -117,7 +119,8 @@ def test_official_tool_includes_matching_addendum_and_correct_date(monkeypatch):
     assert len(addenda) == 1
     assert addenda[0]["effective_date"] == "2027-04-28"
     assert "제2조(임대차신고에 관한 적용례)" in addenda[0]["content"]
-    assert temporal_answer_errors(QUESTION, BAD_ANSWER, sources)
+    # A complete official source is not itself a semantic verdict about an answer.
+    assert temporal_answer_errors(QUESTION, BAD_ANSWER, sources) == []
 
 
 def test_wrong_law_addendum_not_attached(monkeypatch):

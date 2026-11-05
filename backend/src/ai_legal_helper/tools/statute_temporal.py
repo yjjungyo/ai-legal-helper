@@ -135,7 +135,7 @@ def find_contract_date(question: str) -> Optional[date]:
 
 
 def temporal_answer_errors(question: str, answer: str, sources: list[dict]) -> list[str]:
-    """법령 출처의 개별 조문 시행일과 정면 충돌하는 단정만 검출한다.
+    """법령 적용시점 검증에 필요한 공식 자료의 완전성만 확인한다.
 
     동의어 전반의 법률 판단을 규칙으로 대체하지 않는다. 검색된 시행일이 없으면
     이 함수가 정답을 보증하지 않으며, 부칙 확인은 별도 선행 요건이다.
@@ -169,32 +169,7 @@ def temporal_answer_errors(question: str, answer: str, sources: list[dict]) -> l
             "부칙 원문은 확보했지만 시행일을 구조화하여 확정하지 못했습니다. "
             "부칙의 원문·예외·적용례를 확인하기 전 적용 여부를 단정하지 마세요."
         )
-    positive = bool(re.search(
-        r"시행일\s*이후|적용됩니다|적용된다|적용됩니다|포함해야\s*합니다|포함해야\s*한다",
-        answer or "",
-    ))
-    # '적용되지 않습니다' 같은 부정 결론은 이 규칙으로 거절하지 않는다.
-    if re.search(r"적용되지\s*않|적용하지\s*않|의무가\s*없", answer or ""):
-        positive = False
-    if not positive:
-        return errors
-    for source in sources or []:
-        if source.get("source_type") != "STATUTE":
-            continue
-        article = str(source.get("article") or "")
-        if not article:
-            continue
-        if article == "부칙":
-            # 부칙의 적용례가 언급한 실제 조문이 답변에도 있는 경우에만 비교한다.
-            referenced = set(re.findall(r"제\s*\d+\s*조(?:\s*의\s*\d+)?", str(source.get("content") or "")))
-            if not any(ref in answer for ref in referenced):
-                continue
-        elif article not in answer and article not in question:
-            continue
-        effective = parse_date(source.get("effective_date"))
-        if effective and target < effective:
-            errors.append(
-                f"{source.get('statute_name')} {article} 시행일 {effective.isoformat()}은 "
-                f"계약일 {target.isoformat()}보다 늦습니다. 해당 조항을 이미 적용된 것으로 단정하지 마세요."
-            )
+    # Legal assertion polarity and applicability are assessed by the semantic
+    # temporal verifier. This lightweight helper checks source completeness
+    # only; phrase matching must not reject correct legal conclusions.
     return list(dict.fromkeys(errors))
