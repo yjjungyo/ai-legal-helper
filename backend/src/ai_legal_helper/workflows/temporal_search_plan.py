@@ -103,6 +103,43 @@ def _local_law_resolve(question: str) -> Any:
         return LawResolver(LawCatalogStore(session)).resolve(question)
 
 
+def _index_preflight(law_ids: list[str], event_date: str, event_type: str,
+                     question: str, index_fn: Optional[Callable[..., Any]] = None) -> dict[str, Any]:
+    """DB-only diagnostics for HILT planning; does not waive official-search approval.
+
+    A local hit remains a *candidate* until downstream event-specific verification.
+    """
+    from ai_legal_helper.legal_knowledge.retrieval_service import _normalized_article, _ARTICLE_PATTERN
+    from ai_legal_helper.legal_knowledge.retrieval_service import _resolve_index_locally
+    articles = list(dict.fromkeys(
+        _normalized_article(x) for x in _ARTICLE_PATTERN.findall(question)
+        if _normalized_article(x)
+    ))
+    decisions = []
+    for law_id in law_ids:
+        try:
+            decision = (index_fn or _resolve_index_locally)(
+                law_id=law_id, event_date=event_date, event_type=event_type,
+                article_ids=articles,
+            )
+            decisions.append(decision.as_dict())
+        except Exception as exc:
+            logger.warning("[TEMPORAL_PLAN] index preflight failed type=%s",
+                           type(exc).__name__)
+            decisions.append({
+                "law_id": law_id, "status": "INDEX_UNAVAILABLE",
+                "official_lookup_required": True,
+                "reason_codes": ["LAW_INDEX_UNAVAILABLE"],
+            })
+    return {
+        "index_decisions": decisions,
+        "index_status": ("ALL_LOCAL_CANDIDATES" if decisions and all(
+            d.get("status") == "INDEX_READY_CANDIDATE" for d in decisions
+        ) else "OFFICIAL_REVIEW_REQUIRED"),
+        "index_article_ids": articles,
+    }
+
+
 def build_temporal_search_plan(
     question: str,
     *,
@@ -112,6 +149,7 @@ def build_temporal_search_plan(
     max_laws: int = 3,
     llm_event_extraction: bool = False,
     event_invoke_fn: Optional[Callable[[str], str]] = None,
+    index_fn: Optional[Callable[..., Any]] = None,
 ) -> dict[str, Any]:
     """사건일/공식 법령ID가 명시된 질의를 '검색 후보'로만 정규화한다.
 
@@ -155,7 +193,12 @@ def build_temporal_search_plan(
         return {**empty, "reason_code": "AMBIGUOUS_OR_TOO_MANY_LAWS"}
     if any(not getattr(law, "law_id", "") or not getattr(law, "law_name", "") for law in laws):
         return {**empty, "reason_code": "OFFICIAL_LAW_ID_UNCONFIRMED"}
+    index_info = _index_preflight(
+        [law.law_id for law in laws], event.selected.date,
+        event.selected.event_type, question, index_fn=index_fn,
+    )
     return {
+        **index_info,
         "status": "READY",
         "phase": "PRE_ANALYSIS",
         "candidate_laws": [law.law_name for law in laws],
