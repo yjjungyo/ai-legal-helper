@@ -246,7 +246,7 @@ def _normalize_doc(d):
 
 
 @trace
-def retrieve_with_status(query: str, k: int = 3, category: Optional[str] = None) -> RetrievalResult:
+def retrieve_with_status(query: str, k: int = 3, category: Optional[str] = None, metadata_filter: Optional[Dict[str, Any]] = None) -> RetrievalResult:
     """질의에 대해 연관 법률 문서 청크를 검색하고 구조화된 상태(RetrievalResult)를 반환한다.
 
     검색 결과 부재(NO_MATCH)와 인프라 장애(COLLECTION_MISSING, RETRIEVER_UNAVAILABLE, EMBEDDING_ERROR)를
@@ -268,6 +268,11 @@ def retrieve_with_status(query: str, k: int = 3, category: Optional[str] = None)
             used_index_info=get_used_index_info(),
         )
 
+    if metadata_filter is not None and not category:
+        return RetrievalResult(
+            status=RetrievalStatus.CONFIGURATION_ERROR, documents=[],
+            error_detail="MST 필터는 단일 컬렉션 검색에서만 허용됩니다.",
+        )
     used_info = get_used_index_info()
 
     if category:
@@ -287,9 +292,9 @@ def retrieve_with_status(query: str, k: int = 3, category: Optional[str] = None)
             fetch_k = max(k * 2, 4)
             raw_scored: List[Tuple[Any, float]] = []
             try:
-                raw_scored = vs.similarity_search_with_relevance_scores(query, k=fetch_k)
+                raw_scored = vs.similarity_search_with_relevance_scores(query, k=fetch_k, filter=metadata_filter)
             except Exception:
-                raw_docs = vs.similarity_search(query, k=fetch_k)
+                raw_docs = vs.similarity_search(query, k=fetch_k, filter=metadata_filter)
                 raw_scored = [(d, 0.8) for d in raw_docs]
 
             reranked = rerank_with_article_and_keywords(query, raw_scored, top_k=fetch_k)
