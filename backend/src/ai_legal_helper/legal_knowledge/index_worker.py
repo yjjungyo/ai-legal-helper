@@ -388,6 +388,14 @@ def process_next_job(
             chroma_collection=chroma_collection, embeddings=embeddings,
         )
         persist_index_coverage(session, v, payload, chunks)
+        # PostgreSQL coverage is not yet committed. Recheck that Chroma
+        # contains every vector ID before publishing the READY state.
+        expected_ids = {entry["id"] for entry in chunks}
+        if len(expected_ids) != count:
+            raise ValueError("DUPLICATE_INDEXED_VECTOR_ID")
+        observed = chroma_collection.get(ids=sorted(expected_ids), include=[])
+        if set(observed.get("ids") or []) != expected_ids:
+            raise ValueError("CHROMA_COVERAGE_NOT_CONFIRMED")
         # Flush first so the source rows are queryable in this transaction.
         # A failed flush is rolled back by the surrounding error handler.
         session.flush()
