@@ -122,3 +122,37 @@
   - 시행일·적용시점 가드레일
 
 **주의:** 본 문서는 확인된 코드 흐름을 설명하는 설계·리뷰 문서다. 코드 변경이나 실행 테스트는 수행하지 않았다.
+
+## 9. 후속 전체 분기 리뷰 및 수정 기록 (2026-11-05)
+
+### 공식 법령 검색 분기
+
+- `statute_search_approval_node`는 `interrupt`로 사용자 승인 여부를 수신한다.
+- `statute_search_approval_condition`은 `APPROVED`만 공식 검색으로 보낸다.
+- `execute_statute_search_node`는 승인 상태를 다시 검사하며, DOCUMENT_MODE 후속 검색은 `execute_document_search`로 위임한다.
+- `execute_document_search`는 `pending_searches`로 중복 요청을 제외하고, 승인된 법령 범위와 검색 횟수(최대 2회)를 검사한다.
+- `statute_search_result_condition`은 API 오류 시 판단 유보, 사전 검색 시 분석 진행, 사후 검색 시 재분석을 선택한다.
+- `re_analyze_node`의 DOCUMENT_MODE는 `generate_answer(repair=True, increment_revision=False)`로 재작성 후 Verification으로 복귀한다.
+- 검색 결과가 `NOT_FOUND` 또는 `PARTIAL_SUCCESS`인 경우에도 재작성은 가능하지만, 최종 출력의 검색 미확인 안내 및 검증 조건을 지켜야 한다.
+
+### 확인된 오류 및 실제 수정
+
+**오류: 재작성 성공 후 과거 `answer_generation_error` 상태 잔류**
+
+- 위치: `backend/src/ai_legal_helper/workflows/document_consultation.py`의 `generate_answer`.
+- 원인: 성공한 재작성의 반환값이 `answer_generation_error`를 명시적으로 초기화하지 않아, LangGraph 상태 병합 시 과거 생성 실패가 남을 수 있었다.
+- 영향: `verify_answer`의 생성 오류 검사와 `next_verification_step`의 오류 분기가 정상 재작성을 잘못 차단할 수 있었다.
+- 수정: 작성 시도 시작 시 `answer_generation_error: None`을 반환 상태에 포함하고, 실제 예외가 발생한 경우에만 오류명을 기록하도록 했다.
+- 회귀 테스트 추가: `backend/tests/unit/test_document_consultation.py::test_successful_document_repair_clears_previous_generation_error`.
+- 코드 커밋: `9250186fb77dbfe6662c5bd1783616fad72f087c`.
+- 테스트 커밋: `30872b5256d75e5035a4265be945a0e38c78fb60`.
+- **실행 상태:** 정적 검토 및 GitHub 반영 완료. 테스트 실행 및 E2E 검증은 미수행.
+
+### 추가 개선 후보 (미수정)
+
+1. 문서 상담의 `revise_node`는 전체 재작성 방식이므로 정상 Claim 보존을 별도 회귀 시나리오로 검증한다.
+2. `next_verification_step`에서 한도 초과 후 `finalize`로 가는 경우는 PASS 확정이 아니라 제한 출력·판단 유보 정책 실행임을 명확히 한다. `finish_answer`가 별도 검증을 수행하므로 즉각적인 미검증 답변 노출로 단정하지 않는다.
+3. `finish_answer`의 출처 목록 선별에서 Claim 출처 ID 누락 시 문자열 포함 여부에 의존하는 폴백의 정합성을 검토한다.
+4. DOCUMENT_MODE의 Vector 검색과 공통 Law Retrieval Service 사이 법령 버전·조문·시행일 정책 일관성을 별도로 점검한다.
+
+**평가 범위 주의:** 본 기록은 GitHub `main` 코드의 분기 정적 리뷰에 근거한다. 실제 API 호출·DB·LLM·LangGraph 런타임을 실행하지 않았으므로 E2E 성공 여부는 주장하지 않는다.
