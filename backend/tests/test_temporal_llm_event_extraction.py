@@ -5,7 +5,15 @@ from ai_legal_helper.workflows.temporal_search_plan import extract_event_with_ll
 
 
 def _invoke(data):
-    return lambda prompt: json.dumps(data, ensure_ascii=False)
+    """Mock LLM also supplies the exact action phrase when genuinely present."""
+    payload = dict(data)
+    evidence = payload.get("evidence") or ""
+    if "action_quote" not in payload:
+        if "체결" in evidence:
+            payload["action_quote"] = "체결"
+        elif "계약" in evidence and "공포" not in evidence:
+            payload["action_quote"] = "계약"
+    return lambda prompt: json.dumps(payload, ensure_ascii=False)
 
 
 def test_grounded_multiple_date_event():
