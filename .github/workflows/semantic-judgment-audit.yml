@@ -35,3 +35,33 @@ jobs:
             backend/tests/unit/test_conflict_detector_v1_2.py \
             backend/tests/unit/test_case_independence_counterexamples.py \
             backend/tests/unit/test_trace_dae222e6_quality_and_latency.py
+
+      - name: Python source syntax validation
+        run: python -m compileall -q backend/src/ai_legal_helper
+      - name: Extended cross-module compatibility regressions
+        env:
+          PYTHONPATH: backend/src
+          TESTING: "1"
+          LANGFUSE_ENABLED: "false"
+          CHECKPOINTER_TYPE: memory
+        run: |
+          python -m pytest -q \
+            backend/tests/unit/test_parties_timeline_sync.py \
+            backend/tests/unit/test_evidence_adjudication.py \
+            backend/tests/unit/test_installment_proposal_conflict_regression.py \
+            backend/tests/unit/test_conflict_detector.py \
+            backend/tests/unit/test_issue_verification.py \
+            backend/tests/unit/test_intent_analyzer.py \
+            backend/tests/unit/test_multi_turn_dynamic_case_p0_3.py \
+            backend/tests/unit/test_verified_presentation.py \
+            backend/tests/unit/test_document_consultation.py \
+            backend/tests/unit/test_evidence_structured_graphrag.py \
+            backend/tests/unit/test_evidence_grounding_p3.py \
+            backend/tests/unit/test_evidence_subset_consultation.py \
+            backend/tests/unit/test_official_statute_search.py \
+            backend/tests/unit/test_official_statute_temporal_metadata_p1.py \
+            backend/tests/unit/test_official_statute_versions_p4.py \
+            backend/tests/test_document_answer_prompt_no_case_hardcoding.py \
+            backend/tests/test_document_partial_revision.py \
+            backend/tests/test_temporal_llm_event_extraction.py \
+            backend/tests/test_temporal_snapshot_consistency.py
