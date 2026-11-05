@@ -496,6 +496,7 @@ class LawRetrievalService:
                 if temporal_gate_unconfirmed and ready_mst:
                     src["applicability_status"] = "UNCONFIRMED"
                     src["applicability_reason"] = "ARTICLE_TRANSITION_REVIEW_REQUIRED"
+                    temporal_unconfirmed = True
                 if applicability.status is not ApplicabilityStatus.APPLICABLE:
                     temporal_unconfirmed = True
             if temporal_unconfirmed and response.status not in (
@@ -516,10 +517,16 @@ class LawRetrievalService:
         # Temporal legal review is not the same as missing official sources.
         # Avoid repeatedly requesting the same official law when indexed
         # article and addendum texts are already available locally.
-        local_temporal_review_only = bool(response.article_temporal_decisions) and all(
-            item.get("status") == "TEMPORAL_REVIEW_REQUIRED"
-            for item in response.article_temporal_decisions
-        ) and bool(response.sources) and not failures and not unavailable
+        local_temporal_review_only = (
+            bool(response.article_temporal_decisions)
+            and len(response.article_temporal_decisions) == len(ready_mst)
+            and all(item.get("status") == "TEMPORAL_REVIEW_REQUIRED"
+                    for item in response.article_temporal_decisions)
+            and bool(response.sources)
+            and not response.missing_laws
+            and not response.missing_articles
+            and not failures and not unavailable
+        )
         response.official_search_recommended = (
             response.status in (
                 LawSourceStatus.SOURCE_PARTIAL,
