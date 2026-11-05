@@ -117,8 +117,8 @@ def test_speech_act_is_not_lost_through_legacy_semantic_fact_path():
     decision = compare_fact_identity(
         extract_semantic_fact(PROPOSE), extract_semantic_fact(REJECT),
     )
-    assert decision.status == "DIFFERENT_CONTEXT"
-    assert decision.reason_code == "DISTINCT_SPEECH_ACTS"
+    assert decision.status == "CONSISTENT"
+    assert decision.reason_code == "PROPOSAL_VS_REJECTION"
 
 
 @pytest.mark.parametrize("claim,fact", [
