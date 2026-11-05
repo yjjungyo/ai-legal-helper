@@ -107,6 +107,16 @@ _DATE_FULL_RE = re.compile(
     r"(?<!\d)((?:19|20)\d{2})\s*(?:년|[-./])\s*(\d{1,2})\s*(?:월|[-./])\s*(\d{1,2})\s*일?(?!\d)"
 )
 
+
+def _exclude_date_tokens_from_money_matches(text: str) -> str:
+    """Mask dates without changing offsets so a date cannot become part of KRW.
+
+    Example: '2026.09.10 5천만 원' must produce 50,000,000, never a
+    composite made of year/month/day and KRW. '#' cannot match _AMOUNT_EXPR_RE.
+    """
+    return _DATE_FULL_RE.sub(lambda m: "#" * len(m.group(0)), text)
+
+
 # 일반 한국어 조사 제거용 정규식
 _JOSA_STRIP_RE = re.compile(
     r"(으로부터|에서부터|에게서|으로서|으로써|이라도|이라고|이라며|이라서|"
@@ -364,7 +374,7 @@ def extract_amount_roles(text: str) -> Tuple[List[int], Dict[str, List[int]]]:
 
     amounts: List[int] = []
     roles: Dict[str, List[int]] = {}
-    matches = list(_AMOUNT_EXPR_RE.finditer(text))
+    matches = list(_AMOUNT_EXPR_RE.finditer(_exclude_date_tokens_from_money_matches(text)))
     if not matches:
         return amounts, roles
     for match in matches:
@@ -411,7 +421,7 @@ def extract_normalized_amounts(text: str) -> List[int]:
     if not text:
         return []
     values: List[int] = []
-    for match in _AMOUNT_EXPR_RE.finditer(text):
+    for match in _AMOUNT_EXPR_RE.finditer(_exclude_date_tokens_from_money_matches(text)):
         num_part = (match.group(1) or "").strip()
         suffix = (match.group(2) or "").replace(" ", "").strip()
         if not num_part:
