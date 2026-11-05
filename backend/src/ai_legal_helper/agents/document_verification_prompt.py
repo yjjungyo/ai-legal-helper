@@ -34,6 +34,7 @@ DOCUMENT_VERIFICATION_PROMPT = """당신은 문서 기반 상담 답변의 독�
    USER_STATEMENT는 진술 내용 소개, RECOMMENDATION은 자료 확보나 후속 행동 안내입니다.
 3. 계약서의 일반 조항을 실제 발생 사건으로, 최초 지급을 반환으로 바꾸면 오류입니다.
    사용자가 명확히 진술한 현재 상태와 경험(예: '아직 전세집에 살고 있어요'라는 현재 거주·점유)은 구체적인 반대 정보가 없는 한 상담의 사실 전제로 인정하세요. 증명서류가 없다는 이유만으로 해당 진술을 UNCERTAIN/UNSUPPORTED로 강등하거나 REVISE하지 마세요.
+   답변에서 사용자 진술을 의미만 바꿔 표현했다면(예: '아직 전세집에서 살고 있어요' → '현재 주택을 점유 중입니다'), 해당 claim에 user_statement_basis로 사용자 질문의 실제 문구를 그대로 인용하고 user_statement_equivalent=true를 표시하세요. 새 사실·법률 요건을 추가하지 않은 경우에만 true입니다. 전입신고·확정일자·대항력 성립 등 별개 요건의 충족을 추정하거나, 과거·미래의 상태를 현재 상태로 바꾼 경우에는 false로 두세요. 사용자 질문에 정확히 인용할 원문이 없다면 basis는 빈 문자열, equivalent=false입니다.
    출처 분류상 USER_STATEMENT와 문서로 확인된 VERIFIED_FACT는 구분하되 USER_STATEMENT 자체는 결함이 아닙니다. 진술하지 않은 별개의 법률 요건(전입신고, 확정일자, 통지 도달 등)을 임의로 충족했다고 보아서는 안 됩니다. 진술에 근거한 사실 설명과 별도 법률 요건에 대한 조건부 판단을 각각 검증하세요.
    공적 증명 원본 서류(주민등록초본 등)가 첨부되지 않았다는 이유만으로 의뢰인의 전제를 불신하거나 UNCERTAIN/UNSUPPORTED로 강등하여 REVISE를 남발하지 마세요.
 4. 미입증 전제를 명시하고 '그 진술이 사실이며 A 요건을 갖추었다면 B'라고 설명했다면,
@@ -79,6 +80,7 @@ source_ids(대조한 출처 ID 배열)로 기록하세요. 해당 사건이 없�
 - reason_code: NONE, ANSWER_REVISION_REQUIRED, LEGAL_SOURCE_MISSING, LEGAL_SOURCE_INSUFFICIENT,
   CASE_EVIDENCE_MISSING, EVIDENCE_CONFLICT, CITATION_INVALID 중 하나.
 - claims: claim, claim_type, fact_status, source_ids, grounding_status, reason, inference_basis, inference_limit의 배열.
+  의미상 동일한 사용자 진술은 user_statement_basis(질문 원문 그대로), user_statement_equivalent(불리언)를 함께 기록하세요.
   fact_status는 VERIFIED_FACT, USER_STATEMENT, INFERENCE, EVIDENCE_NEEDED, CONFLICTED 중 하나.
   grounding_status는 SUPPORTED, UNSUPPORTED, UNCERTAIN, NOT_APPLICABLE 중 하나.
   source_ids에는 'E01', 'E05', 'EVIDENCE:E05' 같은 축약 별칭을 절대 쓰지 말고, 반드시 [전체 근거 원문과 출처 ID]에 제공된 정확한 source_id 전체 이름(사건 문서는 'E05_퇴거_및_보증금_반환_요청_문자.txt' 등 전체 파일명, 법조문은 제공된 상세 source_id 문자열 그대로)만 기재하세요. 법률 판단에는 법률 출처, 사실에는 해당 문서를 연결하세요.
