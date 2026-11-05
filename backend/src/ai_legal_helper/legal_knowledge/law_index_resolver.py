@@ -110,6 +110,24 @@ class LawIndexResolver:
             return result("HISTORY_STALE", "OFFICIAL_HISTORY_REFRESH_REQUIRED",
                           snapshot_id=snapshot.id)
 
+        # An official history with multiple effective branches for one MST
+        # cannot be represented by the single-date LawVersionIndex schema.
+        # Never silently select one branch as the governing version.
+        from ai_legal_helper.legal_knowledge.index_jobs import LawVersionEffectiveBranch
+        branches = list(self.session.scalars(select(LawVersionEffectiveBranch).where(
+            LawVersionEffectiveBranch.source_snapshot_id == snapshot.id,
+            LawVersionEffectiveBranch.law_id == law_id,
+        )).all())
+        by_mst = {}
+        for branch in branches:
+            by_mst.setdefault(branch.mst, set()).add(branch.effective_date)
+        if any(len(dates) > 1 for dates in by_mst.values()):
+            return result("VERSION_AMBIGUOUS", "MULTI_EFFECTIVE_DATE_PER_MST",
+                          snapshot_id=snapshot.id)
+        if len(branches) != snapshot.official_version_count:
+            return result("HISTORY_INCOMPLETE", "EFFECTIVE_BRANCH_COUNT_MISMATCH",
+                          snapshot_id=snapshot.id)
+
         versions = list(self.session.scalars(
             select(LawVersionIndex).where(
                 LawVersionIndex.law_id == law_id,
