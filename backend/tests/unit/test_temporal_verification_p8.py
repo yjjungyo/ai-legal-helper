@@ -47,8 +47,8 @@ def review_answer(prompt):
     bad = answer == BAD
     return json.dumps({
         "verdict": "CONTRADICTED" if bad else "SUPPORTED",
-        "claim_quote": BAD if bad else "",
-        "source_quote": "이 영 시행 이후" if bad else "",
+        "claim_quote": answer,
+        "source_quote": "이 영 시행 이후",
         "explanation": "사건일과 부칙 시점에 따른 검토",
     })
 
@@ -240,3 +240,22 @@ def test_temporal_recheck_preserves_original_answer_verbatim():
     })
     assert out["draft_answer"] == GOOD
     assert out["revision_method"] == "TEMPORAL_RECHECK_NO_REWRITE"
+
+
+
+def test_unsupported_legal_claims_do_not_pass_on_parser_failure():
+    gate = gate_for(GOOD, "UNCONFIRMED")
+    result = {
+        "status": "PASS", "reason_code": "NONE",
+        "claims": [{"claim_type": "LEGAL_APPLICATION",
+                    "grounding_status": "SUPPORTED",
+                    "source_ids": ["GRAPH:ONLY"]}],
+    }
+    out = apply_temporal_gate_to_verification(
+        result, gate,
+        official_sources_present=True,
+        official_source_ids=["S:200", "A:200"],
+    )
+    assert out["status"] == "REVISE"
+    assert out["temporal_recheck_only"] is True
+    assert out["reason_code"] == "TEMPORAL_SEMANTIC_REVIEW_REQUIRED"
