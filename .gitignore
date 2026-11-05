@@ -25,6 +25,7 @@ backend/storage/
 backend/vectorstore/
 backend/data
 backend/data/chroma/
+data/chroma_legacy_backup
 backend/data/exports
 *.db
 *.sqlite3
@@ -46,3 +47,4 @@ temp_workflow.txt
 frontend/node_modules/
 frontend/dist/
 frontend/build/
+data/desktop.ini

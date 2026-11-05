@@ -203,15 +203,16 @@ def _get_client():
             chroma_port = os.getenv("CHROMA_PORT", "8000")
             try:
                 client = chromadb.HttpClient(host=chroma_host, port=chroma_port)
+                # 원격 서버 생존 여부(Heartbeat) 확인: 서버가 정상 응답하면 컬렉션 유무와 무관하게 사용
+                client.heartbeat()
+                _client = client
+                _used_index_info = f"HTTP_REMOTE:{chroma_host}:{chroma_port}"
                 cols = client.list_collections()
                 names = [getattr(c, "name", "") for c in cols]
-                if any(n.startswith("law_docs_") for n in names):
-                    _client = client
-                    _used_index_info = f"HTTP_REMOTE:{chroma_host}:{chroma_port}"
-                    logger.debug(f"[벡터DB] 원격 ChromaDB 연결 완료: {chroma_host}:{chroma_port} (컬렉션 {len(names)}개)")
-                    return _client
-                logger.warning(f"[RET] HttpClient({chroma_host}:{chroma_port})에 law_docs 컬렉션 부재. 로컬 PersistentClient({persist_dir})로 전환합니다.")
+                logger.debug(f"[벡터DB] 원격 ChromaDB 연결 완료: {chroma_host}:{chroma_port} (컬렉션 {len(names)}개)")
+                return _client
             except Exception as e:
+                # 원격 서버가 완전히 다운되었거나 통신 불가인 경우에만 로컬 파일 저장소로 전환
                 logger.warning(f"[RET] HttpClient 연결 실패: {e}. 로컬 PersistentClient({persist_dir})로 전환합니다.")
 
         # 로컬 data/chroma 우선 확인

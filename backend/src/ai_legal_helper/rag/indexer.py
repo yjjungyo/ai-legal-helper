@@ -127,7 +127,19 @@ def build_statute_index(
         raise ConnectionError("ChromaDB 서버에 연결할 수 없습니다. CHROMA_HOST 및 포트 설정을 확인하세요.")
 
     if not os.path.exists(data_dir):
-        raise FileNotFoundError(f"법령 PDF 디렉터리를 찾을 수 없습니다: {data_dir}")
+        # 실행 디렉터리 위치(backend, backend/src 등)에 따른 레포 루트 기준 상대경로 탐색 보정
+        candidates = [
+            os.path.abspath(data_dir),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../", data_dir)),
+            os.path.abspath(os.path.join(os.getcwd(), "..", data_dir)),
+            os.path.abspath(os.path.join(os.getcwd(), "../..", data_dir)),
+        ]
+        found = next((p for p in candidates if os.path.exists(p)), None)
+        if found:
+            data_dir = found
+            logger.info(f"[INDEXER] 법령 디렉터리 경로를 자동 감지했습니다: {data_dir}")
+        else:
+            raise FileNotFoundError(f"법령 PDF 디렉터리를 찾을 수 없습니다: {data_dir}")
 
     # 대상 PDF 파일 수집
     pdf_files = [
