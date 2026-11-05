@@ -177,32 +177,87 @@ def _heuristic_rule_fallback(
     has_history: bool,
     case_context: str = "",
 ) -> IntentDecision:
-    """Conservative fallback when intent LLM has failed.
+    """Fallback for UI routing only, never a legal or factual verdict.
 
-    Do NOT infer a repayment, legal issue, date correction, or immediate
-    surrender of possession from regex/keyword matches. The user question
-    remains intact for the next supported analysis path.
+    Keep the exact question unchanged for all legal analyses. Short explicit
+    UI requests (review, thanks, next actions, corrections) are recognized
+    without inferring repayment, contract effect, dates or missing facts.
     """
     q = (question or "").strip()
     if not q:
         return IntentDecision(
             intent=ConsultationIntent.NEEDS_CLARIFICATION,
-            resolved_query=q,
+            resolved_query=q, requires_specialist=False,
+            requires_retrieval=False, requires_verification=False,
+            requires_full_analysis=False, reason="원질문 미입력",
+        )
+    normalized = q.replace(" ", "").rstrip(".!?~")
+    if len(normalized) <= 30 and any(
+        normalized.endswith(word) for word in (
+            "감사합니다", "고맙습니다", "고마워요", "수고하셨습니다",
+            "안녕하세요", "알겠습니다", "도움주셔서감사합니다",
+        )
+    ):
+        return IntentDecision(
+            intent=ConsultationIntent.GENERAL_CONVERSATION,
+            resolved_query=q, requires_specialist=False,
+            requires_retrieval=False, requires_verification=False,
+            requires_full_analysis=False, reason="명시적인 인사·감사 메시지",
+        )
+
+    # These are explicit *requests* to inspect already submitted data,
+    # not claims that the landlord actually repaid any money.
+    material_review = (
+        any(term in q for term in ("등록된", "제출된", "계약서와", "증거자료", "이체 자료"))
+        and any(term in q for term in ("분석", "검토", "확인해", "정리", "대조"))
+    )
+    if material_review:
+        return IntentDecision(
+            intent=ConsultationIntent.NEW_LEGAL_ANALYSIS,
+            resolved_query=q, requires_specialist=True,
+            requires_retrieval=True, requires_verification=True,
+            requires_full_analysis=True,
+            reason="등록 자료의 사실·법률 분석 요청(반환 사실 주장은 아님)",
+        )
+
+    if not has_history:
+        return IntentDecision(
+            intent=ConsultationIntent.NEW_LEGAL_ANALYSIS,
+            resolved_query=q, requires_specialist=True,
+            requires_retrieval=True, requires_verification=True,
+            requires_full_analysis=True,
+            reason="사건의 첫 법률 상담",
+        )
+
+    if any(term in q for term in (
+        "뭘 해야", "어떻게 해야", "다음 조치", "우선순위", "다음 단계",
+        "그다음은", "지금 해야", "취해야 할",
+    )):
+        return IntentDecision(
+            intent=ConsultationIntent.FOLLOWUP_ACTION,
+            resolved_query="이전 상담에 따라 지금 실행할 우선순위 조치: " + q,
             requires_specialist=False, requires_retrieval=False,
-            requires_verification=False, requires_full_analysis=False,
-            reason="원질문 미입력",
+            requires_verification=True, requires_full_analysis=False,
+            reason="명시적인 다음 행동 요청(기존 검증 결과 재사용)",
+        )
+    if (
+        any(term in q for term in ("정정", "잘못 알았", "확정일자는", "날짜가 달라"))
+        and not q.endswith("?")
+    ):
+        return IntentDecision(
+            intent=ConsultationIntent.FACT_CLARIFICATION,
+            resolved_query=q,
+            requires_specialist=True, requires_retrieval=False,
+            requires_verification=True, requires_full_analysis=False,
+            reason="사용자의 명시적인 사실 정정 요청(원문은 USER_ALLEGED)",
         )
     return IntentDecision(
-        intent=(ConsultationIntent.FOLLOWUP_QUESTION if has_history
-                else ConsultationIntent.NEW_LEGAL_ANALYSIS),
-        resolved_query=q,
-        requires_specialist=True,
-        requires_retrieval=True,
-        requires_verification=True,
-        requires_full_analysis=not has_history,
-        reason="의도 모델 응답 불가: 질문 의미를 임의 추측하지 않고 전체 검토로 진행",
+        intent=ConsultationIntent.FOLLOWUP_QUESTION,
+        resolved_query=q, requires_specialist=True,
+        requires_retrieval=True, requires_verification=True,
+        requires_full_analysis=False,
+        reason="의도 모델 미응답: 법률 의미를 추정하지 않고 후속 질의 검토",
     )
-
 
 @trace
 def analyze_consultation_intent(
