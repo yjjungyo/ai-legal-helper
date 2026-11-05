@@ -206,6 +206,7 @@ class LawRetrievalService:
         index_fn: Optional[Callable[..., Any]] = None,
         article_temporal_fn: Optional[Callable[..., Any]] = None,
         coverage_fn: Optional[Callable[[dict[str, str]], dict]] = None,
+        exact_fetch_fn: Optional[Callable[[list[str]], list[Any]]] = None,
     ):
         if retrieval_fn is None:
             from ai_legal_helper.rag.retrieval import retrieve_with_status
@@ -215,6 +216,10 @@ class LawRetrievalService:
         self.index_fn = index_fn or _resolve_index_locally
         self.article_temporal_fn = article_temporal_fn or _resolve_article_temporal_locally
         self.coverage_fn = coverage_fn or _load_official_coverage
+        if exact_fetch_fn is None:
+            from ai_legal_helper.rag.retrieval import retrieve_official_by_ids
+            exact_fetch_fn = retrieve_official_by_ids
+        self.exact_fetch_fn = exact_fetch_fn
         self.enable_global = (
             os.getenv("LEGAL_GLOBAL_RETRIEVAL_ENABLED", "1") == "1"
             if enable_global is None else bool(enable_global)
@@ -463,6 +468,59 @@ class LawRetrievalService:
                 failures.append(collection)
                 logger.warning("[LAW_RETRIEVAL] 벡터 검색 장애 | collection=%s exception=%s",
                                collection, type(exc).__name__)
+
+        # Similarity top-k is not a completeness guarantee. For explicit
+        # articles, fetch the indexed vector IDs directly from PostgreSQL
+        # coverage and verify the returned Chroma text before accepting it.
+        if ready_mst:
+            requested = list(dict.fromkeys(
+                _normalized_article(x) for x in _ARTICLE_PATTERN.findall(question)
+                if _normalized_article(x)
+            ))
+            missing_pairs = {
+                (law_id, article)
+                for law_id in ready_mst for article in requested
+                if not any(
+                    str(src.get("law_id") or "") == law_id
+                    and _normalized_article(src.get("article")) == article
+                    for src in found
+                )
+            }
+            ids = [
+                vector_id for (law_id, mst, vector_id), (article, _hash) in coverage_by_vector.items()
+                if (law_id, _normalized_article(article)) in missing_pairs
+                and mst == ready_mst.get(law_id)
+            ]
+            if ids:
+                try:
+                    for doc in self.exact_fetch_fn(ids):
+                        src = build_source_from_chroma_doc(
+                            doc, category=category_eng, retrieval_method="CHROMA_EXACT_ID",
+                        )
+                        meta = getattr(doc, "metadata", None) or {}
+                        vector_id = str(meta.get("vector_id") or getattr(doc, "id", "") or "")
+                        law_id = str(src.get("law_id") or "")
+                        mst = str(src.get("version_id") or "")
+                        expected = coverage_by_vector.get((law_id, mst, vector_id))
+                        content_hash = hashlib.sha256(src.get("content", "").encode("utf-8")).hexdigest()
+                        if (expected is None or mst != ready_mst.get(law_id)
+                                or expected != (str(src.get("article") or ""), content_hash)
+                                or src.get("content_hash") != content_hash
+                                or (law_id, _normalized_article(src.get("article"))) not in missing_pairs
+                                or not any(_source_matches_law(src, law) for law in selected)):
+                            response.reason_codes.append("POSTGRES_VECTOR_COVERAGE_MISMATCH")
+                            continue
+                        src["retrieval_collection"] = GLOBAL_LAW_COLLECTION
+                        src["source_id"] = _canonical_source_id(src)
+                        marker = _source_identity(src)
+                        if marker not in seen:
+                            seen.add(marker)
+                            found.append(src)
+                except Exception as exc:
+                    logger.warning("[LAW_RETRIEVAL] exact article fetch failed type=%s",
+                                   type(exc).__name__)
+                    failures.append(GLOBAL_LAW_COLLECTION)
+                    response.reason_codes.append("EXACT_ARTICLE_FETCH_UNAVAILABLE")
 
         # 복합 질문에서 첫 번째 법령이 모든 slot을 채워 다른 법령을
         # 누락시키지 않도록 요청 법령마다 최소 1건씩 먼저 배정한다.
