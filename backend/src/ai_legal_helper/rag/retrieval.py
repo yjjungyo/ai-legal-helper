@@ -47,8 +47,18 @@ def deduplicate_chunks(docs: List[Any], threshold: float = 0.85) -> List[Any]:
 
     unique_docs: List[Any] = []
     seen_token_sets: List[set[str]] = []
+    seen_official_ids: set[str] = set()
 
     for d in docs:
+        meta = getattr(d, "metadata", None) or {}
+        # Different official articles may share most of their wording.
+        # Do not collapse them using a text-similarity threshold.
+        if meta.get("law_id") and meta.get("version_id") and meta.get("vector_id"):
+            vector_id = str(meta["vector_id"])
+            if vector_id not in seen_official_ids:
+                unique_docs.append(d)
+                seen_official_ids.add(vector_id)
+            continue
         content = getattr(d, "page_content", "") or ""
         tokens = set(TOKEN_RE.findall(content.lower()))
         if not tokens:
