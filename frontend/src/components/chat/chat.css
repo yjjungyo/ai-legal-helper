@@ -958,3 +958,18 @@
   .chat-digest-expand-hint { margin-left: 26px; width: 100%; }
   .chat-digest-full-content { padding: 15px 12px 20px; }
 }
+
+/* UI-02: final answer readability only; preserve source order and citation links. */
+.chat-legal-answer { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.chat-legal-section { min-width: 0; }
+.chat-legal-section.has-heading { padding-top: 8px; border-top: 1px solid #e5eaf1; }
+.chat-legal-section.summary-section { padding: 16px 18px; background: #f8fbff; border: 1px solid #dbeafe; border-left: 4px solid #2563eb; border-radius: 10px; }
+.chat-legal-section.action-section { padding: 14px 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; }
+.chat-legal-heading { margin: 0 0 10px; font-size: 1.04em; line-height: 1.5; font-weight: 750; color: #17253e; }
+.chat-legal-content { line-height: 1.75; overflow-wrap: anywhere; }
+.chat-legal-section.source-section { border-top: 1px solid #e5eaf1; padding-top: 12px; }
+.chat-legal-answer button:focus-visible { outline: 2px solid #2563eb; outline-offset: 3px; }
+@media (max-width: 768px) {
+  .chat-legal-answer { gap: 12px; }
+  .chat-legal-section.summary-section, .chat-legal-section.action-section { padding: 12px; }
+}
