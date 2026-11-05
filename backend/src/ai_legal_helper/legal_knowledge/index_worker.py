@@ -15,9 +15,10 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import math
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Callable, Optional
 
 from sqlalchemy import select
@@ -32,6 +33,21 @@ logger = logging.getLogger(__name__)
 
 COLLECTION_NAME = "law_docs_global"
 MAX_ATTEMPTS = 3
+LEASE_TIMEOUT_MINUTES = 30
+
+def validate_embedding_vectors(vectors, expected_count: int) -> None:
+    if len(vectors) != expected_count:
+        raise ValueError("EMBEDDING_COUNT_MISMATCH")
+    dimensions = set()
+    for vector in vectors:
+        if vector is None or len(vector) == 0:
+            raise ValueError("EMBEDDING_VECTOR_EMPTY")
+        if any(not isinstance(value, (int, float)) or not math.isfinite(value) for value in vector):
+            raise ValueError("EMBEDDING_VECTOR_INVALID")
+        dimensions.add(len(vector))
+    if len(dimensions) != 1:
+        raise ValueError("EMBEDDING_DIMENSION_MISMATCH")
+
 
 
 def enqueue_version(session, version: OfficialLawVersion) -> tuple[str, bool]:
@@ -97,7 +113,24 @@ def claim_job(session, worker_id: str) -> OfficialLawIndexJob | None:
             .with_for_update(skip_locked=True).limit(1))
     job = session.scalar(stmt)
     if not job:
-        return None
+        stale = session.scalar(
+            select(OfficialLawIndexJob)
+            .where(OfficialLawIndexJob.status == "INDEXING")
+            .where(OfficialLawIndexJob.updated_at < now - timedelta(minutes=LEASE_TIMEOUT_MINUTES))
+            .order_by(OfficialLawIndexJob.updated_at, OfficialLawIndexJob.id)
+            .with_for_update(skip_locked=True).limit(1)
+        )
+        if stale is None:
+            return None
+        if stale.attempts >= MAX_ATTEMPTS:
+            stale.status = "FAILED"
+            stale.error_code = "INDEXING_LEASE_EXPIRED"
+            stale.lease_owner = None
+            stale.finished_at = now
+            stale.updated_at = now
+            session.commit()
+            return None
+        job = stale
     job.status = "INDEXING"
     job.attempts += 1
     job.lease_owner = worker_id[:64]
@@ -196,8 +229,7 @@ def index_one_version(
         batch = chunks[start:start + batch_size]
         texts = [entry["content"] for entry in batch]
         vectors = embeddings.embed_documents(texts)
-        if len(vectors) != len(batch):
-            raise ValueError("EMBEDDING_COUNT_MISMATCH")
+        validate_embedding_vectors(vectors, len(batch))
         chroma_collection.upsert(
             ids=[entry["id"] for entry in batch],
             documents=texts,
@@ -393,9 +425,11 @@ def process_next_job(
         expected_ids = {entry["id"] for entry in chunks}
         if len(expected_ids) != count:
             raise ValueError("DUPLICATE_INDEXED_VECTOR_ID")
-        observed = chroma_collection.get(ids=sorted(expected_ids), include=[])
-        if set(observed.get("ids") or []) != expected_ids:
-            raise ValueError("CHROMA_COVERAGE_NOT_CONFIRMED")
+        for start in range(0, len(chunks), 200):
+            batch_ids = [entry["id"] for entry in chunks[start:start + 200]]
+            observed = chroma_collection.get(ids=batch_ids, include=[])
+            if set(observed.get("ids") or []) != set(batch_ids):
+                raise ValueError("CHROMA_COVERAGE_NOT_CONFIRMED")
         # Flush first so the source rows are queryable in this transaction.
         # A failed flush is rolled back by the surrounding error handler.
         session.flush()
