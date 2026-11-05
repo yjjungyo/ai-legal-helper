@@ -127,8 +127,10 @@ def _semantic_review(
             return None, "TEMPORAL_REVIEW_CLAIM_UNGROUNDED"
         if source_quote and not any(source_quote in src["content"] for src in legal):
             return None, "TEMPORAL_REVIEW_SOURCE_UNGROUNDED"
-        if result["verdict"] == "CONTRADICTED" and not (claim_quote and source_quote):
-            return None, "TEMPORAL_REVIEW_CONFLICT_UNGROUNDED"
+        if result["verdict"] in ("SUPPORTED", "CONTRADICTED") and not (
+            claim_quote and source_quote
+        ):
+            return None, "TEMPORAL_REVIEW_CLAIM_OR_SOURCE_UNGROUNDED"
         return result, "TEMPORAL_SEMANTIC_REVIEW_COMPLETE"
     except Exception:
         return None, "TEMPORAL_SEMANTIC_REVIEW_ERROR"
