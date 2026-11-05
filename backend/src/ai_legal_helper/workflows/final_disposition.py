@@ -181,7 +181,9 @@ def select_grounded_facts_for_display(
         if (f.adjudication_status in ("EVIDENCE_SUPPORTED", "CORROBORATED") or getattr(f, "trust_level", "") == "EVIDENCE_SUPPORTED")
         and getattr(f, "trust_level", "") != "SUPERSEDED"
         and not is_trivial_metadata_fact(f.statement)
-        and not is_conditional_contract_statement(f.statement)
+        # Displaying a source-grounded fact verbatim is not declaring its
+        # eventual legal effect. An unavailable termination reviewer must not
+        # silently erase the contract/property fact from the answer.
     ]
 
     # 가중치 점수 내림차순 정렬
@@ -922,7 +924,9 @@ def assemble_grounded_answer(
         briefing, query=current_question, max_facts=12 if evidence_review else 5,
     )
     if evidence_review:
-        selected_facts = [f for f in selected_facts if not is_conditional_contract_statement(f.statement)]
+        # Evidence review must retain sourced conditional plans and promises
+        # as *statements*, not silently discard them. Legal-effect verification
+        # is a separate phase.
         for party in briefing.parties:
             sections.append(f"- 등록 당사자: {party.role} {party.name} (등록 정보 기준)")
     if selected_facts:
