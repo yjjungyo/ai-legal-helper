@@ -54,6 +54,7 @@ jobs:
         run: |
           python -m pytest -q \
             backend/tests/unit/test_semantic_judgment_guardrails.py \
+            backend/tests/unit/test_semantic_monetary_priority_p0.py \
             backend/tests/unit/test_temporal_hilt_workflow_p6.py \
             backend/tests/unit/test_step3_statute_search.py \
             backend/tests/unit/test_temporal_verification_p8.py \

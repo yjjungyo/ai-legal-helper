@@ -48,6 +48,8 @@ from ai_legal_helper.case_intelligence.fact_semantics import (
     compare_fact_identity,
     evaluate_temporal_relation,
     extract_semantic_fact,
+    extract_semantic_proposition,
+    check_proposition_comparability,
 )
 from ai_legal_helper.llm.gateway import get_llm
 from ai_legal_helper.observability.context import get_current_span_id
@@ -106,6 +108,16 @@ _AMOUNT_EXPR_RE = re.compile(
 _DATE_FULL_RE = re.compile(
     r"(?<!\d)((?:19|20)\d{2})\s*(?:년|[-./])\s*(\d{1,2})\s*(?:월|[-./])\s*(\d{1,2})\s*일?(?!\d)"
 )
+
+
+def _exclude_date_tokens_from_money_matches(text: str) -> str:
+    """Mask dates without changing offsets so a date cannot become part of KRW.
+
+    Example: '2026.09.10 5천만 원' must produce 50,000,000, never a
+    composite made of year/month/day and KRW. '#' cannot match _AMOUNT_EXPR_RE.
+    """
+    return _DATE_FULL_RE.sub(lambda m: "#" * len(m.group(0)), text)
+
 
 # 일반 한국어 조사 제거용 정규식
 _JOSA_STRIP_RE = re.compile(
@@ -327,30 +339,53 @@ def parse_korean_number_phrase(phrase: str) -> Optional[int]:
     return result if (has_any_number and result > 0) else None
 
 
-def _classify_amount_role(pre_window: str, immediate_window: str, context_window: str, full_text: str) -> str:
-    """Grounded meaning classification; nearby keywords are not proof of role."""
-    from ai_legal_helper.case_intelligence.semantic_judgment import classify_statement
-    labels = tuple(code for code, _ in _AMOUNT_ROLE_PATTERNS)
-    decision = classify_statement(
-        full_text, task="MONEY_AMOUNT_SEMANTIC_ROLE", labels=labels,
-        context=(
-            "분류해야 할 특정 금액 원문: " + immediate_window +
-            " | 앞 문맥: " + pre_window +
-            " | 양쪽 문맥: " + context_window +
-            " | 반드시 해당 금액의 의미적 역할만 분류하세요. "
-            "계약 보증금 총액, 계약금, 잔금, 실제 반환액은 동일 문장에 "
-            "함께 나타날 수 있으며 서로 다른 속성입니다. "
-            "근거 인용에는 반드시 분류 대상 금액이 포함되어야 합니다. "
-            "의미 불명확 시 UNKNOWN."
-        ),
+def _batch_numeric_role_map(
+    text: str, *, include_amounts: bool = True, include_dates: bool = True,
+) -> Dict[str, str]:
+    """One grounded LLM invocation across *all* values in a statement.
+
+    Numeric parsing is deterministic. The model labels the identity/event
+    role of each literal span and quotes the precise source occurrence.
+    Avoids synchronous amount/date token N+1 calls in consultation.
+    """
+    from ai_legal_helper.case_intelligence.semantic_judgment import (
+        classify_numeric_spans,
     )
-    if (decision.label != "UNKNOWN" and immediate_window
-            and immediate_window in decision.evidence_quote):
-        return decision.label
-    return "GENERAL_AMOUNT"
+    spans: List[Dict[str, Any]] = []
+    if include_amounts:
+        masked = _exclude_date_tokens_from_money_matches(text)
+        for idx, match in enumerate(_AMOUNT_EXPR_RE.finditer(masked)):
+            # The permissive numeric-expression regex can accidentally match
+            # whitespace + '원' alone, without an actual amount. Do not
+            # make it an LLM value-role token or charge a model call for it.
+            if not (match.group(1) or "").strip():
+                continue
+            raw = text[match.start():match.end()]
+            offset = len(raw) - len(raw.lstrip())
+            end_trim = len(raw) - len(raw.rstrip())
+            spans.append({
+                "id": f"a{idx}", "kind": "AMOUNT",
+                "start": match.start() + offset,
+                "end": match.end() - end_trim,
+            })
+    if include_dates:
+        for idx, match in enumerate(_DATE_FULL_RE.finditer(text)):
+            raw = match.group(0)
+            spans.append({
+                "id": f"d{idx}", "kind": "DATE",
+                "start": match.start(),
+                "end": match.end() - (len(raw) - len(raw.rstrip())),
+            })
+    return classify_numeric_spans(
+        text, spans=spans,
+        labels_by_kind={
+            "AMOUNT": tuple(code for code, _ in _AMOUNT_ROLE_PATTERNS),
+            "DATE": tuple(code for code, _ in _DATE_ROLE_PATTERNS),
+        },
+    )
 
 
-def extract_amount_roles(text: str) -> Tuple[List[int], Dict[str, List[int]]]:
+def extract_amount_roles(text: str, *, role_map: Optional[Dict[str, str]] = None) -> Tuple[List[int], Dict[str, List[int]]]:
     """문장 내 모든 금액 표현을 원(KRW) 단위로 정규화하고 의미 역할별로 매핑한다.
 
     Args:
@@ -364,10 +399,12 @@ def extract_amount_roles(text: str) -> Tuple[List[int], Dict[str, List[int]]]:
 
     amounts: List[int] = []
     roles: Dict[str, List[int]] = {}
-    matches = list(_AMOUNT_EXPR_RE.finditer(text))
+    matches = list(_AMOUNT_EXPR_RE.finditer(_exclude_date_tokens_from_money_matches(text)))
     if not matches:
         return amounts, roles
-    for match in matches:
+    if role_map is None:
+        role_map = _batch_numeric_role_map(text, include_dates=False)
+    for index, match in enumerate(matches):
         num_part = (match.group(1) or "").strip()
         suffix = (match.group(2) or "").replace(" ", "").strip()
         if not num_part:
@@ -390,15 +427,9 @@ def extract_amount_roles(text: str) -> Tuple[List[int], Dict[str, List[int]]]:
         if val not in amounts:
             amounts.append(val)
 
-        span = match.group(0)
-        # Interpret the legal role OF THIS SPECIFIC AMOUNT, not every
-        # monetary quantity in the sentence using a single global label.
-        role = _classify_amount_role(
-            text[max(0, match.start() - 48):match.start()],
-            span,
-            text[max(0, match.start() - 64):min(len(text), match.end() + 64)],
-            text,
-        )
+        # Each label is tied to an exact numeric span from a single
+        # statement-level interpretation; absent roles remain unresolved.
+        role = role_map.get(f"a{index}", "GENERAL_AMOUNT")
         role_list = roles.setdefault(role, [])
         if val not in role_list:
             role_list.append(val)
@@ -411,7 +442,7 @@ def extract_normalized_amounts(text: str) -> List[int]:
     if not text:
         return []
     values: List[int] = []
-    for match in _AMOUNT_EXPR_RE.finditer(text):
+    for match in _AMOUNT_EXPR_RE.finditer(_exclude_date_tokens_from_money_matches(text)):
         num_part = (match.group(1) or "").strip()
         suffix = (match.group(2) or "").replace(" ", "").strip()
         if not num_part:
@@ -427,22 +458,7 @@ def extract_normalized_amounts(text: str) -> List[int]:
     return values
 
 
-def _classify_date_role(context_window: str, full_text: str) -> str:
-    """Interpret a date's legal event role; formats are parsed separately."""
-    from ai_legal_helper.case_intelligence.semantic_judgment import classify_statement
-    decision = classify_statement(
-        full_text, task="DATE_EVENT_SEMANTIC_ROLE",
-        labels=tuple(code for code, _ in _DATE_ROLE_PATTERNS),
-        context=(
-            "선택 날짜 주변 원문: " + context_window +
-            ". 발신일/도달일/작성일/시행일/지급기일/실제 이행일을 혼동하지 마세요. "
-            "동일 원문에 서로 다른 날짜가 있으면 해당 날짜의 역할만 확인."
-        ),
-    )
-    return decision.label if decision.label != "UNKNOWN" else "GENERAL_DATE"
-
-
-def extract_dates_with_validation(text: str) -> Tuple[List[str], List[str], Dict[str, List[str]]]:
+def extract_dates_with_validation(text: str, *, role_map: Optional[Dict[str, str]] = None) -> Tuple[List[str], List[str], Dict[str, List[str]]]:
     """문장 내 날짜 표현을 추출하고 실제 달력 유효성(윤년·월별 말일)을 검증한 뒤 역할별로 분류한다.
 
     Args:
@@ -461,7 +477,9 @@ def extract_dates_with_validation(text: str) -> Tuple[List[str], List[str], Dict
     date_matches = list(_DATE_FULL_RE.finditer(text))
     if not date_matches:
         return valid_dates, invalid_dates, date_roles
-    for m in date_matches:
+    if role_map is None:
+        role_map = _batch_numeric_role_map(text, include_amounts=False)
+    for index, m in enumerate(date_matches):
         yyyy, mm, dd = int(m.group(1)), int(m.group(2)), int(m.group(3))
         raw_token = m.group(0).strip()
         try:
@@ -469,10 +487,7 @@ def extract_dates_with_validation(text: str) -> Tuple[List[str], List[str], Dict
             iso = valid_dt.isoformat()
             if iso not in valid_dates:
                 valid_dates.append(iso)
-            role = _classify_date_role(
-                text[max(0, m.start() - 64):min(len(text), m.end() + 64)],
-                text,
-            )
+            role = role_map.get(f"d{index}", "GENERAL_DATE")
             r_list = date_roles.setdefault(role, [])
             if iso not in r_list:
                 r_list.append(iso)
@@ -621,8 +636,13 @@ def build_structured_slots(
     source_span_ids: Optional[List[str]] = None,
 ) -> StructuredFactSlots:
     """단일 진술(Claim 또는 Fact)로부터 정규화된 비교 슬롯(StructuredFactSlots)을 생성한다."""
-    amounts, amount_roles = extract_amount_roles(statement)
-    dates, invalid_dates, date_roles = extract_dates_with_validation(statement)
+    # Single model call for all numeric roles, regardless of token count.
+    # Extraction functions use those roles without invoking the model again.
+    reviewed_roles = _batch_numeric_role_map(statement)
+    amounts, amount_roles = extract_amount_roles(statement, role_map=reviewed_roles)
+    dates, invalid_dates, date_roles = extract_dates_with_validation(
+        statement, role_map=reviewed_roles,
+    )
 
     if amounts and (dates or invalid_dates):
         dim: Literal["AMOUNT", "DATE", "AMOUNT_AND_DATE", "TEXT"] = "AMOUNT_AND_DATE"
@@ -815,11 +835,12 @@ def _verify_pair_with_llm(
 
 def _are_amount_roles_compatible(role_a: str, role_b: str, amounts_equal: bool) -> bool:
     """두 금액 역할(Semantic Role)이 동일 속성이어서 직접 비교 가능한지 판별한다."""
+    # UNKNOWN is not a semantic attribute; two unknowns cannot prove that
+    # money concerns the same item. This guard must precede equality.
+    if not role_a or not role_b or "GENERAL_AMOUNT" in (role_a, role_b):
+        return False
     if role_a == role_b:
         return True
-    if "GENERAL_AMOUNT" in (role_a, role_b):
-        # Missing semantic attribution must not manufacture comparable claims.
-        return False
     # 보증금 원금(PRINCIPAL_DEPOSIT)과 반환 요청 금액(RETURN_REQUEST_AMOUNT)은
     # 전액 반환을 요청하는 경우(금액이 같을 때) 상호 일치(CONSISTENT)로 볼 수 있음
     if {role_a, role_b} == {"PRINCIPAL_DEPOSIT", "RETURN_REQUEST_AMOUNT"} and amounts_equal:
@@ -1044,7 +1065,26 @@ def evaluate_claim_against_fact(
                     else:
                         matched_same_role_diff = (cr if cr != "GENERAL_AMOUNT" else fr, c_vals, f_vals)
 
-        # 서로 다른 금액 속성인 경우 (예: T03 계약 보증금 3억 vs 일부 반환금 2억) -> DIFFERENT_CONTEXT
+        # Role-unresolved amounts cannot establish equality OR contradiction.
+        # Distinct documented roles may be safely classified as separate,
+        # but GENERAL_AMOUNT is uncertainty rather than a specific role.
+        if only_different_roles and (
+            "GENERAL_AMOUNT" in c_roles or "GENERAL_AMOUNT" in f_roles
+        ):
+            return ConflictDecision(
+                claim_id=claim_id,
+                target_fact_id=fact.id,
+                status="INSUFFICIENT_INFORMATION",
+                reason_code="AMOUNT_ROLE_UNCONFIRMED",
+                explanation=(
+                    "두 금액의 대상 및 성격(원금/반환액/비용 등)이 충분히 확인되지 않아 "
+                    "금액 일치 또는 모순 관계를 확정하지 않습니다."
+                ),
+                confidence=1.0,
+                source_span_ids=spans,
+            )
+
+        # Known, distinct semantic amount roles are separate facts.
         if only_different_roles:
             return ConflictDecision(
                 claim_id=claim_id,
@@ -1538,6 +1578,7 @@ def reconcile_case_conflicts(
 
     removed_links = 0
     converted_supports = 0
+    removed_false_support_links = 0
     reset_claims = 0
     restored_facts = 0
     affected_cases: List[str] = []
@@ -1615,7 +1656,13 @@ def reconcile_case_conflicts(
                 # 두 값을 직접 비교하면 이미 올바른 링크도 매번 변경 대상으로 처리되고,
                 # DB에 미지원 타입(CONTRADICTION)을 기록하여 Neo4j 동기화에서 유실될 수 있다.
                 desired_link_type = (
-                    "CONTRADICTS" if decision.status == "CONTRADICTION" else decision.status
+                    "CONTRADICTS" if decision.status == "CONTRADICTION"
+                    else "SUPPORTS" if decision.status == "CONSISTENT"
+                    else "RESPONDS_TO" if (
+                        decision.reason_code == "PROPOSAL_VS_REJECTION"
+                        and link.link_type == "RESPONDS_TO"
+                    )
+                    else decision.status
                 )
                 logger.debug(
                     "[CONFLICT_RECONCILE] claim=%s fact=%s stored_link=%s detected=%s reason=%s expected_link=%s",
@@ -1689,6 +1736,51 @@ def reconcile_case_conflicts(
                         case_changed = True
 
         db.flush()
+
+        # 1b. Legacy false SUPPORTS: a rejection does not corroborate
+        # the preceding offer. Never silently turn a response into proof.
+        # This runs only in the explicit reconciliation workflow.
+        supporting_links = (
+            db.query(EvidenceLink)
+            .join(EvidenceDocument, EvidenceLink.evidence_id == EvidenceDocument.id)
+            .filter(
+                EvidenceDocument.case_id == cid,
+                EvidenceLink.link_type == "SUPPORTS",
+                EvidenceLink.target_type == "FACT",
+            )
+            .all()
+        )
+        for sup_link in supporting_links:
+            sup_claim = (
+                db.query(EvidenceClaim).filter_by(id=sup_link.claim_id).first()
+                if sup_link.claim_id else None
+            )
+            sup_fact = fact_map.get(sup_link.target_id)
+            if not sup_claim or not sup_fact or sup_claim.review_status == "REJECTED":
+                continue
+            # A claim's own Fact link is legitimate provenance, not
+            # a cross-fact semantic SUPPORTS edge.
+            if (
+                sup_claim.evidence_id == sup_fact.source_ref
+                and "".join((sup_claim.statement or "").split())
+                    == "".join((sup_fact.statement or "").split())
+            ):
+                continue
+            proposal = extract_semantic_proposition(sup_claim.statement or "")
+            target = extract_semantic_proposition(sup_fact.statement or "")
+            relation = check_proposition_comparability(proposal, target)
+            if relation.reason_code != "PROPOSAL_VS_REJECTION":
+                continue
+            changes.append({
+                "entity": "EvidenceLink",
+                "id": sup_link.id,
+                "before": "SUPPORTS",
+                "after": "DELETED (FALSE_PROPOSAL_REJECTION_SUPPORT)",
+                "reason_code": relation.reason_code,
+            })
+            db.delete(sup_link)
+            removed_false_support_links += 1
+            case_changed = True
 
         # 2. EvidenceClaim의 구조화 슬롯 백필 및 CONTRADICTION_CANDIDATE 상태 재검증
         all_case_claims = db.query(EvidenceClaim).filter(EvidenceClaim.case_id == cid).all()
@@ -1840,6 +1932,7 @@ def reconcile_case_conflicts(
             "removed_links": removed_links,
             "removed_false_contradict_links": removed_links,
             "converted_supports_links": converted_supports,
+            "removed_false_support_links": removed_false_support_links,
             "reset_claims": reset_claims,
             "restored_facts": restored_facts,
             "restored_disputed_facts": restored_facts,
@@ -1867,6 +1960,7 @@ def reconcile_case_conflicts(
         "removed_links": removed_links,
         "removed_false_contradict_links": removed_links,
         "converted_supports_links": converted_supports,
+        "removed_false_support_links": removed_false_support_links,
         "reset_claims": reset_claims,
         "restored_facts": restored_facts,
         "restored_disputed_facts": restored_facts,

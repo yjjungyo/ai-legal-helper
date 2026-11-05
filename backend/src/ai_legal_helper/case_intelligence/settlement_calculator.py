@@ -118,47 +118,21 @@ def extract_dates_from_text(text: str) -> List[str]:
 
 
 def extract_amounts_from_text(text: str) -> Set[int]:
-    """문자열에서 금액(원 단위 정수) 목록을 추출한다."""
+    """Parse all literal KRW amounts with the case-wide Korean numeral parser.
+
+    Source-of-truth for monetary syntax is conflict_detector's pure numeric
+    extraction, not an independent/partial regex. This supports Korean numerals
+    (삼억 원), compound units (3억 2천 5백만원), and separates amounts when a
+    sentence mentions both principal and an actual refund.
+    Parsing a number never proves its semantic role or repayment status.
+    """
     if not text:
         return set()
-    amounts: Set[int] = set()
-    cleaned_text = text
-
-    # 1. 억 + (천만/만) 단위
-    eok_pattern = re.compile(r"(\d+)\s*억(?:\s*(\d+(?:,\d{3})*|\d+)\s*(천\s*만|만))?\s*원?")
-    for m in eok_pattern.finditer(text):
-        eok = int(m.group(1)) * 100_000_000
-        rest = 0
-        if m.group(2):
-            raw_rest = int(m.group(2).replace(",", ""))
-            unit = m.group(3) or ""
-            if "천" in unit:
-                rest = raw_rest * 10_000_000
-            else:
-                rest = raw_rest * 10_000
-        amounts.add(eok + rest)
-    cleaned_text = eok_pattern.sub(" ", cleaned_text)
-
-    # 2. 천만원 단위
-    cheon_pattern = re.compile(r"(\d+)\s*천\s*만\s*원?")
-    for m in cheon_pattern.finditer(cleaned_text):
-        amounts.add(int(m.group(1)) * 10_000_000)
-    cleaned_text = cheon_pattern.sub(" ", cleaned_text)
-
-    # 3. 만원 단위
-    man_pattern = re.compile(r"(\d+(?:,\d{3})*|\d+)\s*만\s*원?")
-    for m in man_pattern.finditer(cleaned_text):
-        raw = m.group(1).replace(",", "")
-        amounts.add(int(raw) * 10_000)
-    cleaned_text = man_pattern.sub(" ", cleaned_text)
-
-    # 4. 콤마 포함 원 단위 및 5자리 이상 순수 숫자 원 단위 (P0-03/Gate 2)
-    won_pattern = re.compile(r"(\d{1,3}(?:,\d{3})+|\d{5,})\s*원")
-    for m in won_pattern.finditer(cleaned_text):
-        raw = m.group(1).replace(",", "")
-        amounts.add(int(raw))
-
-    return amounts
+    # Lazy import avoids the case intelligence import graph at module import.
+    from ai_legal_helper.case_intelligence.conflict_detector import (
+        extract_normalized_amounts,
+    )
+    return set(extract_normalized_amounts(text))
 
 
 def _approved_money_role(fact: FactItemBrief, category: str) -> tuple[int | None, str]:
@@ -300,12 +274,33 @@ def extract_case_prior_verified_repayments(briefing: CaseEvidenceBriefing) -> Tu
                 if verdict is None or verdict.label != "ACTUAL_REPAYMENT":
                     continue
                 amts = extract_amounts_from_text(verdict.evidence_quote)
+            # A quote may contain contract principal AND the returned part.
+            # Ask for the exact event amount one more time only in this
+            # ambiguous case; never select min/max or silently count principal.
+            if len(amts) > 1 and verdict is not None:
+                clarified = classify_statement(
+                    line_text,
+                    task="SELECT_ACTUAL_REPAYMENT_AMOUNT",
+                    labels=("ACTUAL_REPAYMENT", "AMBIGUOUS"),
+                    context=(
+                        "이미 실제 반환 거래라는 분류는 했으나 인용구에 금액이 "
+                        "둘 이상 있습니다. 실제로 임대인이 임차인에게 반환을 완료한 "
+                        "하나의 금액만 정확히 포함하는 연속된 원문을 인용하세요. "
+                        "전체 계약 원금, 반환 전 원금, 잔액은 선택하지 마세요. "
+                        "여러 반환 거래가 구분되지 않으면 UNKNOWN."
+                    ),
+                )
+                if (
+                    clarified.label == "ACTUAL_REPAYMENT"
+                    and clarified.evidence_quote in verdict.evidence_quote
+                ):
+                    amts = extract_amounts_from_text(clarified.evidence_quote)
             # No 'min(amounts)' or 'max(amounts)' guess when multiple values
             # appear (e.g. refund plus remaining balance).
             if len(amts) != 1:
                 logger.warning(
                     "[SETTLEMENT] 실제 반환 입금액 단일 식별 실패; 계산 보류: %s",
-                    verdict.evidence_quote,
+                    verdict.evidence_quote if verdict is not None else line_text,
                 )
                 continue
             amt = next(iter(amts))
@@ -952,12 +947,33 @@ def evaluate_attachment_ranking(
         elif tenant_priority_date > earliest_att_date:
             res["priority_status"] = "ATTACHMENT_SENIOR"
         else:
-            # 우선변제권 발생일과 가압류 등기일이 같은 날짜인 경우:
-            # 만약 전입 당일(opposing_satisfied_date)에 가압류가 설정된 것이면 가압류가 선순위
-            if opposing_satisfied_date and opposing_satisfied_date == earliest_att_date:
-                res["priority_status"] = "ATTACHMENT_SENIOR"
+            # TIE ON CALENDAR DATE IS NOT A TIE OF LEGAL INSTANTS:
+            # if possession+registration and fixed date were completed by
+            # the PREVIOUS day, priority arose at 00:00 this morning.
+            # A subsequently registered mortgage/attachment enters after
+            # the start of the day (Supreme Court 99다9981, 98다46938).
+            #
+            # If fixed date was obtained today, calendar-only evidence
+            # cannot establish the within-day precedence of the two rights.
+            # Opposing requirements completed on the attachment's date
+            # were already handled above (priority date = following day).
+            if (
+                opposing_satisfied_date
+                and res["tenant_fixed_date"]
+                and res["tenant_fixed_date"] <= opposing_satisfied_date
+                and res["tenant_opposing_effective_date"] == earliest_att_date
+            ):
+                res["priority_status"] = "TENANT_SENIOR"
+                res["summary_text"] += (
+                    "; 대항요건 및 확정일자를 전날까지 갖추어 "
+                    "우선변제권이 등기일 00시에 먼저 발생한 경우"
+                )
             else:
                 res["priority_status"] = "UNCERTAIN"
+                res["summary_text"] += (
+                    "; 동일 일자의 확정일자 취득과 권리등기 선후관계가 "
+                    "확인되지 않아 추가 원본 확인 필요"
+                )
 
     return res
 

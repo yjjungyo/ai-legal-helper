@@ -33,6 +33,27 @@ FACT_TEXT = "박정훈은 보증금을 일시에 전액 반환하지 않고 분�
 CLAIM_TEXT = "박정훈은 보증금 3억 원을 즉시 반환하기 어렵다는 취지로 말했다."
 
 
+@pytest.fixture(autouse=True)
+def reviewed_money_meanings(monkeypatch):
+    """Explicit semantic annotation for controlled, same-contract amounts.
+
+    This test verifies conflict handling, not the availability of a live LLM.
+    Proposals and capacity statements intentionally receive no money role.
+    """
+    def batch(statement, *, spans, labels_by_kind, **kwargs):
+        if statement in ("보증금은 2억 원이다.", "보증금은 3억 원이다."):
+            return {
+                item["id"]: "PRINCIPAL_DEPOSIT"
+                for item in spans if item["kind"] == "AMOUNT"
+            }
+        return {}
+
+    monkeypatch.setattr(
+        "ai_legal_helper.case_intelligence.semantic_judgment.classify_numeric_spans",
+        batch,
+    )
+
+
 @pytest.fixture
 def db():
     """외부 PostgreSQL/Neo4j와 분리된 인메모리 SQLite 세션을 준비한다."""
