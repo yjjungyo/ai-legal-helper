@@ -35,6 +35,16 @@ jobs:
       - run: |
           python -m pip install --upgrade pip
           python -m pip install -r backend/requirements.txt
+      - name: Initialize ephemeral PostgreSQL tables
+        env:
+          PYTHONPATH: backend/src
+        run: |
+          python - <<'PY'
+          from ai_legal_helper.database.session import Base, engine
+          import ai_legal_helper.database.models  # register ORM models
+          Base.metadata.create_all(bind=engine)
+          print("Created test tables:", len(Base.metadata.tables))
+          PY
       - name: Verify meaning classification, cases and statutes
         env:
           PYTHONPATH: backend/src
