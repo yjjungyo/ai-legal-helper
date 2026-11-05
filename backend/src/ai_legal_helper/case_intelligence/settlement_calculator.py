@@ -274,12 +274,33 @@ def extract_case_prior_verified_repayments(briefing: CaseEvidenceBriefing) -> Tu
                 if verdict is None or verdict.label != "ACTUAL_REPAYMENT":
                     continue
                 amts = extract_amounts_from_text(verdict.evidence_quote)
+            # A quote may contain contract principal AND the returned part.
+            # Ask for the exact event amount one more time only in this
+            # ambiguous case; never select min/max or silently count principal.
+            if len(amts) > 1 and verdict is not None:
+                clarified = classify_statement(
+                    line_text,
+                    task="SELECT_ACTUAL_REPAYMENT_AMOUNT",
+                    labels=("ACTUAL_REPAYMENT", "AMBIGUOUS"),
+                    context=(
+                        "이미 실제 반환 거래라는 분류는 했으나 인용구에 금액이 "
+                        "둘 이상 있습니다. 실제로 임대인이 임차인에게 반환을 완료한 "
+                        "하나의 금액만 정확히 포함하는 연속된 원문을 인용하세요. "
+                        "전체 계약 원금, 반환 전 원금, 잔액은 선택하지 마세요. "
+                        "여러 반환 거래가 구분되지 않으면 UNKNOWN."
+                    ),
+                )
+                if (
+                    clarified.label == "ACTUAL_REPAYMENT"
+                    and clarified.evidence_quote in verdict.evidence_quote
+                ):
+                    amts = extract_amounts_from_text(clarified.evidence_quote)
             # No 'min(amounts)' or 'max(amounts)' guess when multiple values
             # appear (e.g. refund plus remaining balance).
             if len(amts) != 1:
                 logger.warning(
                     "[SETTLEMENT] 실제 반환 입금액 단일 식별 실패; 계산 보류: %s",
-                    verdict.evidence_quote,
+                    verdict.evidence_quote if verdict is not None else line_text,
                 )
                 continue
             amt = next(iter(amts))
