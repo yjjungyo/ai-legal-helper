@@ -15,7 +15,7 @@ def upgrade():
         sa.Column("promulgation_date", sa.String(10)),
         sa.Column("history_code", sa.String(30)),
         sa.Column("source_snapshot_id", sa.String(36), sa.ForeignKey("law_history_snapshots.id"), nullable=False),
-        sa.UniqueConstraint("law_id", "mst", "effective_date", name="uq_law_version_effective_branch"))
+        sa.UniqueConstraint("source_snapshot_id", "law_id", "mst", "effective_date", name="uq_law_version_effective_branch"))
     op.create_index("ix_law_version_effective_branch_snapshot",
         "law_version_effective_branches", ["source_snapshot_id"])
 
