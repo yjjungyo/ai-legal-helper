@@ -80,7 +80,7 @@ class LawArticleCoverage(Base):
     """실제로 저장된 조문/부칙의 MST별 청크 커버리지."""
     __tablename__ = "law_article_coverage"
     __table_args__ = (
-        UniqueConstraint("law_id", "mst", "article_id", "content_hash",
+        UniqueConstraint("law_id", "mst", "vector_id",
                          name="uq_law_article_coverage_identity"),
         Index("ix_law_article_coverage_lookup", "law_id", "mst", "article_id"),
     )
@@ -144,7 +144,7 @@ class LawTransitionRule(Base):
     """Source-grounded addendum rules; no automated legal applicability claim."""
     __tablename__ = "law_transition_rules"
     __table_args__ = (
-        UniqueConstraint("law_id", "mst", "rule_hash",
+        UniqueConstraint("law_id", "mst", "source_vector_id",
                          name="uq_law_transition_rule_identity"),
         Index("ix_law_transition_rule_lookup", "law_id", "mst"),
     )
