@@ -102,7 +102,7 @@ class LawVersionEffectiveBranch(Base):
     """Official history may list multiple effective dates for one MST."""
     __tablename__ = "law_version_effective_branches"
     __table_args__ = (
-        UniqueConstraint("law_id", "mst", "effective_date",
+        UniqueConstraint("source_snapshot_id", "law_id", "mst", "effective_date",
                          name="uq_law_version_effective_branch"),
         Index("ix_law_version_effective_branch_snapshot", "source_snapshot_id"),
     )
