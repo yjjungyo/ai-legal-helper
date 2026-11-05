@@ -729,3 +729,24 @@ def test_semantic_user_statement_requires_quoted_question_basis(
     assert result["claims"][0]["claim_type"] == expected_type
     if expected_type == "CASE_FACT":
         assert result["claims"][0]["grounding_status"] == "UNSUPPORTED"
+
+
+def test_semantic_user_statement_does_not_override_model_rejection(document_state):
+    """의미 동일성 플래그만으로 모델의 UNSUPPORTED 판정을 승인하지 않는다."""
+    claim = "현재 주택을 점유 중입니다."
+    reply = verification_reply(claims=[{
+        "claim": claim, "claim_type": "CASE_FACT", "fact_status": "USER_STATEMENT",
+        "source_ids": [], "grounding_status": "UNSUPPORTED",
+        "reason": "사용자 진술로 뒷받침되지 않는다고 판단",
+        "user_statement_basis": "아직 전세집에서 살고 있어요",
+        "user_statement_equivalent": True,
+    }])
+    llm = MagicMock()
+    llm.invoke.return_value.content = json.dumps(reply, ensure_ascii=False)
+    with patch("ai_legal_helper.llm.gateway.get_llm", return_value=llm):
+        result = run_verification("아직 전세집에서 살고 있어요", claim,
+                                  consultation.document_sources(document_state),
+                                  require_question_coverage=True)
+    assert result["claims"][0]["claim_type"] == "CASE_FACT"
+    assert result["claims"][0]["grounding_status"] == "UNSUPPORTED"
+    assert result["status"] != "PASS"
