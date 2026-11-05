@@ -9,6 +9,7 @@
 
 import pytest
 from ai_legal_helper.agents.document_answer import DOCUMENT_ANSWER_SYSTEM
+from ai_legal_helper.agents.document_verification_prompt import DOCUMENT_VERIFICATION_PROMPT
 from ai_legal_helper.agents.synthesizer import SYNTH_SYSTEM, SYNTH_FEWSHOT
 
 
@@ -56,3 +57,24 @@ class TestStep6UserFriendlyAnswer:
         assert "주택임대차보호법 제6조의2" in SYNTH_FEWSHOT
         assert "[1. 핵심 결론]" not in SYNTH_FEWSHOT
 
+
+
+class TestDocumentPromptGroundingRegression:
+    """프롬프트의 사실 구분 및 독립 검증 정책을 정적 회귀 검사한다.
+
+    실제 LLM 판정 품질은 별도 통제 응답/실모델 테스트가 필요하다.
+    """
+
+    def test_user_statement_not_promoted_to_verified_fact(self):
+        assert "반대 증거가 없다는 이유만으로 사용자 진술을 입증된 사실로 승격하지 마세요" in DOCUMENT_ANSWER_SYSTEM
+        assert "조건부 법률 설명이 가능하면 답변을 불필요하게 유보하지 마세요" in DOCUMENT_ANSWER_SYSTEM
+
+    def test_verification_independent_of_predefined_lease_conclusion(self):
+        assert "특정 법률 결론을 사전에 정답으로 가정하지 마세요" in DOCUMENT_VERIFICATION_PROMPT
+        assert "선순위 대항요건(인도+전입)과 확정일자를 갖추고" not in DOCUMENT_VERIFICATION_PROMPT
+        assert "반대 증거가 없다는 이유만으로 진술을 VERIFIED_FACT로 승격하지 마세요" in DOCUMENT_VERIFICATION_PROMPT
+
+    def test_verification_keeps_output_contract_and_revise(self):
+        for token in ("question_coverage", "claims", "consistency_checks", "preserved_points", "legal_search_requests", "REVISE"):
+            assert token in DOCUMENT_VERIFICATION_PROMPT
+        assert "수정 요청이 있으면 지적된 오류를 원문과 대조해 고치되" in DOCUMENT_ANSWER_SYSTEM
