@@ -58,7 +58,22 @@ def store_complete_history(session, lookup: VersionLookup, *, law_id: str) -> di
         fingerprint=fingerprint,
     )
     session.add(snapshot)
+    # The official list can repeat the same MST/effective-date pair.
+    # Preserve each distinct branch once per snapshot, and refuse
+    # contradictory identity metadata rather than violating a unique key.
+    unique_branches = {}
     for version in versions:
+        key = (version.mst, version.list_effective_date)
+        previous = unique_branches.get(key)
+        if previous is not None:
+            if (previous.promulgation_date != version.promulgation_date
+                    or previous.history_code != version.history_code):
+                session.rollback()
+                return {"status": "SKIPPED",
+                        "reason_code": "CONFLICTING_EFFECTIVE_BRANCH_METADATA"}
+            continue
+        unique_branches[key] = version
+    for version in unique_branches.values():
         session.add(LawVersionEffectiveBranch(
             id=str(uuid.uuid4()), law_id=law_id, mst=version.mst,
             effective_date=version.list_effective_date,
