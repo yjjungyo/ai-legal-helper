@@ -357,6 +357,9 @@ def extract_amount_roles(text: str) -> Tuple[List[int], Dict[str, List[int]]]:
 
     amounts: List[int] = []
     roles: Dict[str, List[int]] = {}
+    # One semantic classification per statement, not one remote LLM call
+    # per amount token. Multi-role statements remain GENERAL_AMOUNT.
+    statement_role = _classify_amount_role("", "", "", text)
 
     for match in _AMOUNT_EXPR_RE.finditer(text):
         num_part = (match.group(1) or "").strip()
@@ -381,17 +384,7 @@ def extract_amount_roles(text: str) -> Tuple[List[int], Dict[str, List[int]]]:
         if val not in amounts:
             amounts.append(val)
 
-        # 한국어 금액 구문에서는 금액 직전 명사구(예: '보증금 3억', '계약금 3천만', '잔금 2억 7천만')가 역할을 가장 정확히 나타내므로
-        # 직전 문맥(pre_ctx)을 1순위로 검사하고, 직후 서술어('반환하였다', '반환을 요청하였다')를 포함한 인접 문맥을 2순위로 검사한다.
-        pre_ctx = text[max(0, match.start() - 12):match.start()]
-        imm_start = max(0, match.start() - 10)
-        imm_end = min(len(text), match.end() + 12)
-        immediate_ctx = text[imm_start:imm_end]
-
-        start_idx = max(0, match.start() - 20)
-        end_idx = min(len(text), match.end() + 16)
-        local_ctx = text[start_idx:end_idx]
-        role = _classify_amount_role(pre_ctx, immediate_ctx, local_ctx, text)
+        role = statement_role
         role_list = roles.setdefault(role, [])
         if val not in role_list:
             role_list.append(val)
@@ -436,6 +429,7 @@ def extract_dates_with_validation(text: str) -> Tuple[List[str], List[str], Dict
     valid_dates: List[str] = []
     invalid_dates: List[str] = []
     date_roles: Dict[str, List[str]] = {}
+    statement_role = _classify_date_role("", text)
 
     for m in _DATE_FULL_RE.finditer(text):
         yyyy, mm, dd = int(m.group(1)), int(m.group(2)), int(m.group(3))
@@ -445,10 +439,7 @@ def extract_dates_with_validation(text: str) -> Tuple[List[str], List[str], Dict
             iso = valid_dt.isoformat()
             if iso not in valid_dates:
                 valid_dates.append(iso)
-            start_idx = max(0, m.start() - 24)
-            end_idx = min(len(text), m.end() + 24)
-            local_ctx = text[start_idx:end_idx]
-            role = _classify_date_role(local_ctx, text)
+            role = statement_role
             r_list = date_roles.setdefault(role, [])
             if iso not in r_list:
                 r_list.append(iso)
