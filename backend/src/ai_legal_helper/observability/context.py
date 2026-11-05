@@ -161,3 +161,18 @@ def get_context_dict() -> dict:
         "node_name": get_node_name(),
     }
 
+
+# P12: immutable per-agent temporal retrieval context; scoped to one worker.
+_temporal_retrieval_var: contextvars.ContextVar[Optional[dict]] = contextvars.ContextVar(
+    "temporal_retrieval", default=None
+)
+
+def set_temporal_retrieval_context(value: Optional[dict]) -> contextvars.Token:
+    return _temporal_retrieval_var.set(dict(value) if value else None)
+
+def get_temporal_retrieval_context() -> Optional[dict]:
+    value = _temporal_retrieval_var.get()
+    return dict(value) if value else None
+
+def reset_temporal_retrieval_context(token: contextvars.Token) -> None:
+    _temporal_retrieval_var.reset(token)
