@@ -139,3 +139,49 @@ def test_bulk_index_does_not_interpret_unreviewed_addenda():
     )
     assert result is None
     assert status == "UNCONFIRMED"
+
+
+
+def test_persisted_human_approved_amounts_do_not_call_llm():
+    def fact(statement, label, category, amount, quote, ident):
+        return FactItemBrief(
+            fact_id=ident, statement=statement,
+            adjudication_status="EVIDENCE_SUPPORTED",
+            document_name=f"{ident}.pdf",
+            reviewed_semantics={
+                "status": "HUMAN_APPROVED", "category": category,
+                "amount_krw": amount, "evidence_quote": quote,
+            },
+        )
+    briefing = CaseEvidenceBriefing(
+        case_id="typed", title="인증 금액 재사용",
+        facts=[
+            fact("임대차 보증금 3억 원 계약", "E01", "CONTRACT_PRINCIPAL",
+                 300_000_000, "3억 원", "contract"),
+            fact("보증금 2천만 원 분할 반환을 제안", "E02", "PROMISE_OR_PROPOSAL",
+                 20_000_000, "2천만 원", "proposal"),
+            fact("보증금 500만 원 실제 이체 반환, 거래번호 TX-101", "E03",
+                 "ACTUAL_REPAYMENT", 5_000_000, "500만 원", "transfer"),
+        ],
+    )
+    with patch(
+        "ai_legal_helper.case_intelligence.semantic_judgment.classify_statement",
+        side_effect=AssertionError("Already-reviewed fact must not invoke LLM"),
+    ):
+        assert extract_case_contract_deposit(briefing) == 300_000_000
+        assert extract_case_prior_verified_repayments(briefing)[0] == 5_000_000
+
+
+def test_unreviewed_amount_does_not_gain_fake_semantic_trust():
+    briefing = CaseEvidenceBriefing(
+        case_id="unreviewed", title="미승인 금액",
+        facts=[FactItemBrief(
+            fact_id="f1", statement="보증금 3억 원 반환 계획",
+            adjudication_status="USER_ALLEGED",
+            reviewed_semantics={
+                "status": "VERIFIED", "category": "ACTUAL_REPAYMENT",
+                "amount_krw": 300_000_000, "evidence_quote": "3억 원",
+            },
+        )],
+    )
+    assert extract_case_prior_verified_repayments(briefing)[0] == 0
