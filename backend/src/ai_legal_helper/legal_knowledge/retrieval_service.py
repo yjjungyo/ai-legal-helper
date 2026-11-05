@@ -402,6 +402,13 @@ class LawRetrievalService:
                     ):
                         # Similarity search must not reintroduce an outdated MST.
                         continue
+                    if ready_mst:
+                        # Official indexed chunks must retain the exact source
+                        # fingerprint recorded when the XML was embedded.
+                        actual_hash = hashlib.sha256(src["content"].encode("utf-8")).hexdigest()
+                        if not src.get("content_hash") or src["content_hash"] != actual_hash:
+                            response.reason_codes.append("INDEXED_SOURCE_HASH_MISMATCH")
+                            continue
                     src["retrieval_collection"] = collection
                     src["source_id"] = _canonical_source_id(src)
                     marker = _source_identity(src)
