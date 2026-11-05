@@ -448,7 +448,12 @@ def verify_issue(
                         in ("VERIFIED", "HUMAN_APPROVED")
                         and (getattr(f, "reviewed_semantics", {}) or {}).get("category")
                         == "ACTUAL_TERMINATION"
-                        and str((getattr(f, "reviewed_semantics", {}) or {}).get("evidence_quote") or "")
+                        and isinstance(
+                            (getattr(f, "reviewed_semantics", {}) or {}).get("evidence_quote"),
+                            str,
+                        )
+                        and bool((getattr(f, "reviewed_semantics", {}) or {}).get("evidence_quote"))
+                        and (getattr(f, "reviewed_semantics", {}) or {}).get("evidence_quote")
                         in (f.statement or "")
                     )
                     or termination_statement_status(f.statement) == "ACTUAL_TERMINATION"
