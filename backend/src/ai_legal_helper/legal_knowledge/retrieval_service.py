@@ -159,6 +159,26 @@ def _resolve_article_temporal_locally(*, law_id: str, event_date: str,
         )
 
 
+def _load_official_coverage(law_versions: dict[str, str]) -> dict[tuple[str, str, str], tuple[str, str]]:
+    """Authoritative PG coverage keyed by law ID, MST and indexed vector ID."""
+    from sqlalchemy import select
+    from ai_legal_helper.database.session import SessionLocal
+    from ai_legal_helper.legal_knowledge.index_jobs import LawArticleCoverage
+
+    with SessionLocal() as session:
+        rows = session.scalars(
+            select(LawArticleCoverage).where(
+                LawArticleCoverage.law_id.in_(list(law_versions)),
+            )
+        ).all()
+        return {
+            (str(row.law_id), str(row.mst), str(row.vector_id)):
+                (str(row.article_id), str(row.content_hash))
+            for row in rows
+            if str(row.mst) == law_versions.get(str(row.law_id))
+        }
+
+
 def _resolve_catalog_locally(question: str) -> Any:
     """P2 로컬 카탈로그만 접근한다. DB 미설치 시 호출자가 기존 검색으로 복귀한다."""
     from ai_legal_helper.database.session import SessionLocal
@@ -185,6 +205,7 @@ class LawRetrievalService:
         enable_catalog: Optional[bool] = None,
         index_fn: Optional[Callable[..., Any]] = None,
         article_temporal_fn: Optional[Callable[..., Any]] = None,
+        coverage_fn: Optional[Callable[[dict[str, str]], dict]] = None,
     ):
         if retrieval_fn is None:
             from ai_legal_helper.rag.retrieval import retrieve_with_status
@@ -193,6 +214,7 @@ class LawRetrievalService:
         self.catalog_fn = catalog_fn or _resolve_catalog_locally
         self.index_fn = index_fn or _resolve_index_locally
         self.article_temporal_fn = article_temporal_fn or _resolve_article_temporal_locally
+        self.coverage_fn = coverage_fn or _load_official_coverage
         self.enable_global = (
             os.getenv("LEGAL_GLOBAL_RETRIEVAL_ENABLED", "1") == "1"
             if enable_global is None else bool(enable_global)
@@ -352,6 +374,17 @@ class LawRetrievalService:
                 collections.append(GLOBAL_LAW_COLLECTION)
             collections.append(f"law_docs_{category_eng}")
 
+        coverage_by_vector = {}
+        if ready_mst:
+            try:
+                coverage_by_vector = self.coverage_fn(ready_mst)
+            except Exception as exc:
+                logger.warning("[LAW_RETRIEVAL] coverage lookup failed type=%s", type(exc).__name__)
+                response.status = LawSourceStatus.SOURCE_VERSION_UNCONFIRMED
+                response.reason_codes.append("POSTGRES_COVERAGE_UNAVAILABLE")
+                response.official_search_recommended = False
+                return response
+
         seen: set[tuple] = set()
         found: list[dict[str, Any]] = []
         failures: list[str] = []
@@ -408,6 +441,15 @@ class LawRetrievalService:
                         actual_hash = hashlib.sha256(src["content"].encode("utf-8")).hexdigest()
                         if not src.get("content_hash") or src["content_hash"] != actual_hash:
                             response.reason_codes.append("INDEXED_SOURCE_HASH_MISMATCH")
+                            continue
+                        law_id = str(src.get("law_id") or "")
+                        mst = str(src.get("version_id") or "")
+                        vector_id = str(getattr(doc, "id", "") or
+                                        (getattr(doc, "metadata", None) or {}).get("id") or "")
+                        expected = coverage_by_vector.get((law_id, mst, vector_id))
+                        if (expected is None or expected[0] != str(src.get("article") or "")
+                                or expected[1] != actual_hash):
+                            response.reason_codes.append("POSTGRES_VECTOR_COVERAGE_MISMATCH")
                             continue
                     src["retrieval_collection"] = collection
                     src["source_id"] = _canonical_source_id(src)
