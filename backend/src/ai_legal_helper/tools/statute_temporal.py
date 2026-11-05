@@ -88,11 +88,9 @@ def _effective_from_addendum(addendum: Addendum, article: str) -> Optional[str]:
         return None
     clause = first_article.group(1)
     if "다만" in clause:
-        exception = clause.split("다만", 1)[1]
-        # 개별 시행일 예외에 해당하면 일반 시행일을 강제로 적용하지 않는다.
-        number = re.search(r"제\s*\d+\s*조(?:\s*의\s*\d+)?", article)
-        if number and re.sub(r"\s+", "", number.group()) in re.sub(r"\s+", "", exception):
-            return None
+        # Exception scopes can reference ranges, items, or other provisions.
+        # A simple regex cannot prove that the requested article is excluded.
+        return None
     promulgated = parse_date(addendum.promulgation_date)
     if not promulgated:
         return None
