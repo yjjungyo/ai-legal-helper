@@ -94,6 +94,8 @@ def _semantic_review(
         "다른 개정 버전이나 다른 사건에 대한 조건부 설명을 현재 적용 주장과 혼동하지 마세요. "
         "답변의 시점 판단이 공식 근거와 모순되는 것이 분명한 경우에만 CONTRADICTED를 택하세요. "
         "그렇지 않거나 근거가 부족하면 UNCONFIRMED로 반환하세요. "
+        "SUPPORTED 또는 CONTRADICTED 판정에는 답변 및 공식 원문의 정확한 인용을 "
+        "각각 필수로 제시하세요. "
         "JSON 객체만 출력: "
         '{"verdict":"SUPPORTED|CONTRADICTED|UNCONFIRMED",'
         '"claim_quote":"답변의 정확한 연속 인용 또는 빈 문자열",'
