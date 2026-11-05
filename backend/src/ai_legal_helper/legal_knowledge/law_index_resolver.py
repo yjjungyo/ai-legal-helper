@@ -138,6 +138,19 @@ class LawIndexResolver:
         if not candidates:
             return result("INDEX_MISSING", "NO_VERSION_EFFECTIVE_BY_EVENT",
                           snapshot_id=snapshot.id)
+        # Future versions with the same earliest effective date but different
+        # MSTs can affect transitional provisions. Do not treat the selected
+        # past MST as conclusively safe without resolving that ambiguity.
+        future = []
+        for version in versions:
+            effective = parse_legal_date(version.list_effective_date)
+            if effective is not None and effective > parsed:
+                future.append((effective, version))
+        if future:
+            next_date = min(eff for eff, _ in future)
+            if len({v.mst for eff, v in future if eff == next_date}) != 1:
+                return result("VERSION_AMBIGUOUS", "MULTIPLE_FUTURE_MST_SAME_EFFECTIVE_DATE",
+                              snapshot_id=snapshot.id)
         newest_date = max(eff for eff, _ in candidates)
         newest = [version for eff, version in candidates if eff == newest_date]
         if len({v.mst for v in newest}) != 1:
@@ -146,7 +159,9 @@ class LawIndexResolver:
         version = newest[0]
         if (version.index_status != "READY"
                 or version.xml_identity_status != "VERIFIED"
-                or not version.official_xml_hash or version.chunk_count <= 0):
+                or not version.official_xml_hash
+                or len(version.official_xml_hash) != 64
+                or version.chunk_count <= 0):
             return result("INDEX_MISSING", "VERSION_NOT_READY",
                           mst=version.mst, snapshot_id=snapshot.id)
         job = self.session.scalar(select(OfficialLawIndexJob).where(
