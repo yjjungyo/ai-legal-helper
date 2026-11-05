@@ -259,3 +259,20 @@ def test_unsupported_legal_claims_do_not_pass_on_parser_failure():
     assert out["status"] == "REVISE"
     assert out["temporal_recheck_only"] is True
     assert out["reason_code"] == "TEMPORAL_SEMANTIC_REVIEW_REQUIRED"
+
+
+
+def test_document_mode_temporal_recheck_never_rewrites_draft():
+    state = {
+        "answer_mode": "DOCUMENT",
+        "question": QUESTION, "draft_answer": GOOD,
+        "revision_count": 0,
+        "verification_result": {"temporal_recheck_only": True},
+    }
+    with patch(
+        "ai_legal_helper.workflows.legal_workflow.generate_answer",
+        side_effect=AssertionError("Must not rewrite a legally uncontradicted draft"),
+    ):
+        out = revise_node(state)
+    assert out["draft_answer"] == GOOD
+    assert out["revision_method"] == "TEMPORAL_RECHECK_NO_REWRITE"
