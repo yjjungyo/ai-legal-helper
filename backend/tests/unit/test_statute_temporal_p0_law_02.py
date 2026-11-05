@@ -123,7 +123,10 @@ def test_official_tool_includes_matching_addendum_and_correct_date(monkeypatch):
     assert addenda[0]["content"] == ADDENDUM
     assert "제2조(임대차신고에 관한 적용례)" in addenda[0]["content"]
     # A complete official source is not itself a semantic verdict about an answer.
-    assert temporal_answer_errors(QUESTION, BAD_ANSWER, sources) == []
+    # Search retrieves official addenda but does not semantically certify
+    # a free-text effective date. The later temporal verification stage does.
+    assert temporal_answer_errors(QUESTION, BAD_ANSWER, sources)
+    assert temporal_answer_errors(QUESTION, GOOD_ANSWER, sources)
 
 
 def test_wrong_law_addendum_not_attached(monkeypatch):
