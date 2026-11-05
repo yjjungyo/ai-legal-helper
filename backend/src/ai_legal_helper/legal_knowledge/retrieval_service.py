@@ -117,9 +117,10 @@ def _source_matches_law(source: dict, law: dict) -> bool:
         return False
     target_id = str(law.get("law_id") or "").strip()
     actual_id = str(source.get("law_id") or "").strip()
-    # 서로 다른 ID가 있으면 법령명이 같더라도 다른 법령 버전/매핑 오류일 수 있다.
-    if target_id and actual_id:
-        return target_id == actual_id
+    # An officially resolved law ID must match an explicitly identified source.
+    # Name-only legacy PDF chunks cannot establish official law identity.
+    if target_id:
+        return bool(actual_id) and target_id == actual_id
     return bool(
         normalize_law_name(source.get("statute_name") or "")
         and normalize_law_name(source.get("statute_name") or "")
