@@ -18,7 +18,7 @@ import logging
 import math
 import os
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Callable, Optional
 
 from sqlalchemy import select
@@ -33,7 +33,6 @@ logger = logging.getLogger(__name__)
 
 COLLECTION_NAME = "law_docs_global"
 MAX_ATTEMPTS = 3
-LEASE_TIMEOUT_MINUTES = 30
 
 def validate_embedding_vectors(vectors, expected_count: int) -> None:
     if len(vectors) != expected_count:
@@ -113,24 +112,7 @@ def claim_job(session, worker_id: str) -> OfficialLawIndexJob | None:
             .with_for_update(skip_locked=True).limit(1))
     job = session.scalar(stmt)
     if not job:
-        stale = session.scalar(
-            select(OfficialLawIndexJob)
-            .where(OfficialLawIndexJob.status == "INDEXING")
-            .where(OfficialLawIndexJob.updated_at < now - timedelta(minutes=LEASE_TIMEOUT_MINUTES))
-            .order_by(OfficialLawIndexJob.updated_at, OfficialLawIndexJob.id)
-            .with_for_update(skip_locked=True).limit(1)
-        )
-        if stale is None:
-            return None
-        if stale.attempts >= MAX_ATTEMPTS:
-            stale.status = "FAILED"
-            stale.error_code = "INDEXING_LEASE_EXPIRED"
-            stale.lease_owner = None
-            stale.finished_at = now
-            stale.updated_at = now
-            session.commit()
-            return None
-        job = stale
+        return None
     job.status = "INDEXING"
     job.attempts += 1
     job.lease_owner = worker_id[:64]
