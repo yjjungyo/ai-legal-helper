@@ -230,6 +230,7 @@ def apply_temporal_gate_to_verification(
     gate: TemporalGateResult,
     *,
     official_sources_present: bool = True,
+    official_source_ids: Iterable[str] | None = None,
 ) -> dict[str, Any]:
     """Do not convert a parser failure into a legal contradiction.
 
@@ -256,8 +257,16 @@ def apply_temporal_gate_to_verification(
             c for c in (output.get("claims") or []) if isinstance(c, Mapping)
             and c.get("claim_type") in ("LEGAL_RULE", "LEGAL_APPLICATION")
         ]
+        verified_official_ids = (
+            {str(x) for x in official_source_ids}
+            if official_source_ids is not None else None
+        )
         verified = bool(legal_claims) and all(
-            c.get("grounding_status") == "SUPPORTED" and c.get("source_ids")
+            c.get("grounding_status") == "SUPPORTED"
+            and c.get("source_ids")
+            and (verified_official_ids is None
+                 or any(str(sid) in verified_official_ids
+                        for sid in c.get("source_ids") or []))
             for c in legal_claims
         )
         if verified and official_sources_present:
