@@ -126,3 +126,20 @@ def interpret_article_dates(
             results.append(chosen[0] if len({x.effective_from for x in chosen}) == 1
                            else unknown(article, "CONFLICTING_EFFECTIVE_DATES"))
     return results
+
+
+def interpret_with_company_llm(*, article_ids: Sequence[str],
+                               official_addenda: Sequence[str],
+                               promulgation_date: str | None) -> list[EffectiveInterpretation]:
+    """Explicit opt-in entry point using the existing observable LLM gateway.
+
+    Not invoked by the background indexing worker automatically: the caller
+    controls cost and whether the official source is HILT-authorized.
+    """
+    from ai_legal_helper.llm.gateway import get_llm
+    llm = get_llm(temperature=0.0)
+    return interpret_article_dates(
+        article_ids=article_ids, official_addenda=official_addenda,
+        promulgation_date=promulgation_date,
+        llm_invoke=lambda prompt: llm.invoke(prompt).content,
+    )
