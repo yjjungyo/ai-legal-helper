@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select
 
-from ai_legal_helper.legal_knowledge.index_jobs import LawHistorySnapshot, LawVersionIndex
+from ai_legal_helper.legal_knowledge.index_jobs import LawHistorySnapshot, LawVersionIndex, LawVersionEffectiveBranch
 from ai_legal_helper.tools.official_statute_versions import VersionLookup
 
 logger = logging.getLogger(__name__)
@@ -57,6 +57,14 @@ def store_complete_history(session, lookup: VersionLookup, *, law_id: str) -> di
         fingerprint=fingerprint,
     )
     session.add(snapshot)
+    for version in versions:
+        session.add(LawVersionEffectiveBranch(
+            id=str(uuid.uuid4()), law_id=law_id, mst=version.mst,
+            effective_date=version.list_effective_date,
+            promulgation_date=version.promulgation_date,
+            history_code=version.history_code,
+            source_snapshot_id=snapshot.id,
+        ))
     # Do not overwrite a previously verified XML identity or indexing status.
     # For ambiguous multi-date MSTs, no rows are bound to this snapshot:
     # the resolver will fail closed until the schema supports branches.
