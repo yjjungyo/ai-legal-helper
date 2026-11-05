@@ -160,4 +160,4 @@ docker compose start api frontend
 3. ChromaDB 삭제와 PostgreSQL 초기화 사이에는 서비스 정합성이 깨질 수 있으므로 상담/Worker 중지 상태에서 수행한다.
 4. 공식 XML 조문별 시행일은 불명확하면 `UNCONFIRMED`로 남는다. 임베딩 완료(`READY`)가 법률상 적용 확정은 아니다.
 5. 재임베딩 전에 `backend/.env`의 DB와 Chroma 연결 설정을 확인한다. 검색 프로세스와 Worker가 서로 다른 Chroma 인스턴스를 바라보면 검증에 실패한다.
-6. `pg_dump -Fc`의 PowerShell 리다이렉션은 PowerShell 버전/인코딩에 따라 바이너리 백업을 손상시킬 수 있다. **실제 백업은 검증 가능한 방식(예: 컨테이너 안에서 파일 생성 후 `docker cp`)을 권장**한다.
+6. 백업은 컨테이너 내부에서 파일을 생성한 뒤 `docker cp`로 복사한다. 백업 파일 존재와 복원 가능 여부를 별도 확인한다.
