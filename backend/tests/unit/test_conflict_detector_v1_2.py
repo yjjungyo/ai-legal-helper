@@ -421,8 +421,22 @@ class TestConflictDetectorV12Scenarios:
         db.close()
 
     def test_s16_neo4j_fallback_to_postgresql_api(self, monkeypatch):
-        """[S16] Neo4j 드라이버 연결 실패 시에도 PostgreSQL 기반 get_evidence_conflicts가 정상 서빙됨."""
+        """[S16] Neo4j 장애에도 검증된 금액 역할은 PostgreSQL에서 상충 조회."""
         monkeypatch.setattr("ai_legal_helper.database.neo4j.get_neo4j_driver", lambda: None)
+
+        # Reproducible *verified semantic roles* in this isolated offline
+        # test; a networkless amount without role must not be a contradiction.
+        def approved_roles(statement, *, spans, labels_by_kind, **kwargs):
+            if statement not in (
+                "보증금은 300,000,000원이다.",
+                "보증금은 200,000,000원이다.",
+            ):
+                return {}
+            return {x["id"]: "PRINCIPAL_DEPOSIT" for x in spans if x["kind"] == "AMOUNT"}
+        monkeypatch.setattr(
+            "ai_legal_helper.case_intelligence.semantic_judgment.classify_numeric_spans",
+            approved_roles,
+        )
         db = _create_test_db()
         user = User(id="u-s16", email="s16@example.com", password_hash="hash")
         case = Case(id="c-s16", user_id="u-s16", title="Neo4j 폴백 테스트")
