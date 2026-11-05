@@ -111,6 +111,15 @@ def FactItemBrief(*args, **kwargs):
             "amount_krw": amount,
             "evidence_quote": statement,
         }
+    elif statement == (
+        "2024년 2월 28일 임대차계약 기간 만료. "
+        "갱신거절 통지가 도달하여 갱신 없이 계약이 종료되었다."
+    ):
+        kwargs["reviewed_semantics"] = {
+            "status": "HUMAN_APPROVED",
+            "category": "ACTUAL_TERMINATION",
+            "evidence_quote": statement,
+        }
     return _OriginalFactItemBrief(*args, **kwargs)
 
 
