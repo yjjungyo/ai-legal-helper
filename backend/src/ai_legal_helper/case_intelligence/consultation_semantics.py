@@ -5,11 +5,11 @@ case evidence. Model disagreement/failure is UNKNOWN, never a repayment fact.
 """
 from __future__ import annotations
 
-from ai_legal_helper.case_intelligence.semantic_judgment import classify_statement
+from ai_legal_helper.case_intelligence import semantic_judgment
 
 
 def _consultation_intent(question: str) -> str:
-    return classify_statement(
+    return semantic_judgment.classify_statement(
         question,
         task="CONSULTATION_INTENT_AND_REPAYMENT_ASSERTION",
         labels=("REPAYMENT_ASSERTED", "EVIDENCE_REVIEW", "OTHER"),
@@ -47,7 +47,7 @@ def is_evidence_review_request(question: str) -> bool:
 
 def termination_statement_status(statement: str) -> str:
     """ACTUAL_TERMINATION, CONDITIONAL_OR_PLANNED, OTHER or UNKNOWN."""
-    result = classify_statement(
+    result = semantic_judgment.classify_statement(
         statement,
         task="CONTRACT_TERMINATION_OCCURRENCE",
         labels=("CONDITIONAL_OR_PLANNED", "ACTUAL_TERMINATION", "OTHER"),
