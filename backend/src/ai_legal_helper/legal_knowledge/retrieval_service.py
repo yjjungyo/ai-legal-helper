@@ -341,10 +341,16 @@ class LawRetrievalService:
                     temporal_gate_unconfirmed = True
                     response.reason_codes.append("ARTICLE_TEMPORAL_GATE_UNAVAILABLE")
 
-        collections = []
-        if self.enable_global:
-            collections.append(GLOBAL_LAW_COLLECTION)
-        collections.append(f"law_docs_{category_eng}")
+        # Official law-ID/MST indexed sources live in the global collection.
+        # Legacy PDF collections cannot prove official identity/version and
+        # must not turn a valid global hit into a partial infrastructure error.
+        if ready_mst:
+            collections = [GLOBAL_LAW_COLLECTION]
+        else:
+            collections = []
+            if self.enable_global:
+                collections.append(GLOBAL_LAW_COLLECTION)
+            collections.append(f"law_docs_{category_eng}")
 
         seen: set[tuple] = set()
         found: list[dict[str, Any]] = []
