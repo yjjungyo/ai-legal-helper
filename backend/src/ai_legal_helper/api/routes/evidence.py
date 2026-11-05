@@ -252,26 +252,15 @@ def get_evidence_conflicts(
                     link.id, claim.id, fact.id, link.link_type,
                     decision.status, decision.reason_code,
                 )
-                if (
-                    decision.status == "INSUFFICIENT_INFORMATION"
-                    and link.link_type == "CONTRADICTS"
-                ):
-                    # Never hide an existing recorded dispute just because the
-                    # current semantic reviewer is unavailable. Equally, an
-                    # old CONTRADICTS link alone is NOT proof of contradiction.
-                    conflict_status = "POTENTIAL_CONFLICT"
-                    reason_code = "STORED_CONTRADICTION_REQUIRES_REVIEW"
-                    explanation = (
-                        "과거 상충으로 등록된 증거가 있으나 현재 금액/사실 역할을 "
-                        "재검증할 수 없어 확정 모순에서 제외했습니다. "
-                        "원문과 거래 의미를 다시 확인해야 합니다."
-                    )
-                elif decision.status not in ("CONTRADICTION", "POTENTIAL_CONFLICT"):
+                # Stored conflict links are not evidence of a currently
+                # verified contradiction. Unreviewed or semantically
+                # unresolved pairs are removed from the actionable conflict
+                # list; they remain available in immutable evidence audits.
+                if decision.status not in ("CONTRADICTION", "POTENTIAL_CONFLICT"):
                     continue
-                else:
-                    conflict_status = decision.status
-                    reason_code = decision.reason_code
-                    explanation = decision.explanation
+                conflict_status = decision.status
+                reason_code = decision.reason_code
+                explanation = decision.explanation
         elif link.target_type == "EVENT":
             evt = db.query(Event).filter_by(id=link.target_id).first()
             if evt:
