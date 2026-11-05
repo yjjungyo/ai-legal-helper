@@ -96,3 +96,22 @@ class LawArticleCoverage(Base):
     effective_to = Column(String(10))
     applicability_review_status = Column(String(32), nullable=False, default="UNCONFIRMED")
     indexed_at = Column(DateTime, nullable=False)
+
+
+class LawVersionEffectiveBranch(Base):
+    """Official history may list multiple effective dates for one MST."""
+    __tablename__ = "law_version_effective_branches"
+    __table_args__ = (
+        UniqueConstraint("law_id", "mst", "effective_date",
+                         name="uq_law_version_effective_branch"),
+        Index("ix_law_version_effective_branch_snapshot", "source_snapshot_id"),
+    )
+
+    id = Column(String(36), primary_key=True)
+    law_id = Column(String(64), nullable=False)
+    mst = Column(String(80), nullable=False)
+    effective_date = Column(String(10), nullable=False)
+    promulgation_date = Column(String(10))
+    history_code = Column(String(30))
+    source_snapshot_id = Column(String(36), ForeignKey("law_history_snapshots.id"),
+                                nullable=False)
