@@ -86,33 +86,57 @@ def seed_conflict(db, fact_statement=FACT_TEXT, claim_statement=CLAIM_TEXT,
 
 
 def test_installment_proposal_and_difficulty_are_not_contradictory():
-    """상충 #6 실제 문장: 분할 반환 제안은 일시 반환 곤란 진술과 양립한다."""
-    proposal = extract_semantic_proposition(FACT_TEXT)
-    difficulty = extract_semantic_proposition(CLAIM_TEXT)
-    assert proposal.speech_act == "PROPOSAL"
-    assert difficulty.speech_act != "PROPOSAL"
-    comp = check_proposition_comparability(proposal, difficulty)
-    assert comp.is_comparable is False
-    assert comp.status == "DIFFERENT_CONTEXT"
-    assert comp.reason_code == "PAYMENT_PROPOSAL_VS_CAPACITY_STATEMENT"
+    """분할반환 제안과 즉시 반환 곤란은 서로 양립한다."""
+    from unittest.mock import patch
+    from ai_legal_helper.case_intelligence.semantic_judgment import SemanticDecision
 
-    for claim_text, fact_text in ((CLAIM_TEXT, FACT_TEXT), (FACT_TEXT, CLAIM_TEXT)):
-        slots = build_structured_slots(claim_text, claim_type="ACTION")
-        fact = Fact(id="fact-test", statement=fact_text, fact_type="ACTION")
-        decision = evaluate_claim_against_fact(
-            claim_slots=slots, fact=fact, enable_llm_verification=False,
-        )
-        assert decision.status == "DIFFERENT_CONTEXT"
-        assert decision.reason_code == "PAYMENT_PROPOSAL_VS_CAPACITY_STATEMENT"
+    def reviewed_label(statement, *, task, **kwargs):
+        if task == "SPEECH_ACT_AND_EXECUTION_STATUS":
+            return SemanticDecision(
+                "PROPOSAL" if statement == FACT_TEXT else "STATEMENT",
+                statement,
+            )
+        return SemanticDecision("UNKNOWN", "", status="UNCONFIRMED")
+
+    with patch(
+        "ai_legal_helper.case_intelligence.semantic_judgment.classify_statement",
+        side_effect=reviewed_label,
+    ):
+        proposal = extract_semantic_proposition(FACT_TEXT)
+        difficulty = extract_semantic_proposition(CLAIM_TEXT)
+        assert proposal.speech_act == "PROPOSAL"
+        assert difficulty.speech_act != "PROPOSAL"
+        comp = check_proposition_comparability(proposal, difficulty)
+        assert comp.is_comparable is False
+        assert comp.status == "DIFFERENT_CONTEXT"
+        assert comp.reason_code == "PAYMENT_PROPOSAL_VS_CAPACITY_STATEMENT"
+
+        for claim_text, fact_text in ((CLAIM_TEXT, FACT_TEXT), (FACT_TEXT, CLAIM_TEXT)):
+            slots = build_structured_slots(claim_text, claim_type="ACTION")
+            fact = Fact(id="fact-test", statement=fact_text, fact_type="ACTION")
+            decision = evaluate_claim_against_fact(
+                claim_slots=slots, fact=fact, enable_llm_verification=False,
+            )
+            assert decision.status == "DIFFERENT_CONTEXT"
+            assert decision.reason_code == "PAYMENT_PROPOSAL_VS_CAPACITY_STATEMENT"
 
 
 def test_real_amount_contradiction_is_still_detected():
     """동일 계약의 보증금 액수가 실질적으로 다르면 기존 상충 탐지를 유지한다."""
     slots = build_structured_slots("보증금은 2억 원이다.", claim_type="AMOUNT")
     fact = Fact(id="real-conflict", statement="보증금은 3억 원이다.", fact_type="AMOUNT")
-    decision = evaluate_claim_against_fact(
-        claim_slots=slots, fact=fact, enable_llm_verification=False,
-    )
+    from unittest.mock import patch
+    from ai_legal_helper.case_intelligence.conflict_detector import _LLMConflictVerificationSchema
+    with patch(
+        "ai_legal_helper.case_intelligence.conflict_detector._verify_pair_with_llm",
+        return_value=_LLMConflictVerificationSchema(
+            status="CONTRADICTION", reason_code="MUTUALLY_EXCLUSIVE_AMOUNT",
+            explanation="같은 계약의 보증금 원금 금액이 상반됨",
+        ),
+    ):
+        decision = evaluate_claim_against_fact(
+            claim_slots=slots, fact=fact, enable_llm_verification=True,
+        )
     assert decision.status == "CONTRADICTION"
 
 
