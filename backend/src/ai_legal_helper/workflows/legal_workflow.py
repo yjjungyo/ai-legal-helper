@@ -1252,6 +1252,15 @@ def revise_node(state: LegalState) -> Dict:
         Dict: 수정된 `draft_answer`, 보강된 `retrieved_sources`, 증가된 `revision_count`.
     """
     set_node_name("revise")
+    ver_res = state.get("verification_result", {}) or {}
+    if ver_res.get("temporal_recheck_only"):
+        # This technical check must precede DOCUMENT_MODE repair too.
+        logger.info("[REVISE] technical temporal recheck without changing draft")
+        return {
+            "draft_answer": state.get("draft_answer", ""),
+            "revision_count": state.get("revision_count", 0) + 1,
+            "revision_method": "TEMPORAL_RECHECK_NO_REWRITE",
+        }
     if state.get("answer_mode") == DOCUMENT_MODE:
         return generate_answer(state, repair=True)
     from ai_legal_helper.llm.gateway import get_llm
@@ -1259,15 +1268,6 @@ def revise_node(state: LegalState) -> Dict:
     from ai_legal_helper.rag.source_schema import build_source_from_chroma_doc
     from langchain_core.prompts import PromptTemplate
 
-    ver_res = state.get("verification_result", {}) or {}
-    if ver_res.get("temporal_recheck_only"):
-        # No legal error has been demonstrated. Preserve the exact answer.
-        logger.info("[REVISE] technical temporal recheck without changing draft")
-        return {
-            "draft_answer": state.get("draft_answer", ""),
-            "revision_count": state.get("revision_count", 0) + 1,
-            "revision_method": "TEMPORAL_RECHECK_NO_REWRITE",
-        }
     instructions = ver_res.get("revision_instructions", [])
     missing_issues = ver_res.get("missing_issues", [])
     contradictions = ver_res.get("contradictions", [])
