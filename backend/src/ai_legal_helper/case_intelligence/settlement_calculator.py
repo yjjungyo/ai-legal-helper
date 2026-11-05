@@ -118,47 +118,21 @@ def extract_dates_from_text(text: str) -> List[str]:
 
 
 def extract_amounts_from_text(text: str) -> Set[int]:
-    """문자열에서 금액(원 단위 정수) 목록을 추출한다."""
+    """Parse all literal KRW amounts with the case-wide Korean numeral parser.
+
+    Source-of-truth for monetary syntax is conflict_detector's pure numeric
+    extraction, not an independent/partial regex. This supports Korean numerals
+    (삼억 원), compound units (3억 2천 5백만원), and separates amounts when a
+    sentence mentions both principal and an actual refund.
+    Parsing a number never proves its semantic role or repayment status.
+    """
     if not text:
         return set()
-    amounts: Set[int] = set()
-    cleaned_text = text
-
-    # 1. 억 + (천만/만) 단위
-    eok_pattern = re.compile(r"(\d+)\s*억(?:\s*(\d+(?:,\d{3})*|\d+)\s*(천\s*만|만))?\s*원?")
-    for m in eok_pattern.finditer(text):
-        eok = int(m.group(1)) * 100_000_000
-        rest = 0
-        if m.group(2):
-            raw_rest = int(m.group(2).replace(",", ""))
-            unit = m.group(3) or ""
-            if "천" in unit:
-                rest = raw_rest * 10_000_000
-            else:
-                rest = raw_rest * 10_000
-        amounts.add(eok + rest)
-    cleaned_text = eok_pattern.sub(" ", cleaned_text)
-
-    # 2. 천만원 단위
-    cheon_pattern = re.compile(r"(\d+)\s*천\s*만\s*원?")
-    for m in cheon_pattern.finditer(cleaned_text):
-        amounts.add(int(m.group(1)) * 10_000_000)
-    cleaned_text = cheon_pattern.sub(" ", cleaned_text)
-
-    # 3. 만원 단위
-    man_pattern = re.compile(r"(\d+(?:,\d{3})*|\d+)\s*만\s*원?")
-    for m in man_pattern.finditer(cleaned_text):
-        raw = m.group(1).replace(",", "")
-        amounts.add(int(raw) * 10_000)
-    cleaned_text = man_pattern.sub(" ", cleaned_text)
-
-    # 4. 콤마 포함 원 단위 및 5자리 이상 순수 숫자 원 단위 (P0-03/Gate 2)
-    won_pattern = re.compile(r"(\d{1,3}(?:,\d{3})+|\d{5,})\s*원")
-    for m in won_pattern.finditer(cleaned_text):
-        raw = m.group(1).replace(",", "")
-        amounts.add(int(raw))
-
-    return amounts
+    # Lazy import avoids the case intelligence import graph at module import.
+    from ai_legal_helper.case_intelligence.conflict_detector import (
+        extract_normalized_amounts,
+    )
+    return set(extract_normalized_amounts(text))
 
 
 def _approved_money_role(fact: FactItemBrief, category: str) -> tuple[int | None, str]:
