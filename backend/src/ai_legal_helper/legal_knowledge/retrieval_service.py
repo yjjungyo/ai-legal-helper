@@ -444,8 +444,8 @@ class LawRetrievalService:
                             continue
                         law_id = str(src.get("law_id") or "")
                         mst = str(src.get("version_id") or "")
-                        vector_id = str(getattr(doc, "id", "") or
-                                        (getattr(doc, "metadata", None) or {}).get("id") or "")
+                        vector_id = str((getattr(doc, "metadata", None) or {}).get("vector_id") or
+                                        getattr(doc, "id", "") or "")
                         expected = coverage_by_vector.get((law_id, mst, vector_id))
                         if (expected is None or expected[0] != str(src.get("article") or "")
                                 or expected[1] != actual_hash):
