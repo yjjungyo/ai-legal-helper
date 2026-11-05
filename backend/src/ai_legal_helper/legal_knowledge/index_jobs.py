@@ -115,3 +115,48 @@ class LawVersionEffectiveBranch(Base):
     history_code = Column(String(30))
     source_snapshot_id = Column(String(36), ForeignKey("law_history_snapshots.id"),
                                 nullable=False)
+
+
+class LawArticleVersion(Base):
+    """Article text/version evidence, separate from vector coverage."""
+    __tablename__ = "law_article_versions"
+    __table_args__ = (
+        UniqueConstraint("law_id", "mst", "article_id", "content_hash",
+                         name="uq_law_article_version_identity"),
+        Index("ix_law_article_version_effective", "law_id", "article_id",
+              "effective_from"),
+    )
+
+    id = Column(String(36), primary_key=True)
+    law_id = Column(String(64), nullable=False)
+    mst = Column(String(80), nullable=False)
+    article_id = Column(String(80), nullable=False)
+    content_hash = Column(String(64), nullable=False)
+    effective_from = Column(String(10))
+    effective_to = Column(String(10))
+    effective_date_basis = Column(String(64))
+    effective_date_status = Column(String(32), nullable=False, default="UNCONFIRMED")
+    source_vector_id = Column(String(300))
+    indexed_at = Column(DateTime, nullable=False)
+
+
+class LawTransitionRule(Base):
+    """Source-grounded addendum rules; no automated legal applicability claim."""
+    __tablename__ = "law_transition_rules"
+    __table_args__ = (
+        UniqueConstraint("law_id", "mst", "rule_hash",
+                         name="uq_law_transition_rule_identity"),
+        Index("ix_law_transition_rule_lookup", "law_id", "mst"),
+    )
+
+    id = Column(String(36), primary_key=True)
+    law_id = Column(String(64), nullable=False)
+    mst = Column(String(80), nullable=False)
+    rule_hash = Column(String(64), nullable=False)
+    rule_text = Column(Text, nullable=False)
+    promulgation_date = Column(String(10))
+    promulgation_number = Column(String(80))
+    rule_type = Column(String(32), nullable=False, default="UNCLASSIFIED")
+    applicability_status = Column(String(32), nullable=False, default="REVIEW_REQUIRED")
+    source_vector_id = Column(String(300))
+    indexed_at = Column(DateTime, nullable=False)
