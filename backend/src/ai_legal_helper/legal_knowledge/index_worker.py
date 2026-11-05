@@ -415,6 +415,15 @@ def process_next_job(
         if not payload:
             raise ValueError("OFFICIAL_XML_FETCH_FAILED")
         chunks = official_xml_chunks(payload, v)
+        # Reject a changed official body before touching Chroma.
+        existing_version = session.scalar(select(LawVersionIndex).where(
+            LawVersionIndex.law_id == v.law_id,
+            LawVersionIndex.mst == v.mst,
+        ))
+        payload_hash = hashlib.sha256(payload).hexdigest()
+        if (existing_version is not None and existing_version.official_xml_hash
+                and existing_version.official_xml_hash != payload_hash):
+            raise ValueError("OFFICIAL_XML_HASH_CHANGED_FOR_MST")
         count = index_one_version(
             v, api_key=api_key, fetch_xml=lambda _url: payload,
             chroma_collection=chroma_collection, embeddings=embeddings,
