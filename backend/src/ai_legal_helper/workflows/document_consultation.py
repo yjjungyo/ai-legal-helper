@@ -117,7 +117,9 @@ def generate_answer(
         새 초안, 출처 명세, 오류 상태 및 재작성 횟수.
     """
     sources = document_sources(state)
-    result: Dict[str, Any] = {"answer_mode": DOCUMENT_MODE, "retrieved_sources": sources}
+    # 이전 작성 실패 상태가 성공한 재작성까지 차단하지 않도록 매 시도마다 초기화한다.
+    result: Dict[str, Any] = {"answer_mode": DOCUMENT_MODE, "retrieved_sources": sources,
+                              "answer_generation_error": None}
     if repair and increment_revision:
         result["revision_count"] = (state.get("revision_count") or 0) + 1
     history = [m.content for m in (state.get("messages") or [])[:-1]
