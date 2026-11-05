@@ -111,6 +111,8 @@ def evaluate_statute_applicability(
     parsed_effective = parse_legal_date(recorded)
     parsed_end = parse_legal_date(source.get("effective_to"))
     expected_event_type = source.get("applicability_event_type")
+    allowed_event_types = source.get("applicability_event_types")
+    rule_condition = source.get("applicability_rule_condition")
     confidence = str(source.get("temporal_status") or "").strip().upper()
 
     def decision(status: ApplicabilityStatus, reason_code: str) -> ApplicabilityDecision:
@@ -152,6 +154,22 @@ def evaluate_statute_applicability(
         return decision(ApplicabilityStatus.UNCONFIRMED, "APPLICABILITY_REVIEW_REQUIRED")
     if expected_event_type and (not event_type or expected_event_type != event_type):
         return decision(ApplicabilityStatus.UNCONFIRMED, "EVENT_TYPE_NOT_VERIFIED")
+
+    # The semantic interpreter, not this calculator, decides which legal
+    # condition the official addendum expresses. Python checks dates only.
+    if allowed_event_types is not None:
+        if (not isinstance(allowed_event_types, (list, tuple))
+                or not event_type or event_type not in allowed_event_types):
+            return decision(ApplicabilityStatus.UNCONFIRMED, "EVENT_TYPE_NOT_VERIFIED")
+    if rule_condition is not None:
+        if rule_condition not in (
+            "ON_OR_AFTER_EFFECTIVE_DATE", "AFTER_EFFECTIVE_DATE", "ON_EFFECTIVE_DATE",
+        ):
+            return decision(ApplicabilityStatus.UNCONFIRMED, "APPLICATION_CONDITION_INVALID")
+        if rule_condition == "AFTER_EFFECTIVE_DATE" and parsed_event <= parsed_effective:
+            return decision(ApplicabilityStatus.NOT_APPLICABLE, "EVENT_NOT_AFTER_EFFECTIVE_DATE")
+        if rule_condition == "ON_EFFECTIVE_DATE" and parsed_event != parsed_effective:
+            return decision(ApplicabilityStatus.NOT_APPLICABLE, "EVENT_NOT_ON_EFFECTIVE_DATE")
 
     # 과거 버전 종료일 역시 법률 적용례가 검증된 경우에만 불적용 판정 가능.
     if parsed_end is not None and parsed_event >= parsed_end:
