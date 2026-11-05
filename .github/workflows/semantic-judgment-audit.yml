@@ -27,6 +27,7 @@ jobs:
           CHECKPOINTER_TYPE: memory
         run: |
           python -m pytest -q \
+            backend/tests/unit/test_semantic_judgment_guardrails.py \
             backend/tests/unit/test_temporal_verification_p8.py \
             backend/tests/unit/test_temporal_law_resolver_p5.py \
             backend/tests/unit/test_statute_temporal_p0_law_02.py \
