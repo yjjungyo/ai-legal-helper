@@ -294,6 +294,49 @@ def persist_index_coverage(session, version: OfficialLawVersion, xml_bytes: byte
             ))
 
 
+
+def enrich_article_dates_from_addenda(
+    session, version: OfficialLawVersion, chunks: list[dict], *,
+    llm_invoke=None,
+) -> dict:
+    """Optional, grounded post-index enrichment using the already fetched XML.
+
+    The caller explicitly supplies the LLM function. No official network call
+    or implicit model invocation occurs here. Candidates never become a legal
+    applicability PASS and source-derived dates are never overwritten.
+    """
+    from ai_legal_helper.legal_knowledge.article_effective_interpreter import interpret_article_dates
+
+    addenda = [c["content"] for c in chunks if c["metadata"]["article"] == "부칙"]
+    articles = list(dict.fromkeys(
+        c["metadata"]["article"] for c in chunks
+        if c["metadata"]["article"] != "부칙"
+    ))
+    results = interpret_article_dates(
+        article_ids=articles, official_addenda=addenda,
+        promulgation_date=version.promulgation_date, llm_invoke=llm_invoke,
+    )
+    updated = 0
+    unresolved = 0
+    for result in results:
+        rows = list(session.scalars(select(LawArticleVersion).where(
+            LawArticleVersion.law_id == version.law_id,
+            LawArticleVersion.mst == version.mst,
+            LawArticleVersion.article_id == result.article_id,
+        )).all())
+        if result.status != "SOURCE_GROUNDED_CANDIDATE":
+            unresolved += 1
+            continue
+        for row in rows:
+            if row.effective_from:
+                continue
+            row.effective_from = result.effective_from
+            row.effective_date_basis = "LLM_SOURCE_QUOTE_VERIFIED"
+            row.effective_date_status = "SOURCE_GROUNDED_CANDIDATE"
+            updated += 1
+    return {"updated": updated, "unresolved": unresolved, "articles": len(articles)}
+
+
 def process_next_job(
     session, *,
     worker_id: str, api_key: str,
