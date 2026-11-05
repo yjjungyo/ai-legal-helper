@@ -328,20 +328,19 @@ def parse_korean_number_phrase(phrase: str) -> Optional[int]:
 
 
 def _classify_amount_role(pre_window: str, immediate_window: str, context_window: str, full_text: str) -> str:
-    """단일 금액 표현의 직전 수식 명사(pre_window), 인접 문맥(immediate_window), 주변 문맥(context_window), 전체 문장을 순차 분석하여 금액의 의미적 역할(Role)을 분류한다."""
-    for role_code, pattern in _AMOUNT_ROLE_PATTERNS:
-        if pattern.search(pre_window):
-            return role_code
-    for role_code, pattern in _AMOUNT_ROLE_PATTERNS:
-        if pattern.search(immediate_window):
-            return role_code
-    for role_code, pattern in _AMOUNT_ROLE_PATTERNS:
-        if pattern.search(context_window):
-            return role_code
-    for role_code, pattern in _AMOUNT_ROLE_PATTERNS:
-        if pattern.search(full_text):
-            return role_code
-    return "GENERAL_AMOUNT"
+    """Grounded meaning classification; nearby keywords are not proof of role."""
+    from ai_legal_helper.case_intelligence.semantic_judgment import classify_statement
+    labels = tuple(code for code, _ in _AMOUNT_ROLE_PATTERNS)
+    decision = classify_statement(
+        full_text, task="MONEY_AMOUNT_SEMANTIC_ROLE", labels=labels,
+        context=(
+            "현재 금액 주변 구절: " + context_window +
+            " | 금액 앞 문맥: " + pre_window +
+            " | 해당 금액만 분류. 제안/청구/잔액과 실제 반환 거래를 구분. "
+            "하나의 문장에 금액이 여럿이면 어떤 금액인지 불명확한 경우 UNKNOWN."
+        ),
+    )
+    return decision.label if decision.label != "UNKNOWN" else "GENERAL_AMOUNT"
 
 
 def extract_amount_roles(text: str) -> Tuple[List[int], Dict[str, List[int]]]:
@@ -407,14 +406,18 @@ def extract_normalized_amounts(text: str) -> List[int]:
 
 
 def _classify_date_role(context_window: str, full_text: str) -> str:
-    """날짜 표현 주변 문맥과 전체 문장을 분석하여 날짜의 의미적 역할(Date Role)을 분류한다."""
-    for role_code, pattern in _DATE_ROLE_PATTERNS:
-        if pattern.search(context_window):
-            return role_code
-    for role_code, pattern in _DATE_ROLE_PATTERNS:
-        if pattern.search(full_text):
-            return role_code
-    return "GENERAL_DATE"
+    """Interpret a date's legal event role; formats are parsed separately."""
+    from ai_legal_helper.case_intelligence.semantic_judgment import classify_statement
+    decision = classify_statement(
+        full_text, task="DATE_EVENT_SEMANTIC_ROLE",
+        labels=tuple(code for code, _ in _DATE_ROLE_PATTERNS),
+        context=(
+            "선택 날짜 주변 원문: " + context_window +
+            ". 발신일/도달일/작성일/시행일/지급기일/실제 이행일을 혼동하지 마세요. "
+            "동일 원문에 서로 다른 날짜가 있으면 해당 날짜의 역할만 확인."
+        ),
+    )
+    return decision.label if decision.label != "UNKNOWN" else "GENERAL_DATE"
 
 
 def extract_dates_with_validation(text: str) -> Tuple[List[str], List[str], Dict[str, List[str]]]:
@@ -783,7 +786,8 @@ def _are_amount_roles_compatible(role_a: str, role_b: str, amounts_equal: bool) 
     if role_a == role_b:
         return True
     if "GENERAL_AMOUNT" in (role_a, role_b):
-        return True
+        # Missing semantic attribution must not manufacture comparable claims.
+        return False
     # 보증금 원금(PRINCIPAL_DEPOSIT)과 반환 요청 금액(RETURN_REQUEST_AMOUNT)은
     # 전액 반환을 요청하는 경우(금액이 같을 때) 상호 일치(CONSISTENT)로 볼 수 있음
     if {role_a, role_b} == {"PRINCIPAL_DEPOSIT", "RETURN_REQUEST_AMOUNT"} and amounts_equal:
