@@ -328,19 +328,25 @@ def parse_korean_number_phrase(phrase: str) -> Optional[int]:
 
 
 def _classify_amount_role(pre_window: str, immediate_window: str, context_window: str, full_text: str) -> str:
-    """단일 금액 표현의 직전 수식 명사(pre_window), 인접 문맥(immediate_window), 주변 문맥(context_window), 전체 문장을 순차 분석하여 금액의 의미적 역할(Role)을 분류한다."""
-    for role_code, pattern in _AMOUNT_ROLE_PATTERNS:
-        if pattern.search(pre_window):
-            return role_code
-    for role_code, pattern in _AMOUNT_ROLE_PATTERNS:
-        if pattern.search(immediate_window):
-            return role_code
-    for role_code, pattern in _AMOUNT_ROLE_PATTERNS:
-        if pattern.search(context_window):
-            return role_code
-    for role_code, pattern in _AMOUNT_ROLE_PATTERNS:
-        if pattern.search(full_text):
-            return role_code
+    """Grounded meaning classification; nearby keywords are not proof of role."""
+    from ai_legal_helper.case_intelligence.semantic_judgment import classify_statement
+    labels = tuple(code for code, _ in _AMOUNT_ROLE_PATTERNS)
+    decision = classify_statement(
+        full_text, task="MONEY_AMOUNT_SEMANTIC_ROLE", labels=labels,
+        context=(
+            "분류해야 할 특정 금액 원문: " + immediate_window +
+            " | 앞 문맥: " + pre_window +
+            " | 양쪽 문맥: " + context_window +
+            " | 반드시 해당 금액의 의미적 역할만 분류하세요. "
+            "계약 보증금 총액, 계약금, 잔금, 실제 반환액은 동일 문장에 "
+            "함께 나타날 수 있으며 서로 다른 속성입니다. "
+            "근거 인용에는 반드시 분류 대상 금액이 포함되어야 합니다. "
+            "의미 불명확 시 UNKNOWN."
+        ),
+    )
+    if (decision.label != "UNKNOWN" and immediate_window
+            and immediate_window in decision.evidence_quote):
+        return decision.label
     return "GENERAL_AMOUNT"
 
 
@@ -358,8 +364,10 @@ def extract_amount_roles(text: str) -> Tuple[List[int], Dict[str, List[int]]]:
 
     amounts: List[int] = []
     roles: Dict[str, List[int]] = {}
-
-    for match in _AMOUNT_EXPR_RE.finditer(text):
+    matches = list(_AMOUNT_EXPR_RE.finditer(text))
+    if not matches:
+        return amounts, roles
+    for match in matches:
         num_part = (match.group(1) or "").strip()
         suffix = (match.group(2) or "").replace(" ", "").strip()
         if not num_part:
@@ -382,17 +390,15 @@ def extract_amount_roles(text: str) -> Tuple[List[int], Dict[str, List[int]]]:
         if val not in amounts:
             amounts.append(val)
 
-        # 한국어 금액 구문에서는 금액 직전 명사구(예: '보증금 3억', '계약금 3천만', '잔금 2억 7천만')가 역할을 가장 정확히 나타내므로
-        # 직전 문맥(pre_ctx)을 1순위로 검사하고, 직후 서술어('반환하였다', '반환을 요청하였다')를 포함한 인접 문맥을 2순위로 검사한다.
-        pre_ctx = text[max(0, match.start() - 12):match.start()]
-        imm_start = max(0, match.start() - 10)
-        imm_end = min(len(text), match.end() + 12)
-        immediate_ctx = text[imm_start:imm_end]
-
-        start_idx = max(0, match.start() - 20)
-        end_idx = min(len(text), match.end() + 16)
-        local_ctx = text[start_idx:end_idx]
-        role = _classify_amount_role(pre_ctx, immediate_ctx, local_ctx, text)
+        span = match.group(0)
+        # Interpret the legal role OF THIS SPECIFIC AMOUNT, not every
+        # monetary quantity in the sentence using a single global label.
+        role = _classify_amount_role(
+            text[max(0, match.start() - 48):match.start()],
+            span,
+            text[max(0, match.start() - 64):min(len(text), match.end() + 64)],
+            text,
+        )
         role_list = roles.setdefault(role, [])
         if val not in role_list:
             role_list.append(val)
@@ -401,20 +407,39 @@ def extract_amount_roles(text: str) -> Tuple[List[int], Dict[str, List[int]]]:
 
 
 def extract_normalized_amounts(text: str) -> List[int]:
-    """문장 내 모든 금액 표현을 원(KRW) 단위 정수로 정규화하여 추출한다."""
-    amounts, _ = extract_amount_roles(text)
-    return amounts
+    """Parse literal KRW quantities only; never call an LLM for arithmetic."""
+    if not text:
+        return []
+    values: List[int] = []
+    for match in _AMOUNT_EXPR_RE.finditer(text):
+        num_part = (match.group(1) or "").strip()
+        suffix = (match.group(2) or "").replace(" ", "").strip()
+        if not num_part:
+            continue
+        phrase = num_part
+        for unit in ("천만", "백만", "만", "억"):
+            if suffix.startswith(unit) and not num_part.endswith(("만", "억", "조")):
+                phrase = num_part + unit
+                break
+        amount = parse_korean_number_phrase(phrase)
+        if amount is not None and amount >= 100 and amount not in values:
+            values.append(amount)
+    return values
 
 
 def _classify_date_role(context_window: str, full_text: str) -> str:
-    """날짜 표현 주변 문맥과 전체 문장을 분석하여 날짜의 의미적 역할(Date Role)을 분류한다."""
-    for role_code, pattern in _DATE_ROLE_PATTERNS:
-        if pattern.search(context_window):
-            return role_code
-    for role_code, pattern in _DATE_ROLE_PATTERNS:
-        if pattern.search(full_text):
-            return role_code
-    return "GENERAL_DATE"
+    """Interpret a date's legal event role; formats are parsed separately."""
+    from ai_legal_helper.case_intelligence.semantic_judgment import classify_statement
+    decision = classify_statement(
+        full_text, task="DATE_EVENT_SEMANTIC_ROLE",
+        labels=tuple(code for code, _ in _DATE_ROLE_PATTERNS),
+        context=(
+            "선택 날짜 주변 원문: " + context_window +
+            ". 발신일/도달일/작성일/시행일/지급기일/실제 이행일을 혼동하지 마세요. "
+            "동일 원문에 서로 다른 날짜가 있으면 해당 날짜의 역할만 확인."
+        ),
+    )
+    return decision.label if decision.label != "UNKNOWN" else "GENERAL_DATE"
 
 
 def extract_dates_with_validation(text: str) -> Tuple[List[str], List[str], Dict[str, List[str]]]:
@@ -433,8 +458,10 @@ def extract_dates_with_validation(text: str) -> Tuple[List[str], List[str], Dict
     valid_dates: List[str] = []
     invalid_dates: List[str] = []
     date_roles: Dict[str, List[str]] = {}
-
-    for m in _DATE_FULL_RE.finditer(text):
+    date_matches = list(_DATE_FULL_RE.finditer(text))
+    if not date_matches:
+        return valid_dates, invalid_dates, date_roles
+    for m in date_matches:
         yyyy, mm, dd = int(m.group(1)), int(m.group(2)), int(m.group(3))
         raw_token = m.group(0).strip()
         try:
@@ -442,10 +469,10 @@ def extract_dates_with_validation(text: str) -> Tuple[List[str], List[str], Dict
             iso = valid_dt.isoformat()
             if iso not in valid_dates:
                 valid_dates.append(iso)
-            start_idx = max(0, m.start() - 24)
-            end_idx = min(len(text), m.end() + 24)
-            local_ctx = text[start_idx:end_idx]
-            role = _classify_date_role(local_ctx, text)
+            role = _classify_date_role(
+                text[max(0, m.start() - 64):min(len(text), m.end() + 64)],
+                text,
+            )
             r_list = date_roles.setdefault(role, [])
             if iso not in r_list:
                 r_list.append(iso)
@@ -457,9 +484,17 @@ def extract_dates_with_validation(text: str) -> Tuple[List[str], List[str], Dict
 
 
 def extract_normalized_dates(text: str) -> List[str]:
-    """문장 내 유효한 모든 날짜 표현을 표준 ISO 형식(YYYY-MM-DD)으로 정규화하여 추출한다."""
-    valid_dates, _, _ = extract_dates_with_validation(text)
-    return valid_dates
+    """Parse Gregorian dates only, never decide legal event meanings."""
+    dates: List[str] = []
+    for m in _DATE_FULL_RE.finditer(text or ""):
+        try:
+            parsed = datetime.date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        except ValueError:
+            continue
+        val = parsed.isoformat()
+        if val not in dates:
+            dates.append(val)
+    return dates
 
 
 def analyze_polarity_and_predicate(
@@ -660,7 +695,7 @@ def _should_use_llm_verification(explicit_flag: Optional[bool]) -> bool:
     """Stage 3 선택적 LLM 검증 활성화 여부를 결정한다."""
     if explicit_flag is not None:
         return explicit_flag
-    env_val = os.getenv("CONFLICT_LLM_VERIFICATION_ENABLED", "false").strip().lower()
+    env_val = os.getenv("CONFLICT_LLM_VERIFICATION_ENABLED", "true").strip().lower()
     return env_val in ("1", "true", "yes", "on")
 
 
@@ -783,7 +818,8 @@ def _are_amount_roles_compatible(role_a: str, role_b: str, amounts_equal: bool) 
     if role_a == role_b:
         return True
     if "GENERAL_AMOUNT" in (role_a, role_b):
-        return True
+        # Missing semantic attribution must not manufacture comparable claims.
+        return False
     # 보증금 원금(PRINCIPAL_DEPOSIT)과 반환 요청 금액(RETURN_REQUEST_AMOUNT)은
     # 전액 반환을 요청하는 경우(금액이 같을 때) 상호 일치(CONSISTENT)로 볼 수 있음
     if {role_a, role_b} == {"PRINCIPAL_DEPOSIT", "RETURN_REQUEST_AMOUNT"} and amounts_equal:
@@ -1334,11 +1370,13 @@ def evaluate_claim_against_fact(
                     source_span_ids=spans,
                 )
 
+            # Heuristic polarity/predicate matches alone cannot prove a
+            # real contradiction; require independent semantic verification.
             return ConflictDecision(
                 claim_id=claim_id,
                 target_fact_id=fact.id,
-                status="CONTRADICTION",
-                reason_code="OPPOSITE_POLARITY_ON_SAME_SUBJECT",
+                status="INSUFFICIENT_INFORMATION",
+                reason_code="POLARITY_REQUIRES_SEMANTIC_VERIFICATION",
                 explanation=(
                     f"동일 사실 대상({', '.join(sorted(shared_tokens)[:3])})에 대해 "
                     "긍정 진술과 부정 진술이 동시에 참일 수 없어 상충합니다."

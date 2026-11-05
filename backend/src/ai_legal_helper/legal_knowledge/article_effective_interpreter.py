@@ -103,7 +103,7 @@ def interpret_article_dates(
         # A date written in the quote is required; calculated relative dates
         # are never accepted solely on the model's assertion.
         literal_dates = re.findall(
-            r"(?<!\\d)\\d{4}\\s*(?:년|[-./])\\s*\\d{1,2}\\s*(?:월|[-./])\\s*\\d{1,2}\\s*일?",
+            r"(?<!\d)\d{4}\s*(?:년|[-./])\s*\d{1,2}\s*(?:월|[-./])\s*\d{1,2}\s*일?",
             quote,
         )
         if date not in {iso_date(raw) for raw in literal_dates}:

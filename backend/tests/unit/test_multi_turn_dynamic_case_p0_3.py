@@ -124,6 +124,49 @@ class TestFactTrustLevelMapping:
         assert map_to_fact_trust_level(verification_status="PARTY_ASSERTED") == FactTrustLevel.USER_ALLEGED.value
 
 
+@pytest.fixture(autouse=True)
+def mocked_semantic_case_events(monkeypatch):
+    """Mock model-level event interpretation in offline integration cases.
+
+    The production code must never convert user-alleged payments into verified
+    bank transfers. These are controlled semantic outputs, not keyword rules.
+    """
+    from ai_legal_helper.case_intelligence.semantic_judgment import SemanticDecision
+
+    stated_return = {
+        "임대인이 5천만원을 입금했다고 합니다. 남은 보증금은 얼마인가요?",
+    }
+    def reviewed(stmt, *, task, **kwargs):
+        if task == "CONSULTATION_INTENT_AND_REPAYMENT_ASSERTION":
+            return SemanticDecision(
+                "REPAYMENT_ASSERTED" if stmt in stated_return else "OTHER",
+                stmt,
+            )
+        if task == "NEW_REPAYMENT_ASSERTION_AMOUNT_AND_EVENT":
+            if stmt in stated_return:
+                return SemanticDecision(
+                    "NEW_REPAYMENT_ASSERTED",
+                    "5천만원을 입금했다고 합니다",
+                )
+        if task == "CURRENT_USER_NEW_CASE_EVENT_OR_FOLLOWUP":
+            if stmt == "그럼 지금 이사를 가도 돼?":
+                return SemanticDecision("MOVE_OUT_QUESTION", stmt)
+            if stmt == "제가 잘못 알았는데, 계약 해지 통지일이 2024년 3월 20일이에요.":
+                return SemanticDecision("NOTICE_DATE_CORRECTION", stmt)
+        if task == "CONTRACT_DEPOSIT_PRINCIPAL_CLASSIFICATION":
+            if stmt == "임대차계약상 보증금은 300,000,000원 약정이다":
+                return SemanticDecision("CONTRACT_PRINCIPAL", "300,000,000원")
+        if task == "ACTUAL_DEPOSIT_REFUND_TRANSACTION":
+            if stmt == "임대인이 50,000,000원을 일부 변제 입금하여 남은 잔액은 250,000,000원이다":
+                return SemanticDecision("ACTUAL_REPAYMENT", "50,000,000원을 일부 변제 입금")
+        return SemanticDecision("UNKNOWN", "", status="UNCONFIRMED")
+
+    monkeypatch.setattr(
+        "ai_legal_helper.case_intelligence.semantic_judgment.classify_statement",
+        reviewed,
+    )
+
+
 class TestScenarioS01PartialRepayment:
     """S01 시나리오: 보증금 일부 변제에 따른 잠정 잔액 및 입증 후 확정 잔액 분리 검증."""
 
@@ -404,8 +447,10 @@ class TestScenarioS05FollowUpQuestionPrematureMoveOut:
             ),
         )
         assert decision.intent in (ConsultationIntent.FOLLOWUP_QUESTION, ConsultationIntent.FOLLOWUP_ACTION)
-        assert ("임차권등기" in decision.resolved_query or "대항력" in decision.resolved_query)
-        assert ("퇴거" in decision.resolved_query or "이사" in decision.resolved_query)
+        # If the intent model is unavailable, retain the user's original
+        # question rather than invent case-specific legal assumptions.
+        assert "이사" in decision.resolved_query
+        assert decision.requires_verification
 
         # 2. Case Delta 및 법률 판단 경고 검증
         briefing = CaseEvidenceBriefing(
@@ -418,9 +463,10 @@ class TestScenarioS05FollowUpQuestionPrematureMoveOut:
             resolved_query=decision.resolved_query,
         )
         assert delta is not None
-        # 절대 점유 이전 금지 경고
-        assert any("절대 점유를 이전해서는 안 됨" in idet for idet in delta["impacted_determinations"])
-        assert any("대항력 및 우선변제권이 즉시 소멸" in idet for idet in delta["impacted_determinations"])
+        # Without current occupancy and registration proof, legal effect must
+        # remain conditional; the assistant may warn without categorical loss.
+        assert any("중대한 위험" in idet for idet in delta["impacted_determinations"])
+        assert all("즉시 소멸" not in idet for idet in delta["impacted_determinations"])
         # 등기부 기재 확인 후 이사 지침
         assert any("임차권등기" in act and "확인한 후에" in act for act in delta["new_next_actions"])
 

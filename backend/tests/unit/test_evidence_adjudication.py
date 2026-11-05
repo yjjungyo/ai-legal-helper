@@ -119,19 +119,34 @@ class TestCase01To07Scenarios:
         stmt_proposal = "임대인은 보증금 분할 반환 방안을 제안하였다."
         stmt_rejection = "임차인은 분할 반환 방안에 동의하지 않고 거절하였다."
 
-        prop_prop = extract_semantic_proposition(stmt_proposal)
-        prop_rej = extract_semantic_proposition(stmt_rejection)
+        # Regress the two semantic speech acts with a deterministic model
+        # response; production does not infer them by matching Korean phrases.
+        from unittest.mock import patch
+        from ai_legal_helper.case_intelligence.semantic_judgment import SemanticDecision
 
-        assert prop_prop.speech_act == "PROPOSAL"
-        assert prop_rej.speech_act == "REJECTION"
+        def reviewed_speech(statement, *, task, **kwargs):
+            if task == "SPEECH_ACT_AND_EXECUTION_STATUS":
+                label = "PROPOSAL" if statement == stmt_proposal else "REJECTION"
+                return SemanticDecision(label, statement)
+            return SemanticDecision("UNKNOWN", "", status="UNCONFIRMED")
 
-        comp = check_proposition_comparability(prop_prop, prop_rej)
-        assert not comp.is_comparable
-        assert comp.status == "CONSISTENT"
-        assert comp.reason_code == "PROPOSAL_VS_REJECTION"
+        with patch(
+            "ai_legal_helper.case_intelligence.semantic_judgment.classify_statement",
+            side_effect=reviewed_speech,
+        ):
+            prop_prop = extract_semantic_proposition(stmt_proposal)
+            prop_rej = extract_semantic_proposition(stmt_rejection)
 
-        adj = adjudicate_fact(prop_rej, candidate_facts=[Fact(statement=stmt_proposal)])
-        assert adj.primary_relation == "RESPONDS_TO"
+            assert prop_prop.speech_act == "PROPOSAL"
+            assert prop_rej.speech_act == "REJECTION"
+
+            comp = check_proposition_comparability(prop_prop, prop_rej)
+            assert not comp.is_comparable
+            assert comp.status == "CONSISTENT"
+            assert comp.reason_code == "PROPOSAL_VS_REJECTION"
+
+            adj = adjudicate_fact(prop_rej, candidate_facts=[Fact(statement=stmt_proposal)])
+            assert adj.primary_relation == "RESPONDS_TO"
 
     def test_r05_case05_registry_unsubmitted_vs_occupancy_fact(self):
         """[R05/CASE-05] 등기부 미제출은 증거 공백일 뿐, 입주 사실을 부정하거나 모순되지 않음."""

@@ -664,7 +664,7 @@ def search_official_statutes(
             # 부칙 원문을 검색 결과에서 버리면 LLM이 공포일과 시행일을 혼동할 수 있다.
             if date_sensitive:
                 for addendum in matched_addenda:
-                    addendum_effective = _effective_from_addendum(addendum, "")
+                    addendum_effective = None  # semantic review deferred
                     addendum_title = f"{official_law_name} 부칙 [공포번호 {law_no_disp}]"
                     addendum_hash = hashlib.sha256(addendum.content.encode("utf-8")).hexdigest()
                     logger.info(

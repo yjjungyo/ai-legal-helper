@@ -75,6 +75,12 @@ class FactItemBrief(BaseModel):
     document_name: Optional[str] = Field(None, description="근거 증거 문서명")
     confidence: float = Field(1.0, description="신뢰도 점수 (0.0~1.0)")
     supporting_evidence_labels: List[str] = Field(default_factory=list, description="지지하는 모든 증거 번호 목록")
+    # User/LLM-reviewed, source-grounded semantic annotations. Never populate
+    # from an unreviewed keyword or legacy regex guess.
+    reviewed_semantics: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="승인된 사건 사실의 구조화 의미와 출처 인용(거래/계약 원금 등)",
+    )
     trust_level: str = Field(
         "USER_ALLEGED",
         description="P0-3 논리적 사실 상태 (USER_ALLEGED, EVIDENCE_PENDING, EVIDENCE_SUPPORTED, DISPUTED, SUPERSEDED)"
@@ -293,6 +299,7 @@ def build_case_evidence_briefing(
         .all()
     )
     adj_by_fact_id = {a.fact_id: a for a in adjudication_records if a.fact_id}
+    claim_by_id = {c.id: c for c in claims}
 
     fact_items: List[FactItemBrief] = []
     disputed_items: List[DisputedConflictBrief] = []
@@ -331,6 +338,14 @@ def build_case_evidence_briefing(
             confidence=f.confidence or 1.0,
             supporting_evidence_labels=sup_labels,
             trust_level=trust_lvl,
+            reviewed_semantics=(
+                dict((claim_by_id.get(adj.claim_id).structured_slots or {}).get("reviewed_semantics") or {})
+                if adj and adj.claim_id in claim_by_id
+                and claim_by_id[adj.claim_id].review_status in ("APPROVED", "EDITED")
+                and isinstance(claim_by_id[adj.claim_id].structured_slots, dict)
+                and adj_status in ("EVIDENCE_SUPPORTED", "CORROBORATED")
+                else {}
+            ),
         )
         fact_items.append(fact_brief)
 

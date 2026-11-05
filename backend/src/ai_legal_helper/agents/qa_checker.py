@@ -289,21 +289,20 @@ def check_deterministic_qa(
             for pat in UNCONFIRMED_TERMINATION_PATTERNS:
                 m = pat.search(sent)
                 if m:
-                    legal_risk_passed = False
-                    logger.warning(f"[ANSWER_QA] 법률 적용 위험 감지: 도달일 미확인 상태의 종료일 확정 단정 -> '{sent}'")
-                    repair_targets.append(
-                        RepairTarget(
-                            sentence_index=idx,
-                            original_sentence=sent,
-                            repair_reason="해지 통지 도달일이 객관적으로 확인되지 않았는데 종료일을 확정하여 단정함",
-                            recommended_fix="도달일을 기준으로 3개월 뒤 효력이 발생한다는 조건부 설명으로 수정하세요.",
-                        )
+                    # Phrase matching is ONLY a request for semantic review.
+                    # No automatic REPAIR or blanket three-month legal rule.
+                    logger.info(
+                        "[ANSWER_QA] 검증 필요 법률효과 문구(최종 오류판정 아님): %s", sent
                     )
-                    llm_eval_reasons.append("해지 효력 발생일의 법률요건 적용 (통지 도달 확인 전제 필요)")
+                    llm_eval_reasons.append(
+                        "계약 종료/해지의 효력 시점과 근거를 LLM 및 증거로 재검증: " + sent
+                    )
                     break
 
+    if llm_eval_reasons:
+        logger.info("[ANSWER_QA] 법률 효과 표현은 최종 판단 없이 심층 검증으로 전달")
     if legal_risk_passed:
-        logger.info("[ANSWER_QA] 법률 적용 위험 검사: PASS")
+        logger.info("[ANSWER_QA] 형식 검사 PASS (법률적 의미 판단 아님)")
     else:
         logger.warning("[ANSWER_QA] 법률 적용 위험 검사: REVIEW_REQUIRED")
 
@@ -346,7 +345,7 @@ def check_deterministic_qa(
     )
 
     requires_llm_eval = False
-    if is_pure_statute_query and question_coverage_passed:
+    if is_pure_statute_query and question_coverage_passed and not llm_eval_reasons:
         # 단순 법령 질의이면서 조문이 완벽히 인용되고 검사 통과 시 LLM 재검증 생략!
         requires_llm_eval = False
         logger.info("[ANSWER_QA] 단순 법령 질의 및 결정론적 검사 통과: LLM 추가 검증 생략 (조기 PASS)")

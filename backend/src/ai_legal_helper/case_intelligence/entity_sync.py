@@ -264,7 +264,7 @@ class _ExtractedPartyCandidate:
     contacts: List[str] = field(default_factory=list)
     related_fact_ids: List[str] = field(default_factory=list)
     related_claim_ids: List[str] = field(default_factory=list)
-    verification_status: str = "DOCUMENT_VERIFIED"
+    verification_status: str = "UNVERIFIED"
 
 
 def _clean_and_validate_party_name(raw_name: str) -> Optional[str]:
@@ -391,7 +391,8 @@ def _merge_trust_status(current: str, candidate_fact: Fact) -> str:
     if candidate_fact.source_type == "DOCUMENT_SUPPORTED" and fact_status == "UNVERIFIED":
         fact_status = "DOCUMENT_VERIFIED"
     elif candidate_fact.source_type == "USER_CLAIM" and fact_status == "UNVERIFIED":
-        fact_status = "VERIFIED"
+        # A party's assertion is NOT independent verification of identity.
+        fact_status = "PARTY_ASSERTED"
 
     return fact_status if priority.get(fact_status, 0) > priority.get(current, 0) else current
 
@@ -448,6 +449,10 @@ def extract_parties_from_facts(
         # PARTY_INFO 문맥에서만 느슨한 띄어쓰기 패턴(_PATTERN_ROLE_SPACE_NAME)을 허용한다.
         is_party_context = f_type in ("PARTY_INFO", "당사자정보")
         pairs = _extract_role_name_pairs_from_statement(stmt, allow_loose_space_pattern=is_party_context)
+        # Parsing a name/role span creates a PARTY CANDIDATE, not a legal
+        # ruling. The stored FactAdjudication and EvidenceReview provenance
+        # determine its verification_status; a missing LLM may not erase
+        # approved case participants or suppress user-asserted candidates.
         for name, role, is_sub in pairs:
             if is_sub:
                 key = (name, role)

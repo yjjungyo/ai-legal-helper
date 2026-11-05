@@ -64,9 +64,11 @@ def test_official_article_date_does_not_use_law_wide_fallback(monkeypatch):
     assert article_four["law_id"] == "TEST-LAW"
     assert article_four["version_id"] == "TEST-MST"
     assert article_four["law_effective_date"] == "2026-06-01"
-    assert article_four["article_effective_date"] == "2026-12-02"
-    assert article_four["effective_date_basis"] == "ADDENDUM_EFFECTIVE_DATE"
-    assert article_four["temporal_status"] == "EFFECTIVE_DATE_VERIFIED"
+    # The source index must not transform free-text addendum meaning into
+    # an approved per-article date. The temporal reviewer must do that later.
+    assert article_four["article_effective_date"] is None
+    assert article_four["effective_date_basis"] == "UNCONFIRMED"
+    assert article_four["temporal_status"] != "EFFECTIVE_DATE_VERIFIED"
     # 관련 적용례(체결/갱신 조건)는 이후 Temporal Resolver에서 별도로 검증한다.
     assert evaluate_statute_applicability(
         article_four, "2027-02-01"

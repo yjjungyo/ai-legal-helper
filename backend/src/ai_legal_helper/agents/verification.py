@@ -449,12 +449,9 @@ def _check_claim_supported_by_source(
     if claimed_articles and source_articles and not claimed_articles.intersection(source_articles):
         return False, f"ARTICLE_MISMATCH({','.join(sorted(claimed_articles))})"
 
-    # 2. 법률 효과의 정반대 왜곡 또는 기간 조건 불일치 검증 (P1-03)
-    # 기간 경과(예: 3개월이 지나면 효력 발생) 조건 vs 즉시/당일 효력 발생 모순 검증
-    period_in_source = re.search(r"(\d+\s*(?:개월|달|일|년|주))\s*(?:이\s*지나|경과|후|지난\s*때).*?(?:효력|해지|반환)", combined_content)
-    immediate_in_claim = re.search(r"(도달\s*즉시|즉시|당일|즉각|바로)\s*(?:효력|해지|반환)", claim_segment)
-    if period_in_source and immediate_in_claim:
-        return False, f"LEGAL_EFFECT_CONTRADICTION(기간조건 {period_in_source.group(1)} vs {immediate_in_claim.group(1)})"
+    # Legal effects are semantic claims. Citation audit checks literal article
+    # provenance only; the independent LLM claim verification decides whether
+    # the asserted effect matches the actual source and case context.
 
     # 3. 주장 문장과 출처 본문 간 핵심 어휘 중첩도 확인
     # [P0-VER-01] 법령 조문 인용의 경우 조문 번호(제N조)가 출처의 조문과 정확히 일치하고
@@ -473,7 +470,9 @@ def _check_claim_supported_by_source(
             is_short_reference = len(claim_tokens) <= 3 or any(k in claim_segment for k in ("관련 법령", "관련법령", "근거 법조문", "근거법령", "법령 및 증거", "참조", "조문"))
             # [P0-VER-01] 법령 출처이고 조문 번호가 일치하면(Check 1의 조문 불일치가 없었으므로), 해당 조문 인용은 유효하게 뒷받침됨
             if is_statute_source and has_matching_article:
-                return True, None
+                # Article identity is NOT evidence that the asserted legal
+                # effect is correct. Do not infer substantive support here.
+                return True, "ARTICLE_IDENTITY_ONLY_NEEDS_SEMANTIC_REVIEW"
             # 짧은 법령 목록/헤더 참조 문맥인 경우 허용
             if is_statute_source and is_short_reference and not claimed_articles:
                 return True, None
@@ -958,7 +957,15 @@ def run_verification(
     preliminary_temporal_errors = temporal_answer_errors(question, draft_answer, retrieved_sources)
     if preliminary_temporal_errors:
         logger.warning("[STATUTE_TEMPORAL] 경량 PASS 생략: 시행일/계약일 충돌 %d건", len(preliminary_temporal_errors))
-    if (not force_llm and not qa_check.requires_llm_eval
+    # An official citation proves provenance, not legal reasoning. Claims
+    # supported by retrieved statutes must pass full semantic verification.
+    substantive_legal_sources = any(
+        src.get("source_type") == "STATUTE"
+        or bool(src.get("statute_name"))
+        for src in (retrieved_sources or []) if isinstance(src, dict)
+    )
+    if (not force_llm and not substantive_legal_sources
+            and not qa_check.requires_llm_eval
             and qa_check.status == "PASS" and not preliminary_temporal_errors):
         logger.info("[VERIFICATION] 경량 검사 ALL PASS: LLM 검증 생략 및 초안 즉시 확정")
         from ai_legal_helper.rag.grounding_context import format_grounding_sources

@@ -141,23 +141,28 @@ def verification_node(state: DocumentState) -> DocumentState:
         state.verification_warnings.append("문서 초안 생성에 실패했거나 본문이 비어 있습니다.")
         return state
 
-    # 초안 내 연도/날짜(YYYY-MM-DD 또는 YYYY년) 및 금액 표현이 원본 컨텍스트에 존재하는지 대조
-    # 한국어 조사('까지', '을' 등)가 바로 붙는 경우에도 매칭되도록 단어 경계(\b) 대신 숫자 경계((?<!\d))를 사용한다.
-    context_normalized = state.context_text.replace(",", "")
-    draft_normalized = draft.replace(",", "")
-
-    date_tokens = set(re.findall(r"(?<!\d)20\d{2}[-.]\d{1,2}[-.]\d{1,2}(?!\d)|(?<!\d)20\d{2}년", draft_normalized))
-    unverified_dates = [d for d in date_tokens if d not in context_normalized]
+    # Regex locates literal date/amount formats only; compare normalized
+    # quantities rather than representations ("3억 원" == "300,000,000원").
+    from ai_legal_helper.case_intelligence.settlement_calculator import (
+        extract_amounts_from_text, extract_dates_from_text,
+    )
+    source_dates = set(extract_dates_from_text(state.context_text))
+    answer_dates = set(extract_dates_from_text(draft))
+    unverified_dates = answer_dates - source_dates
     if unverified_dates:
         state.verification_warnings.append(
-            f"사건 기록에서 확인되지 않은 날짜 표현이 포함되었습니다: {', '.join(sorted(unverified_dates))}"
+            "사건 자료에서 확인되지 않은 날짜: "
+            + ", ".join(sorted(unverified_dates))
         )
-
-    amount_tokens = set(re.findall(r"(?<!\d)\d+(?:억|천만|백만|십만|만)?\s*원", draft_normalized))
-    unverified_amounts = [a for a in amount_tokens if a.replace(" ", "") not in context_normalized.replace(" ", "")]
+    source_amounts = extract_amounts_from_text(state.context_text)
+    answer_amounts = extract_amounts_from_text(draft)
+    unverified_amounts = answer_amounts - source_amounts
     if unverified_amounts:
+        # An unmatched amount might be a computed balance or an illustration,
+        # not necessarily a hallucination. Do not auto-rewrite or block.
         state.verification_warnings.append(
-            f"사건 기록에서 확인되지 않은 금액 표현이 포함되었습니다: {', '.join(sorted(unverified_amounts))}"
+            "금액 계산 또는 원문 근거 확인 필요: "
+            + ", ".join(f"{amount:,}원" for amount in sorted(unverified_amounts))
         )
 
     state.verification_status = "WARN" if state.verification_warnings else "PASS"

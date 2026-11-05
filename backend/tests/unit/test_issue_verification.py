@@ -296,6 +296,11 @@ def test_c09_verify_issue_verified_when_facts_and_law_present():
                 statement="2024년 2월 28일 갱신거절 통지가 도달하여 갱신 없이 계약이 종료되었다.",
                 adjudication_status="EVIDENCE_SUPPORTED",
                 evidence_label="E01",
+                reviewed_semantics={
+                    "status": "HUMAN_APPROVED",
+                    "category": "ACTUAL_TERMINATION",
+                    "evidence_quote": "갱신 없이 계약이 종료되었다",
+                },
             )
         ],
         source_registry={"E01": {}, "E05": {}},

@@ -273,8 +273,10 @@ def test_end_to_end_explicit_date_requests_old_and_future_version_with_addenda(m
     assert "개정된" in next_article["content"]
     assert old_article["version_relation"] == "AS_OF_CANDIDATE"
     assert next_article["version_relation"] == "NEXT_EFFECTIVE_CANDIDATE"
-    assert next_article["article_effective_date"] == "2027-04-28"
-    assert next_article["effective_date_basis"] == "ADDENDUM_EFFECTIVE_DATE"
+    # Historical law effective date comes from official version metadata.
+    # Clause-specific free-text interpretation is deferred and never guessed.
+    assert next_article["article_effective_date"] is None
+    assert next_article["effective_date_basis"] == "UNCONFIRMED"
     assert next_article["law_effective_date"] == "2027-04-28"
     assert next_article["requested_as_of_date"] == "2026-11-01"
     assert all(s["version_lookup_status"] == "HISTORY_COMPLETE" for s in found)

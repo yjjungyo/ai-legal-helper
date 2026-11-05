@@ -9,6 +9,9 @@ Fact Semantic & Temporal Reasoning 고도화에 따른 시나리오(S01~S16) 및
 """
 
 import pytest
+from unittest.mock import patch
+from ai_legal_helper.case_intelligence.semantic_judgment import SemanticDecision
+from ai_legal_helper.case_intelligence.conflict_detector import _LLMConflictVerificationSchema
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -192,7 +195,18 @@ class TestConflictDetectorV12Scenarios:
 
         c_slots = build_structured_slots(statement=claim_stmt, claim_type="CONDITION")
         fact = Fact(id="f-s08", statement=fact_stmt, fact_type="CONDITION", verification_status="DOCUMENT_VERIFIED")
-        decision = evaluate_claim_against_fact(claim_slots=c_slots, fact=fact)
+        # Meaning comes from an independently mocked reviewer, not wording regex.
+        with patch(
+            "ai_legal_helper.case_intelligence.conflict_detector._verify_pair_with_llm",
+            return_value=_LLMConflictVerificationSchema(
+                status="CONTRADICTION",
+                reason_code="DIRECT_POLARITY_CONFLICT",
+                explanation="동일 시점·대상 실제 지급과 미지급은 양립 불가",
+            ),
+        ):
+            decision = evaluate_claim_against_fact(
+                claim_slots=c_slots, fact=fact, enable_llm_verification=True,
+            )
 
         assert decision.status == "CONTRADICTION"
         assert decision.reason_code in ("OPPOSITE_POLARITY_ON_SAME_SUBJECT", "DIRECT_POLARITY_CONFLICT")
@@ -309,9 +323,26 @@ class TestConflictDetectorV12Scenarios:
         assert res.is_comparable
         assert res.status == "COMPARABLE"
 
-        c_slots = build_structured_slots(statement=claim_stmt, claim_type="AMOUNT")
-        fact = Fact(id="f-s14", statement=fact_stmt, fact_type="AMOUNT", verification_status="DOCUMENT_VERIFIED")
-        decision = evaluate_claim_against_fact(claim_slots=c_slots, fact=fact)
+        def model_role(statement, *, task, **kwargs):
+            if task == "MONEY_AMOUNT_SEMANTIC_ROLE":
+                return SemanticDecision("PRINCIPAL_DEPOSIT", statement)
+            return SemanticDecision("UNKNOWN", "", status="UNCONFIRMED")
+
+        with patch(
+            "ai_legal_helper.case_intelligence.semantic_judgment.classify_statement",
+            side_effect=model_role,
+        ), patch(
+            "ai_legal_helper.case_intelligence.conflict_detector._verify_pair_with_llm",
+            return_value=_LLMConflictVerificationSchema(
+                status="CONTRADICTION", reason_code="MUTUALLY_EXCLUSIVE_AMOUNT",
+                explanation="동일 계약의 원금 두 값이 양립 불가",
+            ),
+        ):
+            c_slots = build_structured_slots(statement=claim_stmt, claim_type="AMOUNT")
+            fact = Fact(id="f-s14", statement=fact_stmt, fact_type="AMOUNT", verification_status="DOCUMENT_VERIFIED")
+            decision = evaluate_claim_against_fact(
+                claim_slots=c_slots, fact=fact, enable_llm_verification=True,
+            )
 
         assert decision.status == "CONTRADICTION"
         assert decision.reason_code in ("MUTUALLY_EXCLUSIVE_AMOUNT", "NORMALIZED_AMOUNT_CONFLICT")

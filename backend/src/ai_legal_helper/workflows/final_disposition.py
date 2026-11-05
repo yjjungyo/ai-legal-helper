@@ -116,40 +116,14 @@ def score_fact_legal_importance(fact: Any, query: Optional[str] = None) -> float
 
 
 def _extract_semantic_fact_key(statement: str) -> str:
-    """사실 진술문에서 동일한 법률 요건사실(보증금 금액, 계약기간 등)을 대표하는 정규화 키를 추출한다 (P0-03/Gate 2).
+    """Exact de-duplication only: similar monetary digits are not identical facts.
 
-    동일한 보증금 금액 사실(예: 계약서 2억 2천, 송금내역 2억 2천, 영수증 2억 2천 등 3개)이나
-    동일 계약기간 진술이 다수 존재할 때 단 하나의 대표 사실로 병합·중복 제거하기 위함이다.
-
-    Args:
-        statement: 사실 진술문 문자열.
-
-    Returns:
-        str: 의미론적 요건사실 그룹 식별자 키.
+    A contract principal, down payment, returned deposit and unpaid balance can
+    all contain the same money amount but have different legal meaning.
+    Semantic deduplication requires upstream approved proposition keys.
     """
-    stmt = statement.strip()
+    return "STMT_" + " ".join((statement or "").split())
 
-    # 1. 보증금 금액 관련 요건사실 (금액 기반 일치 그룹화: 계약서, 송금내역, 영수증, 수령확인 등)
-    amts = extract_amounts_from_text(stmt)
-    if amts and (any(k in stmt for k in ("보증금", "전세금", "임차보증금", "송금", "입금", "지급", "차임", "영수", "수령", "반환", "계약금", "잔금")) or max(amts) >= 10_000_000):
-        return f"SEMANTIC_DEPOSIT_{max(amts)}"
-
-    # 2. 계약 기간 관련 요건사실 (시작일-종료일 기준 일치 그룹화)
-    date_matches = re.findall(r"(\d{4}[.\-/]\s*\d{1,2}[.\-/]\s*\d{1,2})", stmt)
-    if len(date_matches) >= 2 and any(k in stmt for k in ("기간", "만료", "시작", "종료", "임대차", "계약")):
-        d1 = re.sub(r"\s+", "", date_matches[0]).replace("-", ".").replace("/", ".")
-        d2 = re.sub(r"\s+", "", date_matches[1]).replace("-", ".").replace("/", ".")
-        return f"SEMANTIC_PERIOD_{d1}_{d2}"
-
-    # 3. 전입 및 확정일자 대항력 요건사실
-    if ("전입" in stmt or "주민등록" in stmt) and "확정일자" in stmt:
-        return "SEMANTIC_OPPOSABILITY_REQ"
-
-    # 4. 계약 만료/해지 통지 및 임대인 확인 사실
-    if any(k in stmt for k in ("해지", "종료", "만료", "갱신거절")) and any(k in stmt for k in ("통지", "문자", "카카오", "회신", "확인", "곤란")):
-        return "SEMANTIC_TERMINATION_NOTICE"
-
-    return f"STMT_{stmt}"
 
 
 def select_grounded_facts_for_display(
@@ -181,7 +155,9 @@ def select_grounded_facts_for_display(
         if (f.adjudication_status in ("EVIDENCE_SUPPORTED", "CORROBORATED") or getattr(f, "trust_level", "") == "EVIDENCE_SUPPORTED")
         and getattr(f, "trust_level", "") != "SUPERSEDED"
         and not is_trivial_metadata_fact(f.statement)
-        and not is_conditional_contract_statement(f.statement)
+        # Displaying a source-grounded fact verbatim is not declaring its
+        # eventual legal effect. An unavailable termination reviewer must not
+        # silently erase the contract/property fact from the answer.
     ]
 
     # 가중치 점수 내림차순 정렬
@@ -261,10 +237,10 @@ def reconcile_issue_results(
     Returns:
         원본을 변경하지 않고 종료 판단의 충돌을 조건부로 표시한 결과 목록.
     """
+    # Compare structured issue verdicts. Wording of a recommendation is not
+    # a reliable proxy for whether a legal condition was verified.
     conflict = any(
         r.issue_id == "ISSUE_NOTICE_REACH" and r.status != "VERIFIED"
-        and any(re.search(r"(?:계약\s*종료|해지\s*효력).*(?:조건부|미확인|유보|확정할 수 없)", rec)
-                for rec in r.safe_recommendations)
         for r in issue_results
     )
     reconciled = []
@@ -469,68 +445,47 @@ def detect_case_delta(
     # 재작성 질의가 만든 '변제 주장'이나 지급 자료 언급을 사용자 진술로 승격하지 않는다.
     has_repayment_mention = has_repayment_assertion(current_question)
 
-    has_verified_payment_fact = (prior_repaid_krw > 0) or any(
-        any(w in (f.statement or "").lower() for w in ["일부 변제", "일부 반환", "일부변제", "입금 확인", "변제 확인"])
-        and not any(w in (f.statement or "").lower() for w in ["계약금", "잔금 지급"])
-        and (f.adjudication_status in ("EVIDENCE_SUPPORTED", "CORROBORATED") or getattr(f, "trust_level", "") == "EVIDENCE_SUPPORTED" or getattr(f, "verification_status", "") in ("DOCUMENT_VERIFIED", "VERIFIED"))
-        for f in (briefing.facts or [])
-    )
+    # A textual keyword is not an actual bank transfer. Only the single
+    # evidence-validated settlement calculator may establish paid amounts.
+    has_verified_payment_fact = prior_repaid_krw > 0
 
     if has_repayment_mention or (has_verified_payment_fact and not is_evidence_review_request(current_question)):
-        # 질문 내 언급된 변제/입금 금액 정밀 추출 (남은 잔액 수치와 엄격 분리)
-        asserted_krw = 0
-        # 1. '입금/변제/반환/송금/돌려/지급' 문맥의 변제 주장 금액 우선 추출
-        m_repay = re.search(
-            r"(\d+(?:\s*억|\s*천만|\s*만|\s*원|,|\d)+)\s*(?:원)?을?\s*(?:일부\s*)?(?:추가로\s*|더\s*|새로\s*)?(?:변제|반환|입금|송금|돌려|갚|부쳤|지급)",
-            current_question or q_corpus
+        # Interpret the user's CURRENT assertion once. Never infer a paid
+        # amount from the largest number or an unrelated remaining-balance
+        # figure. User assertions remain USER_ALLEGED until evidence confirms.
+        from ai_legal_helper.case_intelligence.semantic_judgment import classify_statement
+        monetary_statement = classify_statement(
+            current_question,
+            task="NEW_REPAYMENT_ASSERTION_AMOUNT_AND_EVENT",
+            labels=("NEW_REPAYMENT_ASSERTED", "PRIOR_REPAYMENT_RESTATED",
+                    "REPAYMENT_AMOUNT_UNCLEAR", "NO_REPAYMENT_ASSERTION"),
+            context=(
+                "NEW_REPAYMENT_ASSERTED: 이미 알려진 반환과 다른 새로운 추가 입금 "
+                "또는 명시적인 추가 반환을 주장함. "
+                "PRIOR_REPAYMENT_RESTATED: 기존 반환 사건을 반복 설명함. "
+                "REPAYMENT_AMOUNT_UNCLEAR: 반환을 주장하지만 금액이 모호하거나 "
+                "잔액/계약금/잔금/예정액과 분리되지 않음. "
+                "NO_REPAYMENT_ASSERTION: 실제 반환 수령 주장이 아님. "
+                "event evidence_quote에는 해당 반환액을 포함한 최소 인용구를 제공. "
+                "이미 확정된 반환액: " + str(prior_repaid_krw)
+            ),
         )
-        if not m_repay:
-            m_repay = re.search(
-                r"(?:변제|반환|입금|송금|돌려받|받은|갚은)\s*(?:금액이?|돈이?)?\s*(\d+(?:\s*억|\s*천만|\s*만|\s*원|,|\d)+)\s*원",
-                current_question or q_corpus
+        asserted_krw = 0
+        if monetary_statement.label in (
+            "NEW_REPAYMENT_ASSERTED", "PRIOR_REPAYMENT_RESTATED"
+        ):
+            quoted_amounts = extract_amounts_from_text(
+                monetary_statement.evidence_quote
             )
-        if m_repay:
-            repay_amts = extract_amounts_from_text(m_repay.group(0))
-            cand_repay = [a for a in repay_amts if a != contract_deposit_krw and a > 0]
-            if cand_repay:
-                asserted_krw = max(cand_repay)
-        elif not has_verified_payment_fact:
-            # 확정된 변제 증거가 없는 상태에서만 일반 금액 중 잔액 표현 제외 탐색
-            q_amts = extract_amounts_from_text(current_question or q_corpus)
-            cand_amts = [a for a in q_amts if a != contract_deposit_krw and a > 0]
-            if cand_amts:
-                # '남은', '잔액', '미반환', '잔여' 뒤의 금액은 잔액 문의이므로 변제 주장액에서 제외
-                m_bal_q = re.search(r"(?:남은|잔액은?|미반환|잔여).*?(\d+(?:\s*억|\s*천만|\s*만|\s*원|,|\d)+)\s*원", current_question or q_corpus)
-                bal_in_q = max(extract_amounts_from_text(m_bal_q.group(0))) if m_bal_q else None
-                cand_no_bal = [a for a in cand_amts if a != bal_in_q]
-                asserted_krw = max(cand_no_bal) if cand_no_bal else (max(cand_amts) if not bal_in_q else 0)
-
-        # Fact 중 새롭게 입증된 반환 금액 및 파일명 탐색
-        ev_transfer_doc_name = None
-        ev_transfer_amt = 0
+            # Multiple candidate amounts in the quote remain unresolved.
+            if len(quoted_amounts) == 1:
+                asserted_krw = next(iter(quoted_amounts))
+        ev_transfer_doc_name = prior_sources[0] if prior_sources else None
+        ev_transfer_amt = prior_repaid_krw
         explicit_fact_balance = None
-        for f in (briefing.facts or []):
-            if any(w in (f.statement or "") for w in ["일부 변제", "일부 반환", "입금 확인", "변제 확인"]) and not any(w in (f.statement or "") for w in ["계약금", "잔금"]):
-                m = re.search(r"(\d+(?:\s*억|\s*천만|\s*만|\s*원|,|\d)+)\s*(?:원)?을?\s*(?:일부\s*)?(?:변제|반환|입금|돌려)", f.statement or "")
-                if m:
-                    f_amts = extract_amounts_from_text(m.group(0))
-                else:
-                    f_amts = extract_amounts_from_text(f.statement or "")
-                if f_amts:
-                    ev_transfer_amt = min(f_amts) if len(f_amts) > 1 else max(f_amts)
-                    if not ev_transfer_doc_name:
-                        ev_transfer_doc_name = f.document_name or f.evidence_label
-                # 문장에 '남은 잔액' 등이 명시되어 있으면 보관
-                m_bal = re.search(r"(?:잔액은?|미반환).*?(\d+(?:\s*억|\s*천만|\s*만|\s*원|,|\d)+)\s*원", f.statement or "")
-                if m_bal:
-                    b_amts = extract_amounts_from_text(m_bal.group(0))
-                    if b_amts:
-                        explicit_fact_balance = max(b_amts)
-                break
-
         is_new_allegation = (
             asserted_krw > 0
-            and (asserted_krw != prior_repaid_krw or any(w in q_corpus for w in ["추가", "또", "더", "새로", "새로운", "다시"]))
+            and monetary_statement.label == "NEW_REPAYMENT_ASSERTED"
         )
 
         if has_verified_payment_fact:
@@ -570,7 +525,7 @@ def detect_case_delta(
                 )
             else:
                 # 확정된 반환액 계산 (하드코딩 기본값 배제)
-                repaid_amt = prior_repaid_krw if prior_repaid_krw > 0 else (ev_transfer_amt or asserted_krw)
+                repaid_amt = prior_repaid_krw  # never USER_ALLEGED
                 if repaid_amt > 0:
                     total_confirmed_repaid = max(prior_repaid_krw, repaid_amt)
                     if explicit_fact_balance is not None:
@@ -617,7 +572,7 @@ def detect_case_delta(
                     )
         else:
             # 증빙 미제출 또는 미승인 상태 (USER_ALLEGED / 하드코딩 기본값 배제)
-            alleged_amt = asserted_krw or ev_transfer_amt
+            alleged_amt = asserted_krw
             if alleged_amt > 0:
                 provisional_balance = max(0, contract_deposit_krw - (prior_repaid_krw + alleged_amt)) if contract_deposit_krw else 0
                 calc_basis = {
@@ -657,15 +612,28 @@ def detect_case_delta(
                     "임대인으로부터 입금받은 정확한 금액과 계좌 이체확인증 또는 입금증빙 자료를 증거로 등록하여 확인할 것"
                 )
 
-    # 2. 목적물 조기 퇴거 / 점유 이전 / 이사 질의 (S05: '그럼 지금 이사를 가도 돼?')
-    moveout_terms = ["이사", "퇴거", "열쇠", "비밀번호", "짐 빼", "방 빼", "나가도", "이사가도"]
-    if any(t in q_corpus for t in moveout_terms):
+    # 2. 목적물 조기 퇴거 / 점유 이전 / 이사 질의
+    from ai_legal_helper.case_intelligence.semantic_judgment import classify_statement
+    delta_intent = classify_statement(
+        current_question,
+        task="CURRENT_USER_NEW_CASE_EVENT_OR_FOLLOWUP",
+        labels=("MOVE_OUT_QUESTION", "NEW_ATTACHMENT_ASSERTION",
+                "NOTICE_DATE_CORRECTION", "OTHER"),
+        context=(
+            "MOVE_OUT_QUESTION: 이사·퇴거·점유 이전의 법률적 위험을 질문함. "
+            "NEW_ATTACHMENT_ASSERTION: 특정 사건의 새 가압류 등기 발생을 "
+            "실제 사실로 주장함. 일반적인 압류/경매 질문은 제외. "
+            "NOTICE_DATE_CORRECTION: 자신의 기존 통지일 또는 도달일을 "
+            "명시적으로 수정함. 다른 날짜 설명이나 질문은 제외."
+        ),
+    )
+    if delta_intent.label == "MOVE_OUT_QUESTION":
         changed_facts.append("의뢰인의 보증금 미반환 상태에서의 조기 이사(퇴거) 및 점유 이전 가능 여부 문의")
         impacted_determinations.append(
             "보증금 전액을 반환받기 전 또는 임차권등기명령에 따른 등기가 등기부에 기재되기 전에 "
-            "주택의 점유를 상실(이사/열쇠 인도/비밀번호 공유)하거나 전입을 이전하면, "
-            "주택임대차보호법상 대항력 및 우선변제권이 즉시 소멸하는 치명적 법률 위험 발생. "
-            "따라서 현재 상태에서는 절대 점유를 이전해서는 안 됨"
+            "주택의 점유 또는 전입 상태가 변경되면 임차인의 대항력·우선변제권 유지에 "
+            "중대한 위험이 있을 수 있으므로, 현재 권리 요건과 임차권등기 완료 여부를 "
+            "증거로 확인하기 전에는 권리 상실 여부를 단정할 수 없음"
         )
         preserved_determinations.append(
             "목적물에 거주(점유)하고 주민등록(전입)을 유지하는 한 기존 대항력과 우선변제권은 확고히 보존됨"
@@ -684,7 +652,7 @@ def detect_case_delta(
     has_attachment_fact, attachment_date, att_doc_name, is_att_verified = extract_case_attachment_info(briefing)
 
     # 의뢰인이 질문에서 명시적으로 가압류를 신규 주장/문의하였는지 확인 (단순 일반 질문이나 '어떤 조치를 해야 하나요' 배제)
-    user_alleged_attachment = any(w in (current_question or "") for w in ["가압류가", "가압류를", "가압류 들어", "가압류 걸", "가압류 설정", "등기부에 가압류", "가압류 등기", "가압류 추가"])
+    user_alleged_attachment = delta_intent.label == "NEW_ATTACHMENT_ASSERTION"
 
     # 가압류 Fact/증거가 존재하거나, 의뢰인이 신규 가압류를 명시적으로 주장한 경우에만 분기 진입
     if has_attachment_fact or user_alleged_attachment:
@@ -754,8 +722,7 @@ def detect_case_delta(
             )
 
     # 4. 기존 사실 정정 (S03: '통지일이 2024년 3월 20일이에요')
-    correction_terms = ["날짜가 달라", "정정", "잘못 알았", "통지일이", "통지일은"]
-    if any(t in q_corpus for t in correction_terms):
+    if delta_intent.label == "NOTICE_DATE_CORRECTION":
         actual_notice_date = extract_case_notice_delivery_date(briefing) or "공적 서면 증거 도달일"
         changed_facts.append("의뢰인의 계약 해지 통지일 정정 진술 접수 (사용자 진술 / USER_ALLEGED)")
         impacted_determinations.append(
@@ -928,10 +895,14 @@ def assemble_grounded_answer(
 
     # 기초 분석은 초안의 분쟁 가정이 아닌 원질문을 기준으로 계약·지급·거주 사실을 넓게 보존한다.
     selected_facts = select_grounded_facts_for_display(
-        briefing, query=current_question, max_facts=12 if evidence_review else 5,
+        briefing, query=current_question,
+        # An unverified UI intent classification must not hide evidence facts.
+        max_facts=12,
     )
     if evidence_review:
-        selected_facts = [f for f in selected_facts if not is_conditional_contract_statement(f.statement)]
+        # Evidence review must retain sourced conditional plans and promises
+        # as *statements*, not silently discard them. Legal-effect verification
+        # is a separate phase.
         for party in briefing.parties:
             sections.append(f"- 등록 당사자: {party.role} {party.name} (등록 정보 기준)")
     if selected_facts:

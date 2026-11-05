@@ -197,7 +197,18 @@ def test_t06_direct_negation_is_contradiction():
         claim_type="ACTION",
         evidence_id="doc-2",
     )
-    decision = evaluate_claim_against_fact(claim_not_returned, fact_returned, enable_llm_verification=False)
+    from unittest.mock import patch
+    from ai_legal_helper.case_intelligence.conflict_detector import _LLMConflictVerificationSchema
+    with patch(
+        "ai_legal_helper.case_intelligence.conflict_detector._verify_pair_with_llm",
+        return_value=_LLMConflictVerificationSchema(
+            status="CONTRADICTION", reason_code="OPPOSITE_POLARITY_ON_SAME_SUBJECT",
+            explanation="동일 주체의 실제 반환과 미반환은 양립 불가",
+        ),
+    ):
+        decision = evaluate_claim_against_fact(
+            claim_not_returned, fact_returned, enable_llm_verification=True,
+        )
     assert decision.status == "CONTRADICTION"
     assert decision.reason_code == "OPPOSITE_POLARITY_ON_SAME_SUBJECT"
 
@@ -596,8 +607,28 @@ def test_t16_invalid_calendar_date_rejected():
     assert decision.reason_code == "INVALID_CALENDAR_DATE"
 
 
-def test_edge_cases_multi_amount_and_temporal_context():
-    """[8.2 엣지케이스] 한 문장 내 다중 금액(계약금/중도금/잔금), 빈 문자열 Claim, 시점 변경(최초 계약 vs 갱신 계약)을 검증한다."""
+def test_edge_cases_multi_amount_and_temporal_context(monkeypatch):
+    """One LLM-classified role per amount, without regex-based legal semantics."""
+    from ai_legal_helper.case_intelligence.semantic_judgment import SemanticDecision
+
+    def classify_value(statement, *, task, context="", **kwargs):
+        if task != "MONEY_AMOUNT_SEMANTIC_ROLE":
+            return SemanticDecision("UNKNOWN", "", status="UNCONFIRMED")
+        token = context.split("분류해야 할 특정 금액 원문: ", 1)[-1].split(" | ", 1)[0]
+        if "3천만" in token:
+            role = "DOWN_PAYMENT"
+        elif "2억 7천만" in token:
+            role = "INTERIM_OR_BALANCE"
+        elif "3억 5천만" in token:
+            role = "MODIFIED_CONTRACT_AMOUNT"
+        else:
+            role = "PRINCIPAL_DEPOSIT"
+        return SemanticDecision(role, statement)
+
+    monkeypatch.setattr(
+        "ai_legal_helper.case_intelligence.semantic_judgment.classify_statement",
+        classify_value,
+    )
     # 1) 한 문장 내 다중 금액 역할 분리
     multi_stmt = "보증금 3억 원 중 계약금 3천만 원은 계약 시 지급하고 잔금 2억 7천만 원은 2024년 5월 1일에 지급한다."
     amounts, roles = extract_amount_roles(multi_stmt)

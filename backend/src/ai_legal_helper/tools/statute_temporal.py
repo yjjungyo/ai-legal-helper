@@ -77,31 +77,61 @@ def _add_months(value: date, months: int) -> date:
 
 
 def _effective_from_addendum(addendum: Addendum, article: str) -> Optional[str]:
-    """부칙 제1조의 단순 시행일 규칙만 계산한다. 예외는 판단 유보한다.
+    """Interpret an official effective-date rule semantically, then do math.
 
-    지원하지 않는 상대시점이나 개별 조문 예외를 추측하지 않는다. '공포 후 N개월이
-    경과한 날'이라는 확정 패턴만 계산하며, 다만 절에 해당 조문이 포함되면 None.
+    The model decides the clause's legal meaning and exception scope using
+    the COMPLETE addendum. Regex extracts *numbers* from already-classified
+    quotes only; no Korean legal phrase regex decides an effective date.
+    Unknown scope, unsupported arithmetic or model errors fail closed.
     """
-    text = re.sub(r"\s+", " ", addendum.content)
-    first_article = re.search(r"제\s*1\s*조\s*\(\s*시행일\s*\)(.*?)(?=제\s*2\s*조\s*\(|$)", text)
-    if not first_article:
-        return None
-    clause = first_article.group(1)
-    if "다만" in clause:
-        # Exception scopes can reference ranges, items, or other provisions.
-        # A simple regex cannot prove that the requested article is excluded.
-        return None
+    from ai_legal_helper.case_intelligence.semantic_judgment import classify_statement
+
     promulgated = parse_date(addendum.promulgation_date)
-    if not promulgated:
+    if not promulgated or not addendum.content:
         return None
-    relative = re.search(r"공포\s*후\s*(\d+)\s*개월이\s*경과한\s*날부터\s*시행", clause)
-    if relative:
-        months = int(relative.group(1))
-        if not 0 <= months <= 240:
-            return None
-        return (_add_months(promulgated, months) + timedelta(days=1)).isoformat()
-    if re.search(r"이\s*영은\s*공포한\s*날부터\s*시행", clause):
+    interpretation = classify_statement(
+        addendum.content,
+        task="OFFICIAL_ADDENDUM_EFFECTIVE_DATE",
+        labels=(
+            "MONTHS_ELAPSED_AFTER_PROMULGATION",
+            "ON_PROMULGATION",
+            "EXPLICIT_FIXED_DATE",
+            "REVIEW_REQUIRED",
+        ),
+        context=(
+            "대상 조문: " + (article or "법령 공통 시행일") + ". "
+            "부칙 전체에서 조문별 시행 예외, 다른 적용례, 법령 공통 시행일을 "
+            "비교하고 대상 조문에 실제 적용되는 시행일만 결정하세요. "
+            "MONTHS_ELAPSED_AFTER_PROMULGATION: 공포 후 N개월이 '경과한 날'부터 "
+            "시행하는 문장이며 N은 인용문에 명시됨. "
+            "ON_PROMULGATION: 공포한 날부터 시행함. "
+            "EXPLICIT_FIXED_DATE: 달력상 시행일이 인용문에 명시됨. "
+            "REVIEW_REQUIRED: 예외 적용 대상, 계산 방식 또는 조문 관계가 모호함. "
+            "공포 후 N개월이 경과한 날은 공포일 기준 N개월 가산일 다음 날."
+        ),
+    )
+    quote = interpretation.evidence_quote
+    if interpretation.label == "ON_PROMULGATION":
         return promulgated.isoformat()
+    if interpretation.label == "EXPLICIT_FIXED_DATE":
+        # Only parse a literal date from the selected official quotation.
+        spans = re.findall(
+            r"(?<!\d)\d{4}\s*(?:년|[-./])\s*\d{1,2}\s*(?:월|[-./])\s*\d{1,2}\s*일?",
+            quote,
+        )
+        dates = {iso_date(value) for value in spans}
+        dates.discard(None)
+        return next(iter(dates)) if len(dates) == 1 else None
+    if interpretation.label == "MONTHS_ELAPSED_AFTER_PROMULGATION":
+        # This is NUMERIC EXTRACTION from a model-identified time unit, not
+        # regex interpretation of legal effect.
+        months = re.findall(r"(?<!\d)(\d{1,3})\s*개월", quote)
+        if len(months) != 1:
+            return None
+        count = int(months[0])
+        if count < 0 or count > 240:
+            return None
+        return (_add_months(promulgated, count) + timedelta(days=1)).isoformat()
     return None
 
 
@@ -110,14 +140,13 @@ def article_effective_date(
     article_label: str,
     addenda: list[Addendum],
 ) -> tuple[Optional[str], str]:
-    """명시 조문 시행일 > 해당 개정부칙의 안전하게 계산 가능한 시행일 순서."""
+    """공식 XML의 조문 시행일 우선; 부칙 해석은 의미 검증과 계산 분리."""
     article_date = iso_date(article_node.findtext("조문시행일자"))
     if article_date:
         return article_date, "ARTICLE_EFFECTIVE_DATE"
-    if len(addenda) == 1:
-        calculated = _effective_from_addendum(addenda[0], article_label)
-        if calculated:
-            return calculated, "ADDENDUM_EFFECTIVE_DATE"
+    # Retrieval/indexing may not assert an effective date from free-text
+    # addenda. The temporal resolver reviews the complete addendum once per
+    # consultation, independently from the source metadata extractor.
     return None, "UNCONFIRMED"
 
 
