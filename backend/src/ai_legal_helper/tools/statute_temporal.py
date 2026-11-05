@@ -144,10 +144,9 @@ def article_effective_date(
     article_date = iso_date(article_node.findtext("조문시행일자"))
     if article_date:
         return article_date, "ARTICLE_EFFECTIVE_DATE"
-    if len(addenda) == 1:
-        calculated = _effective_from_addendum(addenda[0], article_label)
-        if calculated:
-            return calculated, "ADDENDUM_EFFECTIVE_DATE"
+    # Retrieval/indexing may not assert an effective date from free-text
+    # addenda. The temporal resolver reviews the complete addendum once per
+    # consultation, independently from the source metadata extractor.
     return None, "UNCONFIRMED"
 
 
