@@ -636,15 +636,28 @@ def detect_case_delta(
                     "임대인으로부터 입금받은 정확한 금액과 계좌 이체확인증 또는 입금증빙 자료를 증거로 등록하여 확인할 것"
                 )
 
-    # 2. 목적물 조기 퇴거 / 점유 이전 / 이사 질의 (S05: '그럼 지금 이사를 가도 돼?')
-    moveout_terms = ["이사", "퇴거", "열쇠", "비밀번호", "짐 빼", "방 빼", "나가도", "이사가도"]
-    if any(t in q_corpus for t in moveout_terms):
+    # 2. 목적물 조기 퇴거 / 점유 이전 / 이사 질의
+    from ai_legal_helper.case_intelligence.semantic_judgment import classify_statement
+    delta_intent = classify_statement(
+        current_question,
+        task="CURRENT_USER_NEW_CASE_EVENT_OR_FOLLOWUP",
+        labels=("MOVE_OUT_QUESTION", "NEW_ATTACHMENT_ASSERTION",
+                "NOTICE_DATE_CORRECTION", "OTHER"),
+        context=(
+            "MOVE_OUT_QUESTION: 이사·퇴거·점유 이전의 법률적 위험을 질문함. "
+            "NEW_ATTACHMENT_ASSERTION: 특정 사건의 새 가압류 등기 발생을 "
+            "실제 사실로 주장함. 일반적인 압류/경매 질문은 제외. "
+            "NOTICE_DATE_CORRECTION: 자신의 기존 통지일 또는 도달일을 "
+            "명시적으로 수정함. 다른 날짜 설명이나 질문은 제외."
+        ),
+    )
+    if delta_intent.label == "MOVE_OUT_QUESTION":
         changed_facts.append("의뢰인의 보증금 미반환 상태에서의 조기 이사(퇴거) 및 점유 이전 가능 여부 문의")
         impacted_determinations.append(
             "보증금 전액을 반환받기 전 또는 임차권등기명령에 따른 등기가 등기부에 기재되기 전에 "
-            "주택의 점유를 상실(이사/열쇠 인도/비밀번호 공유)하거나 전입을 이전하면, "
-            "주택임대차보호법상 대항력 및 우선변제권이 즉시 소멸하는 치명적 법률 위험 발생. "
-            "따라서 현재 상태에서는 절대 점유를 이전해서는 안 됨"
+            "주택의 점유 또는 전입 상태가 변경되면 임차인의 대항력·우선변제권 유지에 "
+            "중대한 위험이 있을 수 있으므로, 현재 권리 요건과 임차권등기 완료 여부를 "
+            "증거로 확인하기 전에는 권리 상실 여부를 단정할 수 없음"
         )
         preserved_determinations.append(
             "목적물에 거주(점유)하고 주민등록(전입)을 유지하는 한 기존 대항력과 우선변제권은 확고히 보존됨"
@@ -663,7 +676,7 @@ def detect_case_delta(
     has_attachment_fact, attachment_date, att_doc_name, is_att_verified = extract_case_attachment_info(briefing)
 
     # 의뢰인이 질문에서 명시적으로 가압류를 신규 주장/문의하였는지 확인 (단순 일반 질문이나 '어떤 조치를 해야 하나요' 배제)
-    user_alleged_attachment = any(w in (current_question or "") for w in ["가압류가", "가압류를", "가압류 들어", "가압류 걸", "가압류 설정", "등기부에 가압류", "가압류 등기", "가압류 추가"])
+    user_alleged_attachment = delta_intent.label == "NEW_ATTACHMENT_ASSERTION"
 
     # 가압류 Fact/증거가 존재하거나, 의뢰인이 신규 가압류를 명시적으로 주장한 경우에만 분기 진입
     if has_attachment_fact or user_alleged_attachment:
@@ -733,8 +746,7 @@ def detect_case_delta(
             )
 
     # 4. 기존 사실 정정 (S03: '통지일이 2024년 3월 20일이에요')
-    correction_terms = ["날짜가 달라", "정정", "잘못 알았", "통지일이", "통지일은"]
-    if any(t in q_corpus for t in correction_terms):
+    if delta_intent.label == "NOTICE_DATE_CORRECTION":
         actual_notice_date = extract_case_notice_delivery_date(briefing) or "공적 서면 증거 도달일"
         changed_facts.append("의뢰인의 계약 해지 통지일 정정 진술 접수 (사용자 진술 / USER_ALLEGED)")
         impacted_determinations.append(
