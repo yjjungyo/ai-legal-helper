@@ -20,6 +20,9 @@ SUPPORTS/CONTRADICTS/POTENTIAL_CONFLICT 링크를 생성하고 공식 Fact로 �
 """
 
 from typing import List, Optional, Set, Tuple
+import logging
+
+logger = logging.getLogger(__name__)
 from sqlalchemy.orm import Session
 
 from ai_legal_helper.database.models import (
