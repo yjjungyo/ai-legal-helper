@@ -83,7 +83,7 @@ function CreateCaseModal({ isOpen, onClose, onSuccess }: CreateCaseModalProps) {
                 id="case-title"
                 className="form-control"
                 type="text"
-                placeholder="예: 전세보증금 반환 청구 및 임차권등기명령 사건"
+                placeholder="예: 계약 분쟁, 미지급 대금, 근로 문제"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 autoFocus
@@ -92,7 +92,7 @@ function CreateCaseModal({ isOpen, onClose, onSuccess }: CreateCaseModalProps) {
 
             <div className="form-group">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                <label htmlFor="case-type" style={{ fontWeight: 600, margin: 0 }}>사건 분류 (분쟁 유형)</label>
+                <label htmlFor="case-type" style={{ fontWeight: 600, margin: 0 }}>사건 분야 (선택 사항)</label>
                 <span style={{ fontSize: '0.78em', color: 'var(--primary, #2563eb)' }}>🤖 AI 자동 판별 지원</span>
               </div>
               <select
@@ -140,7 +140,7 @@ function CreateCaseModal({ isOpen, onClose, onSuccess }: CreateCaseModalProps) {
                 id="case-description"
                 className="form-control"
                 rows={3}
-                placeholder="분쟁 배경이나 상황(예: 계약 만료일, 미반환 금액, 현재 임대인과의 연락 상황 등)을 간략히 적어주시면 AI가 더 정확하게 유형을 분류하고 상담을 준비합니다."
+                placeholder="무슨 일이 있었고 어떤 도움이 필요한지 편하게 적어주세요."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 style={{ resize: 'vertical' }}
