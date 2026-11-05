@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from sqlalchemy import select
 
-from ai_legal_helper.legal_knowledge.index_jobs import LawArticleVersion, LawTransitionRule
+from ai_legal_helper.legal_knowledge.index_jobs import LawArticleVersion, LawTransitionRule, LawVersionEffectiveBranch
 from ai_legal_helper.legal_knowledge.law_index_resolver import LawIndexResolver
 from ai_legal_helper.rag.temporal_applicability import parse_legal_date
 
@@ -56,8 +56,19 @@ class ArticleTemporalResolver:
                 reason_codes=tuple(reasons), official_lookup_required=base.official_lookup_required,
                 evidence_vector_ids=tuple(vectors),
             )
-        if base.status != "INDEX_READY_CANDIDATE" or not base.mst:
+        branch_review = base.status == "ARTICLE_BRANCH_REVIEW_REQUIRED"
+        if base.status not in ("INDEX_READY_CANDIDATE", "ARTICLE_BRANCH_REVIEW_REQUIRED") or not base.mst:
             return decision("INDEX_NOT_READY", *base.reason_codes)
+        if not base.article_ids:
+            return decision("ARTICLE_SCOPE_MISSING", "ARTICLE_SCOPE_REQUIRED")
+        if branch_review:
+            branches = list(self.session.scalars(select(LawVersionEffectiveBranch).where(
+                LawVersionEffectiveBranch.law_id == law_id,
+                LawVersionEffectiveBranch.mst == base.mst,
+                LawVersionEffectiveBranch.source_snapshot_id == base.snapshot_id,
+            )).all())
+            if not branches or any(parse_legal_date(b.effective_date) is None for b in branches):
+                return decision("ARTICLE_BRANCH_UNCONFIRMED", "EFFECTIVE_BRANCH_SOURCE_MISSING")
         event = parse_legal_date(base.event_date)
         if event is None:
             return decision("EVENT_UNCONFIRMED", "EVENT_DATE_INVALID")
@@ -102,6 +113,12 @@ class ArticleTemporalResolver:
                             vectors=vectors)
         if any(not r.rule_text or not r.source_vector_id for r in addenda):
             return decision("ADDENDA_UNCONFIRMED", "TRANSITION_SOURCE_MISSING",
+                            vectors=vectors)
+        if branch_review:
+            return decision("ARTICLE_BRANCH_REVIEW_REQUIRED",
+                            "ARTICLE_DATE_CANDIDATE_MATCHES_EVENT",
+                            "MULTI_EFFECTIVE_DATE_PER_MST",
+                            "TRANSITION_APPLICABILITY_REVIEW_REQUIRED",
                             vectors=vectors)
         # Even if all effective dates are source-grounded, event-type-specific
         # applicability may depend on old contracts and transitional provisions.
