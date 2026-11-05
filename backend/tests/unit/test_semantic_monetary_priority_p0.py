@@ -177,3 +177,76 @@ def test_proposal_and_rejection_not_a_supporting_evidence_relation():
     assert comparison.is_comparable is False
     assert comparison.status == "DIFFERENT_CONTEXT"
     assert comparison.reason_code == "PROPOSAL_VS_REJECTION"
+
+
+
+def test_one_batch_model_call_for_three_amounts_and_two_dates():
+    statement = (
+        "2024년 5월 1일 계약 시 원금 3억 원, "
+        "2024년 5월 2일 계약금 3천만 원과 잔금 2억 7천만 원을 기록했다."
+    )
+    calls = []
+
+    def reviewed_batch(text, *, spans, labels_by_kind):
+        calls.append((text, spans))
+        assert sum(x["kind"] == "AMOUNT" for x in spans) == 3
+        assert sum(x["kind"] == "DATE" for x in spans) == 2
+        result = {}
+        for item in spans:
+            token = text[item["start"]:item["end"]]
+            if item["kind"] == "DATE":
+                result[item["id"]] = "CONTRACT_DATE"
+            elif "3천만" in token:
+                result[item["id"]] = "DOWN_PAYMENT"
+            elif "2억 7천만" in token:
+                result[item["id"]] = "INTERIM_OR_BALANCE"
+            else:
+                result[item["id"]] = "PRINCIPAL_DEPOSIT"
+        return result
+
+    with patch(
+        "ai_legal_helper.case_intelligence.semantic_judgment.classify_numeric_spans",
+        side_effect=reviewed_batch,
+    ):
+        slots = build_structured_slots(statement, claim_type="AMOUNT_AND_DATE")
+
+    assert len(calls) == 1
+    assert slots.amount_roles["PRINCIPAL_DEPOSIT"] == [300_000_000]
+    assert slots.amount_roles["DOWN_PAYMENT"] == [30_000_000]
+    assert slots.amount_roles["INTERIM_OR_BALANCE"] == [270_000_000]
+    assert len(slots.date_roles["CONTRACT_DATE"]) == 2
+
+
+def test_batch_rejects_quote_grounded_in_wrong_identical_amount_occurrence():
+    from ai_legal_helper.case_intelligence.semantic_judgment import classify_numeric_spans
+
+    sentence = "원금 5천만 원, 반환액 5천만 원"
+    token = "5천만 원"
+    first = sentence.index(token)
+    second = sentence.rindex(token)
+    invocations = []
+
+    def one_response(prompt):
+        invocations.append(prompt)
+        return {
+            "items": [
+                # Wrong: this is the SECOND occurrence, not the first.
+                {"id": "a0", "role": "PRINCIPAL_DEPOSIT",
+                 "evidence_quote": "반환액 5천만 원"},
+                {"id": "a1", "role": "RETURNED_AMOUNT",
+                 "evidence_quote": "반환액 5천만 원"},
+            ]
+        }
+
+    decisions = classify_numeric_spans(
+        sentence,
+        spans=[
+            {"id": "a0", "kind": "AMOUNT", "start": first, "end": first + len(token)},
+            {"id": "a1", "kind": "AMOUNT", "start": second, "end": second + len(token)},
+        ],
+        labels_by_kind={"AMOUNT": ("PRINCIPAL_DEPOSIT", "RETURNED_AMOUNT")},
+        invoke_fn=one_response,
+    )
+    assert len(invocations) == 1
+    assert "a0" not in decisions
+    assert decisions["a1"] == "RETURNED_AMOUNT"
