@@ -10,6 +10,7 @@ import hashlib
 import json
 import logging
 import uuid
+from dataclasses import asdict
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -40,7 +41,7 @@ def store_complete_history(session, lookup: VersionLookup, *, law_id: str) -> di
         by_mst.setdefault(version.mst, set()).add(version.list_effective_date)
     multi_date = any(len(dates) > 1 for dates in by_mst.values())
     canonical = sorted(
-        (v.as_dict() for v in versions),
+        (asdict(v) for v in versions),
         key=lambda item: (item["mst"], item["list_effective_date"]),
     )
     fingerprint = hashlib.sha256(
