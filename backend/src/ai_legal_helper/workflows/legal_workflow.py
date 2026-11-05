@@ -711,6 +711,12 @@ def verification_node(state: LegalState) -> Dict:
                 for src in (output.get("retrieved_sources") or state.get("retrieved_sources") or [])
                 if isinstance(src, dict)
             ),
+            official_source_ids=[
+                str(src["source_id"])
+                for src in (output.get("retrieved_sources") or state.get("retrieved_sources") or [])
+                if isinstance(src, dict) and src.get("source_type") == "STATUTE"
+                and src.get("source_id") and src.get("content")
+            ],
         )
         return output
     from ai_legal_helper.agents.verification import run_verification
@@ -845,6 +851,12 @@ def verification_node(state: LegalState) -> Dict:
             src.get("source_type") == "STATUTE" and src.get("content")
             for src in combined_sources if isinstance(src, dict)
         ),
+        official_source_ids=[
+            str(src["source_id"])
+            for src in combined_sources if isinstance(src, dict)
+            and src.get("source_type") == "STATUTE"
+            and src.get("source_id") and src.get("content")
+        ],
     )
     logger.info(
         "[TEMPORAL_VERIFICATION] gate=%s pre=%s post=%s reasons=%s",
