@@ -339,30 +339,23 @@ def analyze_consultation_intent(
     except Exception as e:
         logger.warning(f"[INTENT_ANALYZER] LLM 질문 의도 분석 실패(규칙 폴백 적용): {e}")
 
-    # 2. LLM 실패 시 결정론적 휴리스틱 폴백 적용
+    # On model failure, the product must not dispose of a potentially valid
+    # legal question as unknown merely because intent classification failed.
+    # This fallback selects a workflow, NEVER proves a case fact.
     if decision is None:
-        # [장애 안전 정책] LLM이 실패했을 때 단순히 글자 수만 보고
-        # 법률 분석으로 진입시키면 날씨 같은 비법률 요청이 Router로 전달된다.
-        # 명시적인 증거 검토 요청은 기존 규칙을 유지하고, 그 밖의 질문은
-        # 법률성 여부를 알 수 없으므로 확인 요청으로 종료한다.
-        # 법률성 분류를 특정 키워드 목록으로 하드코딩하지 않는다.
-        if is_evidence_review_request(question):
-            decision = _heuristic_rule_fallback(question, has_history=has_history, case_context=case_context)
-        else:
-            decision = IntentDecision(
-                intent=ConsultationIntent.NEEDS_CLARIFICATION,
-                consultation_mode=ConsultationMode.GENERAL_LEGAL,
-                resolved_query=question.strip(),
-                requires_specialist=False,
-                requires_retrieval=False,
-                requires_verification=False,
-                requires_full_analysis=False,
-                reason="의도 분석 실패: 법률 상담 대상 여부를 안전하게 확인할 수 없음",
-            )
+        decision = _heuristic_rule_fallback(
+            question, has_history=has_history, case_context=case_context,
+        )
 
-    # LLM의 재작성도 원질문을 넘어 새 거래 사실을 만들 수 없도록 자료 분석 의도를 보존한다.
-    if is_evidence_review_request(question):
-        decision = _heuristic_rule_fallback(question, has_history=has_history, case_context=case_context)
+    # Current user request, not a rewritten LLM query, controls whether the
+    # user explicitly asked to analyze registered documents. A model must not
+    # turn that request into a new unverified repayment event.
+    explicit_route = _heuristic_rule_fallback(
+        question, has_history=has_history, case_context=case_context,
+    )
+    if (explicit_route.intent == ConsultationIntent.NEW_LEGAL_ANALYSIS
+            and "등록 자료의 사실" in explicit_route.reason):
+        decision = explicit_route
         decision.consultation_mode = ConsultationMode.CASE_EVIDENCE
 
     # 3. 코드 레벨의 엄격한 가드레일 정책 검증 (Deterministic Policy Verification)
