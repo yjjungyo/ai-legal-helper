@@ -63,7 +63,7 @@ def upgrade():
         sa.Column("effective_to", sa.String(10)),
         sa.Column("applicability_review_status", sa.String(32), nullable=False),
         sa.Column("indexed_at", sa.DateTime(), nullable=False),
-        sa.UniqueConstraint("law_id", "mst", "article_id", "content_hash",
+        sa.UniqueConstraint("law_id", "mst", "vector_id",
                             name="uq_law_article_coverage_identity"),
     )
     op.create_index("ix_law_article_coverage_lookup",
