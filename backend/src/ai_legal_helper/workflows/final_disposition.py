@@ -116,40 +116,14 @@ def score_fact_legal_importance(fact: Any, query: Optional[str] = None) -> float
 
 
 def _extract_semantic_fact_key(statement: str) -> str:
-    """사실 진술문에서 동일한 법률 요건사실(보증금 금액, 계약기간 등)을 대표하는 정규화 키를 추출한다 (P0-03/Gate 2).
+    """Exact de-duplication only: similar monetary digits are not identical facts.
 
-    동일한 보증금 금액 사실(예: 계약서 2억 2천, 송금내역 2억 2천, 영수증 2억 2천 등 3개)이나
-    동일 계약기간 진술이 다수 존재할 때 단 하나의 대표 사실로 병합·중복 제거하기 위함이다.
-
-    Args:
-        statement: 사실 진술문 문자열.
-
-    Returns:
-        str: 의미론적 요건사실 그룹 식별자 키.
+    A contract principal, down payment, returned deposit and unpaid balance can
+    all contain the same money amount but have different legal meaning.
+    Semantic deduplication requires upstream approved proposition keys.
     """
-    stmt = statement.strip()
+    return "STMT_" + " ".join((statement or "").split())
 
-    # 1. 보증금 금액 관련 요건사실 (금액 기반 일치 그룹화: 계약서, 송금내역, 영수증, 수령확인 등)
-    amts = extract_amounts_from_text(stmt)
-    if amts and (any(k in stmt for k in ("보증금", "전세금", "임차보증금", "송금", "입금", "지급", "차임", "영수", "수령", "반환", "계약금", "잔금")) or max(amts) >= 10_000_000):
-        return f"SEMANTIC_DEPOSIT_{max(amts)}"
-
-    # 2. 계약 기간 관련 요건사실 (시작일-종료일 기준 일치 그룹화)
-    date_matches = re.findall(r"(\d{4}[.\-/]\s*\d{1,2}[.\-/]\s*\d{1,2})", stmt)
-    if len(date_matches) >= 2 and any(k in stmt for k in ("기간", "만료", "시작", "종료", "임대차", "계약")):
-        d1 = re.sub(r"\s+", "", date_matches[0]).replace("-", ".").replace("/", ".")
-        d2 = re.sub(r"\s+", "", date_matches[1]).replace("-", ".").replace("/", ".")
-        return f"SEMANTIC_PERIOD_{d1}_{d2}"
-
-    # 3. 전입 및 확정일자 대항력 요건사실
-    if ("전입" in stmt or "주민등록" in stmt) and "확정일자" in stmt:
-        return "SEMANTIC_OPPOSABILITY_REQ"
-
-    # 4. 계약 만료/해지 통지 및 임대인 확인 사실
-    if any(k in stmt for k in ("해지", "종료", "만료", "갱신거절")) and any(k in stmt for k in ("통지", "문자", "카카오", "회신", "확인", "곤란")):
-        return "SEMANTIC_TERMINATION_NOTICE"
-
-    return f"STMT_{stmt}"
 
 
 def select_grounded_facts_for_display(
@@ -921,7 +895,9 @@ def assemble_grounded_answer(
 
     # 기초 분석은 초안의 분쟁 가정이 아닌 원질문을 기준으로 계약·지급·거주 사실을 넓게 보존한다.
     selected_facts = select_grounded_facts_for_display(
-        briefing, query=current_question, max_facts=12 if evidence_review else 5,
+        briefing, query=current_question,
+        # An unverified UI intent classification must not hide evidence facts.
+        max_facts=12,
     )
     if evidence_review:
         # Evidence review must retain sourced conditional plans and promises
