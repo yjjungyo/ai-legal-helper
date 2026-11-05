@@ -161,6 +161,26 @@ def extract_amounts_from_text(text: str) -> Set[int]:
     return amounts
 
 
+def _approved_money_role(fact: FactItemBrief, category: str) -> tuple[int | None, str]:
+    """Use persisted, evidence-reviewed semantic attribution before calling an LLM.
+
+    Numeric syntax is checked against the exact statement quotation; category
+    must have been approved upstream. This never guesses category from tokens.
+    """
+    meta = getattr(fact, "reviewed_semantics", None) or {}
+    if not isinstance(meta, dict) or meta.get("status") not in ("VERIFIED", "HUMAN_APPROVED"):
+        return None, ""
+    if meta.get("category") != category:
+        return None, ""
+    quote = meta.get("evidence_quote")
+    val = meta.get("amount_krw")
+    if not isinstance(quote, str) or not quote.strip() or quote not in (fact.statement or ""):
+        return None, ""
+    if type(val) is not int or val <= 0 or val not in extract_amounts_from_text(quote):
+        return None, ""
+    return val, quote
+
+
 def extract_case_contract_deposit(briefing: CaseEvidenceBriefing) -> int:
     """Return a single evidence-verified contract principal, or zero.
 
@@ -173,6 +193,10 @@ def extract_case_contract_deposit(briefing: CaseEvidenceBriefing) -> int:
     candidates: set[int] = set()
     for fact in briefing.facts or []:
         if not is_fact_strictly_verified(fact, briefing):
+            continue
+        trusted_amt, _ = _approved_money_role(fact, "CONTRACT_PRINCIPAL")
+        if trusted_amt is not None:
+            candidates.add(trusted_amt)
             continue
         verdict = classify_statement(
             fact.statement or "",
@@ -229,10 +253,13 @@ def extract_case_prior_verified_repayments(briefing: CaseEvidenceBriefing) -> Tu
             continue
         statement = fact.statement or ""
         doc_name = fact.document_name or fact.evidence_label or ""
+        trusted_amt, trusted_quote = _approved_money_role(fact, "ACTUAL_REPAYMENT")
         for line_text in (line.strip() for line in statement.splitlines()):
             if not line_text:
                 continue
-            verdict = classify_statement(
+            verdict = None
+            if trusted_amt is None or trusted_quote not in line_text:
+                verdict = classify_statement(
                 line_text,
                 task="ACTUAL_DEPOSIT_REFUND_TRANSACTION",
                 labels=("ACTUAL_REPAYMENT", "ORIGINAL_TENANT_PAYMENT",
@@ -246,9 +273,12 @@ def extract_case_prior_verified_repayments(briefing: CaseEvidenceBriefing) -> Tu
                     "포함해 정확히 인용해야 함."
                 ),
             )
-            if verdict.label != "ACTUAL_REPAYMENT":
-                continue
-            amts = extract_amounts_from_text(verdict.evidence_quote)
+            if trusted_amt is not None and trusted_quote in line_text:
+                amts = {trusted_amt}
+            else:
+                if verdict is None or verdict.label != "ACTUAL_REPAYMENT":
+                    continue
+                amts = extract_amounts_from_text(verdict.evidence_quote)
             # No 'min(amounts)' or 'max(amounts)' guess when multiple values
             # appear (e.g. refund plus remaining balance).
             if len(amts) != 1:
