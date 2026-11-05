@@ -1169,6 +1169,7 @@ def run_verification(
             if (require_question_coverage
                     and claim_obj.claim_type == "CASE_FACT"
                     and claim_obj.fact_status == "USER_STATEMENT"
+                    and claim_obj.grounding_status == "SUPPORTED"
                     and not claim_obj.source_ids
                     and _norm_quote(claim_obj.claim)
                     and (
