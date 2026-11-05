@@ -288,3 +288,39 @@ def test_no_semantic_model_never_uses_regex_as_legal_fallback():
     )
     assert out.status == "UNCONFIRMED"
     assert out.decisions[0].reason_code == "LLM_ADDENDUM_DISABLED"
+
+
+
+def test_actual_multi_event_contract_from_apply_wording():
+    """Regression: 체결/갱신/변경하는 계약부터 적용한다 (no '경우부터')."""
+    addendum_text = (
+        "제1조(시행일) 이 영은 2027년 4월 28일부터 시행한다. "
+        "제2조(임대차신고에 관한 적용례) 제36조의 개정규정은 이 영 시행 이후 "
+        "체결하거나 갱신 또는 변경하는 계약부터 적용한다."
+    )
+    def interpret(prompt):
+        if prompt.startswith("독립 검증자입니다"):
+            return _semantic_mock(prompt)
+        return json.dumps({
+            "is_relevant": True, "coverage_complete": True,
+            "event_types": [
+                "CONTRACT_SIGNED", "CONTRACT_RENEWED", "CONTRACT_MODIFIED",
+            ],
+            "condition": "ON_OR_AFTER_EFFECTIVE_DATE",
+            "event_evidence": "체결하거나 갱신 또는 변경하는 계약부터 적용한다",
+            "condition_evidence": "이 영 시행 이후",
+            "has_exception": False, "has_transition": False,
+            "has_retroactivity": False,
+        })
+    for kind, event_date, expected in (
+        ("CONTRACT_SIGNED", "2026-11-01", "NOT_APPLICABLE"),
+        ("CONTRACT_SIGNED", "2027-04-28", "APPLICABLE"),
+        ("CONTRACT_RENEWED", "2027-05-01", "APPLICABLE"),
+        ("CONTRACT_MODIFIED", "2027-06-01", "APPLICABLE"),
+    ):
+        result = evaluate_temporal_sources(
+            "", [article(), addendum(addendum_text)],
+            event_date=event_date, event_type=kind,
+            addendum_invoke_fn=interpret,
+        )
+        assert result.status == expected, (kind, event_date, result.as_dict())
