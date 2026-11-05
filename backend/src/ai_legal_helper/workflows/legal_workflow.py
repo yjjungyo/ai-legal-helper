@@ -762,9 +762,10 @@ def verification_node(state: LegalState) -> Dict:
     # Temporal answers need full claim-level LLM verification; do not allow
     # a regex-based lightweight PASS to bypass semantic grounding.
     from ai_legal_helper.legal_knowledge.temporal_verification import _temporal_question
+    temporal_kwargs = {"force_llm": True} if _temporal_question(q) else {}
     result = run_verification(
         q, draft, combined_sources, state.get("case_context", ""),
-        force_llm=_temporal_question(q),
+        **temporal_kwargs,
     )
 
     warnings = list(result.get("warnings", []))
