@@ -43,6 +43,24 @@ def enqueue_version(session, version: OfficialLawVersion) -> tuple[str, bool]:
         OfficialLawIndexJob.mst == version.mst,
     ))
     if current:
+        version_row = session.scalar(select(LawVersionIndex).where(
+            LawVersionIndex.law_id == version.law_id,
+            LawVersionIndex.mst == version.mst,
+        ))
+        if (version_row is not None and version_row.index_status == "STALE"
+                and current.status in ("READY", "FAILED")):
+            current.status = "PENDING"
+            current.attempts = 0
+            current.error_code = None
+            current.chunk_count = 0
+            current.lease_owner = None
+            current.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+            current.finished_at = None
+            current.list_effective_date = version.list_effective_date
+            current.promulgation_date = version.promulgation_date
+            current.promulgation_number = version.promulgation_number
+            session.commit()
+            return current.id, True
         return current.id, False
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     job = OfficialLawIndexJob(
@@ -272,6 +290,10 @@ def process_next_job(
         job.chunk_count = count
         job.error_code = None
     except Exception as exc:
+        # A partial SQLAlchemy flush must never be committed as successful
+        # coverage after a failed vector upsert or duplicate coverage row.
+        session.rollback()
+        job = session.get(OfficialLawIndexJob, job.id)
         job.error_code = type(exc).__name__[:100]
         job.status = "RETRY" if job.attempts < MAX_ATTEMPTS else "FAILED"
         logger.warning("[OFFICIAL_INDEX] job=%s error_type=%s", job.id, type(exc).__name__)
