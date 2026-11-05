@@ -143,6 +143,7 @@ export function renderInlineMarkdown(
           (ctx.includes(citation.claim_text) || citation.claim_text.includes(ctx))
         );
         const selected = contextual.length === 1 ? contextual[0]
+          : contextual.length > 1 ? undefined
           : matchingRefs.length === 1 ? matchingRefs[0] : undefined;
 
         if (selected) {
@@ -151,13 +152,13 @@ export function renderInlineMarkdown(
             claimId: selected.ref.claim_id || undefined,
             spanId: selected.ref.span_id || undefined,
           };
-          resolvedDocName = selected.ref.document_name || rawLabel;
+          resolvedDocName = rawLabel;
         } else {
           // 동일 파일이 여러 주장에 연결될 때 임의 Claim/Span을 고르지 않는다.
           const evidenceIds = [...new Set(matchingRefs.map(({ ref }) => ref.evidence_id).filter(Boolean))];
           if (evidenceIds.length !== 1) return <span key={index}>{part}</span>;
           meta = { evidenceId: evidenceIds[0] };
-          resolvedDocName = matchingRefs.find(({ ref }) => ref.document_name)?.ref.document_name || rawLabel;
+          resolvedDocName = rawLabel;
         }
       }
 
@@ -175,7 +176,7 @@ export function renderInlineMarkdown(
           title={`증거 [${resolvedDocName}] 원문 및 발췌 확인`}
           aria-label={`증거 ${resolvedDocName} 확인`}
         >
-          📄 [{resolvedDocName}]
+          {part}
         </button>
       );
     }
