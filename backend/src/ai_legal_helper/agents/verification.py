@@ -309,7 +309,7 @@ VERIFICATION_PROMPT = """당신은 법률검증 Agent(Legal Verification Agent)�
 5. 실무상 유의사항 및 입증 안내(Legal Caution)에 관한 특칙:
    - 답변에서 의뢰인에게 실무상 유의사항(예: 상대방의 항변 가능성 주의, 사실관계의 추가 입증 필요성, 통화내역/녹취록 등 증거 확보 권고, 추가 손해액의 객관적 증빙 지참 안내)을 설명하는 것은 변호사·법률전문가의 정상적이고 필수적인 법률 조언(Legal Caution)입니다.
    - 이러한 입증 주의사항이나 권고사항이 초안에 기재되어 있다고 해서 이를 "사건 증거 부족(CASE_EVIDENCE_MISSING)"이나 "근거 부족(INSUFFICIENT/REVISE)"으로 판정해서는 절대 안 됩니다.
-   - 오직 답변이 객관적 사실이나 법리가 없음에도 허위 사실을 단정적으로 주장하거나, 존재하지 않는 법적 권리를 기정사실로 왜곡 확정할 때만 REVISE 또는 INSUFFICIENT로 판정하세요.
+   - 이 특칙은 정상적인 입증 안내 자체를 결함으로 보지 말라는 뜻입니다. 질문 미응답, 법률요건 누락, 허위 인용, 적용 시점 오류 및 내부 모순 등 실제 결함은 다른 검증 기준에 따라 판정하세요.
 
 6. 공식 법령 원문 연동(OFFICIAL_STATUTE_SEARCH) 결과 반영 및 법률적 검증 원칙 (P0-01):
    - OFFICIAL_STATUTE_SEARCH는 근거 출처의 신뢰성을 높이는 검색 경로일 뿐, 답변 전체의 법률적 정확성이나 사건 적용 타당성을 보증하지 않습니다.
@@ -320,7 +320,8 @@ VERIFICATION_PROMPT = """당신은 법률검증 Agent(Legal Verification Agent)�
 7. 현재 답변 범위 기반 적응형 검증 (Adaptive Claim-level Scope):
    - 질문의 범위를 넘어선 과도한 쟁점이나 답변에 실제로 포함되지 않은 법률 주장의 근거 부족을 이유로 전체 답변을 INSUFFICIENT로 차단하지 마세요.
    - RECOMMENDATION(후속 조치 가이드) 및 USER_STATEMENT(사용자 진술 요약)는 법률 조문 RAG 출처가 없더라도 그 자체로 정상적인 실무 조언 또는 사실 정리이므로, 법조문이 없다는 이유로 UNSUPPORTED로 판정하지 마세요 (grounding_status를 NOT_APPLICABLE 또는 SUPPORTED로 설정).
-   - 오직 LEGAL_RULE(법령/판례 규범) 및 LEGAL_APPLICATION(구체적 법률효과 단정) 주장이 검색된 법령 본문에 의해 뒷받침되지 않을 때만 UNSUPPORTED로 판정하세요.
+   - LEGAL_RULE 및 LEGAL_APPLICATION은 법률 본문과 적용 요건으로 검증하세요. CASE_FACT는 실제 사건 자료와 대조하며 원문에 없는 사실은 UNSUPPORTED로 판정할 수 있습니다. 행동 권고라도 법적 의무·기한·효과를 포함하면 그 부분은 법률 주장으로 검증하세요.
+   - 사용자가 명시한 사실은 반대 정보가 없다면 USER_STATEMENT로 상담 전제에 사용할 수 있습니다. 서류 부재만으로 부정하거나 판단 불가로 처리하지 말고, 진술하지 않은 별개의 요건을 추정했는지 확인하세요.
 
 8. 사실 상태 구분 및 임의 증거번호 금지 (Fact Status & Evidence Policy):
    - 사실의 확인 수준(fact_status)을 엄격히 구분하세요:
@@ -332,7 +333,7 @@ VERIFICATION_PROMPT = """당신은 법률검증 Agent(Legal Verification Agent)�
    - 실제 사건 증거 목록에 등록되지 않은 임의의 증거 번호(예: '증거 1', '증거 2', '증거 7호' 등)가 답변에 사용된 경우, 반드시 CITATION_INVALID 및 REVISE로 판정하고 수정 지침에 '임의 증거번호 제거 및 사용자 진술/확보 필요 자료로 정제'를 명시하세요.
 
 9. 사건 사실관계가 없는 일반 법령/조문 질의(General Statute Interpretation Query) 검증 특칙:
-   - 사건 증거, 계약서, 분쟁 사실이 등록되지 않은 일반 법령·조문 직접 해석 질의(예: "~할 수 있나요?", "~의 요건은 무엇인가요?")의 경우, 답변의 법률 규범(LEGAL_RULE) 및 핵심 결론이 [검색된 출처 목록]의 법조문 본문에 부합하면 반드시 PASS로 판정하세요.
+   - 사건 증거, 계약서, 분쟁 사실이 등록되지 않은 일반 법령·조문 직접 해석 질의(예: "~할 수 있나요?", "~의 요건은 무엇인가요?")의 경우, 답변의 법률 규범(LEGAL_RULE) 및 핵심 결론이 [검색된 출처 목록]의 법조문 본문에 부합하고 다른 주요 오류나 질문 미응답이 없으면 PASS로 판정하세요.
    - 사건 사실관계 증빙 부재, 개별 사안의 허락/동의 범위 입증 필요성, 상대방의 항변 가능성 등 변호사로서의 실무상 유의사항(Legal Caution)이나 추가 확인 필요성을 언급했다는 이유로 REVISE 또는 INSUFFICIENT(CASE_EVIDENCE_MISSING, ANSWER_REVISION_REQUIRED 등)로 판정해서는 절대 안 됩니다.
    - 질문에 필요한 핵심 법조문이 이미 [검색된 출처 목록]에 포함되어 있다면, 불필요하게 다른 법령을 candidate_laws에 기재하거나 LEGAL_SOURCE_MISSING / LEGAL_SOURCE_INSUFFICIENT로 판정하지 마세요.
 
