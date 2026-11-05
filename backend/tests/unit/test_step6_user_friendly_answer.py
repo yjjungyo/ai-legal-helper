@@ -52,9 +52,10 @@ class TestStep6UserFriendlyAnswer:
 
     def test_synthesizer_natural_fewshot_example(self):
         """퓨샷 예시가 고정 5단계 보고서가 아닌 자연스러운 질의응답 구조인지 검증"""
-        assert "### 현재 계약 상태" in SYNTH_FEWSHOT
-        assert "### 계약을 종료하려면" in SYNTH_FEWSHOT
-        assert "주택임대차보호법 제6조의2" in SYNTH_FEWSHOT
+        assert "### 현재 판단" in SYNTH_FEWSHOT
+        assert "### 지금 할 일" in SYNTH_FEWSHOT
+        assert "실제 사건의 사실이나 법률 근거가 아닙니다" in SYNTH_FEWSHOT
+        assert "주택임대차보호법" not in SYNTH_FEWSHOT
         assert "[1. 핵심 결론]" not in SYNTH_FEWSHOT
 
 
