@@ -93,6 +93,8 @@ class ClaimVerification(BaseModel):
     reason: str = Field(default="", description="검증 사유")
     inference_basis: str = Field(default="", description="사건 추론을 뒷받침하는 자료와 추론 관계")
     inference_limit: str = Field(default="", description="답변 원문에 명시된 추론 한계의 연속 인용")
+    user_statement_basis: str = Field(default="", description="동일 의미의 사용자 진술을 질문에서 그대로 인용한 문구")
+    user_statement_equivalent: bool = Field(default=False, description="새로운 사실·법률 요건을 추가하지 않는 의미상 동일 진술 여부")
     model_grounding_status: Optional[str] = Field(default=None, description="정책 적용 전 모델 판정")
     model_reason: Optional[str] = Field(default=None, description="정책 적용 전 모델 사유")
 
@@ -1169,7 +1171,12 @@ def run_verification(
                     and claim_obj.fact_status == "USER_STATEMENT"
                     and not claim_obj.source_ids
                     and _norm_quote(claim_obj.claim)
-                    and _norm_quote(claim_obj.claim) in _norm_quote(question)):
+                    and (
+                        _norm_quote(claim_obj.claim) in _norm_quote(question)
+                        or (claim_obj.user_statement_equivalent is True
+                            and bool(_norm_quote(claim_obj.user_statement_basis))
+                            and _norm_quote(claim_obj.user_statement_basis) in _norm_quote(question))
+                    )):
                 claim_obj.claim_type = "USER_STATEMENT"
                 claim_obj.grounding_status = "SUPPORTED"
                 claim_obj.reason = "사용자 질문에 명시된 진술을 상담 전제로 인정합니다."
