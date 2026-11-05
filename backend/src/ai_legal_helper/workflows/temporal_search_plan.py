@@ -31,7 +31,9 @@ def extract_event_with_llm(question: str, invoke_fn: Optional[Callable[[str], st
         "날짜가 여러 개이고 기준 행위가 모호하면 선택하지 마세요. "
         "JSON만 출력: "
         '{"date":"YYYY-MM-DD 또는 null","event_type":"CONTRACT_SIGNED|CONTRACT_RENEWED|'
-        'CONTRACT_MODIFIED|NOTICE_GIVEN|MOVE_OUT 또는 null","evidence":"질문 원문의 정확한 인용"}'
+        'CONTRACT_MODIFIED|NOTICE_GIVEN|MOVE_OUT 또는 null",'
+        '"evidence":"하나의 사건일과 실제 행위를 함께 포함한 질문 원문 연속 인용",'
+        '"action_quote":"event_type에 해당하는 법률 행위 자체를 표현한 질문 원문의 연속 인용(공포/개정/시행은 제외)"}'
         "\n질문: " + question
     )
     try:
@@ -51,10 +53,17 @@ def extract_event_with_llm(question: str, invoke_fn: Optional[Callable[[str], st
         if not isinstance(parsed, dict):
             raise ValueError("NOT_OBJECT")
         date_text, kind, evidence = parsed.get("date"), parsed.get("event_type"), parsed.get("evidence")
+        action_quote = parsed.get("action_quote")
         if not isinstance(date_text, str) or not isinstance(kind, str) or not isinstance(evidence, str):
             raise ValueError("MISSING_FIELDS")
         if not evidence.strip() or evidence not in question:
             raise ValueError("UNGROUNDED_EVENT_SPAN")
+        # Legal event meaning comes from the model, but its verb phrase must
+        # exist in the same quoted event. A statute promulgation date alone
+        # must never be accepted as evidence of a contract signing.
+        if (not isinstance(action_quote, str) or not action_quote.strip()
+                or action_quote not in evidence or action_quote not in question):
+            raise ValueError("UNGROUNDED_EVENT_ACTION")
         parsed_date = parse_legal_date(date_text)
         if parsed_date is None:
             raise ValueError("INVALID_DATE")
