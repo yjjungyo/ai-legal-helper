@@ -181,6 +181,19 @@ def _approved_money_role(fact: FactItemBrief, category: str) -> tuple[int | None
     return val, quote
 
 
+def _has_valid_reviewed_meaning(fact: FactItemBrief) -> bool:
+    """True for explicitly reviewed meaning anchored in the same fact text."""
+    meta = getattr(fact, "reviewed_semantics", None) or {}
+    quote = meta.get("evidence_quote") if isinstance(meta, dict) else None
+    return bool(
+        isinstance(meta, dict)
+        and meta.get("status") in ("VERIFIED", "HUMAN_APPROVED")
+        and isinstance(meta.get("category"), str)
+        and isinstance(quote, str) and quote.strip()
+        and quote in (fact.statement or "")
+    )
+
+
 def extract_case_contract_deposit(briefing: CaseEvidenceBriefing) -> int:
     """Return a single evidence-verified contract principal, or zero.
 
@@ -197,6 +210,11 @@ def extract_case_contract_deposit(briefing: CaseEvidenceBriefing) -> int:
         trusted_amt, _ = _approved_money_role(fact, "CONTRACT_PRINCIPAL")
         if trusted_amt is not None:
             candidates.add(trusted_amt)
+            continue
+        if _has_valid_reviewed_meaning(fact):
+            # The fact is already classified as something other than
+            # principal. Re-analysis would waste model calls and could
+            # override an approved proposal with an invented payment.
             continue
         verdict = classify_statement(
             fact.statement or "",
@@ -254,6 +272,9 @@ def extract_case_prior_verified_repayments(briefing: CaseEvidenceBriefing) -> Tu
         statement = fact.statement or ""
         doc_name = fact.document_name or fact.evidence_label or ""
         trusted_amt, trusted_quote = _approved_money_role(fact, "ACTUAL_REPAYMENT")
+        if trusted_amt is None and _has_valid_reviewed_meaning(fact):
+            # Already classified as principal, proposal, balance, etc.
+            continue
         for line_text in (line.strip() for line in statement.splitlines()):
             if not line_text:
                 continue
