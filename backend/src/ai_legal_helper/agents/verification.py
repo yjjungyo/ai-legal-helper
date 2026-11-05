@@ -1162,6 +1162,18 @@ def run_verification(
                 claim_obj.reason = (claim_obj.reason + " (지정된 출처 ID가 실제 검색 결과에 존재하지 않거나 본문과 불일치함)").strip()
             claim_obj.source_ids = verified_claim_sids
 
+            # 질문에서 그대로 확인되는 사용자 진술은 사건 문서 출처가 없어도 상담 전제다.
+            # 의미가 유사하다는 추측만으로 변환하지 않으며, 법률 효과 주장은 제외한다.
+            if (require_question_coverage
+                    and claim_obj.claim_type == "CASE_FACT"
+                    and claim_obj.fact_status == "USER_STATEMENT"
+                    and not claim_obj.source_ids
+                    and _norm_quote(claim_obj.claim)
+                    and _norm_quote(claim_obj.claim) in _norm_quote(question)):
+                claim_obj.claim_type = "USER_STATEMENT"
+                claim_obj.grounding_status = "SUPPORTED"
+                claim_obj.reason = "사용자 질문에 명시된 진술을 상담 전제로 인정합니다."
+
             # 2. 근거 출처가 전무한 법률 규범(LEGAL_RULE), 법률 적용(LEGAL_APPLICATION), 사건 사실(CASE_FACT) 주장은
             #    모델이 임의로 SUPPORTED로 반환하더라도 뒷받침 출처 부재로 UNSUPPORTED로 강등한다 (STEP 2 원칙).
             if not claim_obj.source_ids and claim_obj.grounding_status == "SUPPORTED":
