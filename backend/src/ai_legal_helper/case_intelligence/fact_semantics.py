@@ -1077,6 +1077,18 @@ def check_proposition_comparability(
             predicate_match_basis="Epistemic status vs Factual assertion",
         )
 
+    # Independently reviewed proposal/rejection are compatible response
+    # speech acts, not contradictory descriptions of one completed payment.
+    # Keep this stronger causal response relationship ahead of the generic
+    # distinct-speech-act branch.
+    if {pa.speech_act, pb.speech_act} == {"PROPOSAL", "REJECTION"}:
+        return ComparabilityResult(
+            is_comparable=False, status="CONSISTENT",
+            identity_status="COMPATIBLE", reason_code="PROPOSAL_VS_REJECTION",
+            explanation="하나의 제안과 그에 대한 거절은 양립 가능한 별도의 의사표시입니다.",
+            matched_dimensions=["RESPONSIVE_SPEECH_ACT"],
+        )
+
     # 3. 상충 비교 가능성 게이트: 서로 다른 화행은 별개의 사건 사실이다.
     # 문의→제안→거절→대안 모색은 사건 진행의 연쇄이지 논리적 모순이 아니다.
     # 요청/질문/제안/계획은 지급이나 이행이 발생했다고 증명하지도 않는다.
