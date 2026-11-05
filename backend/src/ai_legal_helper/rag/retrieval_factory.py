@@ -85,11 +85,16 @@ def make_fixed_retrieval_tool(tool_name: str, category_eng: str, label_ko: str) 
             from ai_legal_helper.legal_knowledge.retrieval_service import (
                 LawRetrievalService, LawSourceStatus,
             )
+            from ai_legal_helper.observability.context import get_temporal_retrieval_context
+            temporal = get_temporal_retrieval_context() or {}
             result = LawRetrievalService().search(
                 query=rewritten_query,
-                original_question=query,
+                original_question=temporal.get("question") or query,
                 category=category_eng,
                 k=MAX_DOCS,
+                as_of_date=temporal.get("event_date"),
+                event_type=temporal.get("event_type"),
+                required_laws=temporal.get("required_laws"),
             )
             sources = result.sources
             if result.status == LawSourceStatus.RETRIEVAL_ERROR and not sources:
