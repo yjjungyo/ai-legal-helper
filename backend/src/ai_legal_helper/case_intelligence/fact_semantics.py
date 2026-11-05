@@ -1083,10 +1083,14 @@ def check_proposition_comparability(
     # distinct-speech-act branch.
     if {pa.speech_act, pb.speech_act} == {"PROPOSAL", "REJECTION"}:
         return ComparabilityResult(
-            is_comparable=False, status="CONSISTENT",
+            is_comparable=False, status="DIFFERENT_CONTEXT",
             identity_status="COMPATIBLE", reason_code="PROPOSAL_VS_REJECTION",
-            explanation="하나의 제안과 그에 대한 거절은 양립 가능한 별도의 의사표시입니다.",
-            matched_dimensions=["RESPONSIVE_SPEECH_ACT"],
+            explanation=(
+                "제안과 거절은 서로 다른 양립 가능한 의사표시입니다. "
+                "서로 모순되지 않는다는 이유만으로 거절이 제안을 입증하거나 "
+                "지지(SUPPORTS)한다고 판정해서는 안 됩니다."
+            ),
+            mismatched_dimensions=["SPEECH_ACT"],
         )
 
     # 3. 상충 비교 가능성 게이트: 서로 다른 화행은 별개의 사건 사실이다.
@@ -1123,21 +1127,6 @@ def check_proposition_comparability(
             matched_dimensions=matched,
             mismatched_dimensions=mismatched,
             predicate_match_basis=f"SpeechAct: {pa.speech_act} vs {pb.speech_act}",
-        )
-
-    # 3-0. 아래 레거시 제안/거절 검사도 일반 규칙에 포함되며
-    # 기존 reason_code를 다루는 외부 소비자를 고려하여 유지한다.
-    if {pa.speech_act, pb.speech_act} == {"PROPOSAL", "REJECTION"}:
-        mismatched.append("SPEECH_ACT")
-        return ComparabilityResult(
-            is_comparable=False,
-            status="DIFFERENT_CONTEXT",
-            identity_status="COMPATIBLE",
-            reason_code="PROPOSAL_VS_REJECTION",
-            explanation="제안과 거절은 별개의 양립 가능한 의사표시로서 모순이 아닙니다.",
-            matched_dimensions=matched,
-            mismatched_dimensions=mismatched,
-            predicate_match_basis="Proposal responds to Rejection",
         )
 
     # 3-0. 분할 지급·반환 제안과 즉시 이행 곤란 진술은 서로 설명 가능한 별개 사실이다.
