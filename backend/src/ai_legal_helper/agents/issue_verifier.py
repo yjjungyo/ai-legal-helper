@@ -31,7 +31,7 @@ import re
 from pydantic import BaseModel, Field
 
 from ai_legal_helper.case_intelligence.case_briefing import CaseEvidenceBriefing
-from ai_legal_helper.case_intelligence.consultation_semantics import is_conditional_contract_statement
+from ai_legal_helper.case_intelligence.consultation_semantics import is_conditional_contract_statement, termination_statement_status
 from ai_legal_helper.case_intelligence.settlement_calculator import (
     is_fact_strictly_verified,
     format_krw_to_korean,
@@ -442,12 +442,7 @@ def verify_issue(
             actual_termination_facts = [
                 f for f in briefing.facts
                 if is_fact_strictly_verified(f, briefing)
-                and not is_conditional_contract_statement(f.statement)
-                and re.search(
-                    r"(?:종료|해지)(?:되었|됐|하였다|하였|됨|되었습니다)|"
-                    r"합의\s*해지\s*완료",
-                    f.statement,
-                )
+                and termination_statement_status(f.statement) == "ACTUAL_TERMINATION"
             ]
             is_expired_or_reached = bool(actual_termination_facts)
             if has_lease and is_future_expiry:
