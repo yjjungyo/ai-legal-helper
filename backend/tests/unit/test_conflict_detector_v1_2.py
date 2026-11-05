@@ -323,14 +323,15 @@ class TestConflictDetectorV12Scenarios:
         assert res.is_comparable
         assert res.status == "COMPARABLE"
 
-        def model_role(statement, *, task, **kwargs):
-            if task == "MONEY_AMOUNT_SEMANTIC_ROLE":
-                return SemanticDecision("PRINCIPAL_DEPOSIT", statement)
-            return SemanticDecision("UNKNOWN", "", status="UNCONFIRMED")
+        def model_roles(statement, *, spans, labels_by_kind, **kwargs):
+            return {
+                item["id"]: "PRINCIPAL_DEPOSIT"
+                for item in spans if item["kind"] == "AMOUNT"
+            }
 
         with patch(
-            "ai_legal_helper.case_intelligence.semantic_judgment.classify_statement",
-            side_effect=model_role,
+            "ai_legal_helper.case_intelligence.semantic_judgment.classify_numeric_spans",
+            side_effect=model_roles,
         ), patch(
             "ai_legal_helper.case_intelligence.conflict_detector._verify_pair_with_llm",
             return_value=_LLMConflictVerificationSchema(
@@ -533,17 +534,19 @@ class TestQuantitativeEvaluationV11VsV12:
             "월 차임은 500,000원이다.": "PERIODIC_RENT_OR_FEE",
         }
 
-        def reviewed_meaning(statement, *, task, **kwargs):
-            role = verified_roles.get(statement) if task == "MONEY_AMOUNT_SEMANTIC_ROLE" else None
-            return (
-                SemanticDecision(role, statement)
-                if role else SemanticDecision("UNKNOWN", "", status="UNCONFIRMED")
-            )
+        def reviewed_meaning_batch(statement, *, spans, labels_by_kind, **kwargs):
+            role = verified_roles.get(statement)
+            if not role:
+                return {}
+            return {
+                item["id"]: role
+                for item in spans if item["kind"] == "AMOUNT"
+            }
 
         tp, fp, tn, fn = 0, 0, 0, 0
         with patch(
-            "ai_legal_helper.case_intelligence.semantic_judgment.classify_statement",
-            side_effect=reviewed_meaning,
+            "ai_legal_helper.case_intelligence.semantic_judgment.classify_numeric_spans",
+            side_effect=reviewed_meaning_batch,
         ):
             for claim_stmt, fact_stmt, claim_type, ground_truth in benchmark_dataset:
                 c_slots = build_structured_slots(statement=claim_stmt, claim_type=claim_type)
