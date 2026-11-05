@@ -357,11 +357,12 @@ def extract_amount_roles(text: str) -> Tuple[List[int], Dict[str, List[int]]]:
 
     amounts: List[int] = []
     roles: Dict[str, List[int]] = {}
-    # One semantic classification per statement, not one remote LLM call
-    # per amount token. Multi-role statements remain GENERAL_AMOUNT.
+    matches = list(_AMOUNT_EXPR_RE.finditer(text))
+    if not matches:
+        return amounts, roles
     statement_role = _classify_amount_role("", "", "", text)
 
-    for match in _AMOUNT_EXPR_RE.finditer(text):
+    for match in matches:
         num_part = (match.group(1) or "").strip()
         suffix = (match.group(2) or "").replace(" ", "").strip()
         if not num_part:
@@ -393,9 +394,24 @@ def extract_amount_roles(text: str) -> Tuple[List[int], Dict[str, List[int]]]:
 
 
 def extract_normalized_amounts(text: str) -> List[int]:
-    """문장 내 모든 금액 표현을 원(KRW) 단위 정수로 정규화하여 추출한다."""
-    amounts, _ = extract_amount_roles(text)
-    return amounts
+    """Parse literal KRW quantities only; never call an LLM for arithmetic."""
+    if not text:
+        return []
+    values: List[int] = []
+    for match in _AMOUNT_EXPR_RE.finditer(text):
+        num_part = (match.group(1) or "").strip()
+        suffix = (match.group(2) or "").replace(" ", "").strip()
+        if not num_part:
+            continue
+        phrase = num_part
+        for unit in ("천만", "백만", "만", "억"):
+            if suffix.startswith(unit) and not num_part.endswith(("만", "억", "조")):
+                phrase = num_part + unit
+                break
+        amount = parse_korean_number_phrase(phrase)
+        if amount is not None and amount >= 100 and amount not in values:
+            values.append(amount)
+    return values
 
 
 def _classify_date_role(context_window: str, full_text: str) -> str:
@@ -429,9 +445,12 @@ def extract_dates_with_validation(text: str) -> Tuple[List[str], List[str], Dict
     valid_dates: List[str] = []
     invalid_dates: List[str] = []
     date_roles: Dict[str, List[str]] = {}
+    date_matches = list(_DATE_FULL_RE.finditer(text))
+    if not date_matches:
+        return valid_dates, invalid_dates, date_roles
     statement_role = _classify_date_role("", text)
 
-    for m in _DATE_FULL_RE.finditer(text):
+    for m in date_matches:
         yyyy, mm, dd = int(m.group(1)), int(m.group(2)), int(m.group(3))
         raw_token = m.group(0).strip()
         try:
@@ -451,9 +470,17 @@ def extract_dates_with_validation(text: str) -> Tuple[List[str], List[str], Dict
 
 
 def extract_normalized_dates(text: str) -> List[str]:
-    """문장 내 유효한 모든 날짜 표현을 표준 ISO 형식(YYYY-MM-DD)으로 정규화하여 추출한다."""
-    valid_dates, _, _ = extract_dates_with_validation(text)
-    return valid_dates
+    """Parse Gregorian dates only, never decide legal event meanings."""
+    dates: List[str] = []
+    for m in _DATE_FULL_RE.finditer(text or ""):
+        try:
+            parsed = datetime.date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        except ValueError:
+            continue
+        val = parsed.isoformat()
+        if val not in dates:
+            dates.append(val)
+    return dates
 
 
 def analyze_polarity_and_predicate(
