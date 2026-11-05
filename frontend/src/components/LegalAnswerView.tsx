@@ -495,17 +495,13 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
         const linesToRender: string[] = [];
         let skippedDuplicate = false;
 
-        let disclaimerSeen = false;
         for (const l of sec.lines) {
           const normL = normalizeTitle(l);
           if (!skippedDuplicate && normSecTitle && (normL === normSecTitle || normL === normSecTitle.replace(/^[0-9.]+\s*/, ''))) {
             skippedDuplicate = true;
             continue;
           }
-          if (l.includes("본 답변은 제공된 자료를 바탕으로 한 법률정보이며") || l.includes("구체적 사실관계에 따라 결론이 달라질 수 있습니다")) {
-            if (disclaimerSeen) continue;
-            disclaimerSeen = true;
-          }
+          // 원문에 포함된 면책 및 주의 문구도 삭제하지 않는다.
           linesToRender.push(l);
         }
 
@@ -595,54 +591,23 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
                 color: 'var(--text-main, #1e293b)',
               }}
             >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                  paddingBottom: isCollapsed ? '0' : '8px',
-                  borderBottom: isCollapsed ? 'none' : '1px solid var(--border, #e2e8f0)',
-                }}
+              <button
+                type="button"
+                aria-expanded={!isCollapsed}
                 onClick={() => toggleSection(idx)}
+                className="chat-legal-issues-toggle"
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, fontSize: '0.96em', color: '#1e40af' }}>
-                  <span>{sec.icon || '⚖️'}</span>
+                <span className="chat-legal-issues-label">
+                  <span aria-hidden="true">{sec.icon || '⚖️'}</span>
                   <span>{sec.title}</span>
-                </div>
-                <button
-                  type="button"
-                  style={{
-                    background: '#f1f5f9',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '4px',
-                    padding: '2px 8px',
-                    fontSize: '0.8em',
-                    color: '#475569',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleSection(idx);
-                  }}
-                >
+                </span>
+                <span className="chat-legal-issues-hint">
                   {isCollapsed ? '▶ 심층 분석 펼치기' : '▼ 심층 분석 접기'}
-                </button>
-              </div>
+                </span>
+              </button>
               {isCollapsed ? (
-                <div
-                  style={{
-                    fontSize: '0.86em',
-                    color: '#64748b',
-                    padding: '8px 0 2px 0',
-                    fontStyle: 'italic',
-                    cursor: 'pointer',
-                  }}
-                  onClick={() => toggleSection(idx)}
-                >
-                  상세 법률 요건 및 쟁점별 조문 분석이 접혀 있습니다. (클릭하여 확인)
+                <div style={{ fontSize: '0.86em', color: '#64748b', padding: '8px 0 2px 0' }}>
+                  상세 법률 분석이 접혀 있습니다. 위 버튼으로 펼칠 수 있습니다.
                 </div>
               ) : (
                 <div style={{ fontSize: '0.91em', color: 'var(--text-main)', marginTop: '8px' }}>
