@@ -442,7 +442,17 @@ def verify_issue(
             actual_termination_facts = [
                 f for f in briefing.facts
                 if is_fact_strictly_verified(f, briefing)
-                and termination_statement_status(f.statement) == "ACTUAL_TERMINATION"
+                and (
+                    (
+                        (getattr(f, "reviewed_semantics", {}) or {}).get("status")
+                        in ("VERIFIED", "HUMAN_APPROVED")
+                        and (getattr(f, "reviewed_semantics", {}) or {}).get("category")
+                        == "ACTUAL_TERMINATION"
+                        and str((getattr(f, "reviewed_semantics", {}) or {}).get("evidence_quote") or "")
+                        in (f.statement or "")
+                    )
+                    or termination_statement_status(f.statement) == "ACTUAL_TERMINATION"
+                )
             ]
             is_expired_or_reached = bool(actual_termination_facts)
             if has_lease and is_future_expiry:
