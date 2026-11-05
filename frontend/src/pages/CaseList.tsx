@@ -83,7 +83,7 @@ function CreateCaseModal({ isOpen, onClose, onSuccess }: CreateCaseModalProps) {
                 id="case-title"
                 className="form-control"
                 type="text"
-                placeholder="예: 전세보증금 반환 청구 및 임차권등기명령 사건"
+                placeholder="예: 계약 분쟁, 미지급 대금, 근로 문제"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 autoFocus
@@ -92,7 +92,7 @@ function CreateCaseModal({ isOpen, onClose, onSuccess }: CreateCaseModalProps) {
 
             <div className="form-group">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                <label htmlFor="case-type" style={{ fontWeight: 600, margin: 0 }}>사건 분류 (분쟁 유형)</label>
+                <label htmlFor="case-type" style={{ fontWeight: 600, margin: 0 }}>사건 분야 (선택 사항)</label>
                 <span style={{ fontSize: '0.78em', color: 'var(--primary, #2563eb)' }}>🤖 AI 자동 판별 지원</span>
               </div>
               <select
@@ -140,7 +140,7 @@ function CreateCaseModal({ isOpen, onClose, onSuccess }: CreateCaseModalProps) {
                 id="case-description"
                 className="form-control"
                 rows={3}
-                placeholder="분쟁 배경이나 상황(예: 계약 만료일, 미반환 금액, 현재 임대인과의 연락 상황 등)을 간략히 적어주시면 AI가 더 정확하게 유형을 분류하고 상담을 준비합니다."
+                placeholder="무슨 일이 있었고 어떤 도움이 필요한지 편하게 적어주세요."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 style={{ resize: 'vertical' }}
@@ -242,6 +242,9 @@ function DeleteConfirmModal({ isOpen, caseItem, onClose, onConfirm, isDeleting }
 export function CaseList() {
   const [cases, setCases] = useState<CaseBase[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [caseToDelete, setCaseToDelete] = useState<CaseBase | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -258,10 +261,12 @@ export function CaseList() {
   const loadCases = async () => {
     try {
       setLoading(true);
+      setLoadError(false);
       const data = await listCases();
       setCases(data);
     } catch (e) {
       console.error('사건 목록 로딩 실패:', e);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -310,14 +315,21 @@ export function CaseList() {
     }
   };
 
+  const filteredCases = cases.filter((c) => {
+    const query = searchTerm.trim().toLocaleLowerCase();
+    const matchesText = !query || [c.title, c.case_type, c.id].some((value) => (value || '').toLocaleLowerCase().includes(query));
+    const matchesStatus = statusFilter === 'ALL' || (c.status || '').toUpperCase() === statusFilter;
+    return matchesText && matchesStatus;
+  });
+
   return (
     <div className="page-container">
       {/* 1. 상단 타이틀 및 액션 바 */}
       <div className="case-list-header">
         <div>
-          <h2 style={{ fontSize: '1.5em', fontWeight: 700, marginBottom: '4px' }}>내 사건 관리 대시보드</h2>
+          <h2 style={{ fontSize: '1.5em', fontWeight: 700, marginBottom: '4px' }}>내 법률 사건</h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9em' }}>
-            진행 중인 법률 상담, 증거 수집 및 대응 계획 워크스페이스를 관리합니다.
+            사건별 상담과 증거, 대응 계획을 한곳에서 이어서 관리하세요.
           </p>
         </div>
         <button 
@@ -355,6 +367,24 @@ export function CaseList() {
         </div>
       )}
 
+      {!loading && !loadError && cases.length > 0 && (
+        <div className="case-list-toolbar" role="search" aria-label="사건 검색 및 필터">
+          <label className="case-list-search-label" htmlFor="case-search">사건 찾기</label>
+          <input id="case-search" className="form-control" type="search" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="사건 제목, 분야 또는 사건 번호 검색" />
+          <label className="case-list-search-label" htmlFor="case-status">진행 상태</label>
+          <select id="case-status" className="form-control" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="ALL">전체 상태</option>
+            <option value="OPEN">접수</option>
+            <option value="ACTIVE">진행중</option>
+            <option value="PENDING">검토중</option>
+            <option value="CLOSED">종결</option>
+          </select>
+          <span className="case-list-result-count" aria-live="polite">{filteredCases.length}건 / 전체 {cases.length}건</span>
+        </div>
+      )}
+
+      {loadError && <div className="empty-state" role="alert"><p>사건 목록을 불러오지 못했습니다.</p><button className="btn btn-secondary" onClick={loadCases}>다시 시도</button></div>}
+
       {/* 2. 로딩 상태 */}
       {loading && (
         <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
@@ -363,7 +393,7 @@ export function CaseList() {
       )}
 
       {/* 3. 빈 상태 (등록된 사건이 없는 경우) */}
-      {!loading && cases.length === 0 && (
+      {!loading && !loadError && cases.length === 0 && (
         <div className="empty-state">
           <div style={{ fontSize: '2.5em', marginBottom: '12px' }}>📂</div>
           <h3 style={{ fontSize: '1.15em', fontWeight: 600, marginBottom: '8px' }}>등록된 사건이 없습니다</h3>
@@ -376,20 +406,28 @@ export function CaseList() {
         </div>
       )}
 
+      {!loading && !loadError && cases.length > 0 && filteredCases.length === 0 && (
+        <div className="empty-state"><h3>검색 결과가 없습니다</h3><p>검색어나 진행 상태를 변경해 보세요.</p><button className="btn btn-secondary" onClick={() => { setSearchTerm(''); setStatusFilter('ALL'); }}>필터 초기화</button></div>
+      )}
+
       {/* 4. 사건 카드 그리드 */}
-      {!loading && cases.length > 0 && (
+      {!loading && !loadError && filteredCases.length > 0 && (
         <div className="case-grid">
-          {cases.map((c) => (
+          {filteredCases.map((c) => (
             <div 
               key={c.id} 
               className="case-card"
+              role="link"
+              tabIndex={0}
+              aria-label={`${c.title} 사건 열기`}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/${c.id}/workspace/overview`); } }}
               onClick={() => navigate(`/${c.id}/workspace/overview`)}
             >
               <div>
                 <div className="case-card-header">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span className="badge badge-blue" style={{ fontSize: '0.75em' }}>
-                      {c.case_type || '주택임대차'}
+                      {c.case_type === 'AI_AUTO' ? '자동 분류' : (c.case_type || '미분류')}
                     </span>
                     {getStatusBadge(c.status)}
                   </div>

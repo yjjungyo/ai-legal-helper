@@ -68,10 +68,10 @@ export const VerifiedPresentationView = ({
         </div>
       )}
 
-      <details className="chat-digest-full-answer">
+      <details className="chat-digest-full-answer" open>
         <summary>
           <span className="chat-digest-expand-icon" aria-hidden="true">▸</span>
-          <span className="chat-digest-expand-title">전체 법률 분석 자세히 보기</span>
+          <span className="chat-digest-expand-title">전체 법률 분석 · 조건 및 주의사항</span>
           <span className="chat-digest-expand-hint">사실관계 · 법률 판단 · 증거별 근거</span>
         </summary>
         <div className="chat-digest-full-content">

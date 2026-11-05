@@ -53,7 +53,7 @@ function classifySectionTitle(title: string): SectionCategoryConfig {
   }
 
   // 1. 핵심 결론 (P0-03)
-  if (t.includes('핵심 결론') || t.includes('핵심 요약') || t.includes('사건 요약') || t.includes('상담 요약') || t.includes('개요')) {
+  if (t.includes('핵심 결론') || t.includes('결론 요약') || t.includes('핵심 요약') || t.includes('사건 요약') || t.includes('상담 요약') || t.includes('개요')) {
     return { icon: '📋', theme: 'summary' };
   }
   // 2. 사건 사실관계 및 판단 근거 (P0-03)
@@ -65,7 +65,7 @@ function classifySectionTitle(title: string): SectionCategoryConfig {
     return { icon: '⚖️', theme: 'issues' };
   }
   // 4. 우선순위별 다음 행동 / 우선 행동 가이드 (P0-04)
-  if (t.includes('행동 가이드') || t.includes('우선순위') || t.includes('다음 행동') || t.includes('action plan') || t.includes('조치 사항') || t.includes('대응 방안')) {
+  if (t.includes('행동 가이드') || t.includes('지금 해야 할 일') || t.includes('우선 행동') || t.includes('우선순위') || t.includes('다음 행동') || t.includes('action plan') || t.includes('조치 사항') || t.includes('대응 방안')) {
     return { icon: '🚀', theme: 'action' };
   }
   // 5. 미확인 사항 및 주의사항
@@ -103,17 +103,11 @@ export function renderInlineMarkdown(
 ): React.ReactNode[] {
   if (!text) return [];
 
-  // [P0-03/Gate 2] 텍스트 내 연속 쉼표(', , ,') 및 빈 괄호 사전 정규화
-  const sanitizedText = text
-    .replace(/,\s*(?:,\s*)+/g, ', ')
-    .replace(/:\s*,+\s*/g, ': ')
-    .replace(/\[\s*\]/g, '');
-
-  // 토큰 분할 정규식: **볼드**, `인라인코드`, *이탤릭*, [증거파일명], (법령명 제N조(조문제목), 파일명.pdf...) 등
+  // 법률 답변 원문을 표시 과정에서 수정하지 않는다.
   const tokenRegex = (
     /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*|\[(?:E\d{1,3}[^\]]*|[^\]\n]+\.(?:pdf|docx|txt|png|jpg|jpeg)|[^\]\n]+)\]|\([가-힣A-Za-z0-9·\s]+(?:법률|법|시행령|시행규칙)\s+제\s*\d+\s*조(?:[^()\n]|\([^()\n]*\))*\))/gi
   );
-  const parts = sanitizedText.split(tokenRegex);
+  const parts = text.split(tokenRegex);
 
   return parts.map((part, index) => {
     if (!part) return null;
@@ -149,6 +143,7 @@ export function renderInlineMarkdown(
           (ctx.includes(citation.claim_text) || citation.claim_text.includes(ctx))
         );
         const selected = contextual.length === 1 ? contextual[0]
+          : contextual.length > 1 ? undefined
           : matchingRefs.length === 1 ? matchingRefs[0] : undefined;
 
         if (selected) {
@@ -157,15 +152,17 @@ export function renderInlineMarkdown(
             claimId: selected.ref.claim_id || undefined,
             spanId: selected.ref.span_id || undefined,
           };
-          resolvedDocName = selected.ref.document_name || rawLabel;
+          resolvedDocName = rawLabel;
         } else {
           // 동일 파일이 여러 주장에 연결될 때 임의 Claim/Span을 고르지 않는다.
           const evidenceIds = [...new Set(matchingRefs.map(({ ref }) => ref.evidence_id).filter(Boolean))];
           if (evidenceIds.length !== 1) return <span key={index}>{part}</span>;
           meta = { evidenceId: evidenceIds[0] };
-          resolvedDocName = matchingRefs.find(({ ref }) => ref.document_name)?.ref.document_name || rawLabel;
+          resolvedDocName = rawLabel;
         }
       }
+
+      if (!onEvidenceClick || !meta?.evidenceId) return <span key={index}>{part}</span>;
 
       return (
         <button
@@ -179,7 +176,7 @@ export function renderInlineMarkdown(
           title={`증거 [${resolvedDocName}] 원문 및 발췌 확인`}
           aria-label={`증거 ${resolvedDocName} 확인`}
         >
-          📄 [{resolvedDocName}]
+          {part}
         </button>
       );
     }
@@ -495,17 +492,13 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
         const linesToRender: string[] = [];
         let skippedDuplicate = false;
 
-        let disclaimerSeen = false;
         for (const l of sec.lines) {
           const normL = normalizeTitle(l);
           if (!skippedDuplicate && normSecTitle && (normL === normSecTitle || normL === normSecTitle.replace(/^[0-9.]+\s*/, ''))) {
             skippedDuplicate = true;
             continue;
           }
-          if (l.includes("본 답변은 제공된 자료를 바탕으로 한 법률정보이며") || l.includes("구체적 사실관계에 따라 결론이 달라질 수 있습니다")) {
-            if (disclaimerSeen) continue;
-            disclaimerSeen = true;
-          }
+          // 원문에 포함된 면책 및 주의 문구도 삭제하지 않는다.
           linesToRender.push(l);
         }
 
@@ -595,54 +588,23 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
                 color: 'var(--text-main, #1e293b)',
               }}
             >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                  paddingBottom: isCollapsed ? '0' : '8px',
-                  borderBottom: isCollapsed ? 'none' : '1px solid var(--border, #e2e8f0)',
-                }}
+              <button
+                type="button"
+                aria-expanded={!isCollapsed}
                 onClick={() => toggleSection(idx)}
+                className="chat-legal-issues-toggle"
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, fontSize: '0.96em', color: '#1e40af' }}>
-                  <span>{sec.icon || '⚖️'}</span>
+                <span className="chat-legal-issues-label">
+                  <span aria-hidden="true">{sec.icon || '⚖️'}</span>
                   <span>{sec.title}</span>
-                </div>
-                <button
-                  type="button"
-                  style={{
-                    background: '#f1f5f9',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '4px',
-                    padding: '2px 8px',
-                    fontSize: '0.8em',
-                    color: '#475569',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleSection(idx);
-                  }}
-                >
+                </span>
+                <span className="chat-legal-issues-hint">
                   {isCollapsed ? '▶ 심층 분석 펼치기' : '▼ 심층 분석 접기'}
-                </button>
-              </div>
+                </span>
+              </button>
               {isCollapsed ? (
-                <div
-                  style={{
-                    fontSize: '0.86em',
-                    color: '#64748b',
-                    padding: '8px 0 2px 0',
-                    fontStyle: 'italic',
-                    cursor: 'pointer',
-                  }}
-                  onClick={() => toggleSection(idx)}
-                >
-                  상세 법률 요건 및 쟁점별 조문 분석이 접혀 있습니다. (클릭하여 확인)
+                <div style={{ fontSize: '0.86em', color: '#64748b', padding: '8px 0 2px 0' }}>
+                  상세 법률 분석이 접혀 있습니다. 위 버튼으로 펼칠 수 있습니다.
                 </div>
               ) : (
                 <div style={{ fontSize: '0.91em', color: 'var(--text-main)', marginTop: '8px' }}>
@@ -660,7 +622,7 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
         return (
           <section
             key={idx}
-            className={`chat-legal-section ${hasTitle ? 'has-heading' : 'plain'} ${isAction ? 'action-section' : ''}`}
+            className={`chat-legal-section ${hasTitle ? 'has-heading' : 'plain'} ${isAction ? 'action-section' : ''} ${sec.type === 'summary' ? 'summary-section' : ''} ${sec.type === 'sources' || sec.type === 'statutes' ? 'source-section' : ''}`}
           >
             {hasTitle && (
               <h3 className="chat-legal-heading">

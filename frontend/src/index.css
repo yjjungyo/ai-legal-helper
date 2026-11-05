@@ -152,3 +152,12 @@ button:disabled {
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* UI-01: accessible case search and responsive controls */
+.case-list-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 14px 16px; margin-bottom: 18px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+.case-list-toolbar input { flex: 1 1 240px; min-width: 180px; }
+.case-list-toolbar select { flex: 0 1 160px; }
+.case-list-search-label { font-weight: 600; font-size: .85rem; color: var(--text-secondary); }
+.case-list-result-count { margin-left: auto; font-size: .85rem; color: var(--text-secondary); }
+.case-card:focus-visible, .workspace-nav-item:focus-visible { outline: 3px solid var(--border-focus); outline-offset: 3px; }
+@media (max-width: 640px) { .case-list-toolbar { align-items: stretch; flex-direction: column; } .case-list-toolbar input, .case-list-toolbar select { width: 100%; flex: none; } .case-list-result-count { margin-left: 0; } }

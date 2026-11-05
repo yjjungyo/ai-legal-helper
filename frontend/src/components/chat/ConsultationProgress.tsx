@@ -30,8 +30,8 @@ export interface ConsultationProgressProps {
  * 기본 6단계 정의 (서버 프로그레스가 아직 없을 때 기본 템플릿으로 사용)
  */
 const DEFAULT_STEPS: ConsultationStep[] = [
-  { step_id: 'INTENT_ANALYSIS', title: '사건 의도 및 쟁점 파악', status: 'COMPLETED' },
-  { step_id: 'FACT_RETRIEVAL', title: '등록 증거 및 사실관계 조회', status: 'RUNNING' },
+  { step_id: 'INTENT_ANALYSIS', title: '사건 의도 및 쟁점 파악', status: 'PENDING' },
+  { step_id: 'FACT_RETRIEVAL', title: '등록 증거 및 사실관계 조회', status: 'PENDING' },
   { step_id: 'LEGAL_RESEARCH', title: '법령·판례 및 전문 법률 분석', status: 'PENDING' },
   { step_id: 'VERIFICATION', title: '쟁점별 사실·법리 교차 검증', status: 'PENDING' },
   { step_id: 'STATUTE_APPROVAL', title: '미보유 법령 외부 검색 승인', status: 'PENDING' },
@@ -95,23 +95,21 @@ export const ConsultationProgress: React.FC<ConsultationProgressProps> = ({
       if (s.step_id === 'STATUTE_APPROVAL') {
         return { ...s, status: 'WAITING_APPROVAL' };
       }
-      if (['INTENT_ANALYSIS', 'FACT_RETRIEVAL', 'LEGAL_RESEARCH', 'VERIFICATION'].includes(s.step_id)) {
-        return { ...s, status: 'COMPLETED' };
-      }
       return s;
     });
   }
 
   const isApprovalWaiting = status === 'APPROVAL_REQUIRED';
+  const hasReportedSteps = Boolean(progress?.steps?.length);
 
   // Completed consultations: process steps are secondary audit data.
   // Never claim a skipped, failed or pending step was completed.
   if (completedMode) {
     return (
       <details className="chat-progress-audit">
-        <summary>상담 처리 과정 확인 <span>{steps.length}개 단계</span></summary>
+        <summary>상담 처리 과정 확인 <span>{hasReportedSteps ? `${steps.length}개 단계` : '상세 기록 없음'}</span></summary>
         <div className="chat-progress-audit-steps">
-          {steps.map((step) => (
+          {hasReportedSteps && steps.map((step) => (
             <div className="chat-progress-audit-step" key={step.step_id}>
               <span>{renderStepIcon(step.status)}</span>
               <span>{step.step_name || step.title}</span>
@@ -155,7 +153,7 @@ export const ConsultationProgress: React.FC<ConsultationProgressProps> = ({
               ? '사건 증거 기반 AI 법률 상담 분석 및 6단계 검증 완료'
               : isApprovalWaiting
               ? '법률 조문 추가 검색 승인 대기 중'
-              : '사건 증거 기반 AI 법률 상담 분석 진행 중...'}
+              : 'AI 법률 상담 처리 중...'}
           </span>
         </div>
 
@@ -169,7 +167,7 @@ export const ConsultationProgress: React.FC<ConsultationProgressProps> = ({
           >
             {completedMode
               ? '6단계 완료'
-              : progress?.current_step_name || progress?.current_step || (isApprovalWaiting ? 'HILT 법령 검색 승인' : '증거 교차 검증')}
+              : progress?.current_step_name || progress?.current_step || (isApprovalWaiting ? '법령 검색 승인 대기' : '서버 진행 정보 확인 중')}
           </span>
 
 
@@ -179,6 +177,7 @@ export const ConsultationProgress: React.FC<ConsultationProgressProps> = ({
       {/* 6단계 진행 리스트 (펼침 상태이거나 분석 중일 때 단계별로 시각화) */}
       {!completedMode && (
         <div className="chat-progress-steps-list">
+          {!hasReportedSteps && <p className="chat-progress-pending-note">서버의 단계별 진행 기록을 기다리고 있습니다. 아래 단계는 예상 작업이며 완료 여부를 뜻하지 않습니다.</p>}
           {steps.map((step) => {
             const statusClass = step.status.toLowerCase();
             return (

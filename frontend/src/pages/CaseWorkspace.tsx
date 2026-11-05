@@ -35,7 +35,7 @@ interface EditCaseModalProps {
  */
 function EditCaseModal({ isOpen, activeCase, onClose, onSuccess }: EditCaseModalProps) {
   const [title, setTitle] = useState(activeCase.title);
-  const [caseType, setCaseType] = useState(activeCase.case_type || '주택임대차');
+  const [caseType, setCaseType] = useState(activeCase.case_type || '미분류');
   const [description, setDescription] = useState(activeCase.description || '');
   const [status, setStatus] = useState(activeCase.status || 'IN_PROGRESS');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -44,7 +44,7 @@ function EditCaseModal({ isOpen, activeCase, onClose, onSuccess }: EditCaseModal
   useEffect(() => {
     if (isOpen) {
       setTitle(activeCase.title);
-      setCaseType(activeCase.case_type || '주택임대차');
+      setCaseType(activeCase.case_type || '미분류');
       setDescription(activeCase.description || '');
       setStatus(activeCase.status || 'IN_PROGRESS');
       setErrorMsg('');
@@ -119,6 +119,8 @@ function EditCaseModal({ isOpen, activeCase, onClose, onSuccess }: EditCaseModal
                 value={caseType}
                 onChange={(e) => setCaseType(e.target.value)}
               >
+                <option value="AI_AUTO">AI 자동 분류</option>
+                {caseType && !['AI_AUTO', '주택임대차', '상가임대차', '민사', '노동', '소비자', '회사'].includes(caseType) && <option value={caseType}>{caseType}</option>}
                 <option value="주택임대차">주택임대차</option>
                 <option value="상가임대차">상가임대차</option>
                 <option value="민사">민사</option>
@@ -219,7 +221,7 @@ function AddStatementModal({ isOpen, caseId, onClose, onSuccess }: AddStatementM
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3 style={{ fontSize: '1.1em', fontWeight: 700, margin: 0 }}>새 사실 / 진술 추가</h3>
+          <h3 style={{ fontSize: '1.1em', fontWeight: 700, margin: 0 }}>사건 내용 추가</h3>
           <button 
             type="button" 
             onClick={onClose} 
@@ -238,19 +240,19 @@ function AddStatementModal({ isOpen, caseId, onClose, onSuccess }: AddStatementM
             )}
 
             <div className="form-group">
-              <label htmlFor="stmt-text">사실관계 또는 진술 내용 *</label>
+              <label htmlFor="stmt-text">새로 발생했거나 알게 된 내용 *</label>
               <textarea
                 id="stmt-text"
                 className="form-control"
                 rows={5}
-                placeholder="예: 2023년 12월 1일 임대인에게 보증금 반환 내용증명을 발송하였으나 폐문부재로 반송됨."
+                placeholder="예: 11월 3일 상대방에게 계약 관련 연락을 받았습니다."
                 value={statement}
                 onChange={(e) => setStatement(e.target.value)}
                 autoFocus
               />
             </div>
             <p style={{ fontSize: '0.82em', color: 'var(--text-muted)' }}>
-              입력된 진술은 사건의 사실관계(Facts) 및 AI 분석 파이프라인에 즉시 반영됩니다.
+              입력 내용은 사용자 진술로 등록됩니다. 증거로 확인된 사실과는 구분하여 검토해야 합니다.
             </p>
           </div>
 
@@ -314,13 +316,13 @@ export function CaseWorkspace() {
    * 7대 핵심 워크스페이스 네비게이션 탭 구성
    */
   const tabs = [
-    { id: 'overview', icon: '📊', label: '개요 (Overview)' },
-    { id: 'chat', icon: '💬', label: 'AI 법률 상담 (Chat)' },
-    { id: 'facts', icon: '⚖️', label: '사실 및 타임라인 (Facts)' },
-    { id: 'evidence', icon: '📁', label: '증거 관리 (Evidence)' },
-    { id: 'graph', icon: '🕸️', label: '증거 지식그래프 (Graph)' },
-    { id: 'action', icon: '📋', label: '대응 계획 (Action Plan)' },
-    { id: 'docs', icon: '📄', label: '법률 문서 (Documents)' },
+    { id: 'overview', icon: '📊', label: '사건 개요' },
+    { id: 'chat', icon: '💬', label: 'AI 상담' },
+    { id: 'facts', icon: '⚖️', label: '사실·타임라인' },
+    { id: 'evidence', icon: '📁', label: '증거 관리' },
+    { id: 'graph', icon: '🕸️', label: '증거 지식그래프' },
+    { id: 'action', icon: '📋', label: '대응 계획' },
+    { id: 'docs', icon: '📄', label: '법률 문서' },
   ];
 
   return (
@@ -340,7 +342,7 @@ export function CaseWorkspace() {
         <div style={{ padding: '12px', backgroundColor: 'var(--surface-alt)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              <span className="badge badge-blue">{activeCase.case_type || '주택임대차'}</span>
+              <span className="badge badge-blue">{activeCase.case_type || '미분류'}</span>
               <span className="badge badge-green">{activeCase.status || '진행중'}</span>
             </div>
             <button
@@ -356,13 +358,13 @@ export function CaseWorkspace() {
             {activeCase.title}
           </h2>
           <div style={{ fontSize: '0.78em', color: 'var(--text-muted)', marginTop: '6px' }}>
-            ID: <span style={{ fontFamily: 'var(--font-mono)' }}>{activeCase.id.slice(0, 8)}...</span>
+            사건 번호: <span style={{ fontFamily: 'var(--font-mono)' }}>{activeCase.id.slice(0, 8)}...</span>
           </div>
         </div>
 
         {/* 네비게이션 메뉴 섹션 */}
         <div className="workspace-sidebar-section" style={{ flex: 1 }}>
-          <div className="workspace-sidebar-title">Workspace Menu</div>
+          <div className="workspace-sidebar-title">사건 관리 메뉴</div>
           {tabs.map((tab) => {
             const isActive = currentTab === tab.id;
             return (
@@ -388,7 +390,7 @@ export function CaseWorkspace() {
             style={{ width: '100%', fontSize: '0.88em' }}
             onClick={() => setIsAddStmtOpen(true)}
           >
-            ＋ 새 사실(Fact) 추가
+            ＋ 사건 내용 추가
           </button>
         </div>
       </aside>
@@ -491,10 +493,10 @@ function OverviewTab({ activeCase, onTabChange }: { activeCase: CaseDetail; onTa
       {/* 1. 상단 기본 정보 및 새로고침 헤더 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h2 style={{ fontSize: '1.4em', fontWeight: 700, margin: '0 0 4px 0' }}>사건 종합 대시보드 (Overview)</h2>
+          <h2 style={{ fontSize: '1.4em', fontWeight: 700, margin: '0 0 4px 0' }}>사건 개요</h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.88em' }}>
             사건 유형: <strong style={{ color: 'var(--primary)' }}>{activeCase.case_type || '일반'}</strong> | 
-            최근 업데이트: {new Date(activeCase.updated_at).toLocaleString()}
+            최근 변경: {new Date(activeCase.updated_at).toLocaleString()}
           </p>
         </div>
         <button onClick={loadSummary} className="btn btn-secondary btn-sm">
@@ -513,7 +515,7 @@ function OverviewTab({ activeCase, onTabChange }: { activeCase: CaseDetail; onTa
           {/* 2. 워크플로우 진행 단계 5-Step 인디케이터 */}
           <div className="card" style={{ padding: '16px' }}>
             <div style={{ fontSize: '0.88em', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '12px' }}>
-              워크플로우 진행 상태: <span style={{ color: 'var(--primary)', fontSize: '1.05em' }}>{summary.stage_name}</span>
+              사건 진행 단계: <span style={{ color: 'var(--primary)', fontSize: '1.05em' }}>{summary.stage_name}</span>
             </div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {stages.map((st, idx) => {
@@ -558,7 +560,7 @@ function OverviewTab({ activeCase, onTabChange }: { activeCase: CaseDetail; onTa
           >
             <div>
               <div style={{ fontSize: '0.8em', color: 'var(--primary-hover)', fontWeight: 700, marginBottom: '3px' }}>
-                📌 다음 권장 액션 (Recommended Step)
+                📌 다음으로 할 일
               </div>
               <div style={{ fontSize: '1.1em', fontWeight: 700, color: 'var(--text-main)', marginBottom: '4px' }}>
                 {summary.next_action.title}
@@ -568,11 +570,11 @@ function OverviewTab({ activeCase, onTabChange }: { activeCase: CaseDetail; onTa
               </div>
             </div>
             <button
-              onClick={() => onTabChange(summary.next_action.tab_id)}
+              onClick={() => onTabChange(['overview', 'chat', 'facts', 'evidence', 'graph', 'action', 'docs'].includes(summary.next_action.tab_id) ? summary.next_action.tab_id : 'overview')}
               className="btn btn-primary"
               style={{ whiteSpace: 'nowrap', marginLeft: '16px' }}
             >
-              해당 단계로 이동 &rarr;
+              자세히 보기 &rarr;
             </button>
           </div>
 
@@ -581,7 +583,7 @@ function OverviewTab({ activeCase, onTabChange }: { activeCase: CaseDetail; onTa
             {/* 4-1. 상담 현황 */}
             <div className="card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <strong style={{ fontSize: '0.95em', color: 'var(--text-main)' }}>💬 AI 법률 상담</strong>
+                <strong style={{ fontSize: '0.95em', color: 'var(--text-main)' }}>💬 AI 상담</strong>
                 <span className="badge badge-blue">총 {summary.stats.consultations_count}회</span>
               </div>
               {summary.consultation_preview ? (
@@ -608,7 +610,7 @@ function OverviewTab({ activeCase, onTabChange }: { activeCase: CaseDetail; onTa
                 <span className="badge badge-blue">증거 {summary.stats.evidences_count}건</span>
               </div>
               <div style={{ fontSize: '0.88em', margin: '10px 0', lineHeight: '1.7' }}>
-                <div>• 확정 사실(Fact): <strong>{summary.stats.facts_count}건</strong></div>
+                <div>• 확정된 사실: <strong>{summary.stats.facts_count}건</strong></div>
                 <div>• 검토 대기 주장: <strong style={{ color: summary.stats.claims_pending_count > 0 ? 'var(--warning)' : 'inherit' }}>{summary.stats.claims_pending_count}건</strong></div>
                 <div>• 증거 상충(모순): <strong style={{ color: summary.stats.conflicts_count > 0 ? 'var(--danger)' : 'inherit' }}>{summary.stats.conflicts_count}건</strong></div>
               </div>
@@ -618,7 +620,7 @@ function OverviewTab({ activeCase, onTabChange }: { activeCase: CaseDetail; onTa
                 </div>
               )}
               <button onClick={() => onTabChange('evidence')} className="btn btn-secondary" style={{ width: '100%' }}>
-                증거 관리 & 검토 &rarr;
+                증거 확인하기 &rarr;
               </button>
             </div>
 
