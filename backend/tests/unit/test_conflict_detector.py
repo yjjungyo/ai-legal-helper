@@ -49,6 +49,36 @@ from ai_legal_helper.database.models import (
 )
 
 
+@pytest.fixture(autouse=True)
+def explicit_reviewed_amount_roles(monkeypatch):
+    """Offline test: only specifically identified source facts have a role.
+
+    Unknown money must stay unknown rather than being given a role through
+    a keyword heuristic or an implicit imaginary model call.
+    """
+    roles = {
+        "보증금은 300,000,000원이다.": "PRINCIPAL_DEPOSIT",
+        "전세보증금은 3억 원이다.": "PRINCIPAL_DEPOSIT",
+        "보증금은 3억 원이다.": "PRINCIPAL_DEPOSIT",
+        "보증금은 2억 원이다.": "PRINCIPAL_DEPOSIT",
+        "계약서상 보증금은 3억 원이다.": "PRINCIPAL_DEPOSIT",
+        "계약서상 보증금은 2억 원이다.": "PRINCIPAL_DEPOSIT",
+        "전세보증금 반환 요청 금액은 3억 원이다.": "RETURN_REQUEST_AMOUNT",
+        "2026-09-30 보증금 3억 원 반환 요청": "RETURN_REQUEST_AMOUNT",
+        "2026-10-15 보증금 3억 원 반환 요청": "RETURN_REQUEST_AMOUNT",
+    }
+    def reviewed(statement, *, spans, labels_by_kind, **kwargs):
+        role = roles.get(statement)
+        return {
+            item["id"]: role
+            for item in spans if item["kind"] == "AMOUNT"
+        } if role else {}
+    monkeypatch.setattr(
+        "ai_legal_helper.case_intelligence.semantic_judgment.classify_numeric_spans",
+        reviewed,
+    )
+
+
 def _create_in_memory_db():
     """격리된 인메모리 SQLite 세션을 생성한다."""
     engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
