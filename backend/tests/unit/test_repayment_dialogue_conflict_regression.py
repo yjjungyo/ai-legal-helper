@@ -47,6 +47,19 @@ def stub_reviewed_semantics(monkeypatch):
                 return SemanticDecision("PRINCIPAL_DEPOSIT", statement)
         return SemanticDecision("UNKNOWN", "", status="UNCONFIRMED")
 
+    def fake_batch_roles(statement, *, spans, labels_by_kind, **kwargs):
+        if statement in ("보증금은 2억 원이다.", "보증금은 3억 원이다."):
+            return {
+                item["id"]: "PRINCIPAL_DEPOSIT"
+                for item in spans if item["kind"] == "AMOUNT"
+            }
+        return {}
+
+    monkeypatch.setattr(
+        "ai_legal_helper.case_intelligence.semantic_judgment.classify_numeric_spans",
+        fake_batch_roles,
+    )
+
     def fake_conflict_review(claim_slots, fact_slots):
         pair = {claim_slots.statement, fact_slots.statement}
         actual = {
