@@ -65,6 +65,8 @@ class FakeCollection:
         self.calls += 1
         for i, text, vector, meta in zip(ids, documents, embeddings, metadatas):
             self.items[i] = (text, vector, meta)
+    def get(self, *, ids, include=None):
+        return {"ids": [item_id for item_id in ids if item_id in self.items]}
     def delete_collection(self, **kwargs):
         raise AssertionError("데이터 파괴 API 호출 불가")
 
