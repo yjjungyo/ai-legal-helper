@@ -477,6 +477,17 @@ def statute_search_plan_condition(state: LegalState) -> str:
     plan = state.get("law_search_plan") or {}
     if (plan.get("status") == "READY" and plan.get("candidate_laws")
             and not state.get("hilt_executed")):
+        # A complete, recently checked local history plus requested article
+        # coverage can proceed to local RAG. Applicability is still verified
+        # downstream; this does NOT approve or perform any official API call.
+        if (plan.get("index_status") == "ALL_LOCAL_CANDIDATES"
+                and plan.get("index_article_ids")
+                and len(plan.get("index_decisions") or []) == len(plan["candidate_laws"])
+                and all(d.get("status") == "INDEX_READY_CANDIDATE"
+                        and not d.get("official_lookup_required", True)
+                        for d in plan["index_decisions"])):
+            logger.info("[TEMPORAL_PLAN] verified local index candidates; defer official search to verification")
+            return "run_agents"
         return "statute_search_approval"
     return "run_agents"
 
