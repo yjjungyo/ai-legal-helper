@@ -659,3 +659,24 @@ def test_successful_document_repair_clears_previous_generation_error(document_st
     assert out["draft_answer"] == "근거를 보완한 새 답변"
     assert out["answer_generation_error"] is None
     assert out["revision_count"] == 1
+
+
+def test_explicit_user_statement_misclassified_as_case_fact_is_preserved(document_state):
+    """질문에 그대로 있는 진술은 문서 출처 없이도 상담 전제로 인정한다."""
+    question = "아직 전세집에서 살고 있어요"
+    draft = "아직 전세집에서 살고 있어요"
+    reply = verification_reply(claims=[{
+        "claim": draft,
+        "claim_type": "CASE_FACT",
+        "fact_status": "USER_STATEMENT",
+        "source_ids": [],
+        "grounding_status": "SUPPORTED",
+        "reason": "사용자 진술",
+    }])
+    llm = MagicMock()
+    llm.invoke.return_value.content = json.dumps(reply, ensure_ascii=False)
+    with patch("ai_legal_helper.llm.gateway.get_llm", return_value=llm):
+        result = run_verification(question, draft, consultation.document_sources(document_state),
+                                  require_question_coverage=True)
+    assert result["claims"][0]["claim_type"] == "USER_STATEMENT"
+    assert result["claims"][0]["grounding_status"] == "SUPPORTED"
