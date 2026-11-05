@@ -152,11 +152,18 @@ def official_xml_chunks(xml_bytes: bytes, version: OfficialLawVersion) -> list[d
         raise ValueError("OFFICIAL_BODY_VERSION_IDENTITY_MISSING")
     addenda = extract_addenda(root, version.promulgation_number)
     chunks = []
-    for node in root.findall(".//조문단위"):
+    article_nodes = root.findall(".//조문단위")
+    if not article_nodes:
+        raise ValueError("OFFICIAL_XML_HAS_NO_ARTICLES")
+    seen_articles = set()
+    for node in article_nodes:
         label = _label(node)
         content = _parts(node)
         if not label or not content:
-            continue
+            raise ValueError("OFFICIAL_XML_ARTICLE_INCOMPLETE")
+        if label in seen_articles:
+            raise ValueError("OFFICIAL_XML_DUPLICATE_ARTICLE")
+        seen_articles.add(label)
         effective, basis = article_effective_date(node, label, addenda)
         checksum = hashlib.sha256(content.encode("utf-8")).hexdigest()
         chunk_id = f"official:{version.law_id}:{version.mst}:{label}:{checksum[:16]}"
