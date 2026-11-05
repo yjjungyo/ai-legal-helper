@@ -500,13 +500,22 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
         }
         setBulkResult('승인 처리 중: ' + (succeeded + failed.length) + '/' + targets.length + '건');
       }
-      await Promise.all([loadClaims(docId), loadEvidences(), loadConflicts(), loadAdjudicationsAndGaps()]);
+      // 개별 승인은 이미 서버에 반영되므로, 목록 갱신 실패와 승인 실패를 구분한다.
+      setSelectedClaimIds(failed);
+      setBulkResult('일괄 승인 결과: 성공 ' + succeeded + '건, 실패 ' + failed.length + '건');
       if (succeeded) {
         setShowReanalyzePrompt(true);
         onRefreshCase();
       }
-      setSelectedClaimIds(failed);
-      setBulkResult('일괄 승인 결과: 성공 ' + succeeded + '건, 실패 ' + failed.length + '건');
+      const refreshed = await Promise.allSettled([
+        loadClaims(docId), loadEvidences(), loadConflicts(), loadAdjudicationsAndGaps(),
+      ]);
+      if (refreshed.some((result) => result.status === 'rejected')) {
+        setBulkResult((prev) => prev + ' · 화면 갱신 일부 실패: 새로고침 후 확인하세요.');
+      }
+    } catch (error) {
+      console.error('일괄 승인 후처리 오류:', error);
+      setBulkResult('일괄 승인 결과: 성공 ' + succeeded + '건, 실패 ' + failed.length + '건 · 화면 갱신 실패: 새로고침 후 확인하세요.');
     } finally {
       setBulkApproving(false);
     }
