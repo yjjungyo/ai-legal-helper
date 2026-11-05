@@ -815,11 +815,12 @@ def _verify_pair_with_llm(
 
 def _are_amount_roles_compatible(role_a: str, role_b: str, amounts_equal: bool) -> bool:
     """두 금액 역할(Semantic Role)이 동일 속성이어서 직접 비교 가능한지 판별한다."""
+    # UNKNOWN is not a semantic attribute; two unknowns cannot prove that
+    # money concerns the same item. This guard must precede equality.
+    if not role_a or not role_b or "GENERAL_AMOUNT" in (role_a, role_b):
+        return False
     if role_a == role_b:
         return True
-    if "GENERAL_AMOUNT" in (role_a, role_b):
-        # Missing semantic attribution must not manufacture comparable claims.
-        return False
     # 보증금 원금(PRINCIPAL_DEPOSIT)과 반환 요청 금액(RETURN_REQUEST_AMOUNT)은
     # 전액 반환을 요청하는 경우(금액이 같을 때) 상호 일치(CONSISTENT)로 볼 수 있음
     if {role_a, role_b} == {"PRINCIPAL_DEPOSIT", "RETURN_REQUEST_AMOUNT"} and amounts_equal:
@@ -1044,7 +1045,26 @@ def evaluate_claim_against_fact(
                     else:
                         matched_same_role_diff = (cr if cr != "GENERAL_AMOUNT" else fr, c_vals, f_vals)
 
-        # 서로 다른 금액 속성인 경우 (예: T03 계약 보증금 3억 vs 일부 반환금 2억) -> DIFFERENT_CONTEXT
+        # Role-unresolved amounts cannot establish equality OR contradiction.
+        # Distinct documented roles may be safely classified as separate,
+        # but GENERAL_AMOUNT is uncertainty rather than a specific role.
+        if only_different_roles and (
+            "GENERAL_AMOUNT" in c_roles or "GENERAL_AMOUNT" in f_roles
+        ):
+            return ConflictDecision(
+                claim_id=claim_id,
+                target_fact_id=fact.id,
+                status="INSUFFICIENT_INFORMATION",
+                reason_code="AMOUNT_ROLE_UNCONFIRMED",
+                explanation=(
+                    "두 금액의 대상 및 성격(원금/반환액/비용 등)이 충분히 확인되지 않아 "
+                    "금액 일치 또는 모순 관계를 확정하지 않습니다."
+                ),
+                confidence=1.0,
+                source_span_ids=spans,
+            )
+
+        # Known, distinct semantic amount roles are separate facts.
         if only_different_roles:
             return ConflictDecision(
                 claim_id=claim_id,
