@@ -32,8 +32,17 @@ def has_repayment_assertion(question: str) -> bool:
 
 
 def is_evidence_review_request(question: str) -> bool:
-    """Distinguish a document review from a new transaction assertion."""
-    return _consultation_intent(question) == "EVIDENCE_REVIEW"
+    """Distinguish a document review from a new transaction assertion.
+
+    A narrowly recognized, explicit UI action (request to inspect registered
+    materials) is safe without legal/factual inference. It never confirms
+    that any payment or termination occurred.
+    """
+    q = (question or "").strip()
+    if (any(term in q for term in ("등록된", "제출된", "계약서와", "증거자료", "이체 자료"))
+            and any(term in q for term in ("분석", "검토", "정리", "확인해", "대조"))):
+        return True
+    return _consultation_intent(q) == "EVIDENCE_REVIEW"
 
 
 def termination_statement_status(statement: str) -> str:
