@@ -493,10 +493,10 @@ function OverviewTab({ activeCase, onTabChange }: { activeCase: CaseDetail; onTa
       {/* 1. 상단 기본 정보 및 새로고침 헤더 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h2 style={{ fontSize: '1.4em', fontWeight: 700, margin: '0 0 4px 0' }}>사건 종합 대시보드 (Overview)</h2>
+          <h2 style={{ fontSize: '1.4em', fontWeight: 700, margin: '0 0 4px 0' }}>사건 개요</h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.88em' }}>
             사건 유형: <strong style={{ color: 'var(--primary)' }}>{activeCase.case_type || '일반'}</strong> | 
-            최근 업데이트: {new Date(activeCase.updated_at).toLocaleString()}
+            최근 변경: {new Date(activeCase.updated_at).toLocaleString()}
           </p>
         </div>
         <button onClick={loadSummary} className="btn btn-secondary btn-sm">
@@ -515,7 +515,7 @@ function OverviewTab({ activeCase, onTabChange }: { activeCase: CaseDetail; onTa
           {/* 2. 워크플로우 진행 단계 5-Step 인디케이터 */}
           <div className="card" style={{ padding: '16px' }}>
             <div style={{ fontSize: '0.88em', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '12px' }}>
-              워크플로우 진행 상태: <span style={{ color: 'var(--primary)', fontSize: '1.05em' }}>{summary.stage_name}</span>
+              사건 진행 단계: <span style={{ color: 'var(--primary)', fontSize: '1.05em' }}>{summary.stage_name}</span>
             </div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {stages.map((st, idx) => {
@@ -560,7 +560,7 @@ function OverviewTab({ activeCase, onTabChange }: { activeCase: CaseDetail; onTa
           >
             <div>
               <div style={{ fontSize: '0.8em', color: 'var(--primary-hover)', fontWeight: 700, marginBottom: '3px' }}>
-                📌 다음 권장 액션 (Recommended Step)
+                📌 다음으로 할 일
               </div>
               <div style={{ fontSize: '1.1em', fontWeight: 700, color: 'var(--text-main)', marginBottom: '4px' }}>
                 {summary.next_action.title}
@@ -570,11 +570,11 @@ function OverviewTab({ activeCase, onTabChange }: { activeCase: CaseDetail; onTa
               </div>
             </div>
             <button
-              onClick={() => onTabChange(summary.next_action.tab_id)}
+              onClick={() => onTabChange(['overview', 'chat', 'facts', 'evidence', 'graph', 'action', 'docs'].includes(summary.next_action.tab_id) ? summary.next_action.tab_id : 'overview')}
               className="btn btn-primary"
               style={{ whiteSpace: 'nowrap', marginLeft: '16px' }}
             >
-              해당 단계로 이동 &rarr;
+              자세히 보기 &rarr;
             </button>
           </div>
 
@@ -583,7 +583,7 @@ function OverviewTab({ activeCase, onTabChange }: { activeCase: CaseDetail; onTa
             {/* 4-1. 상담 현황 */}
             <div className="card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <strong style={{ fontSize: '0.95em', color: 'var(--text-main)' }}>💬 AI 법률 상담</strong>
+                <strong style={{ fontSize: '0.95em', color: 'var(--text-main)' }}>💬 AI 상담</strong>
                 <span className="badge badge-blue">총 {summary.stats.consultations_count}회</span>
               </div>
               {summary.consultation_preview ? (
@@ -610,7 +610,7 @@ function OverviewTab({ activeCase, onTabChange }: { activeCase: CaseDetail; onTa
                 <span className="badge badge-blue">증거 {summary.stats.evidences_count}건</span>
               </div>
               <div style={{ fontSize: '0.88em', margin: '10px 0', lineHeight: '1.7' }}>
-                <div>• 확정 사실(Fact): <strong>{summary.stats.facts_count}건</strong></div>
+                <div>• 확정된 사실: <strong>{summary.stats.facts_count}건</strong></div>
                 <div>• 검토 대기 주장: <strong style={{ color: summary.stats.claims_pending_count > 0 ? 'var(--warning)' : 'inherit' }}>{summary.stats.claims_pending_count}건</strong></div>
                 <div>• 증거 상충(모순): <strong style={{ color: summary.stats.conflicts_count > 0 ? 'var(--danger)' : 'inherit' }}>{summary.stats.conflicts_count}건</strong></div>
               </div>
@@ -620,7 +620,7 @@ function OverviewTab({ activeCase, onTabChange }: { activeCase: CaseDetail; onTa
                 </div>
               )}
               <button onClick={() => onTabChange('evidence')} className="btn btn-secondary" style={{ width: '100%' }}>
-                증거 관리 & 검토 &rarr;
+                증거 확인하기 &rarr;
               </button>
             </div>
 
