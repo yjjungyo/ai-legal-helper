@@ -53,7 +53,7 @@ function classifySectionTitle(title: string): SectionCategoryConfig {
   }
 
   // 1. 핵심 결론 (P0-03)
-  if (t.includes('핵심 결론') || t.includes('핵심 요약') || t.includes('사건 요약') || t.includes('상담 요약') || t.includes('개요')) {
+  if (t.includes('핵심 결론') || t.includes('결론 요약') || t.includes('핵심 요약') || t.includes('사건 요약') || t.includes('상담 요약') || t.includes('개요')) {
     return { icon: '📋', theme: 'summary' };
   }
   // 2. 사건 사실관계 및 판단 근거 (P0-03)
@@ -65,7 +65,7 @@ function classifySectionTitle(title: string): SectionCategoryConfig {
     return { icon: '⚖️', theme: 'issues' };
   }
   // 4. 우선순위별 다음 행동 / 우선 행동 가이드 (P0-04)
-  if (t.includes('행동 가이드') || t.includes('우선순위') || t.includes('다음 행동') || t.includes('action plan') || t.includes('조치 사항') || t.includes('대응 방안')) {
+  if (t.includes('행동 가이드') || t.includes('지금 해야 할 일') || t.includes('우선 행동') || t.includes('우선순위') || t.includes('다음 행동') || t.includes('action plan') || t.includes('조치 사항') || t.includes('대응 방안')) {
     return { icon: '🚀', theme: 'action' };
   }
   // 5. 미확인 사항 및 주의사항
@@ -473,9 +473,25 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
     sections.push(currentSection);
   }
 
+  // UI-02: presentation-only priority. Never alter answer text, citations or backend decisions.
+  // Preserve original order when there is no recognizable structured heading.
+  const sectionPriority: Partial<Record<SectionCategoryConfig['theme'], number>> = {
+    banner: 0, warning: 0, summary: 1, action: 2,
+    issues: 3, analysis: 3, facts: 3, statutes: 4, sources: 4, uncertain: 5,
+  };
+  const hasStructuredSections = sections.some((sec) => sec.type === 'summary' || sec.type === 'action');
+  const displaySections = sections.map((sec, originalIndex) => ({ sec, originalIndex }));
+  if (hasStructuredSections) {
+    displaySections.sort((a, b) => {
+      const aRank = sectionPriority[a.sec.type] ?? 6;
+      const bRank = sectionPriority[b.sec.type] ?? 6;
+      return aRank - bRank || a.originalIndex - b.originalIndex;
+    });
+  }
+
   return (
     <div className="chat-legal-answer">
-      {sections.map((sec, idx) => {
+      {displaySections.map(({ sec, originalIndex: idx }) => {
         // 1. 구분선
         if (sec.title === '__DIVIDER__') {
           return (
