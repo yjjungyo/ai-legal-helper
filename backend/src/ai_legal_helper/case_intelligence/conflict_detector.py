@@ -353,6 +353,11 @@ def _batch_numeric_role_map(
     if include_amounts:
         masked = _exclude_date_tokens_from_money_matches(text)
         for idx, match in enumerate(_AMOUNT_EXPR_RE.finditer(masked)):
+            # The permissive numeric-expression regex can accidentally match
+            # whitespace + '원' alone, without an actual amount. Do not
+            # make it an LLM value-role token or charge a model call for it.
+            if not (match.group(1) or "").strip():
+                continue
             raw = text[match.start():match.end()]
             offset = len(raw) - len(raw.lstrip())
             end_trim = len(raw) - len(raw.rstrip())
