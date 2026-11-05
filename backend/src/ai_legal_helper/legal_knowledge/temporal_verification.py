@@ -160,9 +160,14 @@ def evaluate_temporal_answer_gate(
             d.get("event_date") != event_date or d.get("event_type") != event_type
             for d in decisions
         ):
+            inconsistent = [
+                {**d, "status": "UNCONFIRMED",
+                 "reason_code": "TEMPORAL_SNAPSHOT_INCONSISTENT"}
+                for d in decisions
+            ]
             return TemporalGateResult(
                 "CAUTION", ("TEMPORAL_SNAPSHOT_INCONSISTENT",),
-                event_date=event_date, decisions=tuple(decisions),
+                event_date=event_date, decisions=tuple(inconsistent),
             )
     else:
         # No snapshot: re-evaluate from the official source, not by regex.
