@@ -429,7 +429,9 @@ class LawRetrievalService:
                 if candidate is not None:
                     prioritized.append(candidate)
         prioritized.extend(src for src in found if src not in prioritized)
-        response.sources = prioritized[:k]
+        # A compound question must reserve at least one result slot per law.
+        # Otherwise k=2 with three resolved laws falsely reports one missing.
+        response.sources = prioritized[:max(k, len(selected))]
         if unavailable:
             response.reason_codes.append("COLLECTION_MISSING")
         if failures:
