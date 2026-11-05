@@ -947,12 +947,33 @@ def evaluate_attachment_ranking(
         elif tenant_priority_date > earliest_att_date:
             res["priority_status"] = "ATTACHMENT_SENIOR"
         else:
-            # 우선변제권 발생일과 가압류 등기일이 같은 날짜인 경우:
-            # 만약 전입 당일(opposing_satisfied_date)에 가압류가 설정된 것이면 가압류가 선순위
-            if opposing_satisfied_date and opposing_satisfied_date == earliest_att_date:
-                res["priority_status"] = "ATTACHMENT_SENIOR"
+            # TIE ON CALENDAR DATE IS NOT A TIE OF LEGAL INSTANTS:
+            # if possession+registration and fixed date were completed by
+            # the PREVIOUS day, priority arose at 00:00 this morning.
+            # A subsequently registered mortgage/attachment enters after
+            # the start of the day (Supreme Court 99다9981, 98다46938).
+            #
+            # If fixed date was obtained today, calendar-only evidence
+            # cannot establish the within-day precedence of the two rights.
+            # Opposing requirements completed on the attachment's date
+            # were already handled above (priority date = following day).
+            if (
+                opposing_satisfied_date
+                and res["tenant_fixed_date"]
+                and res["tenant_fixed_date"] <= opposing_satisfied_date
+                and res["tenant_opposing_effective_date"] == earliest_att_date
+            ):
+                res["priority_status"] = "TENANT_SENIOR"
+                res["summary_text"] += (
+                    "; 대항요건 및 확정일자를 전날까지 갖추어 "
+                    "우선변제권이 등기일 00시에 먼저 발생한 경우"
+                )
             else:
                 res["priority_status"] = "UNCERTAIN"
+                res["summary_text"] += (
+                    "; 동일 일자의 확정일자 취득과 권리등기 선후관계가 "
+                    "확인되지 않아 추가 원본 확인 필요"
+                )
 
     return res
 
