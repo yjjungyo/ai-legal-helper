@@ -35,7 +35,7 @@ interface EditCaseModalProps {
  */
 function EditCaseModal({ isOpen, activeCase, onClose, onSuccess }: EditCaseModalProps) {
   const [title, setTitle] = useState(activeCase.title);
-  const [caseType, setCaseType] = useState(activeCase.case_type || '주택임대차');
+  const [caseType, setCaseType] = useState(activeCase.case_type || '미분류');
   const [description, setDescription] = useState(activeCase.description || '');
   const [status, setStatus] = useState(activeCase.status || 'IN_PROGRESS');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -44,7 +44,7 @@ function EditCaseModal({ isOpen, activeCase, onClose, onSuccess }: EditCaseModal
   useEffect(() => {
     if (isOpen) {
       setTitle(activeCase.title);
-      setCaseType(activeCase.case_type || '주택임대차');
+      setCaseType(activeCase.case_type || '미분류');
       setDescription(activeCase.description || '');
       setStatus(activeCase.status || 'IN_PROGRESS');
       setErrorMsg('');
@@ -219,7 +219,7 @@ function AddStatementModal({ isOpen, caseId, onClose, onSuccess }: AddStatementM
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3 style={{ fontSize: '1.1em', fontWeight: 700, margin: 0 }}>새 사실 / 진술 추가</h3>
+          <h3 style={{ fontSize: '1.1em', fontWeight: 700, margin: 0 }}>사건 내용 추가</h3>
           <button 
             type="button" 
             onClick={onClose} 
@@ -238,19 +238,19 @@ function AddStatementModal({ isOpen, caseId, onClose, onSuccess }: AddStatementM
             )}
 
             <div className="form-group">
-              <label htmlFor="stmt-text">사실관계 또는 진술 내용 *</label>
+              <label htmlFor="stmt-text">새로 발생했거나 알게 된 내용 *</label>
               <textarea
                 id="stmt-text"
                 className="form-control"
                 rows={5}
-                placeholder="예: 2023년 12월 1일 임대인에게 보증금 반환 내용증명을 발송하였으나 폐문부재로 반송됨."
+                placeholder="예: 11월 3일 상대방에게 계약 관련 연락을 받았습니다."
                 value={statement}
                 onChange={(e) => setStatement(e.target.value)}
                 autoFocus
               />
             </div>
             <p style={{ fontSize: '0.82em', color: 'var(--text-muted)' }}>
-              입력된 진술은 사건의 사실관계(Facts) 및 AI 분석 파이프라인에 즉시 반영됩니다.
+              입력 내용은 사용자 진술로 등록됩니다. 증거로 확인된 사실과는 구분하여 검토해야 합니다.
             </p>
           </div>
 
@@ -314,13 +314,13 @@ export function CaseWorkspace() {
    * 7대 핵심 워크스페이스 네비게이션 탭 구성
    */
   const tabs = [
-    { id: 'overview', icon: '📊', label: '개요 (Overview)' },
-    { id: 'chat', icon: '💬', label: 'AI 법률 상담 (Chat)' },
-    { id: 'facts', icon: '⚖️', label: '사실 및 타임라인 (Facts)' },
-    { id: 'evidence', icon: '📁', label: '증거 관리 (Evidence)' },
-    { id: 'graph', icon: '🕸️', label: '증거 지식그래프 (Graph)' },
-    { id: 'action', icon: '📋', label: '대응 계획 (Action Plan)' },
-    { id: 'docs', icon: '📄', label: '법률 문서 (Documents)' },
+    { id: 'overview', icon: '📊', label: '사건 개요' },
+    { id: 'chat', icon: '💬', label: 'AI 상담' },
+    { id: 'facts', icon: '⚖️', label: '사실·타임라인' },
+    { id: 'evidence', icon: '📁', label: '증거 관리' },
+    { id: 'graph', icon: '🕸️', label: '증거 지식그래프' },
+    { id: 'action', icon: '📋', label: '대응 계획' },
+    { id: 'docs', icon: '📄', label: '법률 문서' },
   ];
 
   return (
@@ -340,7 +340,7 @@ export function CaseWorkspace() {
         <div style={{ padding: '12px', backgroundColor: 'var(--surface-alt)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              <span className="badge badge-blue">{activeCase.case_type || '주택임대차'}</span>
+              <span className="badge badge-blue">{activeCase.case_type || '미분류'}</span>
               <span className="badge badge-green">{activeCase.status || '진행중'}</span>
             </div>
             <button
@@ -356,13 +356,13 @@ export function CaseWorkspace() {
             {activeCase.title}
           </h2>
           <div style={{ fontSize: '0.78em', color: 'var(--text-muted)', marginTop: '6px' }}>
-            ID: <span style={{ fontFamily: 'var(--font-mono)' }}>{activeCase.id.slice(0, 8)}...</span>
+            사건 번호: <span style={{ fontFamily: 'var(--font-mono)' }}>{activeCase.id.slice(0, 8)}...</span>
           </div>
         </div>
 
         {/* 네비게이션 메뉴 섹션 */}
         <div className="workspace-sidebar-section" style={{ flex: 1 }}>
-          <div className="workspace-sidebar-title">Workspace Menu</div>
+          <div className="workspace-sidebar-title">사건 관리 메뉴</div>
           {tabs.map((tab) => {
             const isActive = currentTab === tab.id;
             return (
@@ -388,7 +388,7 @@ export function CaseWorkspace() {
             style={{ width: '100%', fontSize: '0.88em' }}
             onClick={() => setIsAddStmtOpen(true)}
           >
-            ＋ 새 사실(Fact) 추가
+            ＋ 사건 내용 추가
           </button>
         </div>
       </aside>
