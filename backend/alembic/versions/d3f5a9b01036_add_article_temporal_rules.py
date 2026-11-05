@@ -19,7 +19,7 @@ def upgrade():
         sa.Column("effective_date_status", sa.String(32), nullable=False),
         sa.Column("source_vector_id", sa.String(300)),
         sa.Column("indexed_at", sa.DateTime(), nullable=False),
-        sa.UniqueConstraint("law_id", "mst", "article_id", "content_hash", name="uq_law_article_version_identity"))
+        sa.UniqueConstraint("law_id", "mst", "source_vector_id", name="uq_law_article_version_identity"))
     op.create_index("ix_law_article_version_effective", "law_article_versions", ["law_id", "article_id", "effective_from"])
     op.create_table("law_transition_rules",
         sa.Column("id", sa.String(36), primary_key=True),
@@ -33,7 +33,7 @@ def upgrade():
         sa.Column("applicability_status", sa.String(32), nullable=False),
         sa.Column("source_vector_id", sa.String(300)),
         sa.Column("indexed_at", sa.DateTime(), nullable=False),
-        sa.UniqueConstraint("law_id", "mst", "rule_hash", name="uq_law_transition_rule_identity"))
+        sa.UniqueConstraint("law_id", "mst", "source_vector_id", name="uq_law_transition_rule_identity"))
     op.create_index("ix_law_transition_rule_lookup", "law_transition_rules", ["law_id", "mst"])
 
 def downgrade():
