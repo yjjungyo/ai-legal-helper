@@ -1,5 +1,6 @@
 """LLM 사건일 추출은 원문 일치·날짜 검증을 통과해야만 승인된다."""
 import json
+import pytest
 from ai_legal_helper.workflows.temporal_search_plan import extract_event_with_llm
 
 
@@ -78,5 +79,34 @@ def test_mismatched_month_day_is_rejected():
     result = extract_event_with_llm(q, _invoke({
         "date": "2026-11-07", "event_type": "CONTRACT_SIGNED",
         "evidence": q,
+    }))
+    assert result.status == "UNCONFIRMED"
+
+
+@pytest.mark.parametrize("date_text", [
+    "2026-11-06", "2026.11.06", "2026/11/06", "2026년 11월 6일", "2026년11월6일",
+])
+def test_supported_date_notations_resolve(date_text):
+    """구분자와 공백이 달라도 인용된 사건일의 숫자를 올바르게 검증한다."""
+    question = f"{date_text} 계약을 체결했습니다."
+    result = extract_event_with_llm(question, _invoke({
+        "date": "2026-11-06", "event_type": "CONTRACT_SIGNED", "evidence": question,
+    }))
+    assert result.status == "RESOLVED"
+    assert result.selected.date == "2026-11-06"
+
+
+@pytest.mark.parametrize("question, extracted", [
+    ("2026년 11월 6일 계약 체결", "2026-12-06"),
+    ("2026년 11월 6일 계약 체결", "2025-11-06"),
+    ("2026년 2월 30일 계약 체결", "2026-02-30"),
+    ("2026년 10월 27일 공포된 시행령", "2026-10-27"),
+    ("계약 체결 날짜는 모릅니다.", "2026-11-06"),
+    ("2026년 11월 6일 또는 2026년 11월 7일 계약 체결", "2026-11-06"),
+])
+def test_date_validation_still_rejects_unsupported_events(question, extracted):
+    """정상 날짜 인식 복구 후에도 불일치·불가능·공포일·모호한 근거는 거부한다."""
+    result = extract_event_with_llm(question, _invoke({
+        "date": extracted, "event_type": "CONTRACT_SIGNED", "evidence": question,
     }))
     assert result.status == "UNCONFIRMED"

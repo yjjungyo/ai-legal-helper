@@ -63,8 +63,9 @@ def extract_event_with_llm(question: str, invoke_fn: Optional[Callable[[str], st
             raise ValueError("UNSUPPORTED_EVENT_TYPE")
         # 날짜 의미는 LLM이 해석한다. Python은 근거의 존재와 명백한 모순만 검사한다.
         # 근거의 날짜 표기를 재파싱하여 특정 연도 형식으로 제한하지 않는다.
+        # raw 정규식의 숫자·공백 클래스는 단일 역슬래시로 지정한다.
         # 다만 근거에 명시된 4자리 연도와 결과 연도가 다르면 확정할 수 없다.
-        explicit_years = set(re.findall(r"(?<!\\d)(?:19|20)\\d{2}(?=\\s*(?:년|[-./]))", evidence))
+        explicit_years = set(re.findall(r"(?<!\d)(?:19|20)\d{2}(?=\s*(?:년|[-./]))", evidence))
         if explicit_years and str(parsed_date.year) not in explicit_years:
             raise ValueError("YEAR_CONFLICT_IN_EVIDENCE")
         # 공포·시행일만을 근거로 사건일을 만들지 않는다.
@@ -75,14 +76,14 @@ def extract_event_with_llm(question: str, invoke_fn: Optional[Callable[[str], st
         # 복수 날짜를 포함한 인용 전체는 날짜별 근거를 특정할 수 없으므로 보류.
         # LLM이 해당 행위에 연결된 짧은 원문 구간을 인용하도록 한다.
         date_mentions = re.findall(
-            r"(?<!\\d)\\d{2,4}\\s*(?:년|[-./])\\s*\\d{1,2}\\s*(?:월|[-./])\\s*\\d{1,2}\\s*일?",
+            r"(?<!\d)\d{2,4}\s*(?:년|[-./])\s*\d{1,2}\s*(?:월|[-./])\s*\d{1,2}\s*일?",
             evidence,
         )
         if len(date_mentions) != 1:
             raise ValueError("AMBIGUOUS_EVENT_EVIDENCE")
         # 2자리 연도의 세기 해석은 LLM이 담당하며, 날짜가 모호하면 보류한다.
         # 근거에 있는 월/일 숫자만 확인하여 명백한 환각을 차단한다.
-        numeric_parts = re.findall(r"\\d+", date_mentions[0])
+        numeric_parts = re.findall(r"\d+", date_mentions[0])
         if len(numeric_parts) != 3 or (int(numeric_parts[1]), int(numeric_parts[2])) != (
             parsed_date.month, parsed_date.day
         ):
