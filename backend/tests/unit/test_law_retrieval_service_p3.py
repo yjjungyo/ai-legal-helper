@@ -114,9 +114,9 @@ def test_deduplicate_across_collections_but_keep_full_source_content():
     )
     reply = service(backend).search("가상주택임대차보호법 제3조", category="civil")
     assert len(reply.sources) == 1
-    # 기존 StandardSource는 본문 앞뒤의 불필요한 공백만 strip한다.
-    # 임의의 중간 절삭·LLM용 240자 미리보기로 덮어쓰는 것은 금지한다.
-    assert reply.sources[0]["content"] == body.strip()
+    # Official XML source hashes require byte-for-byte equivalent text.
+    # Do not trim or shorten retrieved source content.
+    assert reply.sources[0]["content"] == body
     assert len(reply.sources[0]["content"]) > 240
     assert reply.sources[0]["retrieval_collection"] == GLOBAL_LAW_COLLECTION
 
