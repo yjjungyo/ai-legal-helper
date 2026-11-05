@@ -680,3 +680,26 @@ def test_explicit_user_statement_misclassified_as_case_fact_is_preserved(documen
                                   require_question_coverage=True)
     assert result["claims"][0]["claim_type"] == "USER_STATEMENT"
     assert result["claims"][0]["grounding_status"] == "SUPPORTED"
+
+
+@pytest.mark.parametrize("question,draft,claim,fact_status,expected_type", [
+    ("아직 전세집에서 살고 있어요", "현재 점유 중입니다.", "현재 점유 중입니다.", "USER_STATEMENT", "CASE_FACT"),
+    ("아직 전세집에서 살고 있어요", "전입신고도 마쳤습니다.", "전입신고도 마쳤습니다.", "USER_STATEMENT", "CASE_FACT"),
+    ("전입신고를 했어요", "전입신고를 했어요", "전입신고를 했어요", "USER_STATEMENT", "USER_STATEMENT"),
+])
+def test_user_statement_normalization_is_conservative(
+    document_state, question, draft, claim, fact_status, expected_type
+):
+    """동일 문장만 보정한다. 의미 변환과 별도 법률 요건은 검증 없이 자동 승인하지 않는다."""
+    reply = verification_reply(claims=[{
+        "claim": claim, "claim_type": "CASE_FACT", "fact_status": fact_status,
+        "source_ids": [], "grounding_status": "SUPPORTED", "reason": "진술 기반",
+    }])
+    llm = MagicMock()
+    llm.invoke.return_value.content = json.dumps(reply, ensure_ascii=False)
+    with patch("ai_legal_helper.llm.gateway.get_llm", return_value=llm):
+        result = run_verification(question, draft, consultation.document_sources(document_state),
+                                  require_question_coverage=True)
+    assert result["claims"][0]["claim_type"] == expected_type
+    if expected_type == "CASE_FACT":
+        assert result["claims"][0]["grounding_status"] == "UNSUPPORTED"
