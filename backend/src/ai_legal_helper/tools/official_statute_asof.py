@@ -225,7 +225,7 @@ def _version_sources(
         # 날짜가 중요한 질문이므로 부칙의 적용례·경과규정을 전부 확보한다.
         # 부칙 내용이 확인되지 않으면 조문 시행일이 있더라도 확정 적용 금지.
         for idx, addendum in enumerate(addenda):
-            default_date = _effective_from_addendum(addendum, "")
+            default_date = None  # unreviewed addendum: interpretation deferred
             out.append(_source(
                 version=version, article="부칙",
                 article_title="시행일·적용례·경과규정",
