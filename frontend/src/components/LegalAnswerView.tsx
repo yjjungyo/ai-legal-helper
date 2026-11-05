@@ -473,25 +473,9 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
     sections.push(currentSection);
   }
 
-  // UI-02: presentation-only priority. Never alter answer text, citations or backend decisions.
-  // Preserve original order when there is no recognizable structured heading.
-  const sectionPriority: Partial<Record<SectionCategoryConfig['theme'], number>> = {
-    banner: 0, warning: 0, summary: 1, action: 2,
-    issues: 3, analysis: 3, facts: 3, statutes: 4, sources: 4, uncertain: 5,
-  };
-  const hasStructuredSections = sections.some((sec) => sec.type === 'summary' || sec.type === 'action');
-  const displaySections = sections.map((sec, originalIndex) => ({ sec, originalIndex }));
-  if (hasStructuredSections) {
-    displaySections.sort((a, b) => {
-      const aRank = sectionPriority[a.sec.type] ?? 6;
-      const bRank = sectionPriority[b.sec.type] ?? 6;
-      return aRank - bRank || a.originalIndex - b.originalIndex;
-    });
-  }
-
   return (
     <div className="chat-legal-answer">
-      {displaySections.map(({ sec, originalIndex: idx }) => {
+      {sections.map((sec, idx) => {
         // 1. 구분선
         if (sec.title === '__DIVIDER__') {
           return (
@@ -676,7 +660,7 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
         return (
           <section
             key={idx}
-            className={`chat-legal-section ${hasTitle ? 'has-heading' : 'plain'} ${isAction ? 'action-section' : ''}`}
+            className={`chat-legal-section ${hasTitle ? 'has-heading' : 'plain'} ${isAction ? 'action-section' : ''} ${sec.type === 'summary' ? 'summary-section' : ''} ${sec.type === 'sources' || sec.type === 'statutes' ? 'source-section' : ''}`}
           >
             {hasTitle && (
               <h3 className="chat-legal-heading">
