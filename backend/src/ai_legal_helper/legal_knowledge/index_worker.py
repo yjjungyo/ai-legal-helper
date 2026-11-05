@@ -23,7 +23,7 @@ from typing import Callable, Optional
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from ai_legal_helper.legal_knowledge.index_jobs import OfficialLawIndexJob, LawVersionIndex, LawArticleCoverage
+from ai_legal_helper.legal_knowledge.index_jobs import OfficialLawIndexJob, LawVersionIndex, LawArticleCoverage, LawArticleVersion, LawTransitionRule
 from ai_legal_helper.tools.official_statute_asof import _check_detail_identity, _label, _parts
 from ai_legal_helper.tools.official_statute_versions import OfficialLawVersion, build_detail_url, _safe_xml
 from ai_legal_helper.tools.statute_temporal import article_effective_date, extract_addenda
@@ -256,6 +256,42 @@ def persist_index_coverage(session, version: OfficialLawVersion, xml_bytes: byte
             applicability_review_status="UNCONFIRMED",
             indexed_at=now,
         ))
+
+    # Article effective dates are provenance, not a legal applicability
+    # decision. Never invent effective_to from the next MST.
+    previous_articles = list(session.scalars(select(LawArticleVersion).where(
+        LawArticleVersion.law_id == version.law_id,
+        LawArticleVersion.mst == version.mst,
+    )).all())
+    for item in previous_articles:
+        session.delete(item)
+    previous_rules = list(session.scalars(select(LawTransitionRule).where(
+        LawTransitionRule.law_id == version.law_id,
+        LawTransitionRule.mst == version.mst,
+    )).all())
+    for item in previous_rules:
+        session.delete(item)
+    for chunk in chunks:
+        meta = chunk["metadata"]
+        if meta["article"] == "부칙":
+            session.add(LawTransitionRule(
+                id=str(uuid.uuid4()), law_id=version.law_id, mst=version.mst,
+                rule_hash=meta["content_hash"], rule_text=chunk["content"],
+                promulgation_date=meta.get("promulgation_date") or None,
+                promulgation_number=meta.get("promulgation_number") or None,
+                rule_type="UNCLASSIFIED", applicability_status="REVIEW_REQUIRED",
+                source_vector_id=chunk["id"], indexed_at=now,
+            ))
+        else:
+            effective = meta.get("article_effective_date") or None
+            session.add(LawArticleVersion(
+                id=str(uuid.uuid4()), law_id=version.law_id, mst=version.mst,
+                article_id=meta["article"], content_hash=meta["content_hash"],
+                effective_from=effective, effective_to=None,
+                effective_date_basis=meta.get("effective_date_basis"),
+                effective_date_status="SOURCE_DERIVED" if effective else "UNCONFIRMED",
+                source_vector_id=chunk["id"], indexed_at=now,
+            ))
 
 
 def process_next_job(
