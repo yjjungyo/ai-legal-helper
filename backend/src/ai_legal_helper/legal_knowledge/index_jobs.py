@@ -121,7 +121,7 @@ class LawArticleVersion(Base):
     """Article text/version evidence, separate from vector coverage."""
     __tablename__ = "law_article_versions"
     __table_args__ = (
-        UniqueConstraint("law_id", "mst", "article_id", "content_hash",
+        UniqueConstraint("law_id", "mst", "source_vector_id",
                          name="uq_law_article_version_identity"),
         Index("ix_law_article_version_effective", "law_id", "article_id",
               "effective_from"),
