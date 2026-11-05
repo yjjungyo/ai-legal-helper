@@ -633,6 +633,72 @@ def process_evidence_review(
                         is_resolved=False,
                     ))
 
+            # Persist a single grounded semantic money decision at the
+            # evidence approval boundary. Consultation must reuse the result
+            # rather than repeatedly re-interpreting the same reviewed fact.
+            # An unsupported or ambiguous monetary statement gets no tag.
+            if (
+                adjudication_res.adjudication_status in ("EVIDENCE_SUPPORTED", "CORROBORATED")
+                and target_fact.verification_status == "DOCUMENT_VERIFIED"
+                and not (claim.structured_slots or {}).get("reviewed_semantics")
+            ):
+                from ai_legal_helper.case_intelligence.settlement_calculator import (
+                    extract_amounts_from_text,
+                )
+                if extract_amounts_from_text(claim.statement or ""):
+                    from ai_legal_helper.case_intelligence.semantic_judgment import (
+                        classify_statement,
+                    )
+                    source_text = "\n".join(
+                        str(span.text_excerpt or "")
+                        for span in (claim.spans or [])
+                        if getattr(span, "text_excerpt", None)
+                    )
+                    if source_text.strip():
+                        semantic_result = classify_statement(
+                            claim.statement,
+                            task="EVIDENCE_APPROVAL_MONETARY_ROLE",
+                            labels=(
+                                "CONTRACT_PRINCIPAL", "ACTUAL_REPAYMENT",
+                                "PAYMENT_COMPONENT", "PROMISE_OR_PROPOSAL",
+                                "REMAINING_BALANCE", "OTHER",
+                            ),
+                            source_text=source_text,
+                            context=(
+                                "승인된 증거의 특정 금액에 관한 역할을 분류하세요. "
+                                "실제 반환 거래는 제안·약속·상대방 주장이나 "
+                                "계약금·잔금의 지급과 다릅니다. "
+                                "계약 원금은 반환된 금액이나 미반환 잔액이 아닙니다. "
+                                "근거가 불명확하면 UNKNOWN."
+                            ),
+                        )
+                        grounded_amounts = extract_amounts_from_text(
+                            semantic_result.evidence_quote
+                        )
+                        if (
+                            semantic_result.label in (
+                                "CONTRACT_PRINCIPAL", "ACTUAL_REPAYMENT"
+                            )
+                            and len(grounded_amounts) == 1
+                            and semantic_result.source_quote in source_text
+                        ):
+                            slots = dict(claim.structured_slots or {})
+                            slots["reviewed_semantics"] = {
+                                "status": "VERIFIED",
+                                "category": semantic_result.label,
+                                "evidence_quote": semantic_result.evidence_quote,
+                                "source_quote": semantic_result.source_quote,
+                                "amount_krw": next(iter(grounded_amounts)),
+                            }
+                            claim.structured_slots = slots
+                            logger.info(
+                                "[EVIDENCE_SEMANTIC] approved monetary role=%s "
+                                "claim_id=%s amount=%s quote=%r",
+                                semantic_result.label, claim.id,
+                                next(iter(grounded_amounts)),
+                                semantic_result.evidence_quote,
+                            )
+
             # FactAdjudication 영구 기록
             db.add(FactAdjudication(
                 case_id=case.id,
