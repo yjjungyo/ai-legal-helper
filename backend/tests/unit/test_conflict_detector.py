@@ -608,26 +608,28 @@ def test_t16_invalid_calendar_date_rejected():
 
 
 def test_edge_cases_multi_amount_and_temporal_context(monkeypatch):
-    """One LLM-classified role per amount, without regex-based legal semantics."""
-    from ai_legal_helper.case_intelligence.semantic_judgment import SemanticDecision
+    """One grounded batch with independent roles for each numeric span."""
 
-    def classify_value(statement, *, task, context="", **kwargs):
-        if task != "MONEY_AMOUNT_SEMANTIC_ROLE":
-            return SemanticDecision("UNKNOWN", "", status="UNCONFIRMED")
-        token = context.split("분류해야 할 특정 금액 원문: ", 1)[-1].split(" | ", 1)[0]
-        if "3천만" in token:
-            role = "DOWN_PAYMENT"
-        elif "2억 7천만" in token:
-            role = "INTERIM_OR_BALANCE"
-        elif "3억 5천만" in token:
-            role = "MODIFIED_CONTRACT_AMOUNT"
-        else:
-            role = "PRINCIPAL_DEPOSIT"
-        return SemanticDecision(role, statement)
+    def review_batch(statement, *, spans, labels_by_kind, **kwargs):
+        roles = {}
+        for item in spans:
+            if item["kind"] != "AMOUNT":
+                continue
+            token = statement[item["start"]:item["end"]]
+            if "3천만" in token:
+                role = "DOWN_PAYMENT"
+            elif "2억 7천만" in token:
+                role = "INTERIM_OR_BALANCE"
+            elif "3억 5천만" in token:
+                role = "MODIFIED_CONTRACT_AMOUNT"
+            else:
+                role = "PRINCIPAL_DEPOSIT"
+            roles[item["id"]] = role
+        return roles
 
     monkeypatch.setattr(
-        "ai_legal_helper.case_intelligence.semantic_judgment.classify_statement",
-        classify_value,
+        "ai_legal_helper.case_intelligence.semantic_judgment.classify_numeric_spans",
+        review_batch,
     )
     # 1) 한 문장 내 다중 금액 역할 분리
     multi_stmt = "보증금 3억 원 중 계약금 3천만 원은 계약 시 지급하고 잔금 2억 7천만 원은 2024년 5월 1일에 지급한다."
