@@ -262,82 +262,82 @@ def extract_case_prior_verified_repayments(briefing: CaseEvidenceBriefing) -> Tu
                 continue
             combined_text = f"{line_text} {doc_name}"
 
-                dates = extract_dates_from_text(line_text)
-                tx_date = sorted(dates)[0] if dates else (str(getattr(fact, "occurred_at", None) or ""))
-                doc_ref = fact.source_evidence_id or fact.evidence_label or fact.document_name or ""
+            dates = extract_dates_from_text(line_text)
+            tx_date = sorted(dates)[0] if dates else (str(getattr(fact, "occurred_at", None) or ""))
+            doc_ref = fact.source_evidence_id or fact.evidence_label or fact.document_name or ""
 
-                m_txid = re.search(r"(?:거래번호|승인번호|전문번호|관리번호|일련번호|tx[-_]?id|txid)[\s:]*([A-Za-z0-9_-]+)", combined_text, re.IGNORECASE)
-                tx_id = m_txid.group(1).strip() if m_txid else None
+            m_txid = re.search(r"(?:거래번호|승인번호|전문번호|관리번호|일련번호|tx[-_]?id|txid)[\s:]*([A-Za-z0-9_-]+)", combined_text, re.IGNORECASE)
+            tx_id = m_txid.group(1).strip() if m_txid else None
 
-                m_time = re.search(r"(\d{1,2}:\d{2}(?::\d{2})?)", combined_text)
-                if not m_time:
-                    m_time = re.search(r"(\d{1,2}시\s*\d{1,2}분(?:\s*\d{1,2}초)?)", combined_text)
-                tx_time = m_time.group(1).strip() if m_time else None
+            m_time = re.search(r"(\d{1,2}:\d{2}(?::\d{2})?)", combined_text)
+            if not m_time:
+                m_time = re.search(r"(\d{1,2}시\s*\d{1,2}분(?:\s*\d{1,2}초)?)", combined_text)
+            tx_time = m_time.group(1).strip() if m_time else None
 
-                m_ord = re.search(r"(\d+)\s*(?:차|회|번째)\s*(?:입금|변제|지급|반환|이체)?", combined_text)
-                tx_ord = m_ord.group(1).strip() if m_ord else None
+            m_ord = re.search(r"(\d+)\s*(?:차|회|번째)\s*(?:입금|변제|지급|반환|이체)?", combined_text)
+            tx_ord = m_ord.group(1).strip() if m_ord else None
 
-                m_acc = re.search(r"(?:계좌|계좌번호)[\s:]*([0-9-]+)", combined_text)
-                tx_acc = m_acc.group(1).strip() if m_acc else None
+            m_acc = re.search(r"(?:계좌|계좌번호)[\s:]*([0-9-]+)", combined_text)
+            tx_acc = m_acc.group(1).strip() if m_acc else None
 
-                is_copy = any(w in combined_text for w in ["사본", "중복", "재발급", "동일 거래", "copy"])
-                src = fact.document_name or fact.evidence_label or "확인된 증거"
+            is_copy = any(w in combined_text for w in ["사본", "중복", "재발급", "동일 거래", "copy"])
+            src = fact.document_name or fact.evidence_label or "확인된 증거"
 
-                is_duplicate = False
-                is_ambiguous = False
+            is_duplicate = False
+            is_ambiguous = False
 
-                for ex in accepted_txs:
-                    if tx_id and ex.get("tx_id"):
-                        if tx_id == ex["tx_id"]:
-                            is_duplicate = True
-                            break
-                        else:
-                            continue
-
-                    if (is_copy or ex.get("is_copy")) and ex["amt"] == amt and (not tx_date or not ex.get("date") or ex["date"] == tx_date):
+            for ex in accepted_txs:
+                if tx_id and ex.get("tx_id"):
+                    if tx_id == ex["tx_id"]:
                         is_duplicate = True
                         break
-
-                    if amt != ex["amt"]:
-                        continue
-                    if tx_date and ex.get("date") and tx_date != ex["date"]:
+                    else:
                         continue
 
-                    if (tx_time and ex.get("tx_time") and tx_time != ex["tx_time"]) or                        (tx_ord and ex.get("tx_ord") and tx_ord != ex["tx_ord"]) or                        (tx_acc and ex.get("tx_acc") and tx_acc != ex["tx_acc"]):
-                        continue
-
-                    if doc_ref and ex.get("doc_ref") and doc_ref == ex["doc_ref"]:
-                        is_duplicate = True
-                        break
-
-                    is_ambiguous = True
+                if (is_copy or ex.get("is_copy")) and ex["amt"] == amt and (not tx_date or not ex.get("date") or ex["date"] == tx_date):
+                    is_duplicate = True
                     break
 
-                if is_duplicate:
+                if amt != ex["amt"]:
+                    continue
+                if tx_date and ex.get("date") and tx_date != ex["date"]:
                     continue
 
-                if is_ambiguous:
-                    repaid_sources.append(
-                        f"[보류] {amt:,}원 [{src}] (동일 일자·금액 거래 중복 의심 / 고유 거래번호 미확인으로 합산 보류)"
-                    )
+                if (tx_time and ex.get("tx_time") and tx_time != ex["tx_time"]) or                        (tx_ord and ex.get("tx_ord") and tx_ord != ex["tx_ord"]) or                        (tx_acc and ex.get("tx_acc") and tx_acc != ex["tx_acc"]):
                     continue
 
-                accepted_txs.append({
-                    "amt": amt,
-                    "date": tx_date,
-                    "tx_id": tx_id,
-                    "tx_time": tx_time,
-                    "tx_ord": tx_ord,
-                    "tx_acc": tx_acc,
-                    "doc_ref": doc_ref,
-                    "src": src,
-                    "is_copy": is_copy,
-                    "stmt": line_text,
-                })
-                total_repaid += amt
-                ord_prefix = f"{tx_ord}차 " if tx_ord else ""
-                id_suffix = f" (거래번호: {tx_id})" if tx_id else ""
-                repaid_sources.append(f"{ord_prefix}{amt:,}원 [{src}]{id_suffix}")
+                if doc_ref and ex.get("doc_ref") and doc_ref == ex["doc_ref"]:
+                    is_duplicate = True
+                    break
+
+                is_ambiguous = True
+                break
+
+            if is_duplicate:
+                continue
+
+            if is_ambiguous:
+                repaid_sources.append(
+                    f"[보류] {amt:,}원 [{src}] (동일 일자·금액 거래 중복 의심 / 고유 거래번호 미확인으로 합산 보류)"
+                )
+                continue
+
+            accepted_txs.append({
+                "amt": amt,
+                "date": tx_date,
+                "tx_id": tx_id,
+                "tx_time": tx_time,
+                "tx_ord": tx_ord,
+                "tx_acc": tx_acc,
+                "doc_ref": doc_ref,
+                "src": src,
+                "is_copy": is_copy,
+                "stmt": line_text,
+            })
+            total_repaid += amt
+            ord_prefix = f"{tx_ord}차 " if tx_ord else ""
+            id_suffix = f" (거래번호: {tx_id})" if tx_id else ""
+            repaid_sources.append(f"{ord_prefix}{amt:,}원 [{src}]{id_suffix}")
 
     return total_repaid, repaid_sources
 
