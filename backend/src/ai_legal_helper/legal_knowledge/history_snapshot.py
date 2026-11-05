@@ -72,6 +72,17 @@ def store_complete_history(session, lookup: VersionLookup, *, law_id: str) -> di
                     list_effective_date=version.list_effective_date,
                 )
                 session.add(row)
+            # An existing READY vector index was built from a particular
+            # official version. If history metadata now differs, the worker
+            # must revalidate/reindex it before the resolver can reuse it.
+            identity_changed = (
+                row.index_status == "READY"
+                and (row.list_effective_date != version.list_effective_date
+                     or (row.promulgation_date and row.promulgation_date != version.promulgation_date))
+            )
+            if identity_changed:
+                row.index_status = "STALE"
+                row.xml_identity_status = "UNCONFIRMED"
             row.promulgation_date = version.promulgation_date
             row.list_effective_date = version.list_effective_date
             row.history_code = version.history_code
