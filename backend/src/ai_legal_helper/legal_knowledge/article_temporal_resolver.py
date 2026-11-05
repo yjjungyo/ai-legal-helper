@@ -115,6 +115,34 @@ class ArticleTemporalResolver:
             return decision("ADDENDA_UNCONFIRMED", "TRANSITION_SOURCE_MISSING",
                             vectors=vectors)
         if branch_review:
+            # A later MST may contain text that was not in force for this
+            # event. Compare historical article candidates by explicit
+            # effective periods; never infer an end date from MST ordering.
+            history = list(self.session.scalars(select(LawArticleVersion).where(
+                LawArticleVersion.law_id == law_id,
+                LawArticleVersion.article_id.in_(base.article_ids),
+            )).all())
+            for article in base.article_ids:
+                candidates = []
+                for old in history:
+                    if old.article_id.replace(" ", "") != article:
+                        continue
+                    start = parse_legal_date(old.effective_from)
+                    end = parse_legal_date(old.effective_to) if old.effective_to else None
+                    if start is None or (old.effective_to and end is None):
+                        return decision("ARTICLE_HISTORY_UNCONFIRMED",
+                                        "HISTORICAL_ARTICLE_DATE_MISSING", vectors=vectors)
+                    if start <= event and (end is None or event < end):
+                        candidates.append(old)
+                if len({(item.mst, item.content_hash) for item in candidates}) != 1:
+                    return decision("ARTICLE_HISTORY_AMBIGUOUS",
+                                    "HISTORICAL_ARTICLE_PERIOD_OVERLAP_OR_GAP",
+                                    vectors=vectors)
+                if candidates[0].mst != base.mst:
+                    return decision("ARTICLE_HISTORICAL_VERSION_REVIEW_REQUIRED",
+                                    "OLDER_MST_ARTICLE_MAY_GOVERN",
+                                    "TRANSITION_APPLICABILITY_REVIEW_REQUIRED",
+                                    vectors=vectors)
             return decision("ARTICLE_BRANCH_REVIEW_REQUIRED",
                             "ARTICLE_DATE_CANDIDATE_MATCHES_EVENT",
                             "MULTI_EFFECTIVE_DATE_PER_MST",
