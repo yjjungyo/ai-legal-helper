@@ -97,7 +97,7 @@ class LawIndexResolver:
         now = self.now
         if now.tzinfo is not None:
             now = now.astimezone(timezone.utc).replace(tzinfo=None)
-        if (snapshot.completeness_status != "COMPLETE"
+        if (snapshot.completeness_status not in ("COMPLETE", "INCOMPLETE")
                 or snapshot.source_target != "eflaw"
                 or not snapshot.fingerprint
                 or not snapshot.pages_fetched
@@ -121,6 +121,42 @@ class LawIndexResolver:
         by_mst = {}
         for branch in branches:
             by_mst.setdefault(branch.mst, set()).add(branch.effective_date)
+        if snapshot.completeness_status == "INCOMPLETE":
+            # Multi-effective-date history is a complete *list* of branches,
+            # but not enough to prove which article text governs an event.
+            # Return a grounded MST candidate for diagnostic/review use only.
+            if snapshot.error_code != "MULTI_EFFECTIVE_DATE_PER_MST":
+                return result("HISTORY_INCOMPLETE", "OFFICIAL_HISTORY_NOT_COMPLETE",
+                              snapshot_id=snapshot.id)
+            if not branches or len(by_mst) != snapshot.official_version_count:
+                return result("HISTORY_INCOMPLETE", "EFFECTIVE_BRANCH_COUNT_MISMATCH",
+                              snapshot_id=snapshot.id)
+            eligible = []
+            for branch in branches:
+                effective = parse_legal_date(branch.effective_date)
+                promulgated = parse_legal_date(branch.promulgation_date)
+                if effective is None or promulgated is None:
+                    return result("VERSION_AMBIGUOUS", "BRANCH_DATE_INVALID",
+                                  snapshot_id=snapshot.id)
+                if effective <= parsed:
+                    if promulgated > parsed:
+                        return result("VERSION_AMBIGUOUS", "RETROACTIVE_REVIEW_REQUIRED",
+                                      snapshot_id=snapshot.id)
+                    eligible.append((effective, branch.mst))
+            if not eligible:
+                return result("INDEX_MISSING", "NO_VERSION_EFFECTIVE_BY_EVENT",
+                              snapshot_id=snapshot.id)
+            latest = max(date for date, _ in eligible)
+            mst_set = {mst for date, mst in eligible if date == latest}
+            if len(mst_set) != 1:
+                return result("VERSION_AMBIGUOUS", "MULTIPLE_MST_SAME_EFFECTIVE_DATE",
+                              snapshot_id=snapshot.id)
+            return result(
+                "ARTICLE_BRANCH_REVIEW_REQUIRED",
+                "MULTI_EFFECTIVE_DATE_PER_MST",
+                "ARTICLE_AND_ADDENDA_BRANCH_SELECTION_REQUIRED",
+                mst=next(iter(mst_set)), snapshot_id=snapshot.id,
+            )
         if any(len(dates) > 1 for dates in by_mst.values()):
             return result("VERSION_AMBIGUOUS", "MULTI_EFFECTIVE_DATE_PER_MST",
                           snapshot_id=snapshot.id)
