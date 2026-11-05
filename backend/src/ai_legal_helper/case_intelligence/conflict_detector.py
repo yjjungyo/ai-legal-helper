@@ -48,6 +48,8 @@ from ai_legal_helper.case_intelligence.fact_semantics import (
     compare_fact_identity,
     evaluate_temporal_relation,
     extract_semantic_fact,
+    extract_semantic_proposition,
+    check_proposition_comparability,
 )
 from ai_legal_helper.llm.gateway import get_llm
 from ai_legal_helper.observability.context import get_current_span_id
@@ -1576,6 +1578,7 @@ def reconcile_case_conflicts(
 
     removed_links = 0
     converted_supports = 0
+    removed_false_support_links = 0
     reset_claims = 0
     restored_facts = 0
     affected_cases: List[str] = []
@@ -1734,6 +1737,51 @@ def reconcile_case_conflicts(
 
         db.flush()
 
+        # 1b. Legacy false SUPPORTS: a rejection does not corroborate
+        # the preceding offer. Never silently turn a response into proof.
+        # This runs only in the explicit reconciliation workflow.
+        supporting_links = (
+            db.query(EvidenceLink)
+            .join(EvidenceDocument, EvidenceLink.evidence_id == EvidenceDocument.id)
+            .filter(
+                EvidenceDocument.case_id == cid,
+                EvidenceLink.link_type == "SUPPORTS",
+                EvidenceLink.target_type == "FACT",
+            )
+            .all()
+        )
+        for sup_link in supporting_links:
+            sup_claim = (
+                db.query(EvidenceClaim).filter_by(id=sup_link.claim_id).first()
+                if sup_link.claim_id else None
+            )
+            sup_fact = fact_map.get(sup_link.target_id)
+            if not sup_claim or not sup_fact or sup_claim.review_status == "REJECTED":
+                continue
+            # A claim's own Fact link is legitimate provenance, not
+            # a cross-fact semantic SUPPORTS edge.
+            if (
+                sup_claim.evidence_id == sup_fact.source_ref
+                and "".join((sup_claim.statement or "").split())
+                    == "".join((sup_fact.statement or "").split())
+            ):
+                continue
+            proposal = extract_semantic_proposition(sup_claim.statement or "")
+            target = extract_semantic_proposition(sup_fact.statement or "")
+            relation = check_proposition_comparability(proposal, target)
+            if relation.reason_code != "PROPOSAL_VS_REJECTION":
+                continue
+            changes.append({
+                "entity": "EvidenceLink",
+                "id": sup_link.id,
+                "before": "SUPPORTS",
+                "after": "DELETED (FALSE_PROPOSAL_REJECTION_SUPPORT)",
+                "reason_code": relation.reason_code,
+            })
+            db.delete(sup_link)
+            removed_false_support_links += 1
+            case_changed = True
+
         # 2. EvidenceClaim의 구조화 슬롯 백필 및 CONTRADICTION_CANDIDATE 상태 재검증
         all_case_claims = db.query(EvidenceClaim).filter(EvidenceClaim.case_id == cid).all()
         for claim in all_case_claims:
@@ -1884,6 +1932,8 @@ def reconcile_case_conflicts(
             "removed_links": removed_links,
             "removed_false_contradict_links": removed_links,
             "converted_supports_links": converted_supports,
+        "removed_false_support_links": removed_false_support_links,
+            "removed_false_support_links": removed_false_support_links,
             "reset_claims": reset_claims,
             "restored_facts": restored_facts,
             "restored_disputed_facts": restored_facts,
