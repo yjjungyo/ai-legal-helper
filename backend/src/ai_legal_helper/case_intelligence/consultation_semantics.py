@@ -36,21 +36,22 @@ def is_evidence_review_request(question: str) -> bool:
     return _consultation_intent(question) == "EVIDENCE_REVIEW"
 
 
-def is_conditional_contract_statement(statement: str) -> bool:
-    """Does the text merely state duties, conditions, prospects or plans?
-
-    No rule may assert that an actual termination happened based on wording.
-    An UNKNOWN result is treated as conditional by high-stakes verifiers.
-    """
+def termination_statement_status(statement: str) -> str:
+    """ACTUAL_TERMINATION, CONDITIONAL_OR_PLANNED, OTHER or UNKNOWN."""
     result = classify_statement(
         statement,
         task="CONTRACT_TERMINATION_OCCURRENCE",
         labels=("CONDITIONAL_OR_PLANNED", "ACTUAL_TERMINATION", "OTHER"),
         context=(
             "CONDITIONAL_OR_PLANNED: 계약 조항, 의무, 가정, 예정 또는 종료 여부 미확인. "
-            "ACTUAL_TERMINATION: 실제 특정 계약 종료 행위/효과가 발생했다는 "
-            "진술임. 단순 만기일 기재나 예상은 해당하지 않음. "
-            "OTHER: 계약 종료와 무관. 근거가 모호하면 UNKNOWN."
+            "ACTUAL_TERMINATION: 특정 계약 종료 사실이 실제 발생했음을 진술함. "
+            "단순 만기일 기재, 통지 발송, 도달 여부 미확인 및 예상은 해당하지 않음. "
+            "OTHER: 종료와 무관. 사건 주체·계약·시점이 모호하면 UNKNOWN."
         ),
     )
-    return result.label in ("CONDITIONAL_OR_PLANNED", "UNKNOWN")
+    return result.label
+
+
+def is_conditional_contract_statement(statement: str) -> bool:
+    """Anything not positively interpreted as actual is conditional for safety."""
+    return termination_statement_status(statement) != "ACTUAL_TERMINATION"
