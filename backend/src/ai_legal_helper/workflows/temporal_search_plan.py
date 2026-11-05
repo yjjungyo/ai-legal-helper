@@ -68,11 +68,9 @@ def extract_event_with_llm(question: str, invoke_fn: Optional[Callable[[str], st
         explicit_years = set(re.findall(r"(?<!\d)(?:19|20)\d{2}(?=\s*(?:년|[-./]))", evidence))
         if explicit_years and str(parsed_date.year) not in explicit_years:
             raise ValueError("YEAR_CONFLICT_IN_EVIDENCE")
-        # 공포·시행일만을 근거로 사건일을 만들지 않는다.
-        if re.search(r"(?:공포일|시행일|개정일|공포된|시행되는|개정된)", evidence) and not re.search(
-            r"(?:계약|체결|갱신|재계약|통지|퇴거|이사|변경)", evidence
-        ):
-            raise ValueError("STATUTE_DATE_NOT_EVENT")
+        # Event type has already been interpreted by the model. A keyword
+        # regex must not reject a quoted event merely because the same span
+        # also mentions the statute's promulgation or effective date.
         # 복수 날짜를 포함한 인용 전체는 날짜별 근거를 특정할 수 없으므로 보류.
         # LLM이 해당 행위에 연결된 짧은 원문 구간을 인용하도록 한다.
         date_mentions = re.findall(
@@ -148,7 +146,7 @@ def build_temporal_search_plan(
     event_type: Optional[str] = None,
     resolver_fn: Optional[Callable[[str], Any]] = None,
     max_laws: int = 3,
-    llm_event_extraction: bool = False,
+    llm_event_extraction: bool = True,
     event_invoke_fn: Optional[Callable[[str], str]] = None,
     index_fn: Optional[Callable[..., Any]] = None,
 ) -> dict[str, Any]:
