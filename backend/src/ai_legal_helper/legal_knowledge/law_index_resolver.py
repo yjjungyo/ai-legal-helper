@@ -121,6 +121,8 @@ class LawIndexResolver:
         by_mst = {}
         for branch in branches:
             by_mst.setdefault(branch.mst, set()).add(branch.effective_date)
+        if snapshot.completeness_status == "INCOMPLETE" and snapshot.error_code != "MULTI_EFFECTIVE_DATE_PER_MST":
+            return result("HISTORY_INCOMPLETE", "OFFICIAL_HISTORY_NOT_COMPLETE", snapshot_id=snapshot.id)
         if snapshot.completeness_status == "INCOMPLETE":
             # Multi-effective-date history is a complete *list* of branches,
             # but not enough to prove which article text governs an event.
