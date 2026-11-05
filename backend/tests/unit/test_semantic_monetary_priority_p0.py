@@ -250,3 +250,98 @@ def test_batch_rejects_quote_grounded_in_wrong_identical_amount_occurrence():
     assert len(invocations) == 1
     assert "a0" not in decisions
     assert decisions["a1"] == "RETURNED_AMOUNT"
+
+
+
+def test_reconcile_removes_legacy_false_support_but_keeps_claim_own_provenance():
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from ai_legal_helper.database.models import (
+        Base, User, Case, EvidenceClaim, EvidenceDocument, EvidenceLink, Fact,
+    )
+    from ai_legal_helper.case_intelligence.conflict_detector import (
+        reconcile_case_conflicts,
+    )
+
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(bind=engine)
+    db = sessionmaker(bind=engine)()
+    try:
+        db.add_all([
+            User(id="repair-user", email="repair@test.invalid", password_hash="test"),
+            Case(id="repair-case", user_id="repair-user", title="오류 관계 복구"),
+            EvidenceDocument(
+                id="doc-proposal", case_id="repair-case", original_filename="임대인제안.txt",
+                media_type="text/plain", size_bytes=50, sha256="h-proposal",
+                safe_storage_key="p.txt", status="APPROVED",
+            ),
+            EvidenceDocument(
+                id="doc-refusal", case_id="repair-case", original_filename="임차인거절.txt",
+                media_type="text/plain", size_bytes=50, sha256="h-refusal",
+                safe_storage_key="r.txt", status="APPROVED",
+            ),
+        ])
+        db.flush()
+        db.add_all([
+            Fact(
+                id="fact-proposal", case_id="repair-case",
+                statement="임대인은 분할 상환을 제안하였다.",
+                fact_type="ACTION", source_ref="doc-proposal",
+                verification_status="DOCUMENT_VERIFIED",
+            ),
+            Fact(
+                id="fact-refusal", case_id="repair-case",
+                statement="임차인은 분할 상환을 거절하였다.",
+                fact_type="ACTION", source_ref="doc-refusal",
+                verification_status="DOCUMENT_VERIFIED",
+            ),
+            EvidenceClaim(
+                id="claim-refusal", case_id="repair-case",
+                evidence_id="doc-refusal",
+                statement="임차인은 분할 상환을 거절하였다.",
+                claim_type="ACTION", assertion_status="DOCUMENT_STATES",
+                review_status="APPROVED", confidence=0.9,
+            ),
+        ])
+        db.flush()
+        db.add_all([
+            EvidenceLink(
+                id="false-cross-support", evidence_id="doc-refusal",
+                claim_id="claim-refusal", target_type="FACT",
+                target_id="fact-proposal", link_type="SUPPORTS",
+            ),
+            EvidenceLink(
+                id="own-provenance", evidence_id="doc-refusal",
+                claim_id="claim-refusal", target_type="FACT",
+                target_id="fact-refusal", link_type="SUPPORTS",
+            ),
+        ])
+        db.commit()
+
+        def speech_act(stmt, *, task, **kwargs):
+            if task == "SPEECH_ACT_AND_EXECUTION_STATUS":
+                return SemanticDecision(
+                    "REJECTION" if "거절" in stmt else "PROPOSAL", stmt,
+                )
+            return SemanticDecision("UNKNOWN", "", status="UNCONFIRMED")
+
+        with patch(
+            "ai_legal_helper.case_intelligence.semantic_judgment.classify_statement",
+            side_effect=speech_act,
+        ):
+            dry = reconcile_case_conflicts(
+                db, case_id="repair-case", dry_run=True, sync_neo4j=False,
+            )
+            assert dry["removed_false_support_links"] == 1
+            assert db.query(EvidenceLink).filter_by(id="false-cross-support").count() == 1
+
+            live = reconcile_case_conflicts(
+                db, case_id="repair-case", dry_run=False, sync_neo4j=False,
+            )
+            assert live["removed_false_support_links"] == 1
+
+        assert db.query(EvidenceLink).filter_by(id="false-cross-support").count() == 0
+        assert db.query(EvidenceLink).filter_by(id="own-provenance").count() == 1
+    finally:
+        db.close()
+        engine.dispose()
