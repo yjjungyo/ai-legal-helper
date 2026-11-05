@@ -507,9 +507,19 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
         setShowReanalyzePrompt(true);
         onRefreshCase();
       }
+      // loadClaims는 일반 화면에서 오류를 로깅하고 삼키므로, 일괄 승인에서는
+      // 직접 조회하여 갱신 실패를 실제로 감지한다.
       const refreshed = await Promise.allSettled([
-        loadClaims(docId), loadEvidences(), loadConflicts(), loadAdjudicationsAndGaps(),
+        getEvidenceClaims(caseId, docId), loadEvidences(), loadConflicts(), loadAdjudicationsAndGaps(),
       ]);
+      if (refreshed[0].status === 'fulfilled') {
+        const latestClaims = refreshed[0].value;
+        setClaims(latestClaims);
+        setSelectedClaimIds(failed.filter((id) => latestClaims.some((claim: any) =>
+          String(claim.id || claim.claim_id) === id &&
+          (claim.review_status || claim.status || 'PENDING') === 'PENDING'
+        )));
+      }
       if (refreshed.some((result) => result.status === 'rejected')) {
         setBulkResult((prev) => prev + ' · 화면 갱신 일부 실패: 새로고침 후 확인하세요.');
       }
