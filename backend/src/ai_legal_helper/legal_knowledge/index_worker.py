@@ -23,7 +23,7 @@ from typing import Callable, Optional
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from ai_legal_helper.legal_knowledge.index_jobs import OfficialLawIndexJob
+from ai_legal_helper.legal_knowledge.index_jobs import OfficialLawIndexJob, LawVersionIndex, LawArticleCoverage
 from ai_legal_helper.tools.official_statute_asof import _check_detail_identity, _label, _parts
 from ai_legal_helper.tools.official_statute_versions import OfficialLawVersion, build_detail_url, _safe_xml
 from ai_legal_helper.tools.statute_temporal import article_effective_date, extract_addenda
@@ -189,6 +189,57 @@ def index_one_version(
     return len(chunks)
 
 
+def persist_index_coverage(session, version: OfficialLawVersion, xml_bytes: bytes,
+                           chunks: list[dict]) -> None:
+    """Persist verified Chroma upserts as relational coverage in same job transaction.
+
+    Do not assert a history snapshot or legal applicability: official-history
+    snapshots must be populated separately from a complete eflaw lookup.
+    """
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    xml_hash = hashlib.sha256(xml_bytes).hexdigest()
+    row = session.scalar(select(LawVersionIndex).where(
+        LawVersionIndex.law_id == version.law_id,
+        LawVersionIndex.mst == version.mst,
+    ))
+    if row is None:
+        row = LawVersionIndex(
+            id=str(uuid.uuid4()), law_id=version.law_id, mst=version.mst,
+            list_effective_date=version.list_effective_date,
+        )
+        session.add(row)
+    elif row.official_xml_hash and row.official_xml_hash != xml_hash:
+        raise ValueError("OFFICIAL_XML_HASH_CHANGED_FOR_MST")
+    row.promulgation_date = version.promulgation_date
+    row.list_effective_date = version.list_effective_date
+    row.history_code = version.history_code
+    row.official_xml_hash = xml_hash
+    row.xml_identity_status = "VERIFIED"
+    row.index_status = "READY"
+    row.indexed_at = now
+    row.chunk_count = len(chunks)
+
+    # Re-index is idempotent. Remove only coverage for this exact MST;
+    # no other version, vector collection, or legal-history row is touched.
+    existing = list(session.scalars(select(LawArticleCoverage).where(
+        LawArticleCoverage.law_id == version.law_id,
+        LawArticleCoverage.mst == version.mst,
+    )).all())
+    for coverage in existing:
+        session.delete(coverage)
+    for chunk in chunks:
+        meta = chunk["metadata"]
+        session.add(LawArticleCoverage(
+            id=str(uuid.uuid4()), law_id=version.law_id, mst=version.mst,
+            article_id=meta["article"], content_hash=meta["content_hash"],
+            vector_id=chunk["id"],
+            article_effective_date=meta.get("article_effective_date") or None,
+            effective_date_basis=meta.get("effective_date_basis"),
+            applicability_review_status="UNCONFIRMED",
+            indexed_at=now,
+        ))
+
+
 def process_next_job(
     session, *,
     worker_id: str, api_key: str,
@@ -206,10 +257,17 @@ def process_next_job(
         list_effective_date=job.list_effective_date,
     )
     try:
+        # Fetch and validate once, then use the same immutable XML for both
+        # Chroma upserts and relational coverage. No second API round-trip.
+        payload = fetch_xml(build_detail_url(api_key, v))
+        if not payload:
+            raise ValueError("OFFICIAL_XML_FETCH_FAILED")
+        chunks = official_xml_chunks(payload, v)
         count = index_one_version(
-            v, api_key=api_key, fetch_xml=fetch_xml,
+            v, api_key=api_key, fetch_xml=lambda _url: payload,
             chroma_collection=chroma_collection, embeddings=embeddings,
         )
+        persist_index_coverage(session, v, payload, chunks)
         job.status = "READY"
         job.chunk_count = count
         job.error_code = None
