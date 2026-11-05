@@ -333,7 +333,12 @@ def interpret_addendum_with_llm(
                 "candidate": candidate,
             }, ensure_ascii=False)
         )
-        review = call(review_prompt, review_invoke_fn)
+        # In tests, an injected interpreter also handles the independently
+        # prompted review unless an explicit reviewer is provided.
+        review = call(
+            review_prompt,
+            review_invoke_fn if review_invoke_fn is not None else invoke_fn,
+        )
         if not isinstance(review, dict) or not all(
             type(review.get(k)) is bool
             for k in ("supported", "complete", "exceptions_accounted_for")
