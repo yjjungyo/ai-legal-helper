@@ -255,6 +255,30 @@ def _normalize_doc(d):
     return d
 
 
+
+def retrieve_official_by_ids(vector_ids: List[str]) -> List[Any]:
+    """Fetch exact official XML chunks by their PostgreSQL coverage IDs."""
+    from langchain_core.documents import Document
+
+    if not vector_ids:
+        return []
+    client = _get_client()
+    collection = client.get_collection("law_docs_global")
+    documents = []
+    for start in range(0, len(vector_ids), 200):
+        requested = vector_ids[start:start + 200]
+        rows = collection.get(ids=requested, include=["documents", "metadatas"])
+        for vector_id, body, metadata in zip(
+            rows.get("ids") or [], rows.get("documents") or [],
+            rows.get("metadatas") or [],
+        ):
+            meta = dict(metadata or {})
+            if meta.get("vector_id") != vector_id:
+                continue
+            documents.append(Document(id=vector_id, page_content=body or "", metadata=meta))
+    return documents
+
+
 @trace
 def retrieve_with_status(query: str, k: int = 3, category: Optional[str] = None, metadata_filter: Optional[Dict[str, Any]] = None) -> RetrievalResult:
     """질의에 대해 연관 법률 문서 청크를 검색하고 구조화된 상태(RetrievalResult)를 반환한다.
