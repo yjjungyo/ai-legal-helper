@@ -151,7 +151,9 @@ def build_source_from_chroma_doc(
         Dict[str, Any]: StandardSource 스키마를 준수하는 딕셔너리.
     """
     meta: Dict[str, Any] = getattr(doc, "metadata", None) or {}
-    content: str = (getattr(doc, "page_content", None) or "").strip()
+    # Official XML hashes are computed from the exact embedded text.
+    # Trimming it here would make a valid Chroma document fail SHA-256 validation.
+    content: str = getattr(doc, "page_content", None) or ""
 
     raw_fn = meta.get("file_name") or meta.get("filename") or meta.get("source") or meta.get("file_path")
     filename = os.path.basename(str(raw_fn)).strip() if raw_fn and str(raw_fn).strip() != "?" else None
