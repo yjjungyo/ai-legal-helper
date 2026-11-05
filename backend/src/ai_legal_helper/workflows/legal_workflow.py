@@ -549,8 +549,33 @@ async def run_agents_node(state: LegalState) -> Dict:
     if not cats:
         return {"results": results, "agent_results": results, "retrieved_sources": all_sources}
 
+    plan = state.get("law_search_plan") or {}
+    required_laws = [
+        {"law_id": str(law_id), "law_name": str(law_name)}
+        for law_id, law_name in zip(plan.get("law_ids") or [], plan.get("candidate_laws") or [])
+        if law_id and law_name
+    ]
+    temporal_context = {
+        "question": q,
+        "event_date": (plan.get("as_of_date") if plan.get("status") == "READY"
+                       else state.get("event_date")),
+        "event_type": (plan.get("event_type") if plan.get("status") == "READY"
+                       else state.get("event_type")),
+        "required_laws": required_laws or None,
+    }
+
+    def _run_specialist_scoped(c: str) -> tuple[str, str, list]:
+        from ai_legal_helper.observability.context import (
+            set_temporal_retrieval_context, reset_temporal_retrieval_context,
+        )
+        token = set_temporal_retrieval_context(temporal_context)
+        try:
+            return run_specialist_agent(c, q, brief)
+        finally:
+            reset_temporal_retrieval_context(token)
+
     async def _run_agent_with_ctx(c: str) -> tuple[str, str, list]:
-        return await asyncio.to_thread(run_specialist_agent, c, q, brief)
+        return await asyncio.to_thread(_run_specialist_scoped, c)
 
     # [P0-05/Gate 3] 전문 에이전트 다중 호출 병목 최적화: 핵심 최대 2개 전문 에이전트로 집중
     selected_cats = cats[:2] if len(cats) > 2 else cats
