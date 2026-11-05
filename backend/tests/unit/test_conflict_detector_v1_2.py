@@ -523,25 +523,44 @@ class TestQuantitativeEvaluationV11VsV12:
             ("월 차임은 1,000,000원이다.", "월 차임은 500,000원이다.", "AMOUNT", "CONFLICT"),
         ]
 
+        # Offline benchmark tests deterministic comparison of *reviewed*
+        # semantic facts; missing LLM alone cannot prove two amounts are
+        # the same legal attribute. The oracle defines only approved roles.
+        verified_roles = {
+            "보증금은 250,000,000원이다.": "PRINCIPAL_DEPOSIT",
+            "보증금은 300,000,000원이다.": "PRINCIPAL_DEPOSIT",
+            "월 차임은 1,000,000원이다.": "PERIODIC_RENT_OR_FEE",
+            "월 차임은 500,000원이다.": "PERIODIC_RENT_OR_FEE",
+        }
+
+        def reviewed_meaning(statement, *, task, **kwargs):
+            role = verified_roles.get(statement) if task == "MONEY_AMOUNT_SEMANTIC_ROLE" else None
+            return (
+                SemanticDecision(role, statement)
+                if role else SemanticDecision("UNKNOWN", "", status="UNCONFIRMED")
+            )
+
         tp, fp, tn, fn = 0, 0, 0, 0
+        with patch(
+            "ai_legal_helper.case_intelligence.semantic_judgment.classify_statement",
+            side_effect=reviewed_meaning,
+        ):
+            for claim_stmt, fact_stmt, claim_type, ground_truth in benchmark_dataset:
+                c_slots = build_structured_slots(statement=claim_stmt, claim_type=claim_type)
+                fact = Fact(id="f-eval", statement=fact_stmt, fact_type=claim_type, verification_status="DOCUMENT_VERIFIED")
+                decision = evaluate_claim_against_fact(claim_slots=c_slots, fact=fact)
 
-        for claim_stmt, fact_stmt, claim_type, ground_truth in benchmark_dataset:
-            c_slots = build_structured_slots(statement=claim_stmt, claim_type=claim_type)
-            fact = Fact(id="f-eval", statement=fact_stmt, fact_type=claim_type, verification_status="DOCUMENT_VERIFIED")
-            decision = evaluate_claim_against_fact(claim_slots=c_slots, fact=fact)
-
-            pred_is_conflict = decision.status in ("CONTRADICTION", "POTENTIAL_CONFLICT")
-
-            if ground_truth == "CONFLICT":
-                if pred_is_conflict:
-                    tp += 1
+                pred_is_conflict = decision.status in ("CONTRADICTION", "POTENTIAL_CONFLICT")
+                if ground_truth == "CONFLICT":
+                    if pred_is_conflict:
+                        tp += 1
+                    else:
+                        fn += 1
                 else:
-                    fn += 1
-            else:  # NOT_CONFLICT
-                if pred_is_conflict:
-                    fp += 1
-                else:
-                    tn += 1
+                    if pred_is_conflict:
+                        fp += 1
+                    else:
+                        tn += 1
 
         total = len(benchmark_dataset)
         precision = tp / (tp + fp) if (tp + fp) > 0 else 1.0
