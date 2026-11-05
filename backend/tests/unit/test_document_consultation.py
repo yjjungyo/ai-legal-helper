@@ -645,3 +645,17 @@ def test_trace_0e4d5603_soft_landing_preserves_high_support_limited_answer(docum
     assert out["final_disposition"] == "CAUTIONARY"
     assert out["final_answer"] == limited_draft
     assert len(out["sources"]) >= 1
+
+
+def test_successful_document_repair_clears_previous_generation_error(document_state):
+    """이전 작성 실패 후 성공한 재작성은 오래된 오류 상태 때문에 차단되지 않는다."""
+    state = {**document_state, "draft_answer": "이전 초안",
+             "answer_generation_error": "TimeoutError",
+             "verification_result": {"status": "REVISE", "revision_instructions": ["근거 보완"]}}
+    with patch.object(consultation, "write_document_answer",
+                      return_value={"draft_answer": "근거를 보완한 새 답변",
+                                    "answer_source_manifest": {"content_sha256": "test"}}):
+        out = consultation.generate_answer(state, repair=True)
+    assert out["draft_answer"] == "근거를 보완한 새 답변"
+    assert out["answer_generation_error"] is None
+    assert out["revision_count"] == 1
