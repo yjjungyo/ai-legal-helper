@@ -103,17 +103,11 @@ export function renderInlineMarkdown(
 ): React.ReactNode[] {
   if (!text) return [];
 
-  // [P0-03/Gate 2] 텍스트 내 연속 쉼표(', , ,') 및 빈 괄호 사전 정규화
-  const sanitizedText = text
-    .replace(/,\s*(?:,\s*)+/g, ', ')
-    .replace(/:\s*,+\s*/g, ': ')
-    .replace(/\[\s*\]/g, '');
-
-  // 토큰 분할 정규식: **볼드**, `인라인코드`, *이탤릭*, [증거파일명], (법령명 제N조(조문제목), 파일명.pdf...) 등
+  // 법률 답변 원문을 표시 과정에서 수정하지 않는다.
   const tokenRegex = (
     /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*|\[(?:E\d{1,3}[^\]]*|[^\]\n]+\.(?:pdf|docx|txt|png|jpg|jpeg)|[^\]\n]+)\]|\([가-힣A-Za-z0-9·\s]+(?:법률|법|시행령|시행규칙)\s+제\s*\d+\s*조(?:[^()\n]|\([^()\n]*\))*\))/gi
   );
-  const parts = sanitizedText.split(tokenRegex);
+  const parts = text.split(tokenRegex);
 
   return parts.map((part, index) => {
     if (!part) return null;
@@ -166,6 +160,8 @@ export function renderInlineMarkdown(
           resolvedDocName = matchingRefs.find(({ ref }) => ref.document_name)?.ref.document_name || rawLabel;
         }
       }
+
+      if (!onEvidenceClick || !meta?.evidenceId) return <span key={index}>{part}</span>;
 
       return (
         <button
