@@ -296,6 +296,25 @@ class LawRetrievalService:
                     response.official_search_recommended = True
                     return response
                 response.index_decisions.append(decision.as_dict())
+                if decision.status == "ARTICLE_BRANCH_REVIEW_REQUIRED" and decision.mst:
+                    # Diagnostic-only branch review: do not expose a selected
+                    # MST as a verified legal source before transition review.
+                    try:
+                        temporal = self.article_temporal_fn(
+                            law_id=law_id, event_date=as_of_date,
+                            event_type=event_type, article_ids=requested_articles,
+                        )
+                        response.article_temporal_decisions.append(temporal.as_dict())
+                        response.reason_codes.extend(temporal.reason_codes)
+                    except Exception as exc:
+                        logger.warning("[LAW_RETRIEVAL] branch review unavailable type=%s",
+                                       type(exc).__name__)
+                        response.reason_codes.append("ARTICLE_BRANCH_GATE_UNAVAILABLE")
+                    response.status = LawSourceStatus.SOURCE_TEMPORAL_UNCONFIRMED
+                    response.reason_codes.extend(decision.reason_codes)
+                    response.reason_codes = list(dict.fromkeys(response.reason_codes))
+                    response.official_search_recommended = True
+                    return response
                 if decision.status != "INDEX_READY_CANDIDATE" or not decision.mst:
                     response.status = LawSourceStatus.SOURCE_VERSION_UNCONFIRMED
                     response.reason_codes.extend(decision.reason_codes)
