@@ -69,6 +69,7 @@ class LawRetrievalResponse:
     reason_codes: list[str] = field(default_factory=list)
     official_search_recommended: bool = False
     index_decisions: list[dict[str, Any]] = field(default_factory=list)
+    article_temporal_decisions: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def has_sources(self) -> bool:
@@ -144,6 +145,19 @@ def _resolve_index_locally(*, law_id: str, event_date: str, event_type: str,
         )
 
 
+def _resolve_article_temporal_locally(*, law_id: str, event_date: str,
+                                      event_type: str, article_ids: list[str]) -> Any:
+    """DB-only article and addendum gate; no remote API or model calls."""
+    from ai_legal_helper.database.session import SessionLocal
+    from ai_legal_helper.legal_knowledge.article_temporal_resolver import ArticleTemporalResolver
+
+    with SessionLocal() as session:
+        return ArticleTemporalResolver(session).resolve(
+            law_id=law_id, event_date=event_date, event_type=event_type,
+            article_ids=article_ids,
+        )
+
+
 def _resolve_catalog_locally(question: str) -> Any:
     """P2 로컬 카탈로그만 접근한다. DB 미설치 시 호출자가 기존 검색으로 복귀한다."""
     from ai_legal_helper.database.session import SessionLocal
@@ -169,6 +183,7 @@ class LawRetrievalService:
         enable_global: Optional[bool] = None,
         enable_catalog: Optional[bool] = None,
         index_fn: Optional[Callable[..., Any]] = None,
+        article_temporal_fn: Optional[Callable[..., Any]] = None,
     ):
         if retrieval_fn is None:
             from ai_legal_helper.rag.retrieval import retrieve_with_status
@@ -176,6 +191,7 @@ class LawRetrievalService:
         self.retrieval_fn = retrieval_fn
         self.catalog_fn = catalog_fn or _resolve_catalog_locally
         self.index_fn = index_fn or _resolve_index_locally
+        self.article_temporal_fn = article_temporal_fn or _resolve_article_temporal_locally
         self.enable_global = (
             os.getenv("LEGAL_GLOBAL_RETRIEVAL_ENABLED", "1") == "1"
             if enable_global is None else bool(enable_global)
@@ -249,6 +265,7 @@ class LawRetrievalService:
         # Unresolved law names can still use Vector for *candidate discovery*,
         # never as a verified legal basis.
         ready_mst: dict[str, str] = {}
+        temporal_gate_unconfirmed = False
         if selected:
             requested_articles = list(dict.fromkeys(
                 _normalized_article(x) for x in _ARTICLE_PATTERN.findall(question)
@@ -285,6 +302,26 @@ class LawRetrievalService:
                     response.official_search_recommended = True
                     return response
                 ready_mst[law_id] = decision.mst
+                # Article/date applicability is separate from index availability.
+                # Preserve the MST for filtered retrieval even when the
+                # applicability gate requires review; never promote to PASS.
+                try:
+                    temporal = self.article_temporal_fn(
+                        law_id=law_id, event_date=as_of_date,
+                        event_type=event_type, article_ids=requested_articles,
+                    )
+                    response.article_temporal_decisions.append(temporal.as_dict())
+                    if temporal.status != "TEMPORAL_REVIEW_REQUIRED":
+                        temporal_gate_unconfirmed = True
+                        response.reason_codes.extend(temporal.reason_codes)
+                    else:
+                        temporal_gate_unconfirmed = True
+                        response.reason_codes.extend(temporal.reason_codes)
+                except Exception as exc:
+                    logger.warning("[LAW_RETRIEVAL] article temporal gate unavailable type=%s",
+                                   type(exc).__name__)
+                    temporal_gate_unconfirmed = True
+                    response.reason_codes.append("ARTICLE_TEMPORAL_GATE_UNAVAILABLE")
 
         collections = []
         if self.enable_global:
@@ -473,7 +510,14 @@ class LawRetrievalService:
         )
         # 인프라 오류는 '법령이 없다'가 아니므로 승인형 추가검색을 자동 권하지 않는다.
         if response.status == LawSourceStatus.RETRIEVAL_ERROR or failures:
-            response.official_search_recommended = False
+            if temporal_gate_unconfirmed and response.status not in (
+            LawSourceStatus.RETRIEVAL_ERROR, LawSourceStatus.SOURCE_MISSING,
+            LawSourceStatus.SOURCE_VERSION_UNCONFIRMED,
+        ):
+            response.status = LawSourceStatus.SOURCE_TEMPORAL_UNCONFIRMED
+            response.reason_codes.append("ARTICLE_TEMPORAL_APPLICABILITY_NOT_CONFIRMED")
+        response.reason_codes = list(dict.fromkeys(response.reason_codes))
+        response.official_search_recommended = False
         logger.info(
             "[LAW_RETRIEVAL] status=%s category=%s source_count=%d "
             "catalog=%s collection_statuses=%s reason_codes=%s",
