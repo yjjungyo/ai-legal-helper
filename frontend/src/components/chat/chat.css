@@ -897,7 +897,7 @@
 .chat-progress-card { padding: 16px 18px; box-shadow: none; }
 .chat-progress-step-item.completed { background: #f8fbfa; border-color: #e4efe9; }
 .chat-progress-steps-list { gap: 6px; }
-.chat-legal-section.action-section { border: 0; }
+/* Action sections use the shared UI-02 border rule below. */
 .chat-presentation-disclosure { margin: 12px 0 0; font-size: .88em; box-shadow: none; }
 @media (max-width: 768px) {
   .case-chat-stream { padding: 16px 10px; }
