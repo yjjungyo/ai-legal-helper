@@ -38,6 +38,8 @@ def test_known_law_and_event_date_create_preflight_plan_without_network():
     out = build_temporal_search_plan(
         "2026년 11월 1일 가상 계약법 시행령에 따라 계약 체결했습니다.",
         resolver_fn=lambda _: _catalog(),
+        event_date="2026-11-01",
+        event_type="CONTRACT_SIGNED",
     )
     assert out["status"] == "READY"
     assert out["as_of_date"] == "2026-11-01"
@@ -63,6 +65,8 @@ def test_catalog_failure_does_not_call_openlaw_while_planning():
     out = build_temporal_search_plan(
         "2026년 11월 1일 가상 계약법 시행령 계약 체결",
         resolver_fn=outage,
+        event_date="2026-11-01",
+        event_type="CONTRACT_SIGNED",
     )
     assert out["status"] == "SKIP"
     assert out["reason_code"] == "CATALOG_UNAVAILABLE"

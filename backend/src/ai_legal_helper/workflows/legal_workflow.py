@@ -367,10 +367,17 @@ def route_condition(state: LegalState) -> str:
     - ROUTER_ERROR: 기술적 오류로 시스템 오류 안내 노드('routing_exit')로 전이.
     """
     from ai_legal_helper.agents.router import RouterStatus
-    # 문서 상담도 Router 실패 시 임의의 법률 분야로 진행하지 않는다.
-    # 분류 성공일 때만 검색 계획을 수립하며 실패 시 기존 안전 종료 경로로 보낸다.
+    # Explicitly selected document consultation already has approved evidence.
+    # Router category uncertainty must not discard verified source documents.
+    # The document writer/verifier performs the grounding checks separately.
     if state.get("answer_mode") == DOCUMENT_MODE:
-        return "plan" if state.get("router_status") == RouterStatus.CLASSIFIED.value and state.get("categories") else "routing_exit"
+        documents = (state.get("case_evidence_briefing") or {}).get("source_documents") or []
+        has_approved = any(
+            isinstance(doc, dict) and doc.get("review_status") == "APPROVED"
+            and bool(str(doc.get("content") or "").strip())
+            for doc in documents
+        )
+        return "plan" if has_approved else "routing_exit"
     status = state.get("router_status")
     if status == RouterStatus.CLASSIFIED.value or (not status and state.get("categories")):
         return "plan"

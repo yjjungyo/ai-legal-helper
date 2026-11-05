@@ -201,7 +201,10 @@ def test_06_already_retrieved_statute_not_duplicated():
         "statute_search_history": [],
     }
     pending = pending_searches(state)
-    assert len(pending) == 0, "이미 확보된 조문은 pending_searches에 담기지 않아야 함"
+    # A source without a validated applicability date is not verified/usable.
+    # It must remain searchable rather than be silently treated as grounded.
+    assert len(pending) == 1
+    assert pending[0]["articles"] == ["제3조"]
 
 
 def test_07_max_articles_per_law_cap_preserves_foundational(mock_law_api):
