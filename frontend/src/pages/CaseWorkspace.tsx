@@ -119,6 +119,8 @@ function EditCaseModal({ isOpen, activeCase, onClose, onSuccess }: EditCaseModal
                 value={caseType}
                 onChange={(e) => setCaseType(e.target.value)}
               >
+                <option value="AI_AUTO">AI 자동 분류</option>
+                {caseType && !['AI_AUTO', '주택임대차', '상가임대차', '민사', '노동', '소비자', '회사'].includes(caseType) && <option value={caseType}>{caseType}</option>}
                 <option value="주택임대차">주택임대차</option>
                 <option value="상가임대차">상가임대차</option>
                 <option value="민사">민사</option>
