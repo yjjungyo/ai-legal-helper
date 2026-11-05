@@ -654,7 +654,7 @@ def _should_use_llm_verification(explicit_flag: Optional[bool]) -> bool:
     """Stage 3 선택적 LLM 검증 활성화 여부를 결정한다."""
     if explicit_flag is not None:
         return explicit_flag
-    env_val = os.getenv("CONFLICT_LLM_VERIFICATION_ENABLED", "false").strip().lower()
+    env_val = os.getenv("CONFLICT_LLM_VERIFICATION_ENABLED", "true").strip().lower()
     return env_val in ("1", "true", "yes", "on")
 
 
@@ -1329,11 +1329,13 @@ def evaluate_claim_against_fact(
                     source_span_ids=spans,
                 )
 
+            # Heuristic polarity/predicate matches alone cannot prove a
+            # real contradiction; require independent semantic verification.
             return ConflictDecision(
                 claim_id=claim_id,
                 target_fact_id=fact.id,
-                status="CONTRADICTION",
-                reason_code="OPPOSITE_POLARITY_ON_SAME_SUBJECT",
+                status="INSUFFICIENT_INFORMATION",
+                reason_code="POLARITY_REQUIRES_SEMANTIC_VERIFICATION",
                 explanation=(
                     f"동일 사실 대상({', '.join(sorted(shared_tokens)[:3])})에 대해 "
                     "긍정 진술과 부정 진술이 동시에 참일 수 없어 상충합니다."
