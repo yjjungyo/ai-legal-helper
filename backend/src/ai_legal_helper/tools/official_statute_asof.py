@@ -290,6 +290,17 @@ def search_official_statutes_by_date(
             logger.warning("[OFFICIAL_P4] 시행일 연혁 미확인 | law=%s status=%s reason=%s",
                            target.law_name, lookup.status, lookup.reason_code)
             continue
+        # The call site is reached only after existing HILT approval. Cache the
+        # complete eflaw history independently of the immediate article response.
+        # DB failures must not suppress already-authorized official retrieval.
+        from ai_legal_helper.legal_knowledge.history_snapshot import store_approved_lookup
+        snapshot_result = store_approved_lookup(lookup)
+        if diagnostic is not None:
+            diagnostic.setdefault("history_cache", []).append({
+                "law_name": target.law_name,
+                "status": snapshot_result.get("status"),
+                "reason_code": snapshot_result.get("reason_code"),
+            })
         version_sources: list[dict[str, Any]] = []
         okay = True
         for version in lookup.candidates:
