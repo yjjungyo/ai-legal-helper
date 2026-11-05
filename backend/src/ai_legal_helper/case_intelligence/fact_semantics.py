@@ -889,47 +889,40 @@ def extract_semantic_fact(
 # ==============================================================================
 
 def _enrich_proposition_speech_act(prop: SemanticProposition) -> SemanticProposition:
-    """원문에서 화행을 보완한다. SemanticFact→Proposition 경로에서도 동일한 규칙 사용.
+    """Enrich speech act through grounded meaning rather than regex patterns.
 
-    '반환/지급'이라는 공통 단어보다 '문의·제안·거절·계획'이라는 발언의
-    성격을 우선한다. 실제 지급과 지급 방안 제안은 같은 사건이 아니다.
-    부정된 제안/약속은 긍정 제안과의 대립을 가릴 수 있으므로 제안으로
-    승격하지 않는다. 특정 사건·인명·금액에 의존하지 않는다.
+    The result is tagged UNCONFIRMED if the model or source is unavailable,
+    allowing conflict verification to withhold an alleged contradiction.
     """
-    compact = re.sub(r"\s+", "", prop.statement or "")
-
-    # 제안/거절/질문은 내용에 포함된 '반환'이라는 동사만으로 실제 이행으로 해석하지 않는다.
-    if re.search(r"(?:동의할수없|동의하기어렵|동의하지않|수락하지않|승낙하지않|"
-                 r"받아들일수없|받아들이지않|거절하|거부하|반대하)", compact):
-        prop.speech_act = "REJECTION"
-    elif re.search(r"(?:방안을제안|제안하였|제안했다|제안함|조건을제안|"
-                   r"제시하였|제시했다|분할반환을제시)", compact) and not re.search(
-        r"(?:제안하지않|제안한적없|제안을거절|제안하지못|제시하지않)", compact
-    ):
-        prop.speech_act = "PROPOSAL"
-    elif re.search(r"(?:문의하였|문의했다|문의했|문의하였다|가능한지문의|"
-                   r"가능한지물|물어보았|질문하였|질문했다)", compact):
-        prop.speech_act = "QUESTION"
-    elif re.search(r"(?:요청하였|요청했다|요구하였|요구했다|촉구하였|"
-                   r"청구하였|달라고요구|해달라고요구)", compact):
-        prop.speech_act = "REQUEST"
-    elif re.search(r"(?:동의하였|동의했다|동의하였다|수락하였|"
-                   r"수락했다|합의하였|승낙하였)", compact):
-        prop.speech_act = "ACCEPTANCE"
-    elif re.search(r"(?:약속하였|약속했다|확약하였|확약했다)", compact):
-        prop.speech_act = "PROMISE"
-    elif re.search(r"(?:찾겠다는|찾겠다고|모색하겠|진행하겠다는|진행하겠다고|"
-                   r"추진하겠다는|추진하겠다고|계획이라고밝혔|"
-                   r"절차를먼저진행|방법을찾겠|방안을찾겠)", compact):
-        prop.speech_act = "PLAN"
-    elif re.search(r"(?:통보하였|통지하였|고지하였|알렸)", compact):
-        prop.speech_act = "NOTICE"
-
-    if prop.speech_act in ("PROPOSAL", "REJECTION", "QUESTION", "REQUEST",
-                           "PLAN", "ACCEPTANCE", "PROMISE"):
-        # 이것은 지급·이행 완료가 아니라 의사표시/계획을 보고한 사실이다.
-        # 원본 서술 극성은 유지한다(예: '동의할 수 없다'는 실제 지급 부정 아님).
-        prop.provenance = {**(prop.provenance or {}), "speech_act_enriched": True}
+    from ai_legal_helper.case_intelligence.semantic_judgment import classify_statement
+    provenance = dict(prop.provenance or {})
+    structured = provenance.get("verified_speech_act")
+    allowed = ("STATEMENT", "REQUEST", "PROPOSAL", "ACCEPTANCE", "REJECTION",
+               "NOTICE", "QUESTION", "PROMISE", "PLAN")
+    if structured in allowed:
+        prop.speech_act = structured
+        provenance["speech_act_review_status"] = "STRUCTURED_VERIFIED"
+    else:
+        result = classify_statement(
+            prop.statement,
+            task="SPEECH_ACT_AND_EXECUTION_STATUS",
+            labels=allowed,
+            context=(
+                "문장 전체의 실제 화행을 분류하세요. "
+                "지급 제안/분할 반환 제안은 실제 반환 완료가 아니며, "
+                "지급이 어렵다는 진술은 거절이나 미변제의 확정과 다릅니다. "
+                "발언의 전언/조건/부정 범위를 고려하세요."
+            ),
+        )
+        if result.label != "UNKNOWN":
+            prop.speech_act = result.label
+        else:
+            # Ambiguous meaning must not be upgraded to completed performance.
+            prop.speech_act = "STATEMENT"
+        provenance["speech_act_review_status"] = result.status
+        if result.evidence_quote:
+            provenance["speech_act_evidence_quote"] = result.evidence_quote
+    prop.provenance = provenance
     return prop
 
 
@@ -961,6 +954,10 @@ def extract_semantic_proposition(
 
     # SemanticFact→Proposition과 동일한 화행 보완 로직을 공유한다.
     _enrich_proposition_speech_act(prop)
+    if prop.speech_act in ("PROPOSAL", "PLAN", "REQUEST", "QUESTION", "PROMISE"):
+        # Never infer actual performance from a stated plan or proposal.
+        if prop.temporal_type == "OCCURRED_AT" and prop.event_type in ("PAYMENT", "LOAN"):
+            prop.temporal_type = "REPORTED_AT"
 
     # 2. 인식 상태(Epistemic Status) 및 정보 부족 분리 (CASE-01, CASE-05, CASE-06)
     if any(kw in compact for kw in (
