@@ -407,7 +407,8 @@ def extract_claims_from_evidence(db: Session, doc_id: str) -> bool:
                 source_span_ids=filtered_span_ids,
                 llm_suggested_fact_id=getattr(claim_data, "contradicts_fact_id", None),
                 fact_doc_names=fact_doc_names,
-                enable_llm_verification=None,
+                enable_llm_verification=False,
+                claim_slots=claim_slots,
             )
             verified_contradictions = eval_res["contradictions"]
             potential_conflicts = eval_res.get("potential_conflicts", [])

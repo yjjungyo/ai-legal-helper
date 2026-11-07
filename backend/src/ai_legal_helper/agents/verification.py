@@ -40,7 +40,7 @@ CITATION_PATTERN = re.compile(
 # 공식 법령 조문 인용 패턴 (예: (주택임대차보호법 제6조의2(묵시적 갱신의 경우 계약의 해지)), (민법 제623조), 민법 제6조)
 # [P0-VER-01] 괄호 유무, 조문제목 괄호 및 조사 접미사와 관계없이 실제 본문에서 언급·인용된 법령 조문이 누락 없이 검색 출처와 매칭되도록 보강한다.
 STATUTE_CITATION_PATTERN = re.compile(
-    r"(?:\(+\s*|(?<![가-힣]))([가-힣]+(?:법률|법|시행령|시행규칙))\s+(제\s*\d+\s*조(?:\s*의\s*\d+)?)(?:\s*\([^)\n]{1,60}\))?(?:\s*\)+|(?=[은는이가의을를에로서와과,.:\-\(\)\s\n]|\Z))",
+    r"(?:\(+\s*|(?<![가-힣]))([가-힣]+(?:법률|법|시행령|시행규칙))\s+(제\s*\d+\s*조(?:\s*의\s*\d+)?)(?!\s*의\s*\d+)(?:\s*\([^)\n]{1,60}\))?(?:\s*\)+|(?=[은는이가의을를에로서만도상중에서까지부터제,.:\-\(\)\s\n]|\Z))",
     re.IGNORECASE,
 )
 # [E05_퇴거_및_보증금_반환_요청_문자.txt] 형태의 전체 파일명 대괄호 인용 패턴
@@ -1536,7 +1536,8 @@ def run_verification(
             and not result.contradictions
             and not unregistered_evidences
         )
-        if not require_question_coverage and has_supported_core_claims and has_no_defects and result.status == "REVISE":
+        coverage_satisfied = (not require_question_coverage) or (coverage_complete and consistency_complete)
+        if coverage_satisfied and has_supported_core_claims and has_no_defects and result.status == "REVISE":
             if result.reason_code in ("LEGAL_SOURCE_INSUFFICIENT", "ANSWER_REVISION_REQUIRED", "CASE_EVIDENCE_MISSING", "NONE"):
                 logger.info("[VERIFICATION] 모든 핵심 주장이 검색 출처에 의해 온전히 뒷받침(SUPPORTED 100%)되므로 PASS로 확정합니다.")
                 result.status = "PASS"

@@ -79,6 +79,22 @@ export function splitAnswerForDisplay(answer: string): PresentationBlock[] {
 }
 
 
+/**
+ * 핵심 요약 카드(lead) 말미에 단순 나열된 증거 파일 목록이나 괄호 묶음 출처를 정제하여
+ * 사용자가 시각적 노이즈 없이 정갈한 자연어 요약 결론만 읽을 수 있도록 한다.
+ * (하단의 '전체 법률 분석' 원문에는 전체 출처가 그대로 유지된다)
+ */
+export function cleanLeadCitationNoise(text: string): string {
+  let s = text.trim();
+  // 1. 괄호로 둘러싸인 말미 증거/법령 일괄 나열 제거: ([01_...txt], ..., 주택임대차보호법 ...)
+  s = s.replace(/\s*\([^\)]*\[?[^\]\(\)\r\n]+\.(?:txt|pdf|docx|png|jpg|jpeg)\]?[^\)]*\)\.?\s*$/i, '.');
+  // 2. 말미에 연속된 대괄호 증거 파일 목록 제거: [01_...txt] [02_...txt]
+  s = s.replace(/(?:\s*\[[^\]\r\n]+\.(?:txt|pdf|docx|png|jpg|jpeg)\])+\.?\s*$/i, '.');
+  // 연속 마침표 정리 (.. -> .)
+  s = s.replace(/\.{2,}/g, '.');
+  return s.trim();
+}
+
 /** 입력 문자열과 정확히 동일한 전체 답변만 구성한다. */
 export function buildConsultationDigest(presentation: Pick<ConsultationPresentation, 'blocks'>): ConsultationDigest {
   const blocks = presentation.blocks || [];
@@ -96,6 +112,10 @@ export function buildConsultationDigest(presentation: Pick<ConsultationPresentat
       const body = firstLineEnd < 0 ? '' : explicit.markdown.slice(firstLineEnd).trim();
       lead = body || null;
     }
+  }
+
+  if (lead) {
+    lead = cleanLeadCitationNoise(lead);
   }
 
   const sections: PreviewSection[] = [];

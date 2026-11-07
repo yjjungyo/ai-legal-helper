@@ -94,9 +94,9 @@ test('초기 화면은 요약을 표시하고 전체 분석은 기본 닫힘 det
   assert.match(html, /이번 상담에서 달라진 점/);
   assert.match(html, /우선 확인할 사항/);
   assert.match(html, /판단 전 주의할 점/);
-  assert.match(html, /<details class="chat-digest-full-answer">/);
-  assert.doesNotMatch(html, /<details[^>]*\sopen=/);
-  assert.match(html, /전체 법률 분석 자세히 보기/);
+  assert.match(html, /<details class="chat-digest-full-answer"/);
+  assert.match(html, /open/);
+  assert.match(html, /전체 법률 분석 · 조건 및 주의사항/);
   assert.match(html, /주택임대차보호법의 구체적 요건/);
 });
 
@@ -104,7 +104,7 @@ test('핵심 결론을 뽑을 수 없는 답변은 원문 전체를 그대로 �
   const p = {...sample(),blocks:[{block_id:'B001',kind:'SECTION',title:'관련 법률',markdown:'### 관련 법률\n법률 내용.'}]};
   const html = renderToStaticMarkup(React.createElement(VerifiedPresentationView,{presentation:p}));
   assert.match(html,/chat-verified-fallback/);
-  assert.doesNotMatch(html,/전체 법률 분석 자세히 보기/);
+  assert.doesNotMatch(html,/전체 법률 분석/);
   assert.match(html,/법률 내용/);
 });
 
@@ -119,7 +119,7 @@ test('조건부 상담에서도 원문을 훼손하지 않고 핵심/상세 레�
   }));
   assert.match(html, /조건부 판단입니다/);
   assert.match(html, /우선 확인할 사항/);
-  assert.match(html, /전체 법률 분석 자세히 보기/);
+  assert.match(html, /전체 법률 분석 · 조건 및 주의사항/);
   assert.match(html, /상담 답변 원문 발췌/);
   assert.doesNotMatch(html, /검증된 답변 원문 발췌/);
 });
@@ -131,4 +131,28 @@ test('조건부 답변에서 증거 파일명을 제목으로 오인하지 않�
   assert.equal(blocks[0].kind, 'LEAD');
   assert.equal(blocks[1].title, '다음 행동');
   assert.equal(blocks.map(b => b.markdown).join(''), answer);
+});
+
+test('상담 핵심 답변 카드에 말미 증거 파일 목록이 노출되지 않도록 정제한다', () => {
+  const leadWithTrailingFiles =
+    '보증금 반환 청구액은 1억 7천만 원이며 등기 전 이사는 위험합니다. ' +
+    '[01_주택임대차계약_주요내용.txt] [03_계약종료_통지_문자대화_202606.txt] [04_최초보증금_임차인송금내역.txt]';
+  const answer = `${leadWithTrailingFiles}\n\n### 지금 바로 확인할 사항\n- 등기부 재열람\n`;
+  const result = buildConsultationDigest({ blocks: splitAnswerForDisplay(answer) });
+
+  // 상담 핵심 답변(lead) 카드에서는 말미 파일 목록이 제거되어 깨끗한 결론 문장만 남는다.
+  assert.equal(result.lead, '보증금 반환 청구액은 1억 7천만 원이며 등기 전 이사는 위험합니다.');
+  // 전체 법률 분석 원문(fullAnswer)에는 원본 파일명이 완전히 보존된다.
+  assert.ok(result.fullAnswer.includes('[01_주택임대차계약_주요내용.txt]'));
+});
+
+test('상담 핵심 답변 카드에서 괄호 묶음 출처 목록도 깔끔하게 정제한다', () => {
+  const leadWithParenthesized =
+    '임차권등기가 실제로 완료된 뒤 이사하면 대항력은 유지됩니다 ' +
+    '([01_계약서.txt], [02_전입.txt], 주택임대차보호법 제3조, 제3조의2).';
+  const answer = `${leadWithParenthesized}\n\n### 확인\n- 내용\n`;
+  const result = buildConsultationDigest({ blocks: splitAnswerForDisplay(answer) });
+
+  assert.equal(result.lead, '임차권등기가 실제로 완료된 뒤 이사하면 대항력은 유지됩니다.');
+  assert.ok(result.fullAnswer.includes('[01_계약서.txt]'));
 });

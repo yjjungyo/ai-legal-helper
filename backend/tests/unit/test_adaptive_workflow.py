@@ -153,7 +153,7 @@ def test_intent_analysis_node():
 
     res = intent_analysis_node(state)
     assert res["intent"] == ConsultationIntent.FACT_CLARIFICATION.value
-    assert "2022년 5월 1일" in res["resolved_query"]
+    assert ("2022년 5월 1일" in res["resolved_query"] or "2022-05-01" in res["resolved_query"])
     assert "intent_decision" in res
     assert res["intent_decision"]["intent"] == ConsultationIntent.FACT_CLARIFICATION.value
 
@@ -179,3 +179,110 @@ def test_adaptive_graph_execution_general_conversation():
     # 복합 Specialist나 분석 결과가 없어야 함
     assert output.get("results") is None or output.get("results") == {}
 
+
+
+def test_followup_action_node_document_mode_manifest():
+    """DOCUMENT_MODE 환경에서 followup_action_node가 answer_source_manifest를 정상 산출하는지 검증한다."""
+    mock_source = {
+        "source_id": "STATUTE:주택임대차보호법_제3조의3",
+        "statute_name": "주택임대차보호법",
+        "article": "제3조의3",
+        "content": "임차인은 임대차가 끝난 후 보증금을 반환받지 못한 경우 임차권등기명령을 신청할 수 있다.",
+    }
+    state = {
+        "question": "이제 제가 취해야 할 구체적인 조치와 순서를 알려주세요.",
+        "answer_mode": "DOCUMENT_GROUNDED",
+        "case_evidence_briefing": {
+            "case_id": "case-test-123",
+            "source_documents": [
+                {
+                    "evidence_id": "ev-01",
+                    "document_name": "E01_임대차계약서.txt",
+                    "content": "보증금 3억 원, 계약기간 2년",
+                    "review_status": "APPROVED",
+                }
+            ],
+        },
+        "retrieved_sources": [mock_source],
+        "conversation_context": {
+            "conversation_id": "conv-test-123",
+            "previously_cited_sources": [mock_source],
+        },
+    }
+
+    mock_llm_response = MagicMock()
+    mock_llm_response.content = (
+        "[1. 핵심 결론 및 우선순위 요약]\n"
+        "임차권등기명령을 신청하여 대항력을 유지해야 합니다.\n\n"
+        "[2. 단계별 구체적 실행 조치]\n"
+        "1단계: 내용증명 발송\n2단계: 임차권등기명령 신청\n\n"
+        "[3. 실무상 유의사항]\n"
+        "등기 완료 전에는 이사하지 마십시오."
+    )
+
+    with patch("ai_legal_helper.workflows.legal_workflow.get_llm") as mock_get_llm:
+        mock_llm = MagicMock()
+        mock_llm.invoke.return_value = mock_llm_response
+        mock_get_llm.return_value = mock_llm
+
+        res = followup_action_node(state)
+
+    assert res["draft_answer"] == mock_llm_response.content
+    assert res["answer_source_manifest"] is not None
+    assert "content_sha256" in res["answer_source_manifest"]
+    assert res["answer_generation_error"] is None
+
+
+def test_followup_action_verification_avoids_coverage_lock():
+    """후속 실무 행동 가이드는 타임라인·의사표시 정합성 강제에 걸리지 않고 원문 대조가 정상 진행되는지 검증한다."""
+    from ai_legal_helper.workflows.document_consultation import verify_answer
+
+    mock_source = {
+        "source_id": "STATUTE:주택임대차보호법_제3조의3",
+        "statute_name": "주택임대차보호법",
+        "article": "제3조의3",
+        "content": "임차인은 임대차가 끝난 후 보증금을 반환받지 못한 경우 임차권등기명령을 신청할 수 있다.",
+    }
+    from ai_legal_helper.agents.document_answer import format_grounding_sources
+    _, manifest = format_grounding_sources([mock_source])
+
+    state = {
+        "question": "이제 제가 취해야 할 구체적인 조치와 순서를 알려주세요.",
+        "intent": "FOLLOWUP_ACTION",
+        "answer_mode": "DOCUMENT_GROUNDED",
+        "draft_answer": "[1. 핵심 결론]\n임차권등기를 신청하세요.\n[2. 실행 조치]\n1단계: 신청서 접수",
+        "answer_source_manifest": manifest,
+        "answer_generation_error": None,
+        "retrieved_sources": [mock_source],
+        "case_evidence_briefing": {
+            "case_id": "case-test-123",
+            "source_documents": [],
+        },
+    }
+
+    mock_verification_result = {
+        "status": "PASS",
+        "reason_code": "NONE",
+        "claims": [
+            {
+                "claim": "임차권등기를 신청하세요.",
+                "claim_type": "RECOMMENDATION",
+                "grounding_status": "SUPPORTED",
+                "source_ids": ["STATUTE:주택임대차보호법_제3조의3"],
+            }
+        ],
+        "warnings": [],
+    }
+
+    with patch("ai_legal_helper.workflows.document_consultation.validate_document_snapshot"):
+        with patch("ai_legal_helper.agents.verification.run_verification") as mock_run_ver:
+            mock_run_ver.return_value = mock_verification_result
+
+            res = verify_answer(state)
+
+            # require_question_coverage가 False로 전달되어 5단계 정밀 의견서 타임라인 강제가 완화되었는지 검증
+            mock_run_ver.assert_called_once()
+            _, kwargs = mock_run_ver.call_args
+            assert kwargs.get("require_question_coverage") is False
+            assert res["verification_result"]["status"] == "PASS"
+            assert res["verification_result"]["reason_code"] != "VERIFICATION_ERROR"

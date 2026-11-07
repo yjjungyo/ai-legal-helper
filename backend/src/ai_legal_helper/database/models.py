@@ -142,6 +142,11 @@ class Fact(Base):
     occurred_at = Column(String, nullable=True)  # 발생 시점 명시 (문자열)
     verification_status = Column(String, default="UNVERIFIED")  # UNVERIFIED, VERIFIED, DISPUTED
     created_at = Column(DateTime, default=get_kst_now)
+    subject_key = Column(String, nullable=True)  # 비교 대상 주체·계약·항목 키
+    predicate_key = Column(String, nullable=True)  # 비교 대상 속성·행위 의미 키
+    scope = Column(String, default="CASE_GLOBAL", nullable=True)  # DOCUMENT_LOCAL, CASE_GLOBAL
+    temporal_context = Column(String, nullable=True)  # 적용 시점·기간·이벤트 역할
+    structured_slots = Column(JSON, nullable=True)  # 정규화된 금액·날짜 역할 및 법률적 의미 속성 영속 데이터
 
     case = relationship("Case", back_populates="facts")
     adjudications = relationship("FactAdjudication", back_populates="fact", cascade="all, delete-orphan")

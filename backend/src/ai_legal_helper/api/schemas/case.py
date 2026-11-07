@@ -37,6 +37,11 @@ class FactSchema(BaseModel):
     source_type: str = Field("USER_CLAIM")
     occurred_at: Optional[str] = Field(None, description="발생 시점 문자열")
     verification_status: str = Field("UNVERIFIED")
+    subject_key: Optional[str] = Field(None, description="비교 대상 주체·계약 키")
+    predicate_key: Optional[str] = Field(None, description="비교 대상 속성·행위 의미 키")
+    scope: Optional[str] = Field("CASE_GLOBAL", description="적용 범위")
+    temporal_context: Optional[str] = Field(None, description="적용 시점·기간 역할")
+    structured_slots: Optional[dict] = Field(None, description="영속화된 정규화 의미 슬롯 데이터")
 
 
 class EventSchema(BaseModel):

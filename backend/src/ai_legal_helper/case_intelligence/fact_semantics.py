@@ -888,21 +888,31 @@ def extract_semantic_fact(
 # 3-1. 사실 명제 추출 함수 (extract_semantic_proposition)
 # ==============================================================================
 
-def _enrich_proposition_speech_act(prop: SemanticProposition) -> SemanticProposition:
-    """Enrich speech act through grounded meaning rather than regex patterns.
+def _enrich_proposition_speech_act(
+    prop: SemanticProposition,
+    *,
+    allow_llm: bool = False,
+) -> SemanticProposition:
+    """사실 진술의 화행(Speech Act)을 0ms에 순수 규칙 및 기저장된 구조화 슬롯으로 분류한다 (LLM 0회).
 
-    The result is tagged UNCONFIRMED if the model or source is unavailable,
-    allowing conflict verification to withhold an alleged contradiction.
+    반복 트랜잭션(승인, 상충 비교, Reconcile, 감사 로그)에서 LLM N+1 연쇄 호출을 원천 방지하며,
+    '반환/지급'이라는 공통 단어보다 '문의·제안·거절·계획'이라는 발언의 성격을 우선한다.
     """
-    from ai_legal_helper.case_intelligence.semantic_judgment import classify_statement
     provenance = dict(prop.provenance or {})
     structured = provenance.get("verified_speech_act")
-    allowed = ("STATEMENT", "REQUEST", "PROPOSAL", "ACCEPTANCE", "REJECTION",
-               "NOTICE", "QUESTION", "PROMISE", "PLAN")
+    allowed = (
+        "STATEMENT", "REQUEST", "PROPOSAL", "ACCEPTANCE", "REJECTION",
+        "NOTICE", "QUESTION", "PROMISE", "PLAN",
+    )
     if structured in allowed:
         prop.speech_act = structured
         provenance["speech_act_review_status"] = "STRUCTURED_VERIFIED"
-    else:
+        prop.provenance = provenance
+        return prop
+
+    # 1. allow_llm=True로 명시적으로 요청한 경우에만 LLM 호출
+    if allow_llm:
+        from ai_legal_helper.case_intelligence.semantic_judgment import classify_statement
         result = classify_statement(
             prop.statement,
             task="SPEECH_ACT_AND_EXECUTION_STATUS",
@@ -917,14 +927,71 @@ def _enrich_proposition_speech_act(prop: SemanticProposition) -> SemanticProposi
         if result.label != "UNKNOWN":
             prop.speech_act = result.label
         else:
-            # Ambiguous meaning must not be upgraded to completed performance.
             prop.speech_act = "STATEMENT"
         provenance["speech_act_review_status"] = result.status
         if result.evidence_quote:
             provenance["speech_act_evidence_quote"] = result.evidence_quote
+        prop.provenance = provenance
+        return prop
+
+    # 2. 런타임/승인/비교 루프 기본값 (LLM 0회, 0ms 고속 정밀 정규식 판별)
+    compact = re.sub(r"\s+", "", prop.statement or "")
+
+    if re.search(
+        r"(?:동의할수없|동의하기어렵|동의하지않|수락하지않|승낙하지않|"
+        r"받아들일수없|받아들이지않|거절하|거부하|반대하)",
+        compact,
+    ):
+        prop.speech_act = "REJECTION"
+    elif re.search(
+        r"(?:방안을제안|제안하였|제안했다|제안함|조건을제안|"
+        r"제시하였|제시했다|분할반환을제시)",
+        compact,
+    ) and not re.search(
+        r"(?:제안하지않|제안한적없|제안을거절|제안하지못|제시하지않)", compact
+    ):
+        prop.speech_act = "PROPOSAL"
+    elif re.search(
+        r"(?:문의하였|문의했다|문의했|문의하였다|가능한지문의|"
+        r"가능한지물|물어보았|질문하였|질문했다)",
+        compact,
+    ):
+        prop.speech_act = "QUESTION"
+    elif re.search(
+        r"(?:요청하였|요청했다|요구하였|요구했다|촉구하였|"
+        r"청구하였|달라고요구|해달라고요구)",
+        compact,
+    ):
+        prop.speech_act = "REQUEST"
+    elif re.search(
+        r"(?:동의하였|동의했다|동의하였다|수락하였|"
+        r"수락했다|합의하였|승낙하였)",
+        compact,
+    ):
+        prop.speech_act = "ACCEPTANCE"
+    elif re.search(
+        r"(?:약속하였|약속했다|확약하였|확약했다)",
+        compact,
+    ):
+        prop.speech_act = "PROMISE"
+    elif re.search(
+        r"(?:찾겠다는|찾겠다고|모색하겠|진행하겠다는|진행하겠다고|"
+        r"추진하겠다는|추진하겠다고|계획이라고밝혔|"
+        r"절차를먼저진행|방법을찾겠|방안을찾겠)",
+        compact,
+    ):
+        prop.speech_act = "PLAN"
+    elif re.search(
+        r"(?:통보하였|통지하였|고지하였|알렸)",
+        compact,
+    ):
+        prop.speech_act = "NOTICE"
+    else:
+        prop.speech_act = "STATEMENT"
+
+    provenance["speech_act_review_status"] = "RULE_VERIFIED"
     prop.provenance = provenance
     return prop
-
 
 def extract_semantic_proposition(
     statement: str,

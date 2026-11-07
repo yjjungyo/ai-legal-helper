@@ -38,7 +38,12 @@ _ARTICLE_RE = re.compile(r"제\s*(\d+)\s*조(?:\s*의\s*(\d+))?")
 
 
 def _label(node: Any) -> str | None:
-    """법제처 조문단위의 번호와 조가지번호로 고유 조문 식별자 구성."""
+    """법제처 조문단위의 번호와 조가지번호로 고유 조문 식별자를 구성한다.
+
+    편·장·절 구분 표제어(전문)는 본 조문이 아니므로 식별 대상에서 제외한다.
+    """
+    if (node.findtext("조문여부") or "").strip() == "전문":
+        return None
     number = (node.findtext("조문번호") or "").strip()
     if not number.isdigit():
         return None

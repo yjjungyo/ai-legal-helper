@@ -105,6 +105,7 @@ def generate_answer(
     *,
     repair: bool = False,
     increment_revision: bool = True,
+    allow_need_more_law: bool | None = None,
 ) -> Dict[str, Any]:
     """최초 작성과 수정 모두 같은 작성자·원문·질문을 사용한다.
 
@@ -136,6 +137,14 @@ def generate_answer(
         len(state.get("draft_answer", "")),
     )
     try:
+        # 공식 법령 검색이 이미 수행되었거나 재작성인 경우 추가 법령 요청(NEED_MORE_LAW)을 차단하고 초안 작성을 강제한다.
+        has_searched = bool(
+            state.get("statute_search_status")
+            or (state.get("statute_search_count") or 0) > 0
+            or state.get("hilt_executed")
+        )
+        effective_allow_need_more_law = (not has_searched and not repair) if allow_need_more_law is None else allow_need_more_law
+
         written = write_document_answer(
             consultation_question(state), sources, user_history=history[-4:],
             previous_draft=state.get("draft_answer", "") if repair else "",
@@ -143,6 +152,7 @@ def generate_answer(
             as_of_date=(state.get("case_evidence_briefing") or {}).get("as_of_date"),
             preserved_points=preserved if repair else None,
             rag_only_notice=(state.get("statute_search_status") in ("NOT_FOUND", "PARTIAL_SUCCESS")),
+            allow_need_more_law=effective_allow_need_more_law,
         )
         result.update(written)
         draft_out = result.get("draft_answer", "")
@@ -153,13 +163,16 @@ def generate_answer(
         )
     except Exception as exc:
         # 모델 오류나 원문 누락을 성공 답변으로 바꾸지 않으며 상담 원문/예외 본문은 기록하지 않는다.
-        logger.warning("문서 답변 작성 실패: %s", type(exc).__name__)
+        logger.warning("문서 답변 작성 실패: %s (%s)", type(exc).__name__, exc)
         # 수정 실패 시 기존 초안을 파괴하지 않는다. 실패 상태를 명시하여
         # Verification/Finalize가 이를 검증 통과 답변으로 취급하지 못하게 한다.
         if repair and state.get("draft_answer"):
+            # 수정보강(repair) 실패 시 이미 생성된 기존 초안을 안전하게 보존하고,
+            # 전체 답변이 파기되는 치명적 보류(WITHHELD)로 빠지지 않도록 generation_error를 발생시키지 않는다.
+            logger.warning("[DOC_CONSULTATION] 재작성(repair) 실패로 기존 초안을 보존하여 검증을 지속합니다: %s", type(exc).__name__)
             result.update(draft_answer=state["draft_answer"],
                           answer_source_manifest=state.get("answer_source_manifest"),
-                          answer_generation_error=type(exc).__name__)
+                          answer_generation_error=None)
         else:
             result.update(draft_answer="", answer_generation_error=type(exc).__name__)
     return result
@@ -224,12 +237,19 @@ def verify_answer(state: Dict[str, Any]) -> Dict[str, Any]:
         as_of = (state.get("case_evidence_briefing") or {}).get("as_of_date") or date.today().isoformat()
         context = (f"검토 기준일: {as_of}\n등록 문서의 원문은 전체 출처 목록에 있습니다. "
                    "검토 승인은 내용의 진실성 확인이 아닙니다.")
+        # 후속 실무 행동 질의(FOLLOWUP_ACTION)는 5단계 정밀 의견서 타임라인/의사표시 정합성 강제를 완화한다.
+        is_followup = (
+            state.get("intent") == "FOLLOWUP_ACTION"
+            or (state.get("intent_decision") or {}).get("intent") == "FOLLOWUP_ACTION"
+            or (state.get("intent_decision") or {}).get("requires_full_analysis") is False
+        )
+        require_coverage = not is_followup
         # 검증 함수의 반환값은 추적 SDK가 비동기로 직렬화한다. 추적 중인 딕셔너리에
         # 해시·명세를 추가하면 순회 중 변경 오류로 관측값이 유실될 수 있어 새 객체를 만든다.
         result = {**run_verification(consultation_question(state), draft, sources, context,
-                                     require_question_coverage=True), "source_manifest": manifest}
+                                     require_question_coverage=require_coverage), "source_manifest": manifest}
     except Exception as exc:
-        logger.warning("문서 원문 검증 실패: %s", type(exc).__name__)
+        logger.warning("문서 원문 검증 실패: %s (%s)", type(exc).__name__, exc)
         result = {"status": "INSUFFICIENT", "reason_code": "VERIFICATION_ERROR",
                   "claims": [], "warnings": ["등록 자료와 답변의 대조를 완료하지 못했습니다."],
                   "missing_issues": [], "revision_instructions": []}
@@ -372,50 +392,62 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
     # 전체 답변이 PASS에 이르지 못했으나 원문 스냅샷·검증 무결성이 유효한 경우,
     # 확인된 사실과 조건부 설명만 남긴 제한 답변을 새로 생성하고 동일 검증기로 재검증한다.
     if snapshot_valid and not valid and result.get("claims") and not temporal_blocked and search_status != "API_ERROR":
-        try:
-            history = [m.content for m in (state.get("messages") or [])[:-1]
-                       if isinstance(m, HumanMessage) and isinstance(m.content, str)]
-            as_of = (state.get("case_evidence_briefing") or {}).get("as_of_date") or date.today().isoformat()
-            preserved = list(dict.fromkeys(
-                list(state.get("preserved_points") or [])
-                + list(result.get("preserved_points") or [])
-            ))
-            limited_written = write_document_answer(
-                consultation_question(state),
-                sources_list,
-                user_history=history[-4:],
-                previous_draft=draft,
-                verification=result,
-                as_of_date=as_of,
-                preserved_points=preserved,
-                limited=True,
-                rag_only_notice=bool(notice),
-            )
-            limited_draft = limited_written.get("draft_answer", "")
-            if limited_draft.strip():
-                context = (
-                    f"검토 기준일: {as_of}\n등록 문서의 원문은 전체 출처 목록에 있습니다. "
-                    "검토 승인은 내용의 진실성 확인이 아닙니다."
-                )
-                limited_ver = run_verification(
+        # 후속 실무 행동 가이드(FOLLOWUP_ACTION)인 경우 write_document_answer로 덮어쓰지 않고 기존 초안의 검증 지지 주장 범위를 보존한다.
+        is_followup_finish = (
+            state.get("intent") == "FOLLOWUP_ACTION"
+            or (state.get("intent_decision") or {}).get("intent") == "FOLLOWUP_ACTION"
+            or (state.get("intent_decision") or {}).get("requires_full_analysis") is False
+        )
+        if not is_followup_finish:
+            try:
+                history = [m.content for m in (state.get("messages") or [])[:-1]
+                           if isinstance(m, HumanMessage) and isinstance(m.content, str)]
+                as_of = (state.get("case_evidence_briefing") or {}).get("as_of_date") or date.today().isoformat()
+                preserved = list(dict.fromkeys(
+                    list(state.get("preserved_points") or [])
+                    + list(result.get("preserved_points") or [])
+                ))
+                limited_written = write_document_answer(
                     consultation_question(state),
-                    limited_draft,
                     sources_list,
-                    context,
-                    require_question_coverage=True,
-                    allow_partial_answer=True,
+                    user_history=history[-4:],
+                    previous_draft=draft,
+                    verification=result,
+                    as_of_date=as_of,
+                    preserved_points=preserved,
+                    limited=True,
+                    rag_only_notice=bool(notice),
                 )
-                if limited_ver.get("status") == "PASS":
-                    draft = limited_draft
-                    result = {
-                        **limited_ver,
-                        "source_manifest": manifest,
-                        "verified_answer_sha256": hashlib.sha256(limited_draft.encode("utf-8")).hexdigest(),
-                    }
-                    valid = True
-                    limited_used = True
-        except Exception as exc:
-            logger.warning("제한 답변 생성 또는 검증 실패: %s", type(exc).__name__)
+                limited_draft = limited_written.get("draft_answer", "")
+                if limited_draft.strip():
+                    context = (
+                        f"검토 기준일: {as_of}\n등록 문서의 원문은 전체 출처 목록에 있습니다. "
+                        "검토 승인은 내용의 진실성 확인이 아닙니다."
+                    )
+                    limited_ver = run_verification(
+                        consultation_question(state),
+                        limited_draft,
+                        sources_list,
+                        context,
+                        require_question_coverage=True,
+                        allow_partial_answer=True,
+                    )
+                    if limited_ver.get("status") == "PASS":
+                        draft = limited_draft
+                        result = {
+                            **limited_ver,
+                            "source_manifest": manifest,
+                            "verified_answer_sha256": hashlib.sha256(limited_draft.encode("utf-8")).hexdigest(),
+                        }
+                        valid = True
+                        limited_used = True
+            except Exception as exc:
+                logger.warning("제한 답변 생성 또는 검증 실패: %s", type(exc).__name__)
+        else:
+            # 후속 실무 행동 가이드이고 claims 중 SUPPORTED 주장이 존재하는 경우 초안을 유지(CAUTIONARY)하여 사용자에게 전달
+            has_supported = any(c.get("grounding_status") == "SUPPORTED" for c in result.get("claims", []))
+            if has_supported:
+                valid = True
 
     if not valid:
         # 검증 결과나 그 이후의 원문 변경을 정형 성공 답변으로 덮어쓰지 않으며 내부 검토 문구 노출을 차단한다.

@@ -427,6 +427,9 @@ def search_official_statutes(
             candidate_articles: Dict[str, Dict[str, Any]] = {}
 
             for node in article_nodes:
+                # 편·장·절 구분 표제어(전문)는 본 조문이 아니므로 검색 대상에서 제외
+                if (node.findtext("조문여부") or "").strip() == "전문":
+                    continue
                 art_no_raw = node.findtext("조문번호") or ""
                 art_title = (node.findtext("조문제목") or "").strip()
                 art_content = (node.findtext("조문내용") or "").strip()

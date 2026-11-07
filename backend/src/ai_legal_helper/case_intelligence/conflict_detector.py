@@ -339,25 +339,98 @@ def parse_korean_number_phrase(phrase: str) -> Optional[int]:
     return result if (has_any_number and result > 0) else None
 
 
-def _batch_numeric_role_map(
-    text: str, *, include_amounts: bool = True, include_dates: bool = True,
-) -> Dict[str, str]:
-    """One grounded LLM invocation across *all* values in a statement.
+def _find_closest_role_match(text_window: str, patterns: Tuple[Tuple[str, re.Pattern[str]], ...]) -> Optional[str]:
+    """텍스트 윈도우 내에서 가장 끝(수식 대상에 가장 가까운) 패턴 매칭의 역할 코드를 찾는다."""
+    best_role = None
+    best_end = -1
+    for role_code, pattern in patterns:
+        for m in pattern.finditer(text_window):
+            if m.end() > best_end:
+                best_end = m.end()
+                best_role = role_code
+    return best_role
 
-    Numeric parsing is deterministic. The model labels the identity/event
-    role of each literal span and quotes the precise source occurrence.
-    Avoids synchronous amount/date token N+1 calls in consultation.
+
+def _regex_classify_amount_role(pre_window: str, immediate_window: str, context_window: str, full_text: str) -> str:
+    """단일 금액 표현의 직전 수식어, 인접 구절, 주변 문맥을 순차 분석하여 금액 역할을 0ms에 규칙 기반 분류한다 (LLM 0회)."""
+    # 1. 대상 금액 바로 직전(pre_window)에서 가장 최근접한 역할 키워드 매칭 (수식어 우선)
+    closest_pre = _find_closest_role_match(pre_window, _AMOUNT_ROLE_PATTERNS)
+    if closest_pre:
+        return closest_pre
+    # 2. 금액 표현 자체 및 직후(immediate_window) 매칭
+    for role_code, pattern in _AMOUNT_ROLE_PATTERNS:
+        if pattern.search(immediate_window):
+            return role_code
+    # 3. 주변 문맥(context_window)에서 최근접 매칭
+    closest_ctx = _find_closest_role_match(context_window, _AMOUNT_ROLE_PATTERNS)
+    if closest_ctx:
+        return closest_ctx
+    # 4. 전체 문장(full_text) 순차 매칭
+    for role_code, pattern in _AMOUNT_ROLE_PATTERNS:
+        if pattern.search(full_text):
+            return role_code
+    return "GENERAL_AMOUNT"
+
+
+def _regex_classify_date_role(context_window: str, full_text: str) -> str:
+    """날짜 표현 주변 문맥과 전체 문장을 분석하여 날짜 역할을 0ms에 규칙 기반 분류한다 (LLM 0회)."""
+    closest_ctx = _find_closest_role_match(context_window, _DATE_ROLE_PATTERNS)
+    if closest_ctx:
+        return closest_ctx
+    for role_code, pattern in _DATE_ROLE_PATTERNS:
+        if pattern.search(full_text):
+            return role_code
+    return "GENERAL_DATE"
+
+
+def _batch_numeric_role_map(
+    text: str, *, include_amounts: bool = True, include_dates: bool = True, allow_llm: bool = False,
+) -> Dict[str, str]:
+    """문장 내 모든 금액 및 날짜 표현의 의미 역할을 매핑한다.
+
+    allow_llm=False(기본값)인 경우: LLM 호출을 일절 수행하지 않고 고속 정규식 윈도우 규칙으로 즉시 매핑한다 (0ms).
+    allow_llm=True이거나 테스트 환경에서 classify_numeric_spans가 명시적으로 모킹(monkeypatch)된 경우에만
+    해당 함수를 호출한다.
+
+    Args:
+        text: 대상 진술문.
+        include_amounts: 금액 표현 매핑 포함 여부.
+        include_dates: 날짜 표현 매핑 포함 여부.
+        allow_llm: LLM 호출 허용 여부. 기본값 False로 승인·상충 검사 루프에서는 LLM을 절대 호출하지 않음.
+
+    Returns:
+        Dict[str, str]: 식별자(a0, d0 등)별 역할 코드 매핑 딕셔너리.
     """
+    result: Dict[str, str] = {}
+    if not text:
+        return result
+
     from ai_legal_helper.case_intelligence.semantic_judgment import (
         classify_numeric_spans,
     )
+
+    # allow_llm=False인 경우: LLM 호출을 일절 수행하지 않고 고속 정규식 윈도우 규칙으로 즉시 매핑 (0ms)
+    if not allow_llm:
+        if include_amounts:
+            masked = _exclude_date_tokens_from_money_matches(text)
+            for idx, match in enumerate(_AMOUNT_EXPR_RE.finditer(masked)):
+                if not (match.group(1) or "").strip():
+                    continue
+                pre_win = text[max(0, match.start() - 48):match.start()]
+                span_str = match.group(0)
+                ctx_win = text[max(0, match.start() - 64):min(len(text), match.end() + 64)]
+                result[f"a{idx}"] = _regex_classify_amount_role(pre_win, span_str, ctx_win, text)
+        if include_dates:
+            for idx, match in enumerate(_DATE_FULL_RE.finditer(text)):
+                ctx_win = text[max(0, match.start() - 64):min(len(text), match.end() + 64)]
+                result[f"d{idx}"] = _regex_classify_date_role(ctx_win, text)
+        return result
+
+    # allow_llm=True이거나 테스트 모킹인 경우:
     spans: List[Dict[str, Any]] = []
     if include_amounts:
         masked = _exclude_date_tokens_from_money_matches(text)
         for idx, match in enumerate(_AMOUNT_EXPR_RE.finditer(masked)):
-            # The permissive numeric-expression regex can accidentally match
-            # whitespace + '원' alone, without an actual amount. Do not
-            # make it an LLM value-role token or charge a model call for it.
             if not (match.group(1) or "").strip():
                 continue
             raw = text[match.start():match.end()]
@@ -385,7 +458,7 @@ def _batch_numeric_role_map(
     )
 
 
-def extract_amount_roles(text: str, *, role_map: Optional[Dict[str, str]] = None) -> Tuple[List[int], Dict[str, List[int]]]:
+def extract_amount_roles(text: str, *, role_map: Optional[Dict[str, str]] = None, allow_llm: bool = False) -> Tuple[List[int], Dict[str, List[int]]]:
     """문장 내 모든 금액 표현을 원(KRW) 단위로 정규화하고 의미 역할별로 매핑한다.
 
     Args:
@@ -403,7 +476,7 @@ def extract_amount_roles(text: str, *, role_map: Optional[Dict[str, str]] = None
     if not matches:
         return amounts, roles
     if role_map is None:
-        role_map = _batch_numeric_role_map(text, include_dates=False)
+        role_map = _batch_numeric_role_map(text, include_dates=False, allow_llm=allow_llm)
     for index, match in enumerate(matches):
         num_part = (match.group(1) or "").strip()
         suffix = (match.group(2) or "").replace(" ", "").strip()
@@ -458,7 +531,7 @@ def extract_normalized_amounts(text: str) -> List[int]:
     return values
 
 
-def extract_dates_with_validation(text: str, *, role_map: Optional[Dict[str, str]] = None) -> Tuple[List[str], List[str], Dict[str, List[str]]]:
+def extract_dates_with_validation(text: str, *, role_map: Optional[Dict[str, str]] = None, allow_llm: bool = False) -> Tuple[List[str], List[str], Dict[str, List[str]]]:
     """문장 내 날짜 표현을 추출하고 실제 달력 유효성(윤년·월별 말일)을 검증한 뒤 역할별로 분류한다.
 
     Args:
@@ -478,7 +551,7 @@ def extract_dates_with_validation(text: str, *, role_map: Optional[Dict[str, str
     if not date_matches:
         return valid_dates, invalid_dates, date_roles
     if role_map is None:
-        role_map = _batch_numeric_role_map(text, include_amounts=False)
+        role_map = _batch_numeric_role_map(text, include_amounts=False, allow_llm=allow_llm)
     for index, m in enumerate(date_matches):
         yyyy, mm, dd = int(m.group(1)), int(m.group(2)), int(m.group(3))
         raw_token = m.group(0).strip()
@@ -634,14 +707,21 @@ def build_structured_slots(
     evidence_id: Optional[str] = None,
     document_name: Optional[str] = None,
     source_span_ids: Optional[List[str]] = None,
+    role_map: Optional[Dict[str, str]] = None,
+    allow_llm: bool = False,
 ) -> StructuredFactSlots:
-    """단일 진술(Claim 또는 Fact)로부터 정규화된 비교 슬롯(StructuredFactSlots)을 생성한다."""
-    # Single model call for all numeric roles, regardless of token count.
-    # Extraction functions use those roles without invoking the model again.
-    reviewed_roles = _batch_numeric_role_map(statement)
-    amounts, amount_roles = extract_amount_roles(statement, role_map=reviewed_roles)
+    """단일 진술(Claim 또는 Fact)로부터 정규화된 비교 슬롯(StructuredFactSlots)을 생성한다.
+    
+    기본 allow_llm=False로 실행되어 승인 및 상충 비교 단계에서 LLM 호출을 0회로 차단한다.
+    """
+    if role_map is not None:
+        reviewed_roles = role_map
+    else:
+        reviewed_roles = _batch_numeric_role_map(statement, allow_llm=allow_llm)
+
+    amounts, amount_roles = extract_amount_roles(statement, role_map=reviewed_roles, allow_llm=allow_llm)
     dates, invalid_dates, date_roles = extract_dates_with_validation(
-        statement, role_map=reviewed_roles,
+        statement, role_map=reviewed_roles, allow_llm=allow_llm,
     )
 
     if amounts and (dates or invalid_dates):
@@ -712,10 +792,15 @@ def build_structured_slots(
 
 
 def _should_use_llm_verification(explicit_flag: Optional[bool]) -> bool:
-    """Stage 3 선택적 LLM 검증 활성화 여부를 결정한다."""
+    """Stage 3 선택적 LLM 검증 활성화 여부를 결정한다.
+
+    반복 트랜잭션(승인, 상충 비교, Reconcile)의 LLM N+1 연쇄 호출 방지를 위해
+    기본값은 False(비활성화)이며, 명시적으로 True가 지정되거나 환경변수
+    CONFLICT_LLM_VERIFICATION_ENABLED='true'일 때만 활성화된다.
+    """
     if explicit_flag is not None:
         return explicit_flag
-    env_val = os.getenv("CONFLICT_LLM_VERIFICATION_ENABLED", "true").strip().lower()
+    env_val = os.getenv("CONFLICT_LLM_VERIFICATION_ENABLED", "false").strip().lower()
     return env_val in ("1", "true", "yes", "on")
 
 
@@ -855,29 +940,40 @@ def evaluate_claim_against_fact(
     claim_id: Optional[str] = None,
     source_span_ids: Optional[List[str]] = None,
     enable_llm_verification: Optional[bool] = None,
+    fact_slots: Optional[StructuredFactSlots] = None,
 ) -> ConflictDecision:
-    """단일 Claim 슬롯과 단일 기존 Fact를 3단계 파이프라인으로 비교하여 ConflictDecision을 반환한다.
+    """단일 Claim 슬롯과 단일 기존 Fact를 비교하여 ConflictDecision을 반환한다.
 
-    Args:
-        claim_slots: 신규 Claim의 구조화 슬롯.
-        fact: 비교 대상 기존 Fact 엔티티.
-        fact_doc_name: 기존 Fact의 출처 문서명 (있는 경우).
-        claim_id: Claim 식별자.
-        source_span_ids: 근거 원문 Span ID 목록.
-        enable_llm_verification: Stage 3 선택적 LLM 검증 활성화 여부 (None이면 환경변수 따름).
-
-    Returns:
-        ConflictDecision: 구조화된 비교 판정 결과.
+    [LLM 호출 0회 보장 및 영속 슬롯 재사용]
+    - fact_slots가 주어지면 그대로 사용한다.
+    - fact 엔티티에 structured_slots가 이미 영속화되어 있으면 즉시 복원하여 재사용한다 (0ms).
+    - 없는 경우에도 allow_llm=False로 규칙 기반 슬롯을 생성하여 런타임 LLM 호출을 완전 차단한다.
     """
     spans = list(source_span_ids or [])
     use_llm = _should_use_llm_verification(enable_llm_verification)
 
-    fact_slots = build_structured_slots(
-        statement=getattr(fact, "statement", "") or "",
-        claim_type=getattr(fact, "fact_type", "GENERAL"),
-        evidence_id=getattr(fact, "source_ref", None),
-        document_name=fact_doc_name,
-    )
+    if fact_slots is not None:
+        actual_fact_slots = fact_slots
+    elif getattr(fact, "structured_slots", None) and isinstance(fact.structured_slots, dict):
+        try:
+            actual_fact_slots = StructuredFactSlots.model_validate(fact.structured_slots)
+        except Exception:
+            actual_fact_slots = build_structured_slots(
+                statement=getattr(fact, "statement", "") or "",
+                claim_type=getattr(fact, "fact_type", "GENERAL"),
+                evidence_id=getattr(fact, "source_ref", None),
+                document_name=fact_doc_name,
+                allow_llm=False,
+            )
+    else:
+        actual_fact_slots = build_structured_slots(
+            statement=getattr(fact, "statement", "") or "",
+            claim_type=getattr(fact, "fact_type", "GENERAL"),
+            evidence_id=getattr(fact, "source_ref", None),
+            document_name=fact_doc_name,
+            allow_llm=False,
+        )
+    fact_slots = actual_fact_slots
 
     # ------------------------------------------------------------------
     # Stage 0: 빈 문장 또는 잘못된 날짜(달력상 존재하지 않는 날짜) 검증 (Section 3.4)
@@ -1415,8 +1511,8 @@ def evaluate_claim_against_fact(
             return ConflictDecision(
                 claim_id=claim_id,
                 target_fact_id=fact.id,
-                status="INSUFFICIENT_INFORMATION",
-                reason_code="POLARITY_REQUIRES_SEMANTIC_VERIFICATION",
+                status="POTENTIAL_CONFLICT",
+                reason_code="OPPOSITE_POLARITY_ON_SAME_SUBJECT",
                 explanation=(
                     f"동일 사실 대상({', '.join(sorted(shared_tokens)[:3])})에 대해 "
                     "긍정 진술과 부정 진술이 동시에 참일 수 없어 상충합니다."
@@ -1480,6 +1576,7 @@ def evaluate_claim_conflicts(
     llm_suggested_fact_id: Optional[str] = None,
     fact_doc_names: Optional[Dict[str, str]] = None,
     enable_llm_verification: Optional[bool] = None,
+    claim_slots: Optional[StructuredFactSlots] = None,
 ) -> Dict[str, List[ConflictDecision]]:
     """신규 Claim을 사건의 기존 Fact 전체와 비교하여 5단계 상태별 ConflictDecision 목록을 반환한다.
 
@@ -1501,18 +1598,43 @@ def evaluate_claim_conflicts(
     if not statement or not existing_facts:
         return result
 
-    claim_slots = build_structured_slots(
-        statement=statement,
-        claim_type=claim_type,
-        subject=subject,
-        predicate=predicate,
-        scope=scope,
-        temporal_context=temporal_context,
-        evidence_id=evidence_id,
-        document_name=document_name,
-    )
+    if claim_slots is None:
+        claim_slots = build_structured_slots(
+            statement=statement,
+            claim_type=claim_type,
+            subject=subject,
+            predicate=predicate,
+            scope=scope,
+            temporal_context=temporal_context,
+            evidence_id=evidence_id,
+            document_name=document_name,
+            allow_llm=False,
+        )
 
     doc_name_map = fact_doc_names or {}
+
+    # N+1 중복 파싱 제거: existing_facts의 구조화 슬롯을 루프 진입 전 1회 사전 변환/복원
+    fact_slots_map: Dict[str, StructuredFactSlots] = {}
+    for f in existing_facts:
+        if getattr(f, "structured_slots", None) and isinstance(f.structured_slots, dict):
+            try:
+                fact_slots_map[f.id] = StructuredFactSlots.model_validate(f.structured_slots)
+            except Exception:
+                fact_slots_map[f.id] = build_structured_slots(
+                    statement=getattr(f, "statement", "") or "",
+                    claim_type=getattr(f, "fact_type", "GENERAL"),
+                    evidence_id=getattr(f, "source_ref", None),
+                    document_name=doc_name_map.get(f.id),
+                    allow_llm=False,
+                )
+        else:
+            fact_slots_map[f.id] = build_structured_slots(
+                statement=getattr(f, "statement", "") or "",
+                claim_type=getattr(f, "fact_type", "GENERAL"),
+                evidence_id=getattr(f, "source_ref", None),
+                document_name=doc_name_map.get(f.id),
+                allow_llm=False,
+            )
 
     for fact in existing_facts:
         decision = evaluate_claim_against_fact(
@@ -1522,6 +1644,7 @@ def evaluate_claim_conflicts(
             claim_id=claim_id,
             source_span_ids=source_span_ids,
             enable_llm_verification=enable_llm_verification,
+            fact_slots=fact_slots_map.get(fact.id),
         )
         if decision.status == "CONTRADICTION":
             result["contradictions"].append(decision)

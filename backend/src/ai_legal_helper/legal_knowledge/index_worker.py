@@ -122,7 +122,18 @@ def claim_job(session, worker_id: str) -> OfficialLawIndexJob | None:
 
 
 def official_xml_chunks(xml_bytes: bytes, version: OfficialLawVersion) -> list[dict]:
-    """특정 공식 MST의 조문 전체를 구조화하여 삭제 없는 Upsert 후보로 변환."""
+    """특정 공식 MST의 조문 전체를 구조화하여 삭제 없는 Upsert 후보로 변환한다.
+
+    Args:
+        xml_bytes: 국가법령정보센터에서 수신한 공식 법령 상세 XML 원문 바이트.
+        version: 법령 식별 정보(law_id, mst, 법령명, 시행일 등)가 검증된 공식 법령 버전 객체.
+
+    Returns:
+        list[dict]: Chroma 벡터 DB 및 관계형 DB 커버리지 인덱스에 적재할 고유 청크 딕셔너리 리스트.
+
+    Raises:
+        ValueError: XML 루트 태그 불일치, 법령 식별자 불일치, 조문 누락 등의 오류 발생 시.
+    """
     root = _safe_xml(xml_bytes)
     if root.tag not in ("법령", "Law", "법령정보"):
         raise ValueError("INVALID_OFFICIAL_XML_ROOT")
@@ -130,8 +141,16 @@ def official_xml_chunks(xml_bytes: bytes, version: OfficialLawVersion) -> list[d
     if mismatch:
         raise ValueError(mismatch)
     # 공식 확인 불가능한 XML을 마치 검증된 MST 원문처럼 저장하지 않는다.
-    if not (root.findtext(".//법령ID") and root.findtext(".//법령일련번호")):
+    # OpenLaw eflaw 상세조회 XML(<기본정보>)은 <법령ID>를 필수로 제공하나 <법령일련번호>는
+    # 생략될 수 있으므로, XML 내 법령ID와 요청된 version.mst의 존재를 함께 확인한다.
+    law_id_in_xml = (root.findtext(".//법령ID") or "").strip()
+    mst_in_xml = (root.findtext(".//법령일련번호") or "").strip()
+    if not (law_id_in_xml and (mst_in_xml or version.mst)):
         raise ValueError("OFFICIAL_BODY_VERSION_IDENTITY_MISSING")
+    if law_id_in_xml != version.law_id:
+        raise ValueError("DETAIL_LAW_ID_MISMATCH")
+    if mst_in_xml and mst_in_xml != version.mst:
+        raise ValueError("DETAIL_MST_MISMATCH")
     addenda = extract_addenda(root, version.promulgation_number)
     chunks = []
     article_nodes = root.findall(".//조문단위")
@@ -139,6 +158,9 @@ def official_xml_chunks(xml_bytes: bytes, version: OfficialLawVersion) -> list[d
         raise ValueError("OFFICIAL_XML_HAS_NO_ARTICLES")
     seen_articles = set()
     for node in article_nodes:
+        # 편·장·절 구분 표제어(전문)는 본 조문이 아니므로 인덱싱 대상에서 제외
+        if (node.findtext("조문여부") or "").strip() == "전문":
+            continue
         label = _label(node)
         content = _parts(node)
         if not label or not content:
@@ -457,10 +479,16 @@ def process_next_job(
 
 
 def enqueue_approved_sources(sources: list[dict]) -> dict:
-    """기존 HILT 승인 완료 후 확보한 P4 공식 버전만 백그라운드 작업으로 등록.
+    """사용자 승인 완료 후 확보한 공식 법령 버전(MST)을 백그라운드 인덱싱 작업 큐에 등록한다.
 
-    이 함수는 API/Chroma/임베딩을 호출하지 않는다. 작업등록 실패는 상담
-    답변을 중단하지 않고 작업 등록 실패 개수만 기록한다.
+    실시간 상담 스레드에서 무거운 임베딩이나 외부 API 조회를 동기 실행하지 않고,
+    작업 큐(OfficialLawIndexJob)에 등록하여 독립된 Worker가 비동기로 안전하게 영구 적재하도록 한다.
+
+    Args:
+        sources: 공식 법령 검색 결과로 반환된 출처 딕셔너리 리스트.
+
+    Returns:
+        dict: 작업 등록 결과 요약 {"registered": 신규등록수, "duplicate": 중복수, "failed": 실패수}.
     """
     from ai_legal_helper.database.session import SessionLocal
 
@@ -468,18 +496,25 @@ def enqueue_approved_sources(sources: list[dict]) -> dict:
     for source in sources or []:
         if not isinstance(source, dict):
             continue
+        # 법령(STATUTE) 출처만 법령 인덱싱 대상이다.
         if source.get("source_type") != "STATUTE":
             continue
-        if source.get("version_lookup_status") != "HISTORY_COMPLETE":
-            continue
-        if source.get("metadata_confidence") != "OFFICIAL_BODY_MST_CONFIRMED":
-            continue
-        law_id = str(source.get("law_id") or "")
-        mst = str(source.get("version_id") or "")
-        name = str(source.get("statute_name") or "")
-        date = source.get("law_effective_date")
+        law_id = str(source.get("law_id") or "").strip()
+        mst = str(source.get("version_id") or "").strip()
+        name = str(source.get("statute_name") or "").strip()
+        date = (
+            source.get("law_effective_date")
+            or source.get("article_effective_date")
+            or source.get("effective_date")
+            or source.get("version_date")
+        )
+        # 필수 식별 정보(법령ID, MST, 법령명, 시행일)가 완전히 확인된 법령만 큐에 추가
         if not (law_id and mst and name and date):
             continue
+        # 모의 데이터나 결측치 문자열 배제
+        if law_id.lower() in ("none", "null") or mst.lower() in ("none", "null"):
+            continue
+
         prom_no = str(source.get("promulgation_number") or "").strip()
         if prom_no.startswith("제") and prom_no.endswith("호"):
             prom_no = prom_no[1:-1]
@@ -488,7 +523,7 @@ def enqueue_approved_sources(sources: list[dict]) -> dict:
             law_type=str(source.get("law_type") or ""),
             promulgation_date=source.get("promulgation_date"),
             promulgation_number=prom_no,
-            list_effective_date=date,
+            list_effective_date=str(date).strip(),
         )
     registered = 0
     duplicate = 0

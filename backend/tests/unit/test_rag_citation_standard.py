@@ -148,7 +148,7 @@ def test_t05_metadata_extraction_for_statute_precedent_and_evidence():
     assert src_statute["statute_name"] == "주택임대차보호법"
     assert src_statute["article"] == "제3조"
     assert src_statute["version_date"] == "2024-01-01"
-    assert src_statute["effective_date"] == "2024-01-01"
+    assert src_statute["filename_date_hint"] == "2024-01-01"
     assert src_statute["page"] == "3-4"
     assert src_statute["chunk_id"] == "chunk-101"
 
@@ -237,5 +237,48 @@ def test_t07_double_parentheses_and_punctuation_clean_citation():
     assert "[근거 미확인]" in sanitized
     assert "[근거 미확인])" not in sanitized, f"잔류 닫는 괄호가 없어야 함: {sanitized}"
     assert "([근거 미확인]" not in sanitized, f"잔류 여는 괄호가 없어야 함: {sanitized}"
+
+
+def test_t08_sub_article_with_korean_particles_matches_correct_article():
+    """T-08: 조문 가지번호(제N조의M)에 한국어 조사/접미사(상, 만, 에 등)가 결합되어도 모조문(제N조)으로 잘못 역추적(Backtracking)되지 않고 정확한 가지번호로 추출·매칭되는지 검증한다."""
+    from ai_legal_helper.agents.verification import STATUTE_CITATION_PATTERN
+
+    # 1. 정규식 추출 검증: '상', '만', '에' 등 조사 결합 시 가지번호(제6조의2)가 모조문(제6조)으로 잘리지 않는지 확인
+    cases = [
+        ("주택임대차보호법 제6조의2상 통지 후 3개월", "주택임대차보호법", "제6조의2"),
+        ("주택임대차보호법 제6조의2만 단독 적용됩니다.", "주택임대차보호법", "제6조의2"),
+        ("주택임대차보호법 제6조의2에 따르면 3개월 후 효력 발생", "주택임대차보호법", "제6조의2"),
+        ("(주택임대차보호법 제6조의2(묵시적 갱신의 경우 계약의 해지)) 규정", "주택임대차보호법", "제6조의2"),
+        ("주택임대차보호법 제6조(계약의 갱신)에 따라 2개월 전 통지", "주택임대차보호법", "제6조"),
+    ]
+    for text, expected_law, expected_art in cases:
+        matches = list(STATUTE_CITATION_PATTERN.finditer(text))
+        assert len(matches) == 1, f"정확히 1개의 법령 인용이 매칭되어야 함 (text='{text}', matches={matches})"
+        law_name = matches[0].group(1).strip()
+        art_num = matches[0].group(2).replace(" ", "")
+        assert law_name == expected_law, f"법령명 불일치: {law_name} != {expected_law}"
+        assert art_num == expected_art, f"조문번호 불일치(역추적 오류 발생): {art_num} != {expected_art} (text='{text}')"
+
+    # 2. 실 RAG 인용 감사(audit_citations_and_claims)에서 가지번호 조사 결합 시 ARTICLE_MISMATCH 오류 없이 정상 통과하는지 검증
+    retrieved_sources = [
+        {
+            "source_id": "STATUTE:주택임대차보호법:제6조의2:001",
+            "source_type": "STATUTE",
+            "statute_name": "주택임대차보호법",
+            "article": "제6조의2",
+            "article_title": "묵시적 갱신의 경우 계약의 해지",
+            "content": "제6조의2(묵시적 갱신의 경우 계약의 해지) ② 제1항에 따른 해지는 임대인이 그 통지를 받은 날부터 3개월이 지나면 그 효력이 발생한다.",
+        }
+    ]
+    draft_answer = (
+        "묵시적 갱신 상태에서는 주택임대차보호법 제6조의2상 임차인이 해지통지를 한 날부터 "
+        "3개월이 지나면 해지의 효력이 발생합니다."
+    )
+    audit = audit_citations_and_claims(draft_answer, retrieved_sources)
+    assert len(audit["unverified_citations"]) == 0, (
+        f"조사 '상' 결합으로 인해 모조문(제6조)으로 오인식되어 미검증 인용으로 분류되면 안 됨: {audit['unverified_citations']}"
+    )
+    assert len(audit["validated_citation_ids"]) >= 1, "정상적으로 제6조의2 출처와 검증 매칭되어야 함"
+
 
 

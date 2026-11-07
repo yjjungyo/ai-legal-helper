@@ -5,6 +5,7 @@
 """
 
 import json
+import re
 from datetime import date
 from typing import Any, Dict, List
 
@@ -23,6 +24,7 @@ DOCUMENT_ANSWER_SYSTEM = """당신은 등록 자료를 읽고 사용자의 현�
 
 [답변 출력 형식 및 가독성 원칙 (STEP 6)]
 - 첫 문단에서 사용자의 질문에 직접 답변하는 핵심 결론을 명쾌하게 제시하세요.
+  첫 문단은 의뢰인이 핵심을 즉시 이해할 수 있도록 명쾌한 요약 문장에 집중하고, 문단 끝에 증거 파일 목록(`[01_...][02_...]...` 또는 괄호 묶음)을 무더기로 몰아서 나열하지 마세요. 개별 사실의 구체적인 증거 출처 표기는 이어지는 세부 분석 문단(`### 소제목`)의 각 사실 항목에서 표기하세요.
   불필요하게 '사건 증거 기반 AI 분석 결과', '검증 완료', '6단계 검증 수행' 등으로 시작하지 마세요.
 - 긴 줄글(통문단)로만 이어 쓰지 말고, 자연스러운 마크다운 소제목(`### 현재 계약 상태`, `### 보증금 반환 순위와 법적 안전성`, `### 실무적 회수 위험 및 대응`, `### 확인할 사항` 등 질문에 맞춘 유연한 소제목)과 글머리 기호(`- `)로 읽기 쉽게 단락을 구분하세요.
 - 단순한 질문에는 긴 분석 보고서 형식을 강요하지 말고, 질문에 필요한 핵심 답변과 관련 법률 조문만 간결하게 설명하세요.
@@ -44,6 +46,10 @@ DOCUMENT_ANSWER_SYSTEM = """당신은 등록 자료를 읽고 사용자의 현�
 - 임차인보다 나중에 등기된 후순위 가압류가 확인되더라도 그 사실만으로 이미 취득한 대항력이나 우선변제권이 즉시 소멸한다고 설명하지 마세요. 선순위 저당권, 조세채권, 법정기일, 우선변제권 취득 시점, 배당요구 등의 요소를 별도로 확인하세요.
 - '보증금을 전액 반환받을 위험이 커졌다'는 표현은 가압류가 있다는 이유만으로 단정할 수 없습니다. 해당 위험이 실제로 어떻게 달라졌는지 사건별 증거와 공적 권리 순위 근거가 있어야 합니다.
 - 주택임대차보호법 제3조 및 제3조의2를 적용할 때, 현행 법령·적용시점이 정확히 검증되지 않았다면 법적 효력을 사실인 것처럼 단정하지 말고 조건부로 설명하세요.
+
+[법령 조문 시행일자와 시점 적용 원칙]
+- 제공된 법령이 최근 개정·시행본(예: 2026년 시행본)이더라도 해당 조문(주택임대차보호법 제6조, 제6조의2, 제3조의3, 민법 등)의 기본 법리와 요건은 질문 대상 임대차의 체결·갱신 시점에도 원칙적으로 동일한 취지로 적용됩니다.
+- 법령의 공포일자나 시행일자가 사건 시점 이후라는 이유만으로 조문 적용을 거부하거나 법령 부족(NEED_MORE_LAW)으로 처리하지 마세요. 필요한 경우 과거 시점과의 관계는 조건부로 자연스럽게 설명하세요.
 
 [권리관계·배당순위 판단 원칙]
 - 임차인의 대항력·우선변제권·배당순위·매수인에 대한 대항 가능성은 사건별로 확인된 주택 인도, 주민등록, 확정일자, 권리 설정 및 등기 시점, 임대차 갱신·종료 상태와 적용 법령을 대조하여 판단하세요.
@@ -74,8 +80,11 @@ DOCUMENT_ANSWER_SYSTEM = """당신은 등록 자료를 읽고 사용자의 현�
 - 날짜와 통지는 작성일/발송일/도달일/희망 종료일/효력 발생일을 구분하세요.
   발견일/접수일/열람일도 별개입니다. 사용자 질문의 발견일과 문서의 접수일은
   서로 다를 수 있으며 그 자체가 모순이나 별도 사건의 증거는 아닙니다.
-  미래 특정일에 종료하겠다는 의사를 도달일부터 기계적으로 계산한 종료일로 바꾸지 마세요.
-  법정 대기기간이 있다는 이유만으로 통지에서 지정한 종료일을 그보다 이른 날짜로 대체하지 마세요.
+  임차인이 묵시적 갱신 후 법정 3개월보다 뒤의 장래 특정일(예: 9월 30일)을 지정하여 해지통지한 경우:
+  법률상 3개월 경과 시점(최소 유예기간)과 당사자 지정 퇴거일의 성격을 명확히 구분하여 설명하세요.
+  현재 기준일(2026-11-06 등) 시점에서 두 날짜가 모두 도래하였다면, 임대차가 이미 적법하게 종료되었고
+  보증금 반환청구권 및 동시이행 항변권, 임차권등기명령 신청 요건을 갖추었음을 첫 결론에서 명쾌하게 제시하세요.
+  법정 대기기간이 있다는 이유만으로 지정한 날짜를 지우거나, 반대로 당사자 지정일만 고집해 법정 효력 발생일을 무시하지 마세요.
   원문이 없어서 통지의 정확한 뜻·도달을 확인할 수 없다면 그 차이가 현재 상태에 미치는 영향을
   조건별로 설명하세요. 통지한 날짜와 지정한 날짜가 모두 지났다면 이미 종료했을 가능성도 검토해야 합니다.
   정확한 문구·도달이 확인되지 않은 상태에서 특정 종료일이나 '늦어도 이 날까지 종료'를 산정하지 마세요.
@@ -83,6 +92,7 @@ DOCUMENT_ANSWER_SYSTEM = """당신은 등록 자료를 읽고 사용자의 현�
 - 소송, 이사 금지, 이율, 지급명령 등은 질문과 근거가 요구할 때만 설명하세요.
 - 출처 표기 시 원칙 (STEP 6 자연스러운 출처 표기):
   * 사건 문서(사실 문장)는 반드시 전체 파일명 그대로 `[E01_주택임대차계약서.txt]`, `[E05_퇴거_및_보증금_반환_요청_문자.txt]`와 같이 대괄호 안에 표기하세요.
+  * 서두의 첫 문단(핵심 결론) 끝에 전체 증거 파일 목록을 일괄 나열하지 말고, 각 증거는 해당 사실을 구체적으로 설명하는 세부 본문(`### 소제목`)의 문장·불릿 항목 옆에서 자연스럽게 1~2개씩 개별 인용하세요.
   * 본문 법령 인용은 긴 공포번호나 시행일자를 나열하지 말고, `주택임대차보호법 제6조의2` 또는 `(주택임대차보호법 제6조의2)`와 같이 법령명과 조문을 간결하고 자연스럽게 표기하세요. (상세 메타데이터는 출처 상세 화면에서 제공됩니다)
   * 축약 기호 '[E01]', 'EVIDENCE:E05'만 단독 사용하지 마시고 전체 파일명을 보존하세요.
   * 존재하지 않는 증거 번호, 출처, 사람, 날짜, 금액을 만들지 마세요.
@@ -97,26 +107,115 @@ DOCUMENT_ANSWER_SYSTEM = """당신은 등록 자료를 읽고 사용자의 현�
 """
 
 
+def find_unique_target_span(draft: str, target: str) -> tuple[int, int] | None:
+    """초안(draft) 내에서 치환 대상 문자열(target)의 유일한 구간(start, end)을 탐색한다.
+
+    1차로 엄격한 문자열 완전 일치(Exact Match)를 시도하고,
+    마크다운 글머리 기호 앞 들여쓰기 공백 누락·변형이나 줄바꿈 차이가 있을 경우
+    2차로 토큰 단위 공백 허용 정규식(Whitespace-Tolerant Token Regex)을 적용한다.
+    3차로 LLM이 글머리 기호(bullet / list / header) 소제목 라벨을 임의로 표준화·변형한 경우,
+    후방 토큰 슬라이스의 고유 매칭 및 글머리 행 시작점 확장을 통해 대상 구간을 안전하게 복원한다.
+    4차로 후행 인용구/문장부호 불일치에 대비하여 전방 토큰 슬라이스 고유 매칭 및 행 끝점 확장을 적용한다.
+
+    Args:
+        draft: 원본 초안 문자열.
+        target: 치환 대상 문자열(old_text).
+
+    Returns:
+        초안 내 유일한 매칭 구간 (start, end) 튜플. 매칭 실패 또는 2건 이상 다중 매칭(모호성) 시 None 반환.
+    """
+    # 1차: 엄격한 문자열 완전 일치
+    if draft.count(target) == 1:
+        start = draft.index(target)
+        return start, start + len(target)
+
+    # 2차: 공백·줄바꿈·들여쓰기 오차를 흡수하는 토큰 단위 정규식 매칭
+    tokens = target.split()
+    if not tokens:
+        return None
+
+    pattern = r"\s+".join(re.escape(t) for t in tokens)
+    matches = list(re.finditer(pattern, draft))
+    if len(matches) == 1:
+        return matches[0].start(), matches[0].end()
+
+    # 3차: 마크다운 글머리 기호/소제목 라벨 변형 허용 후방 토큰 매칭
+    target_is_bullet = bool(re.match(r"^\s*[-*+]\s|^\s*\d+\.\s|^\s*#{1,6}\s", target))
+    max_drop = min(8, len(tokens) - 4)
+
+    for k in range(1, max_drop):
+        sub_tokens = tokens[k:]
+        if len(" ".join(sub_tokens)) < 20:
+            break
+        sub_pat = r"\s+".join(re.escape(t) for t in sub_tokens)
+        sub_matches = list(re.finditer(sub_pat, draft))
+        if len(sub_matches) == 1:
+            sub_start, sub_end = sub_matches[0].start(), sub_matches[0].end()
+            line_start = draft.rfind("\n", 0, sub_start)
+            line_start = 0 if line_start == -1 else line_start + 1
+            line_prefix = draft[line_start:sub_start]
+            draft_is_bullet = bool(re.match(r"^\s*[-*+]\s|^\s*\d+\.\s|^\s*#{1,6}\s", line_prefix))
+            if target_is_bullet and draft_is_bullet:
+                return line_start, sub_end
+
+    # 4차: 후행 인용구/출처 표기 차이 허용 전방 토큰 매칭
+    for k in range(1, max_drop):
+        sub_tokens = tokens[:-k]
+        if len(" ".join(sub_tokens)) < 20:
+            break
+        sub_pat = r"\s+".join(re.escape(t) for t in sub_tokens)
+        sub_matches = list(re.finditer(sub_pat, draft))
+        if len(sub_matches) == 1:
+            sub_start, sub_end = sub_matches[0].start(), sub_matches[0].end()
+            line_end = draft.find("\n", sub_end)
+            line_end = len(draft) if line_end == -1 else line_end
+            if target_is_bullet:
+                return sub_start, line_end
+
+    return None
+
+
 def apply_verified_draft_patches(previous_draft: str, raw_response: str) -> str:
-    """모델이 지정한 원문 구간만 치환한다. 불일치·중복·겹침은 전체 재작성을 막는다."""
+    """모델이 지정한 원문 구간만 치환한다. 불일치·중복·겹침은 전체 재작성을 막는다.
+
+    Args:
+        previous_draft: 수정 전 초안 본문.
+        raw_response: 모델이 반환한 JSON 패치 응답 문자열.
+
+    Returns:
+        부분 패치가 정확하게 적용된 수정 후 초안 본문.
+
+    Raises:
+        ValueError: JSON 형식이 올바르지 않거나, 유효한 패치가 하나도 없거나 패치 구간이 겹치는 경우.
+    """
     try:
-        parsed = json.loads(raw_response.strip())
+        patch_text = raw_response.strip()
+        if "{" in patch_text and "}" in patch_text:
+            patch_text = patch_text[patch_text.index("{"):patch_text.rindex("}") + 1]
+        parsed = json.loads(patch_text, strict=False)
     except (ValueError, TypeError) as exc:
         raise ValueError("INVALID_PARTIAL_REVISION_FORMAT") from exc
     patches = parsed.get("patches") if isinstance(parsed, dict) else None
     if not isinstance(patches, list) or not patches or len(patches) > 12:
         raise ValueError("INVALID_PARTIAL_REVISION_PATCHES")
     spans = []
+    failed_count = 0
     for patch in patches:
         if not isinstance(patch, dict):
             raise ValueError("INVALID_PARTIAL_REVISION_PATCH")
         old, new = patch.get("old_text"), patch.get("new_text")
         if not isinstance(old, str) or not old.strip() or not isinstance(new, str) or not new.strip():
             raise ValueError("INVALID_PARTIAL_REVISION_PATCH")
-        if old == new or previous_draft.count(old) != 1:
-            raise ValueError("AMBIGUOUS_PARTIAL_REVISION_TARGET")
-        start = previous_draft.index(old)
-        spans.append((start, start + len(old), new))
+        if old == new:
+            continue
+        span = find_unique_target_span(previous_draft, old)
+        if span is None:
+            failed_count += 1
+            logger.warning("[PARTIAL_REVISION] 치환 대상 고유 구간 탐색 실패(패치 생략): %.60s", old)
+            continue
+        spans.append((span[0], span[1], new))
+    if not spans:
+        raise ValueError("AMBIGUOUS_PARTIAL_REVISION_TARGET")
     spans.sort()
     if any(left[1] > right[0] for left, right in zip(spans, spans[1:])):
         raise ValueError("OVERLAPPING_PARTIAL_REVISION_PATCHES")
@@ -134,6 +233,7 @@ def write_document_answer(
     preserved_points: List[str] | None = None,
     limited: bool = False,
     rag_only_notice: bool = False,
+    allow_need_more_law: bool = True,
 ) -> Dict[str, Any]:
     """원문 전체와 현재 질문으로 초안 또는 검증 지적을 반영한 답변을 작성한다.
 
@@ -188,9 +288,9 @@ def write_document_answer(
             "내부 검토 지적을 복사하거나 확인 필요만 나열하지 마세요. "
             "근거 없는 법률 결론은 삭제하되 기존에 검증된 설명은 보존하세요."
         )
-    # 최초 작성에서만 동일 LLM 호출로 법령 충분성과 답변을 함께 판단한다.
-    # 재작성/제한 답변은 기존 출력 계약을 유지한다.
-    integrated = not previous_draft and not limited and verification is None and not rag_only_notice
+    # 최초 작성이며 공식 법령 검색이 아직 수행되지 않은 경우에만 동일 LLM 호출로 법령 충분성을 판단한다.
+    # 공식 법령 검색이 이미 수행되었거나 재작성/제한 답변 단계에서는 근거 자료를 바탕으로 완성된 답변 초안을 직접 작성한다.
+    integrated = allow_need_more_law and not previous_draft and not limited and verification is None and not rag_only_notice
     if integrated:
         payload["출력 규약"] = (
             "반드시 JSON 객체만 출력하세요. 법령 원문이 현재 질문의 핵심 쟁점에 부족하면 "
@@ -235,7 +335,28 @@ def write_document_answer(
                        + answer_text)
     if integrated:
         try:
-            parsed = json.loads(answer_text[answer_text.index("{"):answer_text.rindex("}") + 1])
+            parsed = None
+            if "{" in answer_text and "}" in answer_text:
+                slice_text = answer_text[answer_text.index("{"):answer_text.rindex("}") + 1]
+                try:
+                    parsed = json.loads(slice_text, strict=False)
+                except (json.JSONDecodeError, ValueError):
+                    # RFC 8259 제어문자(줄바꿈 등) 또는 답변 본문 내 미이스케이프 따옴표 발생 시 정규식 유연 추출
+                    m_status = re.search(r'"status"\s*:\s*"([^"]+)"', slice_text)
+                    st = m_status.group(1) if m_status else ""
+                    if st == "READY":
+                        m_ans = re.search(r'"answer"\s*:\s*"(.*)"\s*\}\s*$', slice_text, re.DOTALL)
+                        if m_ans:
+                            raw_ans = m_ans.group(1)
+                            ans_unescaped = (
+                                raw_ans.replace('\\"', '"')
+                                .replace('\\n', '\n')
+                                .replace('\\t', '\t')
+                                .replace('\\\\', '\\')
+                            )
+                            parsed = {"status": "READY", "missing_laws": [], "answer": ans_unescaped}
+            if not isinstance(parsed, dict):
+                raise ValueError("INVALID_SYNTHESIS_GATE")
             if parsed.get("status") == "NEED_MORE_LAW":
                 missing = parsed.get("missing_laws") or []
                 if not isinstance(missing, list) or not missing:
@@ -260,6 +381,7 @@ def write_document_answer(
                 raise ValueError("INVALID_SYNTHESIS_GATE")
             answer_text = parsed["answer"].strip()
         except (ValueError, TypeError, KeyError) as exc:
+            logger.warning("[DOCUMENT_ANSWER] 통합 구조화 응답 파싱 실패 (%s: %s)", type(exc).__name__, exc)
             raise ValueError("INVALID_SYNTHESIS_GATE") from exc
 
     draft_hash = hashlib.sha256(answer_text.encode("utf-8")).hexdigest()[:16]

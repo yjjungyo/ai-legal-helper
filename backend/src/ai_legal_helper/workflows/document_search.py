@@ -27,29 +27,47 @@ def law_names(references: list[str]) -> list[str]:
     return [target.law_name for target in _prepare_search_targets(references)]
 
 
-def _is_safe_question_match(part: str, question: str) -> bool:
-    """question_part가 질문 원문의 부분 문자열이거나 질문과 직접 관련된 핵심 쟁점인지 안전하게 검증한다.
+def _is_safe_question_match(part: str, question: str, resolved_query: str = "") -> bool:
+    """question_part가 질문 원문 또는 해석 질문(resolved_query)의 부분 문자열이거나 질문과 직접 관련된 핵심 쟁점인지 안전하게 검증한다.
 
     Args:
         part: 검증기나 계획기가 반환한 질문 부분(question_part).
         question: 사용자 질문 원문.
+        resolved_query: 문맥 보강된 해석 질문 (선택적).
 
     Returns:
         bool: 안전하게 부합할 경우 True, 무관한 외부 검색일 경우 False.
     """
-    if not part or not question:
+    if not part:
         return False
     norm_p = " ".join(part.split())
-    norm_q = " ".join(question.split())
-    if norm_p in norm_q or norm_q in norm_p:
-        return True
+    candidates = [q for q in (question, resolved_query) if q and q.strip()]
+    if not candidates:
+        return False
+
+    # 원문 질문 또는 해석 질문과의 직접 포함 관계 검증
+    for cand in candidates:
+        norm_c = " ".join(cand.split())
+        if norm_p in norm_c or norm_c in norm_p:
+            return True
+
     from ai_legal_helper.tools.official_statute_search import extract_substantive_tokens
     part_tokens = extract_substantive_tokens(norm_p)
     if not part_tokens:
         return False
-    q_tokens = set(extract_substantive_tokens(norm_q))
-    matched = [t for t in part_tokens if t in q_tokens or any(t in qt or qt in t for qt in q_tokens)]
-    return len(matched) >= max(1, len(part_tokens) // 2)
+
+    for cand in candidates:
+        norm_c = " ".join(cand.split())
+        cand_tokens = set(extract_substantive_tokens(norm_c))
+        if not cand_tokens:
+            continue
+        matched = [t for t in part_tokens if t in cand_tokens or any(t in ct or ct in t for ct in cand_tokens)]
+        # part 토큰과 질문 토큰 중 짧은 쪽의 1/3 이상 일치하거나 3단어 이상 일치 시 정당한 질문 관련 요청으로 판정
+        min_threshold = max(1, min(len(part_tokens), len(cand_tokens)) // 3)
+        if len(matched) >= min_threshold or len(matched) >= 3:
+            return True
+
+    return False
 
 def pending_searches(state: dict[str, Any]) -> list[dict[str, Any]]:
     """질문에 연결된 새 검색만 선택하며 이미 확보·시도한 조문을 제외한다.
@@ -101,6 +119,7 @@ def pending_searches(state: dict[str, Any]) -> list[dict[str, Any]]:
     }
     history = set(state.get("statute_search_history") or [])
     norm_question = " ".join(str(state.get("question") or "").split())
+    norm_resolved = " ".join(str(state.get("resolved_query") or "").split())
     pending = []
     for request in requests:
         if not isinstance(request, dict):
@@ -110,7 +129,7 @@ def pending_searches(state: dict[str, Any]) -> list[dict[str, Any]]:
         articles_raw = request.get("articles", [])
         norm_part = " ".join(str(part or "").split()) if isinstance(part, str) else ""
         if (not names or not norm_part
-                or not _is_safe_question_match(norm_part, norm_question)
+                or not _is_safe_question_match(norm_part, norm_question, norm_resolved)
                 or not isinstance(issue, str) or not issue.strip()
                 or not isinstance(articles_raw, list) or not all(isinstance(a, str) for a in articles_raw)):
             continue
@@ -181,6 +200,144 @@ def _verified_local_fallback(state: dict[str, Any], requests: list[dict[str, Any
     return list({src["source_id"]: src for src in matched if src.get("source_id")}.values())
 
 
+def _retrieve_from_local_index(
+    law_name: str,
+    articles: list[str],
+    query: str = "",
+    as_of_date: str | None = None,
+    limit: int = 4,
+    require_all: bool = True,
+) -> list[dict[str, Any]]:
+    """ChromaDB law_docs_global 컬렉션에서 이미 영구 적재된 공식 법령 조문을 선조회한다 (Local-First).
+
+    공식 법령 백그라운드 인덱싱(P9)으로 로컬 Chroma에 수록된 조문 원문을 네트워크 호출 없이
+    즉각 재활용하여 실시간 검색 지연과 외부 API 의존도를 낮춘다.
+
+    Args:
+        law_name: 정식 법령명 (예: "주택임대차보호법", "민법").
+        articles: 특정 조문 번호 리스트 (예: ["제3조", "제3조의2"]). 비어있을 경우 유사도 검색 수행.
+        query: 조문 미지정 시 벡터 검색에 활용할 질문/쟁점 텍스트.
+        as_of_date: 사건 기준일 (선택적).
+        limit: 조문 미지정 시 반환할 최대 조문 개수.
+
+    Returns:
+        list[dict[str, Any]]: 표준 Source 스키마 규격으로 정규화된 법령 출처 딕셔너리 리스트.
+            로컬 인덱스에 없거나 미완비된 경우 빈 리스트 반환 (OpenLaw API 폴백 유도).
+    """
+    from ai_legal_helper.rag.retrieval import _get_client
+    from ai_legal_helper.rag.source_schema import build_source_from_chroma_doc
+    from ai_legal_helper.legal_knowledge.law_catalog import normalize_law_name
+    from langchain_core.documents import Document
+
+    try:
+        client = _get_client()
+        col_names = [getattr(c, "name", str(c)) for c in client.list_collections()]
+        if "law_docs_global" not in col_names:
+            return []
+        collection = client.get_collection("law_docs_global")
+
+        norm_name = normalize_law_name(law_name)
+        target_articles = set(articles) if articles else set()
+
+        if target_articles:
+            # 명시 조문이 요청된 경우 법령명 기준 로드 후 선별
+            res = collection.get(
+                where={"statute_name": norm_name or law_name},
+                include=["documents", "metadatas"],
+            )
+            ids = res.get("ids") or []
+            docs = res.get("documents") or []
+            metas = res.get("metadatas") or []
+            if not ids:
+                return []
+
+            matched = []
+            import urllib.parse
+            for doc_id, text, meta in zip(ids, docs, metas):
+                meta_dict = dict(meta or {})
+                if meta_dict.get("article") in target_articles:
+                    d = Document(id=doc_id, page_content=text, metadata=meta_dict)
+                    s_dict = build_source_from_chroma_doc(
+                        d, category="global", retrieval_method="OFFICIAL_STATUTE_SEARCH",
+                    )
+                    if meta_dict.get("vector_id"):
+                        s_dict["source_id"] = meta_dict["vector_id"]
+                    if not s_dict.get("source_url") and law_name and meta_dict.get("article"):
+                        s_dict["source_url"] = f"https://www.law.go.kr/법령/{urllib.parse.quote(law_name)}/{meta_dict['article']}"
+                    matched.append(s_dict)
+
+            # 요청된 모든 조문 구비 여부 판단 (require_all=True 시 미비 조문 존재 시 외부 폴백)
+            found_articles = {s.get("article") for s in matched}
+            if require_all and not target_articles.issubset(found_articles):
+                return []
+            return matched
+        else:
+            # 조문 번호가 특정되지 않은 경우 질의 기반 벡터 유사도 검색으로 상위 조문 추출
+            if not query or not query.strip():
+                return []
+            from ai_legal_helper.llm.gateway import get_embeddings
+            emb = get_embeddings()
+            q_vec = emb.embed_query(f"{norm_name or law_name} {query}")
+            res = collection.query(
+                query_embeddings=[q_vec],
+                n_results=limit,
+                where={"statute_name": norm_name or law_name},
+                include=["documents", "metadatas"],
+            )
+            matched = []
+            import urllib.parse
+            ids = (res.get("ids") or [[]])[0]
+            docs = (res.get("documents") or [[]])[0]
+            metas = (res.get("metadatas") or [[]])[0]
+            for doc_id, text, meta in zip(ids, docs, metas):
+                meta_dict = dict(meta or {})
+                d = Document(id=doc_id, page_content=text, metadata=meta_dict)
+                s_dict = build_source_from_chroma_doc(
+                    d, category="global", retrieval_method="OFFICIAL_STATUTE_SEARCH",
+                )
+                if meta_dict.get("vector_id"):
+                    s_dict["source_id"] = meta_dict["vector_id"]
+                if not s_dict.get("source_url") and law_name and meta_dict.get("article"):
+                    s_dict["source_url"] = f"https://www.law.go.kr/법령/{urllib.parse.quote(law_name)}/{meta_dict['article']}"
+                matched.append(s_dict)
+            return matched
+    except Exception as exc:
+        logger.warning("[LOCAL_FIRST_SEARCH] 로컬 인덱스 조회 중 예외 발생: %s", exc)
+        return []
+
+
+
+def can_satisfy_requests_locally(requests: list[dict[str, Any]]) -> bool:
+    """법령 검색 요청들이 로컬 인덱스(law_docs_global)에서 모두 충족 가능한지 사전 검사한다.
+
+    HILT 승인 팝업 이전에 로컬 영구 인덱스 적재 여부를 확인하여, 이미 확보된
+    법령 조문에 대한 불필요한 사용자 인터럽트를 방지한다.
+
+    Args:
+        requests: 법령 검색 요청 목록 (law_name, articles 등 포함).
+
+    Returns:
+        bool: 모든 요청이 로컬 인덱스에서 완결될 수 있으면 True.
+    """
+    if not requests:
+        return False
+    for req in requests:
+        law_name = req.get("law_name")
+        articles = req.get("articles") or []
+        issue = req.get("issue") or ""
+        if not law_name:
+            return False
+        matched = _retrieve_from_local_index(
+            law_name=law_name,
+            articles=articles,
+            query=issue,
+            require_all=True,
+        )
+        if not matched:
+            return False
+    return True
+
+
 def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
     """승인된 새 조문만 검색하고 결과·조회 이력을 상태 갱신값으로 반환한다.
 
@@ -201,12 +358,17 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
         approved,
         curr_count,
     )
-    if not approved or curr_count >= 2:
-        if not approved:
-            logger.info("[DOCUMENT_SEARCH] 검색 요청이 승인 범위를 벗어났거나 미승인 상태이므로 건너뜁니다.")
-        if curr_count >= 2:
-            logger.warning("[DOCUMENT_SEARCH] 최대 법령 검색 횟수(2회)에 도달하여 추가 검색을 중단합니다.")
-        return {"statute_search_results": []}
+    if curr_count >= 2:
+        logger.warning("[DOCUMENT_SEARCH] 최대 법령 검색 횟수(2회)에 도달하여 추가 검색을 중단합니다.")
+        return {
+            "statute_search_results": [],
+            "statute_search_status": "MAX_COUNT_REACHED",
+        }
+    if not requests:
+        return {
+            "statute_search_results": [],
+            "statute_search_status": "NOT_APPROVED" if not approved else "NO_PENDING",
+        }
     grouped: dict[str, list[dict]] = {}
     for request in requests:
         grouped.setdefault(request["law_name"], []).append(request)
@@ -218,7 +380,29 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
         references = [f"{name} {a}" for a in articles]
         if has_unnumbered or not references:
             references.append(name)
-        # 쟁점별 검색으로 다른 법·인물·일반 질문 어휘가 관련성 점수를 오염시키지 않게 한다.
+
+        # 1. Local-First: 이미 영구 적재된 공식 법령 인덱스(law_docs_global)에서 선조회 시도
+        local_matched = _retrieve_from_local_index(
+            law_name=name,
+            articles=articles if not has_unnumbered else [],
+            query=" ".join(r["issue"] for r in items),
+            as_of_date=(state.get("case_evidence_briefing") or {}).get("as_of_date"),
+            limit=max(len(articles), 4),
+        )
+        if local_matched:
+            logger.info(
+                "[DOCUMENT_SEARCH] 로컬 공식 법령 인덱스(law_docs_global)에서 '%s' 조문 %d건 즉시 재사용 (Local-First Hit)",
+                name, len(local_matched),
+            )
+            found.extend(local_matched)
+            continue
+
+        # 2. 로컬 인덱스 부재 또는 누락 조문 존재 시 외부 API 승인 여부 검사
+        if not approved and name not in (state.get("approved_statute_laws") or []):
+            logger.info("[DOCUMENT_SEARCH] 로컬 미보유 법령('%s')이나 미승인 상태이므로 외부 API 호출을 생략합니다.", name)
+            continue
+
+        # 3. 승인된 경우에 한해 OpenLaw 실시간 공식 API 호출
         diagnostic = {}
         try:
             found.extend(search_official_statutes(
@@ -268,6 +452,17 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
         len(found),
         len(merged),
     )
+    # P9: 사용자 승인 하에 새로 확보된 공식 법령 조문 버전을 백그라운드 인덱싱 작업 큐에 등록.
+    # 실시간 상담 스레드에서 무거운 임베딩이나 XML 저장을 직접 수행하지 않고 비동기 작업 큐로 격리한다.
+    import os
+    if found and os.getenv("LEGAL_BACKGROUND_INDEX_ENABLED", "1") in ("1", "true", "True"):
+        try:
+            from ai_legal_helper.legal_knowledge.index_worker import enqueue_approved_sources
+            queue_result = enqueue_approved_sources(found)
+            logger.info("[OFFICIAL_INDEX] document_search approved enqueue result=%s", queue_result)
+        except Exception as exc:
+            logger.warning("[OFFICIAL_INDEX] document_search 백그라운드 인덱스 등록 예외: %s", exc)
+
     return {"statute_search_results": found or fallback, "retrieved_sources": merged,
             "statute_search_status": ("API_ERROR" if api_error else
                 "PARTIAL_SUCCESS" if partial else
