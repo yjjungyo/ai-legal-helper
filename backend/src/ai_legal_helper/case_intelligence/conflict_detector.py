@@ -104,19 +104,32 @@ _AMOUNT_EXPR_RE = re.compile(
     r"\s*(원|만원|만\s*원|억원|억\s*원|천만원|천만\s*원|백만원|백만\s*원)",
 )
 
-# 날짜 표현 추출용 정규식 (YYYY년 M월 D일, YYYY-MM-DD, YYYY. M. D.)
+# 날짜 표현 정규식 (YYYY년 M월 D일, YYYY-MM-DD, YYYY. M. D.)
 _DATE_FULL_RE = re.compile(
     r"(?<!\d)((?:19|20)\d{2})\s*(?:년|[-./])\s*(\d{1,2})\s*(?:월|[-./])\s*(\d{1,2})\s*일?(?!\d)"
+)
+
+# 연도가 생략된 월/일 표현 정규식 (M월 D일, MM-DD, M. D.)
+_DATE_MD_RE = re.compile(
+    r"(?<!\d)(\d{1,2})\s*(?:월|[-./])\s*(\d{1,2})\s*일(?!\d)"
+)
+
+# 금액 파싱 시 날짜(일자 '일')가 한글 숫자 '일(1)'로 오인되는 것을 방지하기 위한 날짜 마스킹 정규식
+_DATE_MASK_RE = re.compile(
+    r"(?<!\d)((?:19|20)\d{2})\s*(?:년|[-./])\s*(\d{1,2})\s*(?:월|[-./])\s*(\d{1,2})\s*일?(?!\d)"
+    r"|(?<!\d)(\d{1,2})\s*(?:월|[-./])\s*(\d{1,2})\s*일(?!\d)"
+    r"|(?<!\d)(\d{1,2})\s*일(?![가-힣0-9])"
 )
 
 
 def _exclude_date_tokens_from_money_matches(text: str) -> str:
     """Mask dates without changing offsets so a date cannot become part of KRW.
 
-    Example: '2026.09.10 5천만 원' must produce 50,000,000, never a
-    composite made of year/month/day and KRW. '#' cannot match _AMOUNT_EXPR_RE.
+    Example: '2026.09.10 5천만 원', '9월 20일 2천만 원' must produce
+    accurate amounts without date day tokens ('20일' -> '일(1)') distorting numerals.
+    '#' cannot match _AMOUNT_EXPR_RE.
     """
-    return _DATE_FULL_RE.sub(lambda m: "#" * len(m.group(0)), text)
+    return _DATE_MASK_RE.sub(lambda m: "#" * len(m.group(0)), text)
 
 
 # 일반 한국어 조사 제거용 정규식
@@ -133,12 +146,17 @@ _FUNCTION_WORDS: Set[str] = {
     "이다", "있다", "없다", "한다", "하였다", "되었다", "대한", "위해", "따라",
     "통해", "대해", "맞춰", "재차", "확인", "해당", "기준", "일정", "가능",
     "금액", "일자", "날짜", "원금", "전액", "금원",
+    # 은행 거래/서류 일반 기록·메모 보조어 (동일 항목 오탐 방지)
+    "적요", "적요란", "비고", "기재", "기재되어", "기재된", "기재됨",
+    "표시", "표시되어", "표시된", "표시됨",
+    "이체되었", "이체된", "송금되었", "송금된", "입금되었", "입금된", "지급되었", "지급된",
 }
 
 # 금액의 의미적 역할(Semantic Role) 분류 패턴 (우선순위 순)
 _AMOUNT_ROLE_PATTERNS: Tuple[Tuple[str, re.Pattern[str]], ...] = (
     ("MODIFIED_CONTRACT_AMOUNT", re.compile(r"증액|감액|변경\s*보증금|갱신\s*보증금|인상|인하")),
-    ("TOTAL_AMOUNT", re.compile(r"합계|총액|전체\s*보증금|보증금\s*전액")),
+    ("TOTAL_AMOUNT", re.compile(r"합계|총액|전체\s*보증금|보증금\s*전액|총\s*(?=[0-9일이삼사오육칠팔구십백천만억조])")),
+    ("PROOF_OR_INQUIRY_REQUEST", re.compile(r"(?:이체\s*날짜|거래번호|내역|영수증|증빙|소명|자료)(?:를|을)?\s*(?:제공\s*요청|요청|요구|소명\s*요구|확인\s*요청)")),
     ("RETURN_REQUEST_AMOUNT", re.compile(r"반환\s*요청|반환을\s*요청|반환\s*청구")),
     ("RETURNED_AMOUNT", re.compile(r"보증금\s*(?:중|에서)|일부\s*(?:반환|변제|지급|입금)|반환한\s*금액|반환된\s*금액|반환받은|돌려받은|돌려준|회수한|공제\s*후\s*반환|원을\s*(?:일부\s*)?(?:반환|변제|입금)|변제(?:하였|했|입금)")),
     ("REMAINING_DEBT", re.compile(r"미반환|미지급|잔여\s*채무|잔존\s*채무|남은\s*금액|못\s*받은|연체액|체불액")),
@@ -171,6 +189,12 @@ _REPORTED_NEGATION_RE = re.compile(
     r"(?:통보|통지|연락|말|전달|회신|답변|문자|주장|고지)"
 )
 
+# 금융 거래 증빙/이체 내역 제공 요청 표현 정규식
+_PROOF_REQUEST_RE = re.compile(
+    r"(?:이체\s*날짜|거래번호|입금\s*내역|이체\s*내역|영수증|증빙|소명|자료|거래\s*내역)"
+    r".*?(?:제공\s*요청|요청|요구|소명\s*요구|확인\s*요청|제출\s*요청)"
+)
+
 # 이중 부정(Double Negation) 패턴: "거절하지 않았다", "부인하지 않았다" 등
 _DOUBLE_NEGATION_RE = re.compile(
     r"(거절|거부|부인|불응|해태|지체|누락)하?지\s*(?:않|못)|"
@@ -196,6 +220,48 @@ _NEGATION_PATTERNS: Tuple[re.Pattern[str], ...] = (
 )
 
 
+# 분할 지급 회차/차수(1차, 2차, 1회차 등) 추출 정규식
+_INSTALLMENT_ORDINAL_RE = re.compile(
+    r"(?<![가-힣0-9])([0-9]+|[일이삼사오육칠팔구십]+)\s*(?:차|회|회차|차수)(?:\s*(?:중도금|중도|잔금|지급|납부|이체))?",
+    re.IGNORECASE,
+)
+_HANGEUL_DIGIT_MAP: Dict[str, str] = {
+    "일": "1", "이": "2", "삼": "3", "사": "4", "오": "5",
+    "육": "6", "칠": "7", "팔": "8", "구": "9", "십": "10",
+}
+
+
+def _extract_installment_or_stage(text: str) -> Optional[str]:
+    """진술에서 분할 지급 회차(1차, 2차 등) 또는 계약 이행 단계(계약금, 중도금, 잔금)를 추출한다.
+
+    1차중도금과 2차중도금, 계약금과 잔금 등 서로 다른 분할 지급 단계를 구별하여
+    동일 역할 금액 상충(MUTUALLY_EXCLUSIVE_AMOUNT) 오탐을 방지한다.
+
+    Args:
+        text: 분석할 진술 문자열.
+
+    Returns:
+        정규화된 회차 문자열(예: '1차', '2차', '계약금', '잔금') 또는 None.
+    """
+    if not text:
+        return None
+    # 1. 'N차', 'N회', 'N회차' 정규화 (예: 1차, 2차, 1차중도, 2차중도금)
+    m = _INSTALLMENT_ORDINAL_RE.search(text)
+    if m:
+        num_raw = m.group(1)
+        num = _HANGEUL_DIGIT_MAP.get(num_raw, num_raw)
+        return f"{num}차"
+
+    # 2. 계약 이행 단계 (계약금 vs 중도금 vs 잔금) 단독 출현 확인
+    has_down = bool(re.search(r"계약금|가계약금", text))
+    has_interim = bool(re.search(r"중도금|중도", text))
+    has_balance = bool(re.search(r"잔금", text))
+    stages = [s for s, has in [("계약금", has_down), ("중도금", has_interim), ("잔금", has_balance)] if has]
+    if len(stages) == 1:
+        return stages[0]
+    return None
+
+
 class StructuredFactSlots(BaseModel):
     """문장에서 추출·정규화된 사실 비교 슬롯 모델 (P0-01 & P0-02)."""
     statement: str = Field(description="원본 진술 문장")
@@ -215,6 +281,10 @@ class StructuredFactSlots(BaseModel):
     amount_roles: Dict[str, List[int]] = Field(
         default_factory=dict,
         description="금액의 의미 역할(예: PRINCIPAL_DEPOSIT, RETURNED_AMOUNT, DOWN_PAYMENT)별 정규화 금액 목록",
+    )
+    installment_stage: Optional[str] = Field(
+        default=None,
+        description="분할 지급 회차(1차, 2차) 또는 계약 단계(계약금, 중도금, 잔금)",
     )
     normalized_dates: List[str] = Field(default_factory=list, description="YYYY-MM-DD로 정규화된 유효 날짜 목록")
     invalid_dates: List[str] = Field(default_factory=list, description="달력상 존재하지 않는 잘못된 날짜 표현 목록")
@@ -532,14 +602,16 @@ def extract_normalized_amounts(text: str) -> List[int]:
 
 
 def extract_dates_with_validation(text: str, *, role_map: Optional[Dict[str, str]] = None, allow_llm: bool = False) -> Tuple[List[str], List[str], Dict[str, List[str]]]:
-    """문장 내 날짜 표현을 추출하고 실제 달력 유효성(윤년·월별 말일)을 검증한 뒤 역할별로 분류한다.
+    """문서 내 날짜 표현을 추출하고 양력 달력 유효성(윤년·월일 범위)을 검증하여 역할별로 분류한다.
 
     Args:
-        text: 분석 대상 한국어 문장.
+        text: 분석할 한국어 텍스트.
+        role_map: 사전 계산된 날짜 역할 매핑 (선택사항).
+        allow_llm: LLM 기반 정밀 분류 허용 여부.
 
     Returns:
         Tuple[List[str], List[str], Dict[str, List[str]]]:
-            (유효한 YYYY-MM-DD 목록, 잘못된 날짜 원문 목록, 날짜 역할별 YYYY-MM-DD 딕셔너리)
+            (유효 ISO/MM-DD 날짜 리스트, 잘못된 날짜 원문 리스트, 역할별 날짜 딕셔너리)
     """
     if not text:
         return [], [], {}
@@ -548,10 +620,11 @@ def extract_dates_with_validation(text: str, *, role_map: Optional[Dict[str, str
     invalid_dates: List[str] = []
     date_roles: Dict[str, List[str]] = {}
     date_matches = list(_DATE_FULL_RE.finditer(text))
-    if not date_matches:
-        return valid_dates, invalid_dates, date_roles
+    full_spans = [m.span() for m in date_matches]
+
     if role_map is None:
         role_map = _batch_numeric_role_map(text, include_amounts=False, allow_llm=allow_llm)
+
     for index, m in enumerate(date_matches):
         yyyy, mm, dd = int(m.group(1)), int(m.group(2)), int(m.group(3))
         raw_token = m.group(0).strip()
@@ -568,21 +641,54 @@ def extract_dates_with_validation(text: str, *, role_map: Optional[Dict[str, str
             if raw_token not in invalid_dates:
                 invalid_dates.append(raw_token)
 
+    # 연도가 생략된 월/일(MM-DD) 표현 추출 및 검증 (예: '9월 20일', '10월 10일')
+    for md_idx, m in enumerate(_DATE_MD_RE.finditer(text)):
+        span = m.span()
+        if any(fs[0] <= span[0] and span[1] <= fs[1] for fs in full_spans):
+            continue
+        mm, dd = int(m.group(1)), int(m.group(2))
+        raw_token = m.group(0).strip()
+        try:
+            datetime.date(2024, mm, dd)  # 윤년(2024) 기준으로 1~12월 및 유효 일자 검증
+            md_str = f"{mm:02d}-{dd:02d}"
+            if md_str not in valid_dates:
+                valid_dates.append(md_str)
+            role = role_map.get(f"md{md_idx}", "GENERAL_DATE")
+            r_list = date_roles.setdefault(role, [])
+            if md_str not in r_list:
+                r_list.append(md_str)
+        except ValueError:
+            if raw_token not in invalid_dates:
+                invalid_dates.append(raw_token)
+
     return valid_dates, invalid_dates, date_roles
 
 
 def extract_normalized_dates(text: str) -> List[str]:
-    """Parse Gregorian dates only, never decide legal event meanings."""
-    dates: List[str] = []
-    for m in _DATE_FULL_RE.finditer(text or ""):
-        try:
-            parsed = datetime.date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
-        except ValueError:
-            continue
-        val = parsed.isoformat()
-        if val not in dates:
-            dates.append(val)
-    return dates
+    """Parse Gregorian dates only, supporting full YYYY-MM-DD and MM-DD formats."""
+    valid_dates, _, _ = extract_dates_with_validation(text)
+    return valid_dates
+
+
+def _normalize_date_suffix(d: str) -> str:
+    """Normalize date string to MM-DD suffix for calendar day comparison."""
+    parts = d.split("-")
+    if len(parts) >= 2:
+        return f"{int(parts[-2]):02d}-{int(parts[-1]):02d}"
+    return d
+
+
+def _are_date_sets_distinct(dates_a: Sequence[str], dates_b: Sequence[str]) -> bool:
+    """Check whether two non-empty sets of dates are completely distinct.
+
+    Matches either exact ISO strings or corresponding MM-DD calendar days.
+    Returns True if both sets are non-empty and have no overlapping calendar dates.
+    """
+    if not dates_a or not dates_b:
+        return False
+    suffixes_a = {_normalize_date_suffix(d) for d in dates_a}
+    suffixes_b = {_normalize_date_suffix(d) for d in dates_b}
+    return suffixes_a.isdisjoint(suffixes_b)
 
 
 def analyze_polarity_and_predicate(
@@ -773,6 +879,7 @@ def build_structured_slots(
         value_dimension=dim,
         normalized_amounts=amounts,
         amount_roles=amount_roles,
+        installment_stage=_extract_installment_or_stage(statement),
         normalized_dates=dates,
         invalid_dates=invalid_dates,
         date_roles=date_roles,
@@ -1210,7 +1317,98 @@ def evaluate_claim_against_fact(
 
         # 동일 역할 금액이 다른 경우 (예: T02 동일 계약 보증금 3억 vs 2억)
         if matched_same_role_diff is not None and not matched_same_role_equal:
-            _, diff_c_vals, diff_f_vals = matched_same_role_diff
+            diff_role, diff_c_vals, diff_f_vals = matched_same_role_diff
+
+            # [가드 1] 분할 지급 회차(1차 vs 2차) 또는 계약 단계(계약금 vs 중도금 vs 잔금) 상이성 검사
+            c_stage = claim_slots.installment_stage or _extract_installment_or_stage(claim_slots.statement)
+            f_stage = fact_slots.installment_stage or _extract_installment_or_stage(fact_slots.statement)
+            if c_stage and f_stage and c_stage != f_stage:
+                return ConflictDecision(
+                    claim_id=claim_id,
+                    target_fact_id=fact.id,
+                    status="DIFFERENT_CONTEXT",
+                    reason_code="DIFFERENT_INSTALLMENT_ROUND",
+                    explanation=(
+                        f"비교 대상 금액의 지급 회차 또는 계약 단계({c_stage} vs {f_stage})가 "
+                        f"서로 다른 별개의 분할 지급 사실입니다."
+                    ),
+                    confidence=0.95,
+                    source_span_ids=spans,
+                )
+
+            # [가드 2] 금융 거래/이체 일자(Transaction Date) 상이성 검사
+            # 이체/송금/입금/지급 행위의 경우 일자가 서로 다르면 서로 다른 개별 금융 거래임
+            if _are_date_sets_distinct(c_dates, f_dates):
+                is_payment_action = (
+                    diff_role in ("ACTUAL_PAYMENT", "RETURNED_AMOUNT", "PERIODIC_RENT_OR_FEE", "INTERIM_OR_BALANCE")
+                    or any(kw in (claim_slots.statement + " " + fact_slots.statement) for kw in (
+                        "이체", "송금", "입금", "지급", "지급되었", "이체되었", "송금되었", "입금되었",
+                        "입금 확인", "입금을 확인", "반환하여 입금", "이체금액", "입금액", "거래내역"
+                    ))
+                )
+                if is_payment_action:
+                    return ConflictDecision(
+                        claim_id=claim_id,
+                        target_fact_id=fact.id,
+                        status="DIFFERENT_CONTEXT",
+                        reason_code="DIFFERENT_TRANSACTION_DATE",
+                        explanation=(
+                            f"서로 다른 일자({', '.join(sorted(c_dates))} vs {', '.join(sorted(f_dates))})에 "
+                            f"발생한 개별 금융 이체·지급 내역이므로 상충하지 않습니다."
+                        ),
+                        confidence=0.95,
+                        source_span_ids=spans,
+                    )
+
+            # [가드 3] 임대차보증금 또는 채무의 분할 반환·일부 변제(Partial Return) 검사
+            # '일부 반환', '일부 변제', '보증금 중 일부' 등은 여러 차례 나누어 지급될 수 있는 분할 이행 행위이므로,
+            # 전액·총액 반환이라는 배타적 명시가 없는 한 금액이 달라도 상충이 아닌 별개 분할 반환 회차로 처리한다.
+            combined_text = claim_slots.statement + " " + fact_slots.statement
+            is_partial_return = any(
+                kw in combined_text for kw in (
+                    "일부 반환", "일부반환", "일부 변제", "일부변제", "일부 입금",
+                    "중 일부를 반환", "중 일부 반환", "보증금 중 일부"
+                )
+            )
+            is_total_claim = any(
+                kw in combined_text for kw in (
+                    "전액 반환", "전액반환", "총 반환", "총액", "전부 변제", "전액 지급"
+                )
+            )
+            if is_partial_return and not is_total_claim:
+                return ConflictDecision(
+                    claim_id=claim_id,
+                    target_fact_id=fact.id,
+                    status="DIFFERENT_CONTEXT",
+                    reason_code="PARTIAL_RETURN_INSTANCE",
+                    explanation=(
+                        f"임대차보증금 또는 채무의 '일부 반환·분할 변제' 내역으로, "
+                        f"각각의 분할 지급액({', '.join(f'{a:,}원' for a in sorted(diff_c_vals))} vs "
+                        f"{', '.join(f'{a:,}원' for a in sorted(diff_f_vals))})은 서로 다른 회차의 분할 집행이므로 상충하지 않습니다."
+                    ),
+                    confidence=0.95,
+                    source_span_ids=spans,
+                )
+
+            # [가드 4] 금융 거래 증빙/이체 내역 제공 요청(Proof Request) vs 실제 지급 내역 검사
+            # 이체 날짜, 거래번호, 소명 자료 등의 제공을 요청하는 진술은
+            # 이미 확인·실행된 지급 내역 또는 과거 거래 내역과 배타적으로 상충하는 것이 아님
+            is_c_proof_req = bool(_PROOF_REQUEST_RE.search(claim_slots.statement))
+            is_f_proof_req = bool(_PROOF_REQUEST_RE.search(fact_slots.statement))
+            if is_c_proof_req != is_f_proof_req:
+                return ConflictDecision(
+                    claim_id=claim_id,
+                    target_fact_id=fact.id,
+                    status="DIFFERENT_CONTEXT",
+                    reason_code="PROOF_REQUEST_VS_ACTUAL_PAYMENT",
+                    explanation=(
+                        "한쪽은 금융 이체 증빙(이체 날짜, 거래번호, 소명 자료 등)의 제공을 요청하는 진술이고, "
+                        "다른 쪽은 실제 실행·확인된 지급 내역이므로 행위 성격이 달라 상충하지 않습니다."
+                    ),
+                    confidence=0.95,
+                    source_span_ids=spans,
+                )
+
             if use_llm:
                 llm_ver = _verify_pair_with_llm(claim_slots, fact_slots)
                 if llm_ver is not None:
@@ -1255,6 +1453,23 @@ def evaluate_claim_against_fact(
 
         # 동일 역할 금액이 일치하는 경우 (matched_same_role_equal == True)
         if matched_same_role_equal and claim_slots.polarity == fact_slots.polarity:
+            # 동일 금액이더라도 회차나 계약 단계가 다르면 별개의 사실 (예: 1차 2000만 vs 2차 2000만)
+            c_stage = claim_slots.installment_stage or _extract_installment_or_stage(claim_slots.statement)
+            f_stage = fact_slots.installment_stage or _extract_installment_or_stage(fact_slots.statement)
+            if c_stage and f_stage and c_stage != f_stage:
+                return ConflictDecision(
+                    claim_id=claim_id,
+                    target_fact_id=fact.id,
+                    status="DIFFERENT_CONTEXT",
+                    reason_code="DIFFERENT_INSTALLMENT_ROUND",
+                    explanation=(
+                        f"언급된 금액({sorted(c_amounts)[0]:,}원)은 동일하나 "
+                        f"지급 회차 또는 계약 단계({c_stage} vs {f_stage})가 서로 다른 별개의 사실입니다."
+                    ),
+                    confidence=0.95,
+                    source_span_ids=spans,
+                )
+
             # Section 3.4: 양쪽 모두 날짜가 있는 경우에는 날짜도 호환되어야 CONSISTENT로 확정
             if c_dates and f_dates and set(c_dates) != set(f_dates):
                 c_date_roles = set(claim_slots.date_roles.keys())
@@ -1354,6 +1569,22 @@ def evaluate_claim_against_fact(
                     reason_code="DIFFERENT_TIMELINE_EVENT",
                     explanation="서로 다른 시점의 개별 이벤트 또는 후속 절차에 관한 일자입니다.",
                     confidence=0.9,
+                    source_span_ids=spans,
+                )
+
+            # 분할 반환 또는 분할 회차의 경우 일자가 다르면 서로 다른 분할 지급 회차의 이벤트임
+            comb_text = claim_slots.statement + " " + fact_slots.statement
+            is_partial_event = any(kw in comb_text for kw in ("일부 반환", "일부반환", "일부 변제", "일부변제", "일부 입금", "보증금 중 일부"))
+            c_stage_val = claim_slots.installment_stage or _extract_installment_or_stage(claim_slots.statement)
+            f_stage_val = fact_slots.installment_stage or _extract_installment_or_stage(fact_slots.statement)
+            if (c_stage_val and f_stage_val and c_stage_val != f_stage_val) or is_partial_event:
+                return ConflictDecision(
+                    claim_id=claim_id,
+                    target_fact_id=fact.id,
+                    status="DIFFERENT_CONTEXT",
+                    reason_code="DIFFERENT_TIMELINE_EVENT",
+                    explanation="서로 다른 일자에 발생한 분할 반환 또는 개별 회차 이벤트이므로 상충하지 않습니다.",
+                    confidence=0.95,
                     source_span_ids=spans,
                 )
 
@@ -1768,11 +1999,23 @@ def reconcile_case_conflicts(
                     evidence_id=claim.evidence_id,
                     document_name=claim_doc.original_filename if claim_doc else None,
                 )
+                target_fact_slots = build_structured_slots(
+                    statement=target_fact.statement or "",
+                    claim_type=target_fact.fact_type,
+                    subject=target_fact.subject_key,
+                    predicate=target_fact.predicate_key,
+                    scope=target_fact.scope,
+                    temporal_context=target_fact.temporal_context,
+                    evidence_id=target_fact.source_ref,
+                    document_name=fact_doc_names.get(target_fact.id),
+                )
+                target_fact.structured_slots = target_fact_slots.model_dump()
                 decision = evaluate_claim_against_fact(
                     claim_slots=claim_slots,
                     fact=target_fact,
                     fact_doc_name=fact_doc_names.get(target_fact.id),
                     claim_id=claim.id,
+                    fact_slots=target_fact_slots,
                     enable_llm_verification=False,
                 )
                 # 판정 상태명(CONTRADICTION)과 DB 관계명(CONTRADICTS)은 별도 규약이다.

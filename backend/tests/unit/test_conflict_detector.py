@@ -766,3 +766,114 @@ def test_p1_03_verifier_evidence_conflict_gating_integration(monkeypatch):
     assert res_2["conflict_acknowledged"] is True
     state_cautionary["verification_result"] = res_2
     assert verification_condition(state_cautionary) == "finalize"
+
+def test_installment_rounds_and_differing_transaction_dates_not_contradiction():
+    """1차·2차 등 회차별 분할 지급액 및 서로 다른 일자의 계좌 이체 내역은 모순이 아닌 별개 사실로 분류되어야 한다."""
+    # 1. 서로 다른 회차의 중도금 (1차중도금 24,000,000원 vs 2차중도금 20,000,000원)
+    claim_round2 = "2차중도금 지급액은 20,000,000원이다."
+    fact_round1 = Fact(
+        id="f-interim-1",
+        case_id="case-installment-test",
+        statement="1차중도금 지급액은 24,000,000원이다.",
+        fact_type="AMOUNT",
+        source_type="DOCUMENT_SUPPORTED",
+    )
+    slots_c2 = build_structured_slots(claim_round2)
+    dec_c2 = evaluate_claim_against_fact(slots_c2, fact_round1, claim_id="c-round2")
+    assert dec_c2.status == "DIFFERENT_CONTEXT"
+    assert dec_c2.reason_code == "DIFFERENT_INSTALLMENT_ROUND"
+
+    # 2. 서로 다른 일자의 계좌 이체 내역 (2026-04-30 24,000,000원 vs 2026-05-12 20,000,000원)
+    claim_tx2 = "2026-05-12에 20,000,000원이 ㈜한빛인테리어 계좌로 이체되었고 적요는 2차중도로 기재되어 있다."
+    fact_tx1 = Fact(
+        id="f-tx-1",
+        case_id="case-installment-test",
+        statement="2026-04-30에 24,000,000원이 ㈜한빛인테리어 계좌로 이체되었고 적요는 1차중도로 기재되어 있다.",
+        fact_type="AMOUNT",
+        source_type="DOCUMENT_SUPPORTED",
+    )
+    slots_tx2 = build_structured_slots(claim_tx2)
+    dec_tx2 = evaluate_claim_against_fact(slots_tx2, fact_tx1, claim_id="c-tx2")
+    assert dec_tx2.status == "DIFFERENT_CONTEXT"
+    assert dec_tx2.reason_code in ("DIFFERENT_INSTALLMENT_ROUND", "DIFFERENT_TRANSACTION_DATE")
+
+    # 3. 동일 회차인데 금액이 다른 경우 (1차중도금 24,000,000원 vs 1차중도금 20,000,000원) -> 상충(CONTRADICTION) 정상 유지
+    claim_round1_conflict = "1차중도금 지급액은 20,000,000원이다."
+    slots_c1_conflict = build_structured_slots(claim_round1_conflict)
+    dec_c1_conflict = evaluate_claim_against_fact(slots_c1_conflict, fact_round1, claim_id="c-round1-conflict")
+    assert dec_c1_conflict.status == "CONTRADICTION"
+    assert dec_c1_conflict.reason_code == "MUTUALLY_EXCLUSIVE_AMOUNT"
+
+
+
+def test_date_masking_prevents_day_numeral_distortion():
+    """Section 3.3/3.4: 일자 표현('20일', '10일')의 '일'이 한글 숫자 '일(1)'로 오인되어
+
+    금액이 비정상적으로 부풀려지는 현상(20M -> 230M, 30M -> 140M)을 방지하고 정확한 날짜를 추출한다.
+    """
+    text_sep20 = "김차인은 9월 20일 2천만 원 입금을 확인했다고 주장하였다."
+    slots_sep20 = build_structured_slots(text_sep20)
+    assert slots_sep20.normalized_amounts == [20_000_000]
+    assert "09-20" in slots_sep20.normalized_dates
+
+    text_oct10 = "김차인은 10월 10일 3천만 원 입금을 확인했다고 주장하였다."
+    slots_oct10 = build_structured_slots(text_oct10)
+    assert slots_oct10.normalized_amounts == [30_000_000]
+    assert "10-10" in slots_oct10.normalized_dates
+
+
+def test_distinct_transaction_dates_with_month_day_not_contradiction():
+    """서로 다른 일자(9월 20일 vs 10월 10일)에 발생한 개별 금융 입금 내역은 상충하지 않는다 (DIFFERENT_TRANSACTION_DATE)."""
+    claim_oct = "김차인은 10월 10일 3천만 원 입금을 확인했다고 주장하였다."
+    fact_sep = Fact(
+        id="f-sep20",
+        case_id="case-date-test",
+        statement="김차인은 9월 20일 2천만 원 입금을 확인했다고 주장하였다.",
+        fact_type="AMOUNT",
+        source_type="DOCUMENT_SUPPORTED",
+    )
+    slots_claim = build_structured_slots(claim_oct)
+    slots_fact = build_structured_slots(fact_sep.statement)
+    dec = evaluate_claim_against_fact(slots_claim, fact_sep, claim_id="c-oct", fact_slots=slots_fact)
+    assert dec.status == "DIFFERENT_CONTEXT"
+    assert dec.reason_code == "DIFFERENT_TRANSACTION_DATE"
+
+
+def test_partial_repayment_amounts_not_contradiction():
+    """임대차보증금 분할 반환·일부 변제(Partial Return)는 여러 차례 나누어 지급될 수 있으므로
+
+    금액이 달라도 전액 명시가 없는 한 상충이 아닌 별개 분할 반환으로 처리한다 (PARTIAL_RETURN_INSTANCE).
+    """
+    claim_partial = "2026-10-10에 김대인(임대인)이 김차인(임차인) 계좌로 임대차보증금 중 30,000,000원을 일부 반환하여 입금되었다고 거래내역에 기재되어 있다."
+    fact_partial = Fact(
+        id="f-part-20m",
+        case_id="case-partial-test",
+        statement="거래 내용란에는 임대차보증금 중 20,000,000원을 일부 반환하여 입금 확인이라고 기재되어 있다.",
+        fact_type="AMOUNT",
+        source_type="DOCUMENT_SUPPORTED",
+    )
+    slots_claim = build_structured_slots(claim_partial)
+    slots_fact = build_structured_slots(fact_partial.statement)
+    dec = evaluate_claim_against_fact(slots_claim, fact_partial, claim_id="c-partial", fact_slots=slots_fact)
+    assert dec.status == "DIFFERENT_CONTEXT"
+    assert dec.reason_code == "PARTIAL_RETURN_INSTANCE"
+
+
+def test_proof_or_inquiry_request_vs_payment_not_contradiction():
+    """추가 이체 날짜와 거래번호 등의 증빙 제공을 요청하는 진술(Proof Request)은
+
+    실제 확인된 이체금액 기록과 배타적으로 상충하지 않는다 (PROOF_REQUEST_VS_ACTUAL_PAYMENT).
+    """
+    claim_inquiry = "김차인은 임대인에게 추가 5천만 원의 이체 날짜와 거래번호 제공을 요청하였다."
+    fact_payment = Fact(
+        id="f-actual-20m",
+        case_id="case-proof-test",
+        statement="이체금액은 20,000,000원으로 기재되어 있다.",
+        fact_type="AMOUNT",
+        source_type="DOCUMENT_SUPPORTED",
+    )
+    slots_claim = build_structured_slots(claim_inquiry)
+    slots_fact = build_structured_slots(fact_payment.statement)
+    dec = evaluate_claim_against_fact(slots_claim, fact_payment, claim_id="c-inquiry", fact_slots=slots_fact)
+    assert dec.status == "DIFFERENT_CONTEXT"
+    assert dec.reason_code == "PROOF_REQUEST_VS_ACTUAL_PAYMENT"
