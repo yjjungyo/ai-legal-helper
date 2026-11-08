@@ -66,7 +66,7 @@ def test_case_question_keeps_document_grounding(monkeypatch):
     out = workflow.intent_analysis_node(state)
     assert out["consultation_mode"] == "CASE_EVIDENCE"
     assert out["answer_mode"] == DOCUMENT_MODE
-    assert "case_evidence_briefing" not in out  # 기존 조회 결과 유지
+    assert "case_evidence_briefing" in out  # 기존 조회 유지 확인  # 기존 조회 결과 유지
 
 
 def test_missing_mode_defaults_to_case_evidence():

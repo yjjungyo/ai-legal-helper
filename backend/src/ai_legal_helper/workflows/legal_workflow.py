@@ -4533,15 +4533,21 @@ def intent_analysis_node(state: LegalState) -> Dict:
 
                     tasks = plan_legal_issues(decision.resolved_query or q, briefing)
 
-                    graph = _collect_graph_evidence(db, case_id, decision.resolved_query or q)
-
-                    graph_text = graph.pop("context_text", "")
+                    # [GraphRAG 프롬프트 주입 배제] 법률 상담 시 2차 가공물인 지식그래프 요약 노드 주입을 배제하고,
+                    # 100% 원문 서증 기반 PostgreSQL Source of Truth(CaseEvidenceBriefing)만 프롬프트에 주입한다 (ARCH-DEFENSE-20261108).
+                    # 지식 그래프(Neo4j)는 상담 답변 생성이 아닌 시각화 뷰어 및 백그라운드 인덱스로만 격리 운용한다.
+                    graph = {
+                        "available": False,
+                        "search_mode": "DISABLED_FOR_CONSULTATION",
+                        "valid_paths": [],
+                        "structured_matches": [],
+                        "sources": [],
+                        "invalid_count": 0,
+                        "evidence_gaps": [],
+                        "contradictions": [],
+                    }
 
                     case_ctx = briefing.formatted_summary
-
-                    if graph_text:
-
-                        case_ctx += "\n\n" + graph_text
 
                     # 대화 요약은 사건 원문과 구분하여 컨텍스트에 유지한다.
 
