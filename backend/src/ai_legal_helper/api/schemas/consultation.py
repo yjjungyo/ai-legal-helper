@@ -133,6 +133,14 @@ class Source(BaseModel):
     span_id: Optional[str] = None
     text_excerpt: Optional[str] = None
 
+    # 증거 문서별 사실 승인 범위 및 인용 지침 필드
+    approval_scope: Optional[str] = None
+    approval_scope_label: Optional[str] = None
+    claim_review_guide: Optional[str] = None
+    approved_claim_count: Optional[int] = None
+    rejected_claim_count: Optional[int] = None
+    pending_claim_count: Optional[int] = None
+
 class ClaimReference(BaseModel):
     """주장에 대응하는 구체적 증거 문서, 추출 클레임 및 텍스트 발췌 참조 모델 (P0-2)."""
     evidence_id: str = Field(description="증거 문서 UUID")

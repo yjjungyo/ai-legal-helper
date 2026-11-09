@@ -114,6 +114,14 @@ class StandardSource(BaseModel):
     page: Optional[str] = None
     text_excerpt: Optional[str] = None
 
+    # 증거 문서별 사실 승인 범위 및 인용 지침 필드
+    approval_scope: Optional[str] = None
+    approval_scope_label: Optional[str] = None
+    claim_review_guide: Optional[str] = None
+    approved_claim_count: Optional[int] = None
+    rejected_claim_count: Optional[int] = None
+    pending_claim_count: Optional[int] = None
+
     # 5. 기존 API/UI 하위 호환용 필드
     file: str = "?"
     file_name: Optional[str] = None
@@ -649,6 +657,12 @@ def normalize_source_dict(raw: Any) -> Dict[str, Any]:
         file=filename or raw.get("file") or source_id,
         file_name=filename,
         category=raw.get("category"),
+        approval_scope=raw.get("approval_scope"),
+        approval_scope_label=raw.get("approval_scope_label"),
+        claim_review_guide=raw.get("claim_review_guide"),
+        approved_claim_count=raw.get("approved_claim_count"),
+        rejected_claim_count=raw.get("rejected_claim_count"),
+        pending_claim_count=raw.get("pending_claim_count"),
     )
     return std.model_dump()
 

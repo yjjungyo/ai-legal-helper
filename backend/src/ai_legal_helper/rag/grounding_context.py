@@ -1,7 +1,11 @@
+# -*- coding: utf-8 -*-
 """답변 작성자와 검증기가 동일한 원문 출처를 보도록 컨텍스트를 구성한다.
 
+[역할]
 출처 추가 순서에 따른 개수 제한이나 본문 앞부분 절단을 하지 않는다.
 전체 예산을 넘으면 누락을 숨기는 대신 명시적으로 실패하여 검증 범위를 보존한다.
+사건 증거 문서의 경우 개별 사실 승인/반려 현황(claim_review_guide)을 본문과 함께
+결합하여 LLM이 반려된 주장을 배제하고 승인된 사실만을 신뢰할 수 있도록 인용 지침을 주입한다.
 """
 
 import json
@@ -13,6 +17,9 @@ def format_grounding_sources(
     sources: List[Dict[str, Any]], max_chars: int = 120_000,
 ) -> Tuple[str, Dict[str, Any]]:
     """전체 출처 본문과 실제 전달 목록을 함께 반환한다.
+
+    증거 문서(CASE_EVIDENCE)의 경우 개별 사실의 승인 범위(approval_scope) 및
+    승인/반려/보류 지침(claim_review_guide)을 본문 앞에 결합하여 LLM에 전달한다.
 
     Args:
         sources: 이번 요청에서 확보한 사건 증거와 법령 레지스트리.
@@ -43,8 +50,14 @@ def format_grounding_sources(
             "statute_name", "article", "article_title", "paragraph_no", "part", "chapter", "section",
             "promulgation_number", "promulgation_date", "effective_date", "version_date",
             "page", "source_url", "retrieval_method", "review_status", "source_kind", "document_name",
+            "approval_scope", "approval_scope_label", "approved_claim_count", "rejected_claim_count", "pending_claim_count",
         ) if source.get(key) is not None}
-        blocks.append(json.dumps(meta, ensure_ascii=False) + "\n본문:\n" + (content or "(원문 본문 미확보)"))
+
+        # 증거 문서별 사실 승인 지침(claim_review_guide)이 존재할 경우 원문 상단에 명시 주입
+        guide = source.get("claim_review_guide")
+        guide_section = f"\n[사실 검토 및 인용 지침]\n{guide}\n" if guide else ""
+
+        blocks.append(json.dumps(meta, ensure_ascii=False) + guide_section + "\n본문:\n" + (content or "(원문 본문 미확보)"))
     rendered = "\n\n".join(blocks) or "(검색된 출처 없음)"
     if len(rendered) > max_chars:
         raise ValueError("GROUNDING_CONTEXT_LIMIT_EXCEEDED")
