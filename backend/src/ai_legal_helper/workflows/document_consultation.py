@@ -58,8 +58,22 @@ def document_sources(state: Dict[str, Any]) -> List[Dict[str, Any]]:
     Returns:
         파생 그래프 주장과 반려/미승인 문서 본문을 제외한 전체 출처.
     """
-    sources = []
-    for document in (state.get("case_evidence_briefing") or {}).get("source_documents", []):
+    # Feature-flagged verified graph span retrieval; original evidence remains the
+    # fallback when the graph has no verified provenance or incomplete coverage.
+    import os as _graph_os
+    _graph_pack = state.get("verified_graph_source_pack") or []
+    _graph_meta = state.get("graph_evidence") or {}
+    _use_graph_pack = (
+        _graph_os.getenv("COMPOSITE_GRAPHRAG_CONSULTATION", "false").lower() == "true"
+        and _graph_meta.get("search_mode") == "VERIFIED_GRAPH_EXACT_SPAN"
+        and bool(_graph_pack)
+        and not _graph_meta.get("evidence_gaps")
+        and not _graph_meta.get("invalid_count")
+    )
+    sources = [dict(source) for source in _graph_pack] if _use_graph_pack else []
+    for document in ([] if _use_graph_pack else
+                     (state.get("case_evidence_briefing") or {}).get("source_documents", [])):
+
         usable_content = document.get("content", "") if document.get("review_status") == "APPROVED" else ""
         # "E05", "EVIDENCE:E05" 같은 축약 별칭 대신 실제 전체 파일명(예: "E05_퇴거_및_보증금_반환_요청_문자.txt")을 출처 ID로 사용한다.
         full_doc_name = str(
