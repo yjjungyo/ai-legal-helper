@@ -47,6 +47,7 @@ def build_verified_graph_source_pack(
             EvidenceClaim.id == claim_id,
             EvidenceClaim.case_id == case_id,
             EvidenceDocument.case_id == case_id,
+            EvidenceDocument.status == "APPROVED",
             EvidenceClaim.evidence_id == EvidenceDocument.id,
             EvidenceClaim.review_status.in_(tuple(approved)),
         ).first()
