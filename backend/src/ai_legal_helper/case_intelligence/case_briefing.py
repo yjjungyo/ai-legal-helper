@@ -48,6 +48,11 @@ class EvidenceItemBrief(BaseModel):
     document_type: str = Field("GENERAL", description="문서 유형 (계약서, 영수증, 등기부 등)")
     status: str = Field("UPLOADED", description="추출 및 검토 상태")
     claim_count: int = Field(0, description="해당 문서에서 추출된 주장/사실 건수")
+    approval_scope: str = Field("NO_CLAIMS", description="사실 승인 범위 (FULL_APPROVED, PARTIAL_APPROVED, ALL_REJECTED, PENDING, NO_CLAIMS)")
+    approval_scope_label: str = Field("추출 사실 없음", description="사실 승인 범위 한글 레이블")
+    approved_claim_count: int = Field(0, description="승인된 주장 건수")
+    rejected_claim_count: int = Field(0, description="반려된 주장 건수")
+    pending_claim_count: int = Field(0, description="검토 대기 주장 건수")
     uploaded_at: Optional[str] = Field(None, description="업로드 일시 (KST)")
 
 
@@ -192,6 +197,127 @@ def assign_evidence_labels(documents: List[EvidenceDocument]) -> Dict[str, str]:
     return label_map
 
 
+def compute_document_claim_review_summary(claims: List[Any]) -> Dict[str, Any]:
+    """증거 문서에 귀속된 개별 주장(Claim)들의 승인/반려/보류 현황을 집계하고 LLM용 인용 지침을 생성한다.
+
+    [역할 및 목적]
+    문서 단위의 status(APPROVED 등)만으로는 문서 내부의 개별 사실관계 채택 여부를 알 수 없다.
+    의뢰인이 일부 주장은 반려(기각)하고 일부만 승인한 경우, LLM이 반려된 거짓 주장을 사실로
+    오인하여 법률 조언에 인용하는 2차 환각을 방지하기 위해 정밀한 검토 범위 및 지침을 제공한다.
+
+    [검토 범위 분류]
+    1. FULL_APPROVED (전체 사실 승인): 모든 추출 사실이 APPROVED 또는 EDITED
+    2. PARTIAL_APPROVED (일부 사실 승인): 승인된 사실과 반려/보류 사실이 혼재
+    3. ALL_REJECTED (전체 사실 반려): 모든 추출 사실이 REJECTED
+    4. PENDING (사실 검토 대기): 모든 추출 사실이 아직 PENDING
+    5. NO_CLAIMS (추출 사실 없음): 해당 문서에서 추출된 Claim이 0건
+
+    Args:
+        claims: 해당 증거 문서에 연결된 EvidenceClaim ORM 객체 또는 딕셔너리 리스트.
+
+    Returns:
+        Dict[str, Any]: 승인 범위(approval_scope), 레이블(approval_scope_label),
+        상태별 건수, 상태별 문장 목록 및 LLM 인용 지침(claim_review_guide) 딕셔너리.
+    """
+    total = len(claims)
+    if total == 0:
+        return {
+            "approval_scope": "NO_CLAIMS",
+            "approval_scope_label": "추출 사실 없음",
+            "total_claim_count": 0,
+            "approved_claim_count": 0,
+            "rejected_claim_count": 0,
+            "pending_claim_count": 0,
+            "approved_claims": [],
+            "rejected_claims": [],
+            "pending_claims": [],
+            "claim_review_guide": "",
+        }
+
+    # ORM 객체 또는 Dict 호환 처리
+    def get_status(c: Any) -> str:
+        if isinstance(c, dict):
+            return str(c.get("review_status") or "PENDING")
+        return str(getattr(c, "review_status", "PENDING") or "PENDING")
+
+    def get_statement(c: Any) -> str:
+        if isinstance(c, dict):
+            return str(c.get("statement") or "")
+        return str(getattr(c, "statement", "") or "")
+
+    approved = [c for c in claims if get_status(c) in ("APPROVED", "EDITED")]
+    rejected = [c for c in claims if get_status(c) == "REJECTED"]
+    pending = [c for c in claims if get_status(c) not in ("APPROVED", "EDITED", "REJECTED")]
+
+    approved_stmts = [get_statement(c) for c in approved if get_statement(c)]
+    rejected_stmts = [get_statement(c) for c in rejected if get_statement(c)]
+    pending_stmts = [get_statement(c) for c in pending if get_statement(c)]
+
+    if len(approved) == total:
+        scope = "FULL_APPROVED"
+        scope_label = "전체 사실 승인"
+        guide_lines = [
+            f"■ 사실 승인 구분: [전체 사실 승인] (총 {total}건 전원 승인 완료)",
+            "- 확인된 승인 사실 목록:",
+        ]
+        for s in approved_stmts:
+            guide_lines.append(f'  * "{s}"')
+        guide_lines.append("👉 지침: 문서에서 추출된 모든 주요 사실이 사용자에 의해 검증·승인되었습니다. 서류 전체를 높은 신뢰도로 사실 인정 및 인용하십시오.")
+    elif len(rejected) == total:
+        scope = "ALL_REJECTED"
+        scope_label = "전체 사실 반려"
+        guide_lines = [
+            f"■ 사실 승인 구분: [전체 사실 반려] (총 {total}건 전원 기각/반려)",
+            "- 반려된 주장 목록:",
+        ]
+        for s in rejected_stmts:
+            guide_lines.append(f'  * "{s}"')
+        guide_lines.append("👉 지침: 이 문서에 기재된 모든 주요 주장은 사용자에 의해 거짓 또는 무효로 배제(기각)되었습니다. 절대 진실한 사실로 인정하거나 의뢰인에게 불리한 사실로 채택하지 마십시오.")
+    elif len(pending) == total:
+        scope = "PENDING"
+        scope_label = "사실 검토 대기"
+        guide_lines = [
+            f"■ 사실 승인 구분: [사실 검토 대기] (총 {total}건 미검토)",
+            "- 검토 대기 주장 목록:",
+        ]
+        for s in pending_stmts:
+            guide_lines.append(f'  * "{s}"')
+        guide_lines.append("👉 지침: 아직 사용자의 사실 확인을 거치지 않은 자료입니다. 확정적 사실로 단정하지 말고 조건부 정황으로만 취급하십시오.")
+    else:
+        scope = "PARTIAL_APPROVED"
+        scope_label = "일부 사실 승인"
+        guide_lines = [
+            f"■ 사실 승인 구분: [일부 사실 승인] (총 {total}건 중 승인 {len(approved)}건, 반려 {len(rejected)}건, 보류 {len(pending)}건)",
+        ]
+        if approved_stmts:
+            guide_lines.append("- [승인된 사실 (APPROVED)] (법률 판단의 확실한 근거로 활용):")
+            for s in approved_stmts:
+                guide_lines.append(f'  * "{s}"')
+        if rejected_stmts:
+            guide_lines.append("- [반려된 주장 (REJECTED)] (주의: 의뢰인이 배제/기각한 내용. 절대 사실로 채택하거나 불리한 근거로 쓰지 마십시오):")
+            for s in rejected_stmts:
+                guide_lines.append(f'  * "{s}"')
+        if pending_stmts:
+            guide_lines.append("- [보류/미확인 주장 (PENDING)] (아직 사실 확인 전. 단정하지 말고 조건부로만 취급):")
+            for s in pending_stmts:
+                guide_lines.append(f'  * "{s}"')
+
+    guide_text = "\n".join(guide_lines)
+
+    return {
+        "approval_scope": scope,
+        "approval_scope_label": scope_label,
+        "total_claim_count": total,
+        "approved_claim_count": len(approved),
+        "rejected_claim_count": len(rejected),
+        "pending_claim_count": len(pending),
+        "approved_claims": approved_stmts,
+        "rejected_claims": rejected_stmts,
+        "pending_claims": pending_stmts,
+        "claim_review_guide": guide_text,
+    }
+
+
 def build_case_evidence_briefing(
     db: Session,
     case_id: str,
@@ -235,6 +361,14 @@ def build_case_evidence_briefing(
     label_map = assign_evidence_labels(doc_records)
     doc_dict = {d.id: d for d in doc_records}
 
+    # 증거별 Claim 조회 및 문서별 그룹핑 (개별 사실 승인/반려 현황 집계용)
+    claims = db.query(EvidenceClaim).filter(EvidenceClaim.case_id == case_id).all()
+    claims_by_doc: Dict[str, List[EvidenceClaim]] = {}
+    claim_counts: Dict[str, int] = {}
+    for c in claims:
+        claims_by_doc.setdefault(c.evidence_id, []).append(c)
+        claim_counts[c.evidence_id] = claim_counts.get(c.evidence_id, 0) + 1
+
     # 파생 Fact 요약을 원문처럼 사용하지 않는다. 현재 사건 문서의 추출 문단만 별도로 보존한다.
     spans_by_document: Dict[str, List[Any]] = {}
     if doc_dict:
@@ -245,6 +379,8 @@ def build_case_evidence_briefing(
         spans = sorted(spans_by_document.get(document.id, []), key=lambda span: (
             span.page_number or 0, span.paragraph_index or 0, span.char_start or 0, span.id,
         ))
+        doc_claims = claims_by_doc.get(document.id, [])
+        claim_summary = compute_document_claim_review_summary(doc_claims)
         source_documents.append({
             "evidence_id": document.id, "evidence_label": label_map[document.id],
             "document_name": document.original_filename, "review_status": document.status,
@@ -253,16 +389,18 @@ def build_case_evidence_briefing(
             "extracted_at": str(document.extracted_at) if document.extracted_at else None,
             "content": "\n".join(span.text_excerpt for span in spans),
             "span_ids": [span.id for span in spans],
+            "approval_scope": claim_summary["approval_scope"],
+            "approval_scope_label": claim_summary["approval_scope_label"],
+            "approved_claims": claim_summary["approved_claims"],
+            "rejected_claims": claim_summary["rejected_claims"],
+            "pending_claims": claim_summary["pending_claims"],
+            "claim_review_guide": claim_summary["claim_review_guide"],
         })
-
-    # 증거별 Claim 건수 집계
-    claim_counts: Dict[str, int] = {}
-    claims = db.query(EvidenceClaim).filter(EvidenceClaim.case_id == case_id).all()
-    for c in claims:
-        claim_counts[c.evidence_id] = claim_counts.get(c.evidence_id, 0) + 1
 
     evidence_items: List[EvidenceItemBrief] = []
     for d in doc_records:
+        doc_claims = claims_by_doc.get(d.id, [])
+        claim_summary = compute_document_claim_review_summary(doc_claims)
         evidence_items.append(
             EvidenceItemBrief(
                 evidence_id=d.id,
@@ -270,7 +408,12 @@ def build_case_evidence_briefing(
                 document_name=d.original_filename,
                 document_type=d.source_kind or "GENERAL",
                 status=d.status or "UPLOADED",
-                claim_count=claim_counts.get(d.id, 0),
+                claim_count=claim_summary["total_claim_count"],
+                approval_scope=claim_summary["approval_scope"],
+                approval_scope_label=claim_summary["approval_scope_label"],
+                approved_claim_count=claim_summary["approved_claim_count"],
+                rejected_claim_count=claim_summary["rejected_claim_count"],
+                pending_claim_count=claim_summary["pending_claim_count"],
                 uploaded_at=str(d.uploaded_at) if d.uploaded_at else None,
             )
         )
@@ -425,6 +568,8 @@ def build_case_evidence_briefing(
             "citation_tag": f"[{ev_item.evidence_label}]",
             "content": document_content.get(ev_item.evidence_id, ""),
             "review_status": ev_item.status,
+            "approval_scope": ev_item.approval_scope,
+            "approval_scope_label": ev_item.approval_scope_label,
         }
         source_registry[ev_item.evidence_label] = entry
         source_registry[ev_item.evidence_id] = entry
@@ -440,7 +585,10 @@ def build_case_evidence_briefing(
     if evidence_items:
         summary_lines.append("\n#### 1. 등록된 사건 증거 목록 (Source Registry)")
         for ev in evidence_items:
-            summary_lines.append(f"- [{ev.document_name}] ({ev.document_type}, 추출사실: {ev.claim_count}건)")
+            summary_lines.append(
+                f"- [{ev.document_name}] ({ev.document_type}, 사실검토: {ev.approval_scope_label}, "
+                f"총 {ev.claim_count}건 [승인 {ev.approved_claim_count}/반려 {ev.rejected_claim_count}/대기 {ev.pending_claim_count}])"
+            )
 
     # 당사자 정보
     if party_items:
