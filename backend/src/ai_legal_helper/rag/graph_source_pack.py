@@ -31,7 +31,7 @@ def build_verified_graph_source_pack(
     seen = set()
     for path in validated_paths:
         if len(sources) >= max_spans:
-            break
+            raise ValueError("graph source span limit exceeded; require full-document fallback")
         span_id = str(path.get("span_id") or "")
         claim_id = str(path.get("claim_id") or "")
         if not span_id or not claim_id or (span_id, claim_id) in seen:
@@ -59,7 +59,7 @@ def build_verified_graph_source_pack(
             continue
         # Never silently truncate a span that is needed to understand the claim.
         if len(excerpt) > max_chars_per_span:
-            continue
+            raise ValueError("graph source span too long; require full-document fallback")
         filename = str(getattr(document, "original_filename", None)
                        or getattr(document, "filename", None)
                        or getattr(document, "document_name", None) or document.id)
