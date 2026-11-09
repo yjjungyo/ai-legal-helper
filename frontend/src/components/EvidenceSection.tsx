@@ -753,27 +753,56 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
                     <strong style={{ fontSize: '0.92em', color: isSelected ? 'var(--primary)' : 'var(--text-main)', wordBreak: 'break-all' }}>
                       {displayName}
                     </strong>
-                    <span
-                      className={
-                        doc.status === 'APPROVED'
-                          ? 'badge badge-green'
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                      <span
+                        className={
+                          doc.status === 'APPROVED'
+                            ? 'badge badge-green'
+                            : doc.status === 'REVIEW_REQUIRED'
+                              ? 'badge badge-amber'
+                              : doc.status === 'EXTRACTING'
+                                ? 'badge badge-blue'
+                                : doc.status === 'FAILED' || doc.status === 'EXTRACTION_UNAVAILABLE'
+                                  ? 'badge badge-red'
+                                  : 'badge badge-gray'
+                        }
+                        style={{ fontSize: '0.72em', whiteSpace: 'nowrap' }}
+                      >
+                        {doc.status === 'APPROVED'
+                          ? 'APPROVED (검토완료)'
                           : doc.status === 'REVIEW_REQUIRED'
-                            ? 'badge badge-amber'
-                            : doc.status === 'EXTRACTING'
-                              ? 'badge badge-blue'
-                              : doc.status === 'FAILED' || doc.status === 'EXTRACTION_UNAVAILABLE'
-                                ? 'badge badge-red'
-                                : 'badge badge-gray'
-                      }
-                      style={{ fontSize: '0.72em', whiteSpace: 'nowrap' }}
-                    >
-                      {doc.status === 'APPROVED'
-                        ? 'APPROVED (검토완료)'
-                        : doc.status === 'REVIEW_REQUIRED'
-                          ? 'REVIEW_REQUIRED'
-                          : doc.status}
-                    </span>
+                            ? 'REVIEW_REQUIRED'
+                            : doc.status}
+                      </span>
+                      {doc.approval_scope && doc.approval_scope !== 'NO_CLAIMS' && (
+                        <span
+                          className={
+                            doc.approval_scope === 'FULL_APPROVED'
+                              ? 'badge badge-green'
+                              : doc.approval_scope === 'PARTIAL_APPROVED'
+                                ? 'badge badge-teal'
+                                : doc.approval_scope === 'ALL_REJECTED'
+                                  ? 'badge badge-red'
+                                  : doc.approval_scope === 'PENDING'
+                                    ? 'badge badge-amber'
+                                    : 'badge badge-gray'
+                          }
+                          style={{ fontSize: '0.70em', whiteSpace: 'nowrap' }}
+                        >
+                          {doc.approval_scope_label || doc.approval_scope}
+                        </span>
+                      )}
+                    </div>
                   </div>
+
+                  {typeof doc.claim_count === 'number' && doc.claim_count > 0 && (
+                    <div style={{ fontSize: '0.75em', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                      추출 사실: {doc.claim_count}건
+                      {doc.approval_scope !== 'NO_CLAIMS' && (
+                        <span> (승인 {doc.approved_claim_count || 0} / 반려 {doc.rejected_claim_count || 0} / 대기 {doc.pending_claim_count || 0})</span>
+                      )}
+                    </div>
+                  )}
 
                   <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
                     {(doc.status === 'UPLOADED' || doc.status === 'FAILED' || doc.status === 'REVIEW_REQUIRED' || doc.status === 'APPROVED') && (

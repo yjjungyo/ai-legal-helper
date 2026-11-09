@@ -9,6 +9,18 @@ export interface EvidenceDocument {
   status: string; // UPLOADED, EXTRACTING, REVIEW_REQUIRED, FAILED, COMPLETED
   source_kind?: string;
   error_code?: string;
+  /** 해당 문서에서 추출된 주장/사실 전체 건수 */
+  claim_count?: number;
+  /** 사실 승인 범위 (FULL_APPROVED, PARTIAL_APPROVED, ALL_REJECTED, PENDING, NO_CLAIMS) */
+  approval_scope?: 'FULL_APPROVED' | 'PARTIAL_APPROVED' | 'ALL_REJECTED' | 'PENDING' | 'NO_CLAIMS';
+  /** 사실 승인 범위 표시용 한글 레이블 */
+  approval_scope_label?: string;
+  /** 승인된 사실 건수 */
+  approved_claim_count?: number;
+  /** 반려(기각)된 주장 건수 */
+  rejected_claim_count?: number;
+  /** 검토 대기 주장 건수 */
+  pending_claim_count?: number;
   created_at: string;
   extracted_at?: string;
 }

@@ -150,22 +150,43 @@ def list_evidence(case: Case = Depends(get_case_for_user), db: Session = Depends
     if status_changed:
         db.commit()
 
+    from ai_legal_helper.case_intelligence.case_briefing import (
+        assign_evidence_labels,
+        compute_document_claim_review_summary,
+    )
+
     label_map = assign_evidence_labels(docs)
 
-    return [
-        {
-            "id": d.id,
-            "filename": d.original_filename,
-            "original_filename": d.original_filename,
-            "evidence_label": label_map.get(d.id, "E??"),
-            "media_type": d.media_type,
-            "size_bytes": d.size_bytes,
-            "status": d.status,
-            "uploaded_at": d.uploaded_at,
-            "created_at": d.uploaded_at,
-        }
-        for d in docs
-    ]
+    # 개별 사실(Claim) 승인/반려 현황 집계
+    claims = db.query(EvidenceClaim).filter(EvidenceClaim.case_id == case.id).all()
+    claims_by_doc: dict = {}
+    for c in claims:
+        claims_by_doc.setdefault(c.evidence_id, []).append(c)
+
+    results = []
+    for d in docs:
+        doc_claims = claims_by_doc.get(d.id, [])
+        claim_summary = compute_document_claim_review_summary(doc_claims)
+        results.append(
+            {
+                "id": d.id,
+                "filename": d.original_filename,
+                "original_filename": d.original_filename,
+                "evidence_label": label_map.get(d.id, "E??"),
+                "media_type": d.media_type,
+                "size_bytes": d.size_bytes,
+                "status": d.status,
+                "claim_count": claim_summary["total_claim_count"],
+                "approval_scope": claim_summary["approval_scope"],
+                "approval_scope_label": claim_summary["approval_scope_label"],
+                "approved_claim_count": claim_summary["approved_claim_count"],
+                "rejected_claim_count": claim_summary["rejected_claim_count"],
+                "pending_claim_count": claim_summary["pending_claim_count"],
+                "uploaded_at": d.uploaded_at,
+                "created_at": d.uploaded_at,
+            }
+        )
+    return results
 
 
 @router.get("/conflicts")
