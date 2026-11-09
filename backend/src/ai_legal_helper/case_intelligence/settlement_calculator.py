@@ -175,6 +175,13 @@ def extract_case_contract_deposit(briefing: CaseEvidenceBriefing) -> int:
     different values even when they share words. Monetary arithmetic is
     deterministic; semantic amount attribution uses grounded meaning.
     """
+    if not briefing:
+        return 0
+
+    # 1회 연산 결과 인스턴스 캐싱 (중복 LLM 호출 방지)
+    if hasattr(briefing, "_cached_contract_deposit"):
+        return getattr(briefing, "_cached_contract_deposit")
+
     from ai_legal_helper.case_intelligence.semantic_judgment import classify_statement
 
     candidates: set[int] = set()
@@ -190,6 +197,11 @@ def extract_case_contract_deposit(briefing: CaseEvidenceBriefing) -> int:
             # principal. Re-analysis would waste model calls and could
             # override an approved proposal with an invented payment.
             continue
+
+        # [Fast-Path] 문장 내 금액 숫자가 전혀 없으면 계약금 원금일 수 없으므로 LLM 호출 스킵
+        if not extract_amounts_from_text(fact.statement or ""):
+            continue
+
         verdict = classify_statement(
             fact.statement or "",
             task="CONTRACT_DEPOSIT_PRINCIPAL_CLASSIFICATION",
@@ -208,16 +220,22 @@ def extract_case_contract_deposit(briefing: CaseEvidenceBriefing) -> int:
         amounts = extract_amounts_from_text(verdict.evidence_quote)
         if len(amounts) == 1:
             candidates.update(amounts)
+    res_amt = 0
     if len(candidates) == 1:
-        return next(iter(candidates))
-    if len(candidates) > 1:
+        res_amt = next(iter(candidates))
+    elif len(candidates) > 1:
         logger.warning(
             "[DEPOSIT_CONFLICT] 동일 계약 보증금 원금의 승인된 수치가 상충: %s",
             sorted(candidates),
         )
     else:
         logger.info("[DEPOSIT_UNCONFIRMED] 근거가 확인된 총 보증금 원금 없음")
-    return 0
+
+    try:
+        object.__setattr__(briefing, "_cached_contract_deposit", res_amt)
+    except Exception:
+        pass
+    return res_amt
 
 
 def extract_case_prior_verified_repayments(briefing: CaseEvidenceBriefing) -> Tuple[int, List[str]]:
@@ -234,6 +252,13 @@ def extract_case_prior_verified_repayments(briefing: CaseEvidenceBriefing) -> Tu
     Returns:
         Tuple[int, List[str]]: (합산된 반환액, 근거 출처 목록) 튜플.
     """
+    if not briefing:
+        return 0, []
+
+    # 1회 연산 결과 인스턴스 캐싱 (중복 LLM 호출 방지)
+    if hasattr(briefing, "_cached_prior_repayments"):
+        return getattr(briefing, "_cached_prior_repayments")
+
     total_repaid = 0
     repaid_sources: List[str] = []
     accepted_txs: List[Dict[str, Any]] = []
@@ -252,6 +277,11 @@ def extract_case_prior_verified_repayments(briefing: CaseEvidenceBriefing) -> Tu
         for line_text in (line.strip() for line in statement.splitlines()):
             if not line_text:
                 continue
+
+            # [Fast-Path] 문장 내 금액 숫자가 전혀 없으면 반환 거래일 수 없으므로 LLM 호출 스킵
+            if trusted_amt is None and not extract_amounts_from_text(line_text):
+                continue
+
             verdict = None
             if trusted_amt is None or trusted_quote not in line_text:
                 verdict = classify_statement(
@@ -385,7 +415,12 @@ def extract_case_prior_verified_repayments(briefing: CaseEvidenceBriefing) -> Tu
             id_suffix = f" (거래번호: {tx_id})" if tx_id else ""
             repaid_sources.append(f"{ord_prefix}{amt:,}원 [{src}]{id_suffix}")
 
-    return total_repaid, repaid_sources
+    res_tuple = (total_repaid, repaid_sources)
+    try:
+        object.__setattr__(briefing, "_cached_prior_repayments", res_tuple)
+    except Exception:
+        pass
+    return res_tuple
 
 
 def calculate_three_months_expiry(reach_date_str: str) -> Optional[str]:

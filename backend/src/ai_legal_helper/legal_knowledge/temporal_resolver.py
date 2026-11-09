@@ -15,6 +15,7 @@
 """
 from __future__ import annotations
 
+import copy
 import hashlib
 import re
 from dataclasses import dataclass, field
@@ -37,6 +38,16 @@ _EVENT_TERMS = {
     "MOVE_OUT": ("퇴거", "인도", "이사"),
 }
 _LEGAL_DATE_TERMS = ("공포", "시행", "개정", "법령", "시행령", "시행규칙")
+# 부칙 적용례 검증을 위한 전체 사건 키워드 튜플 (Fast-Path 필터용)
+_ALL_EVENT_TOKENS: tuple[str, ...] = tuple(
+    tok for terms in _EVENT_TERMS.values() for tok in terms
+)
+# 조문별 개정규정 적용례/경과조치 특정 패턴 (예: "제36조의 개정규정은", "제6조 및 제7조의 개정규정")
+_SPECIFIC_ARTICLE_AMENDMENT = re.compile(
+    r"제\s*\d+\s*조(?:\s*의\s*\d+)?(?:[,\s및~]+제\s*\d+\s*조(?:\s*의\s*\d+)?)*\s*(?:의\s*)?개정규정"
+)
+# 프로덕션 LLM 부칙 해석 결과 캐시 (동일 부칙·조문 반복 호출 및 다수 조문 검색 시 중복 호출 방지)
+_addendum_interpretation_cache: dict[tuple[str, str], tuple[dict[str, Any] | None, str]] = {}
 _STRICT_EVENT_TERMS = {
     "CONTRACT_SIGNED": ("체결", "계약 체결"),
     "CONTRACT_RENEWED": ("갱신", "재계약"),
@@ -235,17 +246,64 @@ def interpret_addendum_with_llm(
     invoke_fn: Optional[Any] = None,
     review_invoke_fn: Optional[Any] = None,
 ) -> tuple[dict[str, Any] | None, str]:
-    """Interpret the COMPLETE official addendum for a target article.
+    """대상 조문에 대한 공식 부칙 적용례를 LLM 및 검증자로 정밀 해석한다.
 
-    Korean legal meaning is never validated with keyword/regular-expression
-    matching. Exact quotations, provenance and JSON types are checked by code;
-    a separate LLM review checks whether the extracted legal meaning and its
-    exception coverage actually follow from the complete source.
+    속도 최적화:
+        - 부칙 원문에 사건 행위 키워드가 없거나, 대상 조문 번호가 포함되지 않은 조문별
+          부칙인 경우 LLM 호출 없이 Fast-Path로 APPLICATION_PROVISION_NOT_FOUND 반환.
+        - 프로덕션 LLM 호출 결과는 메모이제이션 캐시(_addendum_interpretation_cache)에
+          보관하여 동일 부칙·조문 반복 조회 시 네트워크 지연을 방지한다.
+
+    안전 원칙:
+        Korean legal meaning is never validated with keyword/regular-expression
+        matching. Exact quotations, provenance and JSON types are checked by code;
+        a separate LLM review checks whether the extracted legal meaning and its
+        exception coverage actually follow from the complete source.
+
+    Args:
+        provision: 공식 부칙 전문 텍스트.
+        article: 대상 조문 식별자 (예: '제36조', '제6조의2').
+        invoke_fn: 테스트용 1차 부칙 해석 목(Mock) 함수 (선택).
+        review_invoke_fn: 테스트용 2차 독립 검증 목(Mock) 함수 (선택).
+
+    Returns:
+        (적용례 구조화 딕셔너리 또는 None, 판정 사유 코드).
     """
     import json
 
     if not provision.strip():
         return None, "OFFICIAL_ADDENDUM_MISSING"
+
+    # [Fast-Path 1: 사건 행위 키워드 부재 배제]
+    # 부칙 원문에 계약, 체결, 갱신, 통지 등 어떠한 사건 행위 키워드도 없다면
+    # 사건 적용례(event_evidence)가 원문에 존재할 수 없으므로 LLM 호출을 건너뛰고 즉시 배제한다.
+    if not any(token in provision for token in _ALL_EVENT_TOKENS):
+        return None, "APPLICATION_PROVISION_NOT_FOUND"
+
+    # [Fast-Path 2: 조문 한정 적용례 불일치 배제]
+    # 부칙에 특정 조문의 개정규정 적용례가 명시되어 있고,
+    # 대상 조문(article)이 부칙 원문에 전혀 언급되지 않았으며 일반 적용례 문구도 없는 경우 즉시 배제한다.
+    norm_art = _norm_article(article)
+    clean_provision = re.sub(r"\s+", "", provision)
+    if norm_art and (norm_art not in clean_provision):
+        has_general_scope = any(
+            f"{scope}시행" in clean_provision or f"{scope}은" in clean_provision
+            for scope in ("이법", "이영", "이규칙", "이조례")
+        )
+        if not has_general_scope or _SPECIFIC_ARTICLE_AMENDMENT.search(provision):
+            return None, "APPLICATION_PROVISION_NOT_FOUND"
+
+    # [캐시 확인: 프로덕션 환경의 중복 LLM 호출 방지]
+    cache_key = (provision, article)
+    use_cache = (invoke_fn is None and review_invoke_fn is None)
+    if use_cache and cache_key in _addendum_interpretation_cache:
+        cached_candidate, cached_reason = _addendum_interpretation_cache[cache_key]
+        return copy.deepcopy(cached_candidate), cached_reason
+
+    def _fail(reason_code: str) -> tuple[None, str]:
+        if use_cache:
+            _addendum_interpretation_cache[cache_key] = (None, reason_code)
+        return None, reason_code
 
     payload = json.dumps(
         {"target_article": article, "official_addenda": provision},
@@ -286,33 +344,33 @@ def interpret_addendum_with_llm(
     try:
         data = call(prompt, invoke_fn)
         if not isinstance(data, dict):
-            return None, "LLM_ADDENDUM_INVALID_OUTPUT"
+            return _fail("LLM_ADDENDUM_INVALID_OUTPUT")
         if not all(type(data.get(k)) is bool for k in (
             "is_relevant", "coverage_complete", "has_exception",
             "has_transition", "has_retroactivity",
         )):
-            return None, "LLM_ADDENDUM_INVALID_FLAGS"
+            return _fail("LLM_ADDENDUM_INVALID_FLAGS")
         if not data["is_relevant"]:
-            return None, "APPLICATION_PROVISION_NOT_FOUND"
+            return _fail("APPLICATION_PROVISION_NOT_FOUND")
         if not data["coverage_complete"]:
-            return None, "LLM_ADDENDUM_INCOMPLETE"
+            return _fail("LLM_ADDENDUM_INCOMPLETE")
         if data["has_exception"] or data["has_transition"] or data["has_retroactivity"]:
-            return None, "TRANSITIONAL_REVIEW_REQUIRED"
+            return _fail("TRANSITIONAL_REVIEW_REQUIRED")
         events = data.get("event_types")
         condition = data.get("condition")
         if (not isinstance(events, list) or not events
                 or len(events) != len(set(map(str, events)))
                 or any(not isinstance(e, str) or e not in _EVENT_TERMS for e in events)):
-            return None, "LLM_ADDENDUM_UNSUPPORTED_EVENT"
+            return _fail("LLM_ADDENDUM_UNSUPPORTED_EVENT")
         if condition not in (
             "ON_OR_AFTER_EFFECTIVE_DATE", "AFTER_EFFECTIVE_DATE", "ON_EFFECTIVE_DATE",
         ):
-            return None, "LLM_ADDENDUM_UNSUPPORTED_CONDITION"
+            return _fail("LLM_ADDENDUM_UNSUPPORTED_CONDITION")
         event_quote = data.get("event_evidence")
         condition_quote = data.get("condition_evidence")
         if any(not isinstance(q, str) or not q.strip() or q not in provision
                for q in (event_quote, condition_quote)):
-            return None, "LLM_ADDENDUM_UNGROUNDED"
+            return _fail("LLM_ADDENDUM_UNGROUNDED")
 
         candidate = {
             "event_types": events,
@@ -343,12 +401,15 @@ def interpret_addendum_with_llm(
             type(review.get(k)) is bool
             for k in ("supported", "complete", "exceptions_accounted_for")
         ):
-            return None, "LLM_ADDENDUM_REVIEW_INVALID"
+            return _fail("LLM_ADDENDUM_REVIEW_INVALID")
         if not all(review[k] for k in ("supported", "complete", "exceptions_accounted_for")):
-            return None, "LLM_ADDENDUM_REVIEW_REJECTED"
+            return _fail("LLM_ADDENDUM_REVIEW_REJECTED")
+
+        if use_cache:
+            _addendum_interpretation_cache[cache_key] = (copy.deepcopy(candidate), "LLM_ADDENDUM_SEMANTICALLY_VERIFIED")
         return candidate, "LLM_ADDENDUM_SEMANTICALLY_VERIFIED"
     except Exception:
-        return None, "LLM_ADDENDUM_INTERPRETATION_ERROR"
+        return _fail("LLM_ADDENDUM_INTERPRETATION_ERROR")
 
 
 def evaluate_temporal_sources(

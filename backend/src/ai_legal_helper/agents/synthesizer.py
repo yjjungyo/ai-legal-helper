@@ -198,9 +198,16 @@ def synthesize(
     findings = _format_findings(results, per_cat_limit=1500)
 
     # 사건 증거 브리핑 텍스트 구성 (P0-01, P0-02, P0-07)
+    # 사건 브리핑(formatted_summary)에 이미 확정 사실관계([입증된 사실]), 타임라인, 등록 증거가
+    # 체계적으로 정리되어 있으므로, 별도의 증거 원문 블록을 중복 주입하지 않고 단일 권위 소스로 활용한다.
     briefing_text = "(등록된 사건 증거 정보 없음)"
     if case_evidence_briefing:
-        b_summary = case_evidence_briefing.get("formatted_summary", "")
+        briefing_dict = (
+            case_evidence_briefing
+            if isinstance(case_evidence_briefing, dict)
+            else (case_evidence_briefing.model_dump() if hasattr(case_evidence_briefing, "model_dump") else {})
+        )
+        b_summary = briefing_dict.get("formatted_summary", "")
         if len(b_summary) > 2500:
             briefing_text = b_summary[:2500] + "\n...(후략)"
         else:
@@ -244,13 +251,14 @@ def synthesize(
                 + "\n- UNCONFIRMED인 적용례는 추가 확인사항으로 표시하고 확정적 결론을 피하세요."
             )
 
-        # 등록 증거 및 쟁점 목록 프롬프트 주입
+        # 사건 브리핑 및 쟁점 목록 프롬프트 주입 (단일 권위 사실 소스로 유지)
         cur_system = (
             f"{cur_system}\n\n"
             f"[등록된 사건 증거 및 확정 사실 브리핑]\n{briefing_text}\n\n"
             f"[검토 대상 핵심 법률 쟁점 목록]\n{issues_text}\n\n"
-            f"[중요 작성 원칙]\n"
-            f"- 입증된 사실은 입력에 있는 정확한 파일명을 `[파일명]`으로 인용하세요. 파일명이 없으면 실제 제공된 증거 라벨만 사용하고 파일명을 추정하지 마세요.\n"
+            f"[중요 작성 및 인용 원칙]\n"
+            f"- 사건 브리핑의 확정 사실관계([입증된 사실])를 근거로 답변하고, 해당 사실의 근거가 된 증거 파일명을 `[파일명]` 형식으로 인용하세요.\n"
+            f"- 사용자가 증거에서 반려(REJECTED)했거나 미확인(PENDING)된 사항은 단정하지 말고 추가 확인이 필요한 사항으로만 안내하세요.\n"
             f"- 쟁점별 법률 분석에서는 위 [검토 대상 핵심 법률 쟁점 목록]의 각 항목을 독립적으로 분석하세요."
         )
 

@@ -324,3 +324,50 @@ def test_actual_multi_event_contract_from_apply_wording():
             addendum_invoke_fn=interpret,
         )
         assert result.status == expected, (kind, event_date, result.as_dict())
+
+
+
+def test_fast_path_skips_llm_when_no_event_keywords():
+    """부칙에 계약, 체결 등 사건 키워드가 전혀 없으면 LLM을 호출하지 않고 Fast-Path로 배제한다."""
+    called = False
+
+    def fail_llm(prompt):
+        nonlocal called
+        called = True
+        raise AssertionError("사건 키워드가 없는 부칙에 대해 LLM이 호출되면 안 됩니다.")
+
+    # 단순 시행일만 있고 사건 적용례가 없는 부칙
+    no_event_addendum = "제1조(시행일) 이 영은 공포한 날부터 시행한다."
+    out = evaluate_temporal_sources(
+        "", [article(), addendum(no_event_addendum)],
+        event_date="2027-05-01", event_type="CONTRACT_SIGNED",
+        addendum_invoke_fn=fail_llm,
+    )
+    assert not called
+    assert out.status == "UNCONFIRMED"
+    assert out.decisions[0].reason_code == "APPLICATION_PROVISION_NOT_FOUND"
+
+
+def test_fast_path_skips_llm_when_article_not_in_specific_amendment():
+    """부칙이 특정 다른 조문의 개정규정에 한정된 경우 대상 조문 평가 시 LLM을 호출하지 않는다."""
+    called = False
+
+    def fail_llm(prompt):
+        nonlocal called
+        called = True
+        raise AssertionError("대상 조문 번호가 없는 한정 부칙에 대해 LLM이 호출되면 안 됩니다.")
+
+    # 제36조에만 한정된 적용례
+    specific_addendum = (
+        "제1조(시행일) 이 영은 공포 후 6개월이 경과한 날부터 시행한다. "
+        "제2조(적용례) 제36조의 개정규정은 이 영 시행 이후 계약을 체결하는 경우부터 적용한다."
+    )
+    # 대상 조문은 제37조
+    out = evaluate_temporal_sources(
+        "", [article(article_name="제37조"), addendum(specific_addendum)],
+        event_date="2027-05-01", event_type="CONTRACT_SIGNED",
+        addendum_invoke_fn=fail_llm,
+    )
+    assert not called
+    assert out.status == "UNCONFIRMED"
+    assert out.decisions[0].reason_code == "APPLICATION_PROVISION_NOT_FOUND"

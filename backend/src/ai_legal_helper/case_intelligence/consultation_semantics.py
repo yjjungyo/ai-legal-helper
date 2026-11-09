@@ -47,6 +47,15 @@ def is_evidence_review_request(question: str) -> bool:
 
 def termination_statement_status(statement: str) -> str:
     """ACTUAL_TERMINATION, CONDITIONAL_OR_PLANNED, OTHER or UNKNOWN."""
+    stmt = (statement or "").strip()
+    if not stmt:
+        return "OTHER"
+
+    # [Fast-Path] 종료/해지/퇴거 관련 핵심 키워드가 전혀 없으면 LLM 분류 스킵 (성능 최적화)
+    _TERMINATION_KEYWORDS = ("종료", "해지", "퇴거", "만료", "인도완료", "명도", "해제", "이사", "비웠", "방을 뺐")
+    if not any(k in stmt for k in _TERMINATION_KEYWORDS):
+        return "OTHER"
+
     result = semantic_judgment.classify_statement(
         statement,
         task="CONTRACT_TERMINATION_OCCURRENCE",

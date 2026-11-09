@@ -395,6 +395,10 @@ def build_case_evidence_briefing(
             "rejected_claims": claim_summary["rejected_claims"],
             "pending_claims": claim_summary["pending_claims"],
             "claim_review_guide": claim_summary["claim_review_guide"],
+            # 증거별 승인/반려/대기 클레임 건수 보존 (LLM 프롬프트 및 메타데이터 정규화용)
+            "approved_claim_count": claim_summary["approved_claim_count"],
+            "rejected_claim_count": claim_summary["rejected_claim_count"],
+            "pending_claim_count": claim_summary["pending_claim_count"],
         })
 
     evidence_items: List[EvidenceItemBrief] = []
@@ -554,6 +558,7 @@ def build_case_evidence_briefing(
     # 6. Source Registry 구성 (인용 검증 및 Verifier/Synthesizer 공통 참조, P0-2)
     source_registry: Dict[str, Dict[str, Any]] = {}
     document_content = {document["evidence_id"]: document["content"] for document in source_documents}
+    doc_guide = {document["evidence_id"]: document.get("claim_review_guide", "") for document in source_documents}
     for ev_item in evidence_items:
         entry = {
             "source_id": f"EVIDENCE:{ev_item.evidence_label}",
@@ -570,6 +575,11 @@ def build_case_evidence_briefing(
             "review_status": ev_item.status,
             "approval_scope": ev_item.approval_scope,
             "approval_scope_label": ev_item.approval_scope_label,
+            # 상담 컨텍스트 및 DB 보존을 위한 사실 검토 지침과 건수 연동
+            "claim_review_guide": doc_guide.get(ev_item.evidence_id, ""),
+            "approved_claim_count": ev_item.approved_claim_count,
+            "rejected_claim_count": ev_item.rejected_claim_count,
+            "pending_claim_count": ev_item.pending_claim_count,
         }
         source_registry[ev_item.evidence_label] = entry
         source_registry[ev_item.evidence_id] = entry
