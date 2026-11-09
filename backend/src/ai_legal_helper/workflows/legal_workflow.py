@@ -4547,6 +4547,38 @@ def intent_analysis_node(state: LegalState) -> Dict:
                         "contradictions": [],
                     }
 
+                    # Experimental GraphRAG evidence path. Disabled by default.
+                    # A missing/unavailable graph never suppresses original documents.
+                    import os as _graph_os
+                    graph_source_pack = []
+                    if _graph_os.getenv("COMPOSITE_GRAPHRAG_CONSULTATION", "false").lower() == "true":
+                        try:
+                            from ai_legal_helper.rag.graph_rag import retrieve_structured_evidence
+                            from ai_legal_helper.rag.graph_source_pack import build_verified_graph_source_pack
+                            graph_result = retrieve_structured_evidence(
+                                db, case_id, decision.resolved_query or q,
+                            )
+                            if graph_result.graph_available and graph_result.graph_paths:
+                                graph_source_pack = build_verified_graph_source_pack(
+                                    db, case_id, graph_result.graph_paths,
+                                )
+                            if graph_source_pack:
+                                graph = {
+                                    "available": True,
+                                    "search_mode": "VERIFIED_GRAPH_EXACT_SPAN",
+                                    "valid_paths": graph_result.graph_paths,
+                                    "structured_matches": graph_result.structured_matches,
+                                    "sources": graph_source_pack,
+                                    "invalid_count": graph_result.invalid_graph_count,
+                                    "evidence_gaps": graph_result.evidence_gaps,
+                                    "contradictions": graph_result.contradictions,
+                                }
+                        except Exception as graph_exc:
+                            logger.warning(
+                                "[GRAPH_RAG_EXPERIMENT] 검증된 증거 검색 실패: %s",
+                                type(graph_exc).__name__,
+                            )
+
                     case_ctx = briefing.formatted_summary
 
                     # 대화 요약은 사건 원문과 구분하여 컨텍스트에 유지한다.
@@ -4568,6 +4600,7 @@ def intent_analysis_node(state: LegalState) -> Dict:
                         "case_evidence_sources": list(briefing.source_registry.values()),
 
                         "graph_evidence": graph,
+                        "verified_graph_source_pack": graph_source_pack,
 
                         "issue_tasks": [task.model_dump() for task in tasks],
 
