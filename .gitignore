@@ -14,13 +14,13 @@ backend/*.key
 backend/.langfuse.key
 
 # Logs and databases
-*.log
-logs/
-app.log
+# *.log
+# logs/
+# app.log
 storage/
 vectorstore/
 data/chroma/
-backend/logs/
+# backend/logs/
 backend/storage/
 backend/vectorstore/
 backend/data

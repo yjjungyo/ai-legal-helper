@@ -1,0 +1,991 @@
+2026-10-27 05:43:30.189 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 05:43:30.304 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 05:43:30.305 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 05:43:30.305 | INFO  | -------- | server.py:113:_serve         - Finished server process [30968]
+2026-10-27 05:43:31.709 | DEBUG | -------- | _trace.py:45:trace           - close.started
+2026-10-27 05:43:31.709 | DEBUG | -------- | _trace.py:45:trace           - close.complete
+2026-10-27 05:43:31.710 | DEBUG | -------- | _trace.py:45:trace           - close.started
+2026-10-27 05:43:31.710 | DEBUG | -------- | _trace.py:45:trace           - close.complete
+2026-10-27 05:43:31.714 | DEBUG | -------- | _trace.py:45:trace           - close.started
+2026-10-27 05:43:31.714 | DEBUG | -------- | _trace.py:45:trace           - close.complete
+2026-10-27 05:43:39.821 | INFO  | -------- | server.py:103:_serve         - Started server process [31628]
+2026-10-27 05:43:39.821 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 05:43:39.839 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 05:43:39.839 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 05:43:39.848 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 05:46:20.409 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 05:46:20.510 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 05:46:20.980 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 05:46:20.994 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 05:46:20.994 | INFO  | -------- | server.py:113:_serve         - Finished server process [31628]
+2026-10-27 05:46:27.400 | INFO  | -------- | server.py:103:_serve         - Started server process [54728]
+2026-10-27 05:46:27.400 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 05:46:27.429 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 05:46:27.429 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 05:46:27.452 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 05:50:23.424 | INFO  | c56b3f9b | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/c1dc2255-c851-4b50-9b98-c042d24bc925/evidence/fe9a1f12-7e0d-49d8-86d3-7bdb6900b776/claims" 200 (55.1ms) [case:c1dc2255, req:709a0e13]
+2026-10-27 18:25:05.160 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 18:25:05.273 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 18:25:05.284 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 18:25:05.297 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 18:25:05.298 | INFO  | -------- | server.py:113:_serve         - Finished server process [54728]
+2026-10-27 18:25:13.012 | INFO  | -------- | server.py:103:_serve         - Started server process [42476]
+2026-10-27 18:25:13.012 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 18:25:13.032 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 18:25:13.032 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 18:25:13.050 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 18:26:01.298 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 18:26:01.407 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 18:26:01.945 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 18:26:01.957 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 18:26:01.957 | INFO  | -------- | server.py:113:_serve         - Finished server process [42476]
+2026-10-27 18:26:08.572 | INFO  | -------- | server.py:103:_serve         - Started server process [26764]
+2026-10-27 18:26:08.572 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 18:26:08.590 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 18:26:08.590 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 18:26:08.610 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 18:27:04.678 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 18:27:04.791 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 18:27:05.305 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 18:27:05.317 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 18:27:05.317 | INFO  | -------- | server.py:113:_serve         - Finished server process [26764]
+2026-10-27 18:27:11.895 | INFO  | -------- | server.py:103:_serve         - Started server process [31096]
+2026-10-27 18:27:11.896 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 18:27:11.912 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 18:27:11.912 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 18:27:11.930 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 18:28:58.239 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 18:28:58.347 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 18:28:58.844 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 18:28:58.856 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 18:28:58.856 | INFO  | -------- | server.py:113:_serve         - Finished server process [31096]
+2026-10-27 18:29:05.469 | INFO  | -------- | server.py:103:_serve         - Started server process [47112]
+2026-10-27 18:29:05.469 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 18:29:05.486 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 18:29:05.486 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 18:29:05.493 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 18:30:40.227 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 18:30:40.330 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 18:30:40.875 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 18:30:40.888 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 18:30:40.888 | INFO  | -------- | server.py:113:_serve         - Finished server process [47112]
+2026-10-27 18:30:47.471 | INFO  | -------- | server.py:103:_serve         - Started server process [33772]
+2026-10-27 18:30:47.471 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 18:30:47.487 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 18:30:47.487 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 18:30:47.502 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 18:31:03.382 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 18:31:03.497 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 18:31:04.155 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 18:31:04.167 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 18:31:04.167 | INFO  | -------- | server.py:113:_serve         - Finished server process [33772]
+2026-10-27 18:31:10.731 | INFO  | -------- | server.py:103:_serve         - Started server process [47936]
+2026-10-27 18:31:10.733 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 18:31:10.748 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 18:31:10.749 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 18:31:10.762 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 18:31:51.351 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 18:31:51.461 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 18:31:51.952 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 18:31:51.965 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 18:31:51.966 | INFO  | -------- | server.py:113:_serve         - Finished server process [47936]
+2026-10-27 18:31:58.622 | INFO  | -------- | server.py:103:_serve         - Started server process [19576]
+2026-10-27 18:31:58.622 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 18:31:58.640 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 18:31:58.640 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 18:31:58.659 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 18:33:08.285 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 18:33:08.394 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 18:33:08.921 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 18:33:08.934 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 18:33:08.934 | INFO  | -------- | server.py:113:_serve         - Finished server process [19576]
+2026-10-27 18:33:15.445 | INFO  | -------- | server.py:103:_serve         - Started server process [57500]
+2026-10-27 18:33:15.446 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 18:33:15.464 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 18:33:15.464 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 18:33:15.485 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 18:34:57.910 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 18:34:58.020 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 18:34:58.624 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 18:34:58.640 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 18:34:58.640 | INFO  | -------- | server.py:113:_serve         - Finished server process [57500]
+2026-10-27 18:35:05.637 | INFO  | -------- | server.py:103:_serve         - Started server process [8016]
+2026-10-27 18:35:05.637 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 18:35:05.657 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 18:35:05.657 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 18:35:05.675 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 18:37:49.502 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 18:37:49.612 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 18:37:50.120 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 18:37:50.132 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 18:37:50.132 | INFO  | -------- | server.py:113:_serve         - Finished server process [8016]
+2026-10-27 18:37:56.674 | INFO  | -------- | server.py:103:_serve         - Started server process [35648]
+2026-10-27 18:37:56.674 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 18:37:56.715 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 18:37:56.715 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 18:37:56.733 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 18:38:17.311 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 18:38:17.417 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 18:38:18.014 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 18:38:18.027 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 18:38:18.027 | INFO  | -------- | server.py:113:_serve         - Finished server process [35648]
+2026-10-27 18:38:24.866 | INFO  | -------- | server.py:103:_serve         - Started server process [50080]
+2026-10-27 18:38:24.866 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 18:38:24.882 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 18:38:24.882 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 18:38:24.897 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 18:38:37.155 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 18:38:37.264 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 18:38:37.755 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 18:38:37.766 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 18:38:37.767 | INFO  | -------- | server.py:113:_serve         - Finished server process [50080]
+2026-10-27 18:38:44.323 | INFO  | -------- | server.py:103:_serve         - Started server process [56516]
+2026-10-27 18:38:44.324 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 18:38:44.339 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 18:38:44.339 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 18:38:44.353 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 18:38:50.374 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 18:38:50.482 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 18:38:51.007 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 18:38:51.019 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 18:38:51.019 | INFO  | -------- | server.py:113:_serve         - Finished server process [56516]
+2026-10-27 18:38:57.608 | INFO  | -------- | server.py:103:_serve         - Started server process [37400]
+2026-10-27 18:38:57.608 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 18:38:57.626 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 18:38:57.626 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 18:38:57.646 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 18:39:02.887 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 18:39:02.995 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 18:39:03.478 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 18:39:03.490 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 18:39:03.490 | INFO  | -------- | server.py:113:_serve         - Finished server process [37400]
+2026-10-27 18:39:10.012 | INFO  | -------- | server.py:103:_serve         - Started server process [9456]
+2026-10-27 18:39:10.012 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 18:39:10.028 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 18:39:10.028 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 18:39:10.047 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 18:39:53.117 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 18:39:53.225 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 18:39:53.698 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 18:39:53.711 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 18:39:53.711 | INFO  | -------- | server.py:113:_serve         - Finished server process [9456]
+2026-10-27 18:40:00.143 | INFO  | -------- | server.py:103:_serve         - Started server process [18060]
+2026-10-27 18:40:00.144 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 18:40:00.162 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 18:40:00.162 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 18:40:00.182 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 18:40:09.347 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 18:40:09.455 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 18:40:09.942 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 18:40:09.954 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 18:40:09.954 | INFO  | -------- | server.py:113:_serve         - Finished server process [18060]
+2026-10-27 18:40:16.482 | INFO  | -------- | server.py:103:_serve         - Started server process [12944]
+2026-10-27 18:40:16.482 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 18:40:16.502 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 18:40:16.503 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 18:40:16.515 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 18:40:22.409 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 18:40:22.520 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 18:40:23.005 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 18:40:23.017 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 18:40:23.017 | INFO  | -------- | server.py:113:_serve         - Finished server process [12944]
+2026-10-27 18:40:29.558 | INFO  | -------- | server.py:103:_serve         - Started server process [57348]
+2026-10-27 18:40:29.558 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 18:40:29.575 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 18:40:29.575 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 18:40:29.588 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 18:41:40.538 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 18:41:40.647 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 18:41:41.155 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 18:41:41.167 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 18:41:41.168 | INFO  | -------- | server.py:113:_serve         - Finished server process [57348]
+2026-10-27 18:41:47.538 | INFO  | -------- | server.py:103:_serve         - Started server process [8016]
+2026-10-27 18:41:47.539 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 18:41:47.555 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 18:41:47.555 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 18:41:47.574 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 18:41:59.605 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 18:41:59.713 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 18:42:00.227 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 18:42:00.239 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 18:42:00.239 | INFO  | -------- | server.py:113:_serve         - Finished server process [8016]
+2026-10-27 18:42:06.713 | INFO  | -------- | server.py:103:_serve         - Started server process [57940]
+2026-10-27 18:42:06.713 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 18:42:06.729 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 18:42:06.729 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 18:42:06.746 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 18:42:15.364 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 18:42:15.474 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 18:42:15.973 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 18:42:15.984 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 18:42:15.984 | INFO  | -------- | server.py:113:_serve         - Finished server process [57940]
+2026-10-27 18:42:22.377 | INFO  | -------- | server.py:103:_serve         - Started server process [33452]
+2026-10-27 18:42:22.378 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 18:42:22.408 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 18:42:22.408 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 18:42:22.422 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 18:42:22.457 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 18:42:22.570 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 18:42:23.080 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 18:42:23.093 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 18:42:23.093 | INFO  | -------- | server.py:113:_serve         - Finished server process [33452]
+2026-10-27 18:42:29.527 | INFO  | -------- | server.py:103:_serve         - Started server process [46768]
+2026-10-27 18:42:29.527 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 18:42:29.546 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 18:42:29.546 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 18:42:29.557 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 18:43:32.637 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 18:43:32.739 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 18:43:33.199 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 18:43:33.212 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 18:43:33.212 | INFO  | -------- | server.py:113:_serve         - Finished server process [46768]
+2026-10-27 18:43:39.968 | INFO  | -------- | server.py:103:_serve         - Started server process [57504]
+2026-10-27 18:43:39.968 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 18:43:39.994 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 18:43:39.994 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 18:43:40.013 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 18:44:17.300 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 18:44:17.415 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 18:44:17.891 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 18:44:17.903 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 18:44:17.904 | INFO  | -------- | server.py:113:_serve         - Finished server process [57504]
+2026-10-27 18:44:24.579 | INFO  | -------- | server.py:103:_serve         - Started server process [52664]
+2026-10-27 18:44:24.579 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 18:44:24.607 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 18:44:24.608 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 18:44:24.625 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 18:44:28.978 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 18:44:29.079 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 18:44:29.544 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 18:44:29.556 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 18:44:29.556 | INFO  | -------- | server.py:113:_serve         - Finished server process [52664]
+2026-10-27 18:44:35.926 | INFO  | -------- | server.py:103:_serve         - Started server process [49876]
+2026-10-27 18:44:35.926 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 18:44:35.944 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 18:44:35.944 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 18:44:35.954 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 18:48:23.681 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 18:48:23.782 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 18:48:24.344 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 18:48:24.359 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 18:48:24.360 | INFO  | -------- | server.py:113:_serve         - Finished server process [49876]
+2026-10-27 18:48:31.067 | INFO  | -------- | server.py:103:_serve         - Started server process [45116]
+2026-10-27 18:48:31.067 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 18:48:31.106 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 18:48:31.106 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 18:48:31.128 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 18:48:31.142 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 18:48:31.259 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 18:48:31.720 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 18:48:31.733 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 18:48:31.733 | INFO  | -------- | server.py:113:_serve         - Finished server process [45116]
+2026-10-27 18:48:37.995 | INFO  | -------- | server.py:103:_serve         - Started server process [53656]
+2026-10-27 18:48:37.995 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 18:48:38.021 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 18:48:38.021 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 18:48:38.035 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 19:37:19.691 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 19:37:19.806 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 19:37:20.247 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 19:37:20.265 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 19:37:20.265 | INFO  | -------- | server.py:113:_serve         - Finished server process [53656]
+2026-10-27 19:37:27.085 | INFO  | -------- | server.py:103:_serve         - Started server process [55360]
+2026-10-27 19:37:27.085 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 19:37:27.112 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 19:37:27.113 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 19:37:27.130 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 19:52:41.535 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 19:52:41.645 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 19:52:42.202 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 19:52:42.220 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 19:52:42.221 | INFO  | -------- | server.py:113:_serve         - Finished server process [55360]
+2026-10-27 19:52:49.367 | INFO  | -------- | server.py:103:_serve         - Started server process [13748]
+2026-10-27 19:52:49.367 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 19:52:49.386 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 19:52:49.386 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 19:52:49.403 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 20:01:06.771 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 20:01:06.872 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 20:01:07.344 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 20:01:07.361 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 20:01:07.361 | INFO  | -------- | server.py:113:_serve         - Finished server process [13748]
+2026-10-27 20:01:14.257 | INFO  | -------- | server.py:103:_serve         - Started server process [45340]
+2026-10-27 20:01:14.257 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 20:01:14.274 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 20:01:14.274 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 20:01:14.289 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 20:02:08.295 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 20:02:08.403 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 20:02:08.900 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 20:02:08.918 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 20:02:08.918 | INFO  | -------- | server.py:113:_serve         - Finished server process [45340]
+2026-10-27 20:02:15.983 | INFO  | -------- | server.py:103:_serve         - Started server process [1312]
+2026-10-27 20:02:15.984 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 20:02:16.001 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 20:02:16.002 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 20:02:16.011 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 20:03:18.276 | INFO  | 1eb0b2d4 | cases.py:75:list_cases       - 사건 목록 조회 완료 (총 396건) [req:dc07e5bc]
+2026-10-27 20:03:18.284 | INFO  | 1eb0b2d4 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases" 200 (34.6ms) [req:dc07e5bc]
+2026-10-27 20:03:18.292 | INFO  | d7b080b2 | cases.py:75:list_cases       - 사건 목록 조회 완료 (총 396건) [req:283dbdba]
+2026-10-27 20:03:18.295 | INFO  | d7b080b2 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases" 200 (9.0ms) [req:283dbdba]
+2026-10-27 20:03:21.575 | INFO  | 2b0098be | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: '보증금 3억 원 반환 분쟁 사건' [case:case_300, req:5b27826d]
+2026-10-27 20:03:21.578 | INFO  | 2b0098be | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_a5aa0d43" 200 (21.9ms) [case:case_300, req:5b27826d]
+2026-10-27 20:03:21.592 | INFO  | af726a0b | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: '보증금 3억 원 반환 분쟁 사건' [case:case_300, req:0a6bb02b]
+2026-10-27 20:03:21.595 | INFO  | af726a0b | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_a5aa0d43" 200 (10.7ms) [case:case_300, req:0a6bb02b]
+2026-10-27 20:03:21.659 | INFO  | 4b1c9c0f | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_a5aa0d43/workflow/summary" 200 (60.4ms) [case:case_300, req:f2587d80]
+2026-10-27 20:03:21.677 | INFO  | df8567df | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_a5aa0d43/workflow/summary" 200 (16.5ms) [case:case_300, req:e8980382]
+2026-10-27 20:03:23.402 | INFO  | 03ed0205 | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: '보증금 3억 원 반환 분쟁 사건' [case:case_300, req:07a053d0]
+2026-10-27 20:03:23.404 | INFO  | 03ed0205 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_a5aa0d43" 200 (15.1ms) [case:case_300, req:07a053d0]
+2026-10-27 20:03:23.419 | INFO  | 7dc9d99a | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: '보증금 3억 원 반환 분쟁 사건' [case:case_300, req:2f91fad9]
+2026-10-27 20:03:23.420 | INFO  | c8622f06 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_a5aa0d43/evidence" 200 (25.8ms) [case:case_300, req:979c4647]
+2026-10-27 20:03:23.422 | INFO  | 7dc9d99a | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_a5aa0d43" 200 (16.1ms) [case:case_300, req:2f91fad9]
+2026-10-27 20:03:23.427 | INFO  | 8f3d8fc6 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_a5aa0d43/evidence" 200 (6.3ms) [case:case_300, req:295abbbf]
+2026-10-27 20:03:23.438 | INFO  | 8785cd81 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_a5aa0d43/consultations" 200 (46.5ms) [case:case_300, req:4709fc17]
+2026-10-27 20:03:23.446 | INFO  | ff2a460c | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_a5aa0d43/consultations" 200 (6.9ms) [case:case_300, req:7f251a92]
+2026-10-27 20:03:30.563 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 20:03:30.672 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 20:03:30.691 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 20:03:30.709 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 20:03:30.709 | INFO  | -------- | server.py:113:_serve         - Finished server process [1312]
+2026-10-27 20:03:37.188 | INFO  | -------- | server.py:103:_serve         - Started server process [24644]
+2026-10-27 20:03:37.189 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 20:03:37.207 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 20:03:37.208 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 20:03:37.215 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 20:03:37.743 | INFO  | be3d7f9b | cases.py:75:list_cases       - 사건 목록 조회 완료 (총 396건) [req:a9a0e5ba]
+2026-10-27 20:03:37.745 | INFO  | be3d7f9b | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases" 200 (28.7ms) [req:a9a0e5ba]
+2026-10-27 20:03:37.754 | INFO  | 3295de78 | cases.py:75:list_cases       - 사건 목록 조회 완료 (총 396건) [req:2f6078fc]
+2026-10-27 20:03:37.756 | INFO  | 3295de78 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases" 200 (7.7ms) [req:2f6078fc]
+2026-10-27 20:04:38.138 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 20:04:38.253 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 20:04:38.275 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 20:04:38.295 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 20:04:38.295 | INFO  | -------- | server.py:113:_serve         - Finished server process [24644]
+2026-10-27 20:04:44.990 | INFO  | -------- | server.py:103:_serve         - Started server process [56068]
+2026-10-27 20:04:44.990 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 20:04:45.006 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 20:04:45.007 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 20:04:45.028 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 20:05:55.142 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_96f975
+2026-10-27 20:05:55.169 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 20:05:56.162 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_96f975 nodes=3 links=0
+2026-10-27 20:06:01.890 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 20:06:01.990 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 20:06:02.490 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 20:06:02.490 | INFO  | -------- | server.py:113:_serve         - Finished server process [56068]
+2026-10-27 20:06:09.537 | INFO  | -------- | server.py:103:_serve         - Started server process [51816]
+2026-10-27 20:06:09.537 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 20:06:09.579 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 20:06:09.579 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 20:06:09.595 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 20:06:20.273 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 20:06:20.374 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 20:06:20.823 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 20:06:20.837 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 20:06:20.837 | INFO  | -------- | server.py:113:_serve         - Finished server process [51816]
+2026-10-27 20:06:28.418 | INFO  | -------- | server.py:103:_serve         - Started server process [53148]
+2026-10-27 20:06:28.418 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 20:06:28.434 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 20:06:28.434 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 20:06:28.449 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 20:07:12.045 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 20:07:12.160 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 20:07:12.630 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 20:07:12.642 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 20:07:12.642 | INFO  | -------- | server.py:113:_serve         - Finished server process [53148]
+2026-10-27 20:07:19.428 | INFO  | -------- | server.py:103:_serve         - Started server process [17072]
+2026-10-27 20:07:19.428 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 20:07:19.446 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 20:07:19.447 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 20:07:19.465 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 20:08:03.516 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 20:08:03.617 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 20:08:04.118 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 20:08:04.130 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 20:08:04.130 | INFO  | -------- | server.py:113:_serve         - Finished server process [17072]
+2026-10-27 20:08:11.166 | INFO  | -------- | server.py:103:_serve         - Started server process [49316]
+2026-10-27 20:08:11.166 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 20:08:11.185 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 20:08:11.185 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 20:08:11.205 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 20:08:31.300 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_bebf3813
+2026-10-27 20:08:31.305 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 20:08:31.521 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_bebf3813 nodes=11 links=1
+2026-10-27 20:08:36.561 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_1340daf9
+2026-10-27 20:08:36.651 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_1340daf9 nodes=11 links=1
+2026-10-27 20:08:36.661 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_489df661
+2026-10-27 20:08:36.832 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_489df661 nodes=15 links=3
+2026-10-27 20:08:36.840 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_69bbf484
+2026-10-27 20:08:36.890 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_69bbf484 nodes=11 links=1
+2026-10-27 20:08:40.286 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 20:08:40.387 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 20:08:40.929 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 20:08:40.929 | INFO  | -------- | server.py:113:_serve         - Finished server process [49316]
+2026-10-27 20:08:48.025 | INFO  | -------- | server.py:103:_serve         - Started server process [57048]
+2026-10-27 20:08:48.026 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 20:08:48.061 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 20:08:48.061 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 20:08:48.078 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 20:10:28.244 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_b8c4ba2f
+2026-10-27 20:10:28.266 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 20:10:28.388 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_b8c4ba2f nodes=11 links=1
+2026-10-27 20:14:09.232 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 20:14:09.340 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 20:14:09.831 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 20:14:09.831 | INFO  | -------- | server.py:113:_serve         - Finished server process [57048]
+2026-10-27 20:14:17.299 | INFO  | -------- | server.py:103:_serve         - Started server process [49796]
+2026-10-27 20:14:17.300 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 20:14:17.317 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 20:14:17.318 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 20:14:17.337 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 20:16:10.301 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 20:16:10.414 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 20:16:10.874 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 20:16:10.887 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 20:16:10.887 | INFO  | -------- | server.py:113:_serve         - Finished server process [49796]
+2026-10-27 20:16:17.662 | INFO  | -------- | server.py:103:_serve         - Started server process [49528]
+2026-10-27 20:16:17.662 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 20:16:17.679 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 20:16:17.679 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 20:16:17.690 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 20:35:06.631 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 20:35:06.732 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 20:35:07.195 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 20:35:07.212 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 20:35:07.213 | INFO  | -------- | server.py:113:_serve         - Finished server process [49528]
+2026-10-27 20:35:15.420 | INFO  | -------- | server.py:103:_serve         - Started server process [35948]
+2026-10-27 20:35:15.420 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 20:35:15.440 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 20:35:15.440 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 20:35:15.455 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 20:39:58.691 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 20:39:58.800 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 20:39:59.516 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 20:39:59.535 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 20:39:59.535 | INFO  | -------- | server.py:113:_serve         - Finished server process [35948]
+2026-10-27 20:40:06.910 | INFO  | -------- | server.py:103:_serve         - Started server process [46512]
+2026-10-27 20:40:06.910 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 20:40:06.949 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 20:40:06.949 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 20:40:06.966 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 20:45:10.729 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 20:45:10.837 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 20:45:11.355 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 20:45:11.371 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 20:45:11.371 | INFO  | -------- | server.py:113:_serve         - Finished server process [46512]
+2026-10-27 20:45:18.252 | INFO  | -------- | server.py:103:_serve         - Started server process [40348]
+2026-10-27 20:45:18.252 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 20:45:18.269 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 20:45:18.269 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 20:45:18.285 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 20:46:52.150 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 20:46:52.260 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 20:46:52.794 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 20:46:52.810 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 20:46:52.811 | INFO  | -------- | server.py:113:_serve         - Finished server process [40348]
+2026-10-27 20:46:59.564 | INFO  | -------- | server.py:103:_serve         - Started server process [52724]
+2026-10-27 20:46:59.564 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 20:46:59.582 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 20:46:59.582 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 20:46:59.602 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 20:48:23.950 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 20:48:24.058 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 20:48:24.555 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 20:48:24.571 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 20:48:24.571 | INFO  | -------- | server.py:113:_serve         - Finished server process [52724]
+2026-10-27 20:48:31.254 | INFO  | -------- | server.py:103:_serve         - Started server process [42060]
+2026-10-27 20:48:31.255 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 20:48:31.273 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 20:48:31.274 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 20:48:31.293 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 20:49:15.756 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 20:49:15.867 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 20:49:16.419 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 20:49:16.437 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 20:49:16.437 | INFO  | -------- | server.py:113:_serve         - Finished server process [42060]
+2026-10-27 20:49:23.041 | INFO  | -------- | server.py:103:_serve         - Started server process [54612]
+2026-10-27 20:49:23.042 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 20:49:23.059 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 20:49:23.059 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 20:49:23.066 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 20:51:00.100 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 20:51:00.209 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 20:51:00.706 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 20:51:00.723 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 20:51:00.724 | INFO  | -------- | server.py:113:_serve         - Finished server process [54612]
+2026-10-27 20:51:07.240 | INFO  | -------- | server.py:103:_serve         - Started server process [41688]
+2026-10-27 20:51:07.241 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 20:51:07.259 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 20:51:07.259 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 20:51:07.268 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 20:52:17.382 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_4c488f
+2026-10-27 20:52:17.388 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 20:52:17.490 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_4c488f nodes=3 links=0
+2026-10-27 20:53:38.815 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 20:53:38.924 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 20:53:39.414 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 20:53:39.414 | INFO  | -------- | server.py:113:_serve         - Finished server process [41688]
+2026-10-27 20:53:46.011 | INFO  | -------- | server.py:103:_serve         - Started server process [53132]
+2026-10-27 20:53:46.012 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 20:53:46.031 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 20:53:46.032 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 20:53:46.045 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 20:55:31.244 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_aa917f
+2026-10-27 20:55:31.260 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 20:55:31.326 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_aa917f nodes=3 links=0
+2026-10-27 20:56:36.486 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_a56c6161
+2026-10-27 20:56:36.545 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_a56c6161 nodes=11 links=1
+2026-10-27 20:56:36.551 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_6827937c
+2026-10-27 20:56:36.619 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_6827937c nodes=11 links=1
+2026-10-27 20:56:36.626 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_11e2cb80
+2026-10-27 20:56:36.687 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_11e2cb80 nodes=15 links=3
+2026-10-27 20:56:41.713 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_8a979a6a
+2026-10-27 20:56:41.757 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_8a979a6a nodes=11 links=1
+2026-10-27 20:58:41.979 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_f6dc6d9a
+2026-10-27 20:58:42.076 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_f6dc6d9a nodes=11 links=1
+2026-10-27 21:19:12.013 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 21:19:12.129 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 21:19:12.578 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 21:19:12.583 | INFO  | -------- | server.py:113:_serve         - Finished server process [53132]
+2026-10-27 21:24:07.114 | INFO  | -------- | server.py:103:_serve         - Started server process [8680]
+2026-10-27 21:24:07.114 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 21:24:07.134 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 21:24:07.134 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 21:24:07.149 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 21:35:45.027 | INFO  | 34ccaf87 | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: 'User 1 Case' [case:7234553f, req:40e2ee35]
+2026-10-27 21:35:45.034 | INFO  | 34ccaf87 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/7234553f-6271-40a7-98ec-a5958ddcef35" 200 (37.5ms) [case:7234553f, req:40e2ee35]
+2026-10-27 21:35:45.050 | INFO  | 31d9816a | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: 'User 1 Case' [case:7234553f, req:36760aed]
+2026-10-27 21:35:45.053 | INFO  | 31d9816a | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/7234553f-6271-40a7-98ec-a5958ddcef35" 200 (11.0ms) [case:7234553f, req:36760aed]
+2026-10-27 21:35:45.151 | INFO  | 8edb5b51 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/7234553f-6271-40a7-98ec-a5958ddcef35/workflow/summary" 200 (75.8ms) [case:7234553f, req:04474911]
+2026-10-27 21:35:45.178 | INFO  | ab9388c3 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/7234553f-6271-40a7-98ec-a5958ddcef35/workflow/summary" 200 (25.5ms) [case:7234553f, req:b7a04a3c]
+2026-10-27 21:35:46.933 | INFO  | 0ee2799b | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/7234553f-6271-40a7-98ec-a5958ddcef35/evidence" 200 (31.6ms) [case:7234553f, req:5e7d5afc]
+2026-10-27 21:35:46.941 | INFO  | af026aea | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/7234553f-6271-40a7-98ec-a5958ddcef35/evidence/adjudications" 200 (33.8ms) [case:7234553f, req:18635b6f]
+2026-10-27 21:35:46.953 | INFO  | bf2e4800 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/7234553f-6271-40a7-98ec-a5958ddcef35/evidence/gaps" 200 (45.9ms) [case:7234553f, req:8c93f287]
+2026-10-27 21:35:46.961 | INFO  | 11ad2436 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/7234553f-6271-40a7-98ec-a5958ddcef35/evidence" 200 (23.7ms) [case:7234553f, req:5de970d1]
+2026-10-27 21:35:46.970 | INFO  | 60738c25 | neo4j.py:114:get_driver      - Neo4j 연결 성공 [case:7234553f, req:1ff2b070]
+2026-10-27 21:35:46.976 | INFO  | 6016fe93 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/7234553f-6271-40a7-98ec-a5958ddcef35/evidence/adjudications" 200 (31.2ms) [case:7234553f, req:9388bc46]
+2026-10-27 21:35:46.976 | INFO  | 9cb65ee8 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/7234553f-6271-40a7-98ec-a5958ddcef35/evidence/gaps" 200 (15.8ms) [case:7234553f, req:ef78dff6]
+2026-10-27 21:35:47.001 | INFO  | 815f8cc8 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/7234553f-6271-40a7-98ec-a5958ddcef35/evidence/0592cc19-726a-40cd-ad2a-2bcb0219b61d/claims" 200 (48.2ms) [case:7234553f, req:0e0cb64f]
+2026-10-27 21:35:47.011 | INFO  | 60738c25 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/7234553f-6271-40a7-98ec-a5958ddcef35/evidence/conflicts" 200 (107.0ms) [case:7234553f, req:1ff2b070]
+2026-10-27 21:35:47.035 | INFO  | 28066ce2 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/7234553f-6271-40a7-98ec-a5958ddcef35/evidence/conflicts" 200 (13.5ms) [case:7234553f, req:4f67f3c8]
+2026-10-27 21:35:50.852 | INFO  | 52b4670e | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/7234553f-6271-40a7-98ec-a5958ddcef35/evidence/9e73a6b1-8154-4b4d-a7bb-9273d1493236/claims" 200 (33.4ms) [case:7234553f, req:89fe5d04]
+2026-10-27 21:36:02.390 | INFO  | ce339e00 | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: 'User 1 Case' [case:7234553f, req:97fed2ec]
+2026-10-27 21:36:02.394 | INFO  | ce339e00 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/7234553f-6271-40a7-98ec-a5958ddcef35" 200 (13.4ms) [case:7234553f, req:97fed2ec]
+2026-10-27 21:36:02.412 | INFO  | 077f1937 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/7234553f-6271-40a7-98ec-a5958ddcef35/workflow/summary" 200 (32.9ms) [case:7234553f, req:f65f4174]
+2026-10-27 21:36:02.442 | INFO  | 36a6006b | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/7234553f-6271-40a7-98ec-a5958ddcef35/workflow/summary" 200 (29.6ms) [case:7234553f, req:438243f3]
+2026-10-27 21:36:06.069 | INFO  | d97c8884 | cases.py:75:list_cases       - 사건 목록 조회 완료 (총 453건) [req:a4b3f97c]
+2026-10-27 21:36:06.071 | INFO  | d97c8884 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases" 200 (11.6ms) [req:a4b3f97c]
+2026-10-27 21:36:06.092 | INFO  | 66d7054d | cases.py:75:list_cases       - 사건 목록 조회 완료 (총 453건) [req:bbb1922e]
+2026-10-27 21:36:06.095 | INFO  | 66d7054d | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases" 200 (9.5ms) [req:bbb1922e]
+2026-10-27 21:36:21.966 | INFO  | c05a9049 | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: 'Test Case' [case:72b58992, req:42611614]
+2026-10-27 21:36:21.969 | INFO  | c05a9049 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/72b58992-a14c-45f7-88e7-57d2c2ea20a2" 200 (10.3ms) [case:72b58992, req:42611614]
+2026-10-27 21:36:21.975 | INFO  | 39f45634 | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: 'Test Case' [case:72b58992, req:d8c4b247]
+2026-10-27 21:36:21.978 | INFO  | 39f45634 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/72b58992-a14c-45f7-88e7-57d2c2ea20a2" 200 (7.3ms) [case:72b58992, req:d8c4b247]
+2026-10-27 21:36:22.007 | INFO  | 96ccef0b | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/72b58992-a14c-45f7-88e7-57d2c2ea20a2/workflow/summary" 200 (24.4ms) [case:72b58992, req:b08006e0]
+2026-10-27 21:36:22.033 | INFO  | edfa9059 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/72b58992-a14c-45f7-88e7-57d2c2ea20a2/workflow/summary" 200 (24.1ms) [case:72b58992, req:05e98a40]
+2026-10-27 21:36:24.659 | INFO  | a2333158 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/72b58992-a14c-45f7-88e7-57d2c2ea20a2/evidence/gaps" 200 (9.9ms) [case:72b58992, req:8c2e175d]
+2026-10-27 21:36:24.660 | INFO  | 6a97202c | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/72b58992-a14c-45f7-88e7-57d2c2ea20a2/evidence" 200 (13.8ms) [case:72b58992, req:8c68e21a]
+2026-10-27 21:36:24.666 | INFO  | b2e2ecea | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/72b58992-a14c-45f7-88e7-57d2c2ea20a2/evidence/conflicts" 200 (20.1ms) [case:72b58992, req:d2c879a8]
+2026-10-27 21:36:24.667 | INFO  | 4faf0d3e | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/72b58992-a14c-45f7-88e7-57d2c2ea20a2/evidence/adjudications" 200 (18.4ms) [case:72b58992, req:b7ac8c78]
+2026-10-27 21:36:24.676 | INFO  | 6a0d271b | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/72b58992-a14c-45f7-88e7-57d2c2ea20a2/evidence/gaps" 200 (13.1ms) [case:72b58992, req:2fd4fff7]
+2026-10-27 21:36:24.677 | INFO  | 2f7ac2b8 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/72b58992-a14c-45f7-88e7-57d2c2ea20a2/evidence" 200 (15.3ms) [case:72b58992, req:6c83f76f]
+2026-10-27 21:36:24.682 | INFO  | 4dd98326 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/72b58992-a14c-45f7-88e7-57d2c2ea20a2/evidence/adjudications" 200 (13.7ms) [case:72b58992, req:ec153dd1]
+2026-10-27 21:36:24.684 | INFO  | dcc39cb1 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/72b58992-a14c-45f7-88e7-57d2c2ea20a2/evidence/conflicts" 200 (16.3ms) [case:72b58992, req:38e2afb6]
+2026-10-27 21:36:24.707 | INFO  | 85a950bb | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/72b58992-a14c-45f7-88e7-57d2c2ea20a2/evidence/8283ecb4-aae8-4660-a956-c3f9fc7d22c3/claims" 200 (7.8ms) [case:72b58992, req:658cf8a3]
+2026-10-27 21:36:27.215 | INFO  | bd46ad88 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/72b58992-a14c-45f7-88e7-57d2c2ea20a2/evidence" 200 (9.5ms) [case:72b58992, req:e3e4fcea]
+2026-10-27 21:36:27.225 | INFO  | 88c6b916 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/72b58992-a14c-45f7-88e7-57d2c2ea20a2/evidence/8283ecb4-aae8-4660-a956-c3f9fc7d22c3/claims" 200 (7.3ms) [case:72b58992, req:eb948ae6]
+2026-10-27 21:36:27.240 | INFO  | 5d8c4abc | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/72b58992-a14c-45f7-88e7-57d2c2ea20a2/evidence/conflicts" 200 (12.1ms) [case:72b58992, req:336af192]
+2026-10-27 21:36:27.249 | INFO  | f943f006 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/72b58992-a14c-45f7-88e7-57d2c2ea20a2/evidence/gaps" 200 (6.2ms) [case:72b58992, req:5306c1cc]
+2026-10-27 21:36:27.252 | INFO  | a4e7844c | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/72b58992-a14c-45f7-88e7-57d2c2ea20a2/evidence/adjudications" 200 (10.1ms) [case:72b58992, req:bb4c41f8]
+2026-10-27 21:36:28.585 | INFO  | 6317f0c6 | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: 'Test Case' [case:72b58992, req:cc0e59b8]
+2026-10-27 21:36:28.588 | INFO  | 6317f0c6 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/72b58992-a14c-45f7-88e7-57d2c2ea20a2" 200 (8.1ms) [case:72b58992, req:cc0e59b8]
+2026-10-27 21:36:28.602 | INFO  | bc31a9f0 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/72b58992-a14c-45f7-88e7-57d2c2ea20a2/workflow/summary" 200 (23.6ms) [case:72b58992, req:51a25cf6]
+2026-10-27 21:36:28.623 | INFO  | a471b3b4 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/72b58992-a14c-45f7-88e7-57d2c2ea20a2/workflow/summary" 200 (19.8ms) [case:72b58992, req:fd37de72]
+2026-10-27 21:36:29.665 | INFO  | 873d9f64 | cases.py:75:list_cases       - 사건 목록 조회 완료 (총 453건) [req:4e91277d]
+2026-10-27 21:36:29.668 | INFO  | 873d9f64 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases" 200 (10.5ms) [req:4e91277d]
+2026-10-27 21:36:29.674 | INFO  | 4f1966a0 | cases.py:75:list_cases       - 사건 목록 조회 완료 (총 453건) [req:cf4f3e2a]
+2026-10-27 21:36:29.678 | INFO  | 4f1966a0 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases" 200 (8.8ms) [req:cf4f3e2a]
+2026-10-27 21:36:38.768 | INFO  | d3900954 | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: '테스트' [case:fa8f215a, req:127277ba]
+2026-10-27 21:36:38.772 | INFO  | d3900954 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/fa8f215a-1c55-44e6-9af8-50f336a85717" 200 (13.0ms) [case:fa8f215a, req:127277ba]
+2026-10-27 21:36:38.787 | INFO  | 6cc8f009 | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: '테스트' [case:fa8f215a, req:97e79515]
+2026-10-27 21:36:38.790 | INFO  | 6cc8f009 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/fa8f215a-1c55-44e6-9af8-50f336a85717" 200 (10.0ms) [case:fa8f215a, req:97e79515]
+2026-10-27 21:36:38.836 | INFO  | 77d7b989 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/fa8f215a-1c55-44e6-9af8-50f336a85717/workflow/summary" 200 (42.3ms) [case:fa8f215a, req:854d037b]
+2026-10-27 21:36:38.884 | INFO  | 265b03ca | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/fa8f215a-1c55-44e6-9af8-50f336a85717/workflow/summary" 200 (47.5ms) [case:fa8f215a, req:50e6ec93]
+2026-10-27 21:36:47.028 | INFO  | ef0ade41 | cases.py:75:list_cases       - 사건 목록 조회 완료 (총 453건) [req:dd9681f9]
+2026-10-27 21:36:47.031 | INFO  | ef0ade41 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases" 200 (10.7ms) [req:dd9681f9]
+2026-10-27 21:36:47.040 | INFO  | 2bc28291 | cases.py:75:list_cases       - 사건 목록 조회 완료 (총 453건) [req:759c9d82]
+2026-10-27 21:36:47.044 | INFO  | 2bc28291 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases" 200 (11.0ms) [req:759c9d82]
+2026-10-27 21:36:50.275 | INFO  | d0df24a5 | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: '보증금 3억 원 반환 분쟁 사건' [case:case_300, req:d63d2aef]
+2026-10-27 21:36:50.277 | INFO  | d0df24a5 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a" 200 (9.7ms) [case:case_300, req:d63d2aef]
+2026-10-27 21:36:50.287 | INFO  | 34861280 | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: '보증금 3억 원 반환 분쟁 사건' [case:case_300, req:d980dbcc]
+2026-10-27 21:36:50.289 | INFO  | 34861280 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a" 200 (10.5ms) [case:case_300, req:d980dbcc]
+2026-10-27 21:36:50.304 | INFO  | 3b1c82be | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a/workflow/summary" 200 (22.6ms) [case:case_300, req:b3f9da20]
+2026-10-27 21:36:50.328 | INFO  | 3e20a1e6 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a/workflow/summary" 200 (22.8ms) [case:case_300, req:c3bfd197]
+2026-10-27 21:36:56.431 | INFO  | e6ad8eea | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a/evidence" 200 (12.6ms) [case:case_300, req:e923381b]
+2026-10-27 21:36:56.432 | INFO  | d3c4101f | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a/evidence/gaps" 200 (11.1ms) [case:case_300, req:05c6842e]
+2026-10-27 21:36:56.434 | INFO  | 1f9a6173 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a/evidence/adjudications" 200 (14.9ms) [case:case_300, req:718d5270]
+2026-10-27 21:36:56.440 | INFO  | ba1855d0 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a/evidence/conflicts" 200 (20.1ms) [case:case_300, req:81c5b5a6]
+2026-10-27 21:36:56.450 | INFO  | 1ee369ee | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a/evidence/gaps" 200 (15.6ms) [case:case_300, req:bba042b0]
+2026-10-27 21:36:56.455 | INFO  | 05c18e55 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a/evidence" 200 (18.7ms) [case:case_300, req:55dba7d2]
+2026-10-27 21:36:56.456 | INFO  | ec85f916 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a/evidence/ev_live_7f995291/claims" 200 (16.6ms) [case:case_300, req:b928cb77]
+2026-10-27 21:36:56.456 | INFO  | 092812ea | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a/evidence/adjudications" 200 (20.0ms) [case:case_300, req:129e5c47]
+2026-10-27 21:36:56.461 | INFO  | bdf9a75a | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a/evidence/conflicts" 200 (17.9ms) [case:case_300, req:5774602f]
+2026-10-27 21:37:01.973 | INFO  | 52fac359 | cases.py:75:list_cases       - 사건 목록 조회 완료 (총 453건) [req:cac7f4d8]
+2026-10-27 21:37:01.976 | INFO  | 52fac359 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases" 200 (9.2ms) [req:cac7f4d8]
+2026-10-27 21:37:01.984 | INFO  | f0b304b3 | cases.py:75:list_cases       - 사건 목록 조회 완료 (총 453건) [req:692269a7]
+2026-10-27 21:37:01.987 | INFO  | f0b304b3 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases" 200 (8.5ms) [req:692269a7]
+2026-10-27 21:49:13.997 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 21:49:14.097 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 21:49:14.098 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 21:49:14.098 | INFO  | -------- | server.py:113:_serve         - Finished server process [8680]
+2026-10-27 21:49:20.933 | INFO  | -------- | server.py:103:_serve         - Started server process [54280]
+2026-10-27 21:49:20.933 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 21:49:20.969 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 21:49:20.969 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 21:49:20.986 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 21:54:16.716 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 21:54:16.823 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 21:54:17.294 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 21:54:17.312 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 21:54:17.312 | INFO  | -------- | server.py:113:_serve         - Finished server process [54280]
+2026-10-27 21:54:25.309 | INFO  | -------- | server.py:103:_serve         - Started server process [3524]
+2026-10-27 21:54:25.309 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 21:54:25.344 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 21:54:25.345 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 21:54:25.365 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 21:55:48.561 | INFO  | a2a6a3af | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: '보증금 3억 원 반환 분쟁 사건' [case:case_300, req:9f2938f1]
+2026-10-27 21:55:48.563 | INFO  | a2a6a3af | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a" 200 (30.6ms) [case:case_300, req:9f2938f1]
+2026-10-27 21:55:48.591 | INFO  | b8a9c013 | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: '보증금 3억 원 반환 분쟁 사건' [case:case_300, req:5fa9931f]
+2026-10-27 21:55:48.592 | INFO  | b8a9c013 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a" 200 (27.4ms) [case:case_300, req:5fa9931f]
+2026-10-27 21:55:48.656 | INFO  | f9e74833 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a/workflow/summary" 200 (86.0ms) [case:case_300, req:8fb49ab4]
+2026-10-27 21:55:48.679 | INFO  | e7617bb6 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a/workflow/summary" 200 (21.9ms) [case:case_300, req:bc0b4e78]
+2026-10-27 21:55:50.619 | INFO  | d26566d1 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a/evidence" 200 (28.3ms) [case:case_300, req:43002509]
+2026-10-27 21:55:50.623 | INFO  | 62c61512 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a/evidence/gaps" 200 (25.9ms) [case:case_300, req:c44387e9]
+2026-10-27 21:55:50.625 | INFO  | fc11ef50 | neo4j.py:114:get_driver      - Neo4j 연결 성공 [case:case_300, req:23690ef6]
+2026-10-27 21:55:50.635 | INFO  | 849aa8be | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a/evidence" 200 (13.6ms) [case:case_300, req:068ddef7]
+2026-10-27 21:55:50.636 | INFO  | ac39e6ba | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a/evidence/adjudications" 200 (39.5ms) [case:case_300, req:3d709a63]
+2026-10-27 21:55:50.637 | INFO  | ff1f78b4 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a/evidence/gaps" 200 (13.1ms) [case:case_300, req:5b073183]
+2026-10-27 21:55:50.648 | INFO  | e7fa3b10 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a/evidence/adjudications" 200 (10.7ms) [case:case_300, req:f3160d8c]
+2026-10-27 21:55:50.653 | INFO  | fc11ef50 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a/evidence/conflicts" 200 (60.0ms) [case:case_300, req:23690ef6]
+2026-10-27 21:55:50.665 | INFO  | fafea4a6 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a/evidence/conflicts" 200 (11.7ms) [case:case_300, req:31a8ef62]
+2026-10-27 21:55:50.767 | INFO  | 555e07cc | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a/evidence/ev_live_7f995291/claims" 200 (13.2ms) [case:case_300, req:e31d620d]
+2026-10-27 21:55:56.514 | INFO  | 84bd070c | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: '보증금 3억 원 반환 분쟁 사건' [case:case_300, req:a83fc58b]
+2026-10-27 21:55:56.520 | INFO  | 158f7c82 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a/consultations" 200 (17.0ms) [case:case_300, req:8228c524]
+2026-10-27 21:55:56.521 | INFO  | 683b3589 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a/evidence" 200 (18.5ms) [case:case_300, req:724a03ad]
+2026-10-27 21:55:56.524 | INFO  | 84bd070c | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a" 200 (22.1ms) [case:case_300, req:a83fc58b]
+2026-10-27 21:55:56.532 | INFO  | b7a5feb7 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a/consultations" 200 (9.0ms) [case:case_300, req:81a46c9d]
+2026-10-27 21:55:56.536 | INFO  | 5f49bf84 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a/evidence" 200 (12.1ms) [case:case_300, req:2cfe8103]
+2026-10-27 21:55:56.537 | INFO  | cd8e550f | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: '보증금 3억 원 반환 분쟁 사건' [case:case_300, req:6d857d7c]
+2026-10-27 21:55:56.539 | INFO  | cd8e550f | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_f6dc6d9a" 200 (13.7ms) [case:case_300, req:6d857d7c]
+2026-10-27 21:56:01.330 | DEBUG | 5d3ee2aa | conversation_context.py:351:load_conversation_context - [CONVERSATION_CONTEXT] New conversation session started for case=case_300m_f6dc6d9a, conv=conv_case_300m_f6dc6d9a [case:case_300, req:0a6766e6]
+2026-10-27 21:56:01.344 | INFO  | 5d3ee2aa | main.py:161:trace_context_middleware - 127.0.0.1 - "POST /api/v1/consultations" 200 (25.3ms) [req:0a6766e6]
+2026-10-27 21:56:01.346 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - Starting execution of run_legal_consultation [case:case_300, req:0a6766e6]
+2026-10-27 21:56:01.354 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - Starting execution of build_legal_graph [case:case_300, req:0a6766e6]
+2026-10-27 21:56:01.370 | INFO  | 5d3ee2aa | legal_workflow.py:1642:build_legal_graph - [GRAPH] Unified Legal Engine (with HILT Statute Search) build complete [case:case_300, req:0a6766e6]
+2026-10-27 21:56:01.370 | INFO  | 5d3ee2aa | decorators.py:105:log_success - Successfully completed build_legal_graph [case:case_300, req:0a6766e6]
+2026-10-27 21:56:01.391 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - Starting execution of supervisor_initialize_node [case:case_300, req:0a6766e6]
+2026-10-27 21:56:01.430 | INFO  | 5d3ee2aa | issue_planner.py:632:plan_legal_issues - [supervisor_initialize] [ISSUE_PLANNER] 질문 분석 결과 4개 단위 쟁점 도출 완료 [case:case_300, req:0a6766e6]
+2026-10-27 21:56:01.430 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - [supervisor_initialize] Starting execution of search_hybrid [case:case_300, req:0a6766e6]
+2026-10-27 21:56:01.439 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - [supervisor_initialize] Starting execution of search_evidence_in_postgres [case:case_300, req:0a6766e6]
+2026-10-27 21:56:01.454 | INFO  | 5d3ee2aa | decorators.py:105:log_success - [supervisor_initialize] Successfully completed search_evidence_in_postgres [case:case_300, req:0a6766e6]
+2026-10-27 21:56:01.455 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - [supervisor_initialize] Starting execution of search_traversal [case:case_300, req:0a6766e6]
+2026-10-27 21:56:01.464 | INFO  | 5d3ee2aa | decorators.py:105:log_success - [supervisor_initialize] Successfully completed search_traversal [case:case_300, req:0a6766e6]
+2026-10-27 21:56:01.472 | INFO  | 5d3ee2aa | decorators.py:105:log_success - [supervisor_initialize] Successfully completed search_hybrid [case:case_300, req:0a6766e6]
+2026-10-27 21:56:01.481 | INFO  | 5d3ee2aa | decorators.py:105:log_success - [supervisor_initialize] Successfully completed supervisor_initialize_node [case:case_300, req:0a6766e6]
+2026-10-27 21:56:01.493 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - Starting execution of intent_analysis_node [case:case_300, req:0a6766e6]
+2026-10-27 21:56:01.494 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - [intent_analysis] Starting execution of analyze_consultation_intent [case:case_300, req:0a6766e6]
+2026-10-27 21:56:01.650 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [intent_analysis] connect_tcp.started host='skax.ai-talentlab.com' port=443 local_address=None timeout=None socket_options=None [case:case_300, req:0a6766e6]
+2026-10-27 21:56:01.657 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [intent_analysis] connect_tcp.complete return_value=<httpcore2._backends.sync.SyncStream object at 0x000001B314FA0D50> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:01.657 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [intent_analysis] start_tls.started ssl_context=<truststore._api.SSLContext object at 0x000001B314FEDC70> server_hostname='skax.ai-talentlab.com' timeout=None [case:case_300, req:0a6766e6]
+2026-10-27 21:56:01.691 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [intent_analysis] start_tls.complete return_value=<httpcore2._backends.sync.SyncStream object at 0x000001B31522D350> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:01.691 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [intent_analysis] send_request_headers.started request=<Request [b'POST']> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:01.692 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [intent_analysis] send_request_headers.complete [case:case_300, req:0a6766e6]
+2026-10-27 21:56:01.692 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [intent_analysis] send_request_body.started request=<Request [b'POST']> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:01.692 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [intent_analysis] send_request_body.complete [case:case_300, req:0a6766e6]
+2026-10-27 21:56:01.693 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [intent_analysis] receive_response_headers.started request=<Request [b'POST']> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:02.853 | INFO  | b210a9e9 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.9ms) [req:f3010a80]
+2026-10-27 21:56:04.358 | INFO  | 82ce6bb1 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (3.9ms) [req:3f10e15e]
+2026-10-27 21:56:05.853 | INFO  | 83b4e2ad | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (3.9ms) [req:22cee406]
+2026-10-27 21:56:06.295 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [intent_analysis] receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Tue, 27 Oct 2026 12:56:04 GMT'), (b'Content-Type', b'application/json'), (b'Transfer-Encoding', b'chunked'), (b'Connection', b'keep-alive'), (b'Server', b'nginx'), (b'Vary', b'Accept-Encoding'), (b'vary', b'Origin'), (b'azureai-fe-is-streaming', b'False'), (b'azureai-fe-offer-type', b'paygo'), (b'azureml-model-session', b'd20261023093704-2895099c'), (b'skip-error-remapping', b'true'), (b'x-ms-is-spilled-over', b'false'), (b'x-ms-rai-invoked', b'true'), (b'x-ms-served-model', b'gpt-5.4-2026-03-05'), (b'x-ratelimit-abusepenalty-active', b'False'), (b'x-ratelimit-key', b'aitl-prd-gpt-5.4'), (b'x-ratelimit-limit-requests', b'79970'), (b'x-ratelimit-limit-tokens', b'7997000'), (b'x-ratelimit-remaining-requests', b'79969'), (b'x-ratelimit-remaining-tokens', b'7994683'), (b'x-ratelimit-renewalperiod-requests', b'60'), (b'x-ratelimit-renewalperiod-tokens', b'60'), (b'x-ratelimit-reset-requests', b'0'), (b'x-ratelimit-reset-tokens', b'0'), (b'x-request-id', b'9953a3bc-8ec9-4ee9-ae79-d21c3d9960a8'), (b'apim-request-id', b'50ebd0c1-d93c-4f0d-8ae7-5c1b201c3678'), (b'x-http2-stream-id', b'237'), (b'strict-transport-security', b'max-age=31536000; includeSubDomains; preload'), (b'x-content-type-options', b'nosniff'), (b'x-ms-region', b'Korea Central'), (b'X-Robots-Tag', b'noindex, nofollow'), (b'Content-Encoding', b'gzip')]) [case:case_300, req:0a6766e6]
+2026-10-27 21:56:06.295 | INFO  | 5d3ee2aa | _client.py:1085:_send_single_request - [intent_analysis] HTTP Request: POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview "HTTP/1.1 200 OK" [case:case_300, req:0a6766e6]
+2026-10-27 21:56:06.296 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [intent_analysis] receive_response_body.started request=<Request [b'POST']> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:06.296 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [intent_analysis] receive_response_body.complete [case:case_300, req:0a6766e6]
+2026-10-27 21:56:06.296 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [intent_analysis] response_closed.started [case:case_300, req:0a6766e6]
+2026-10-27 21:56:06.296 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [intent_analysis] response_closed.complete [case:case_300, req:0a6766e6]
+2026-10-27 21:56:06.303 | INFO  | 5d3ee2aa | callbacks.py:98:on_llm_end   - [intent_analysis] LLM Call End [case:case_300, req:0a6766e6]
+2026-10-27 21:56:06.306 | INFO  | 5d3ee2aa | intent_analyzer.py:347:analyze_consultation_intent - [intent_analysis] [INTENT_ANALYZER] Final decision: intent=NEW_LEGAL_ANALYSIS, specialist=False, retrieval=True, resolved_q='임차인 김차인이 경기도 수원시 영통구 영통동 소재 다세대주택 502호에 관하여 보증금 2억 2천만 원의 주택...' [case:case_300, req:0a6766e6]
+2026-10-27 21:56:06.306 | INFO  | 5d3ee2aa | decorators.py:105:log_success - [intent_analysis] Successfully completed analyze_consultation_intent [case:case_300, req:0a6766e6]
+2026-10-27 21:56:06.308 | INFO  | 5d3ee2aa | legal_workflow.py:1430:intent_analysis_node - [intent_analysis] [NODE:intent_analysis] intent=NEW_LEGAL_ANALYSIS, resolved_q='임차인 김차인이 경기도 수원시 영통구 영통동 소재 다세대주택 502호에 관하여 보증금 2억 2천만 원의 주택...' [case:case_300, req:0a6766e6]
+2026-10-27 21:56:06.308 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - [intent_analysis] Starting execution of search_hybrid [case:case_300, req:0a6766e6]
+2026-10-27 21:56:06.308 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - [intent_analysis] Starting execution of search_evidence_in_postgres [case:case_300, req:0a6766e6]
+2026-10-27 21:56:06.321 | INFO  | 5d3ee2aa | decorators.py:105:log_success - [intent_analysis] Successfully completed search_evidence_in_postgres [case:case_300, req:0a6766e6]
+2026-10-27 21:56:06.321 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - [intent_analysis] Starting execution of search_traversal [case:case_300, req:0a6766e6]
+2026-10-27 21:56:06.326 | INFO  | 5d3ee2aa | decorators.py:105:log_success - [intent_analysis] Successfully completed search_traversal [case:case_300, req:0a6766e6]
+2026-10-27 21:56:06.331 | INFO  | 5d3ee2aa | decorators.py:105:log_success - [intent_analysis] Successfully completed search_hybrid [case:case_300, req:0a6766e6]
+2026-10-27 21:56:06.334 | INFO  | 5d3ee2aa | decorators.py:105:log_success - [intent_analysis] Successfully completed intent_analysis_node [case:case_300, req:0a6766e6]
+2026-10-27 21:56:06.368 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - Starting execution of route_node [case:case_300, req:0a6766e6]
+2026-10-27 21:56:06.369 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - [route] Starting execution of route_categories_detailed [case:case_300, req:0a6766e6]
+2026-10-27 21:56:06.376 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [route] connect_tcp.started host='skax.ai-talentlab.com' port=443 local_address=None timeout=None socket_options=None [case:case_300, req:0a6766e6]
+2026-10-27 21:56:06.383 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [route] connect_tcp.complete return_value=<httpcore2._backends.sync.SyncStream object at 0x000001B314D74590> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:06.383 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [route] start_tls.started ssl_context=<truststore._api.SSLContext object at 0x000001B314FEFC80> server_hostname='skax.ai-talentlab.com' timeout=None [case:case_300, req:0a6766e6]
+2026-10-27 21:56:06.391 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [route] start_tls.complete return_value=<httpcore2._backends.sync.SyncStream object at 0x000001B314C9EB10> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:06.392 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [route] send_request_headers.started request=<Request [b'POST']> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:06.392 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [route] send_request_headers.complete [case:case_300, req:0a6766e6]
+2026-10-27 21:56:06.392 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [route] send_request_body.started request=<Request [b'POST']> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:06.392 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [route] send_request_body.complete [case:case_300, req:0a6766e6]
+2026-10-27 21:56:06.393 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [route] receive_response_headers.started request=<Request [b'POST']> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:07.361 | INFO  | 5ee232d8 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.6ms) [req:f978f628]
+2026-10-27 21:56:08.542 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [route] receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Tue, 27 Oct 2026 12:56:07 GMT'), (b'Content-Type', b'application/json'), (b'Transfer-Encoding', b'chunked'), (b'Connection', b'keep-alive'), (b'Server', b'nginx'), (b'Vary', b'Accept-Encoding'), (b'vary', b'Origin'), (b'azureai-fe-is-streaming', b'False'), (b'azureai-fe-offer-type', b'paygo'), (b'azureml-model-session', b'd20261012154157-0b1f050c'), (b'skip-error-remapping', b'true'), (b'x-ms-is-spilled-over', b'false'), (b'x-ms-rai-invoked', b'true'), (b'x-ms-served-model', b'gpt-5.4-2026-03-05'), (b'x-ratelimit-abusepenalty-active', b'False'), (b'x-ratelimit-key', b'aitl-prd-gpt-5.4'), (b'x-ratelimit-limit-requests', b'79970'), (b'x-ratelimit-limit-tokens', b'7997000'), (b'x-ratelimit-remaining-requests', b'79969'), (b'x-ratelimit-remaining-tokens', b'7994960'), (b'x-ratelimit-renewalperiod-requests', b'60'), (b'x-ratelimit-renewalperiod-tokens', b'60'), (b'x-ratelimit-reset-requests', b'0'), (b'x-ratelimit-reset-tokens', b'0'), (b'x-request-id', b'd690a791-1af3-4fa3-9e2a-bac2954325b9'), (b'apim-request-id', b'58ce75e3-88e9-4329-a7e7-4cf628a314b7'), (b'x-http2-stream-id', b'897'), (b'strict-transport-security', b'max-age=31536000; includeSubDomains; preload'), (b'x-content-type-options', b'nosniff'), (b'x-ms-region', b'Korea Central'), (b'X-Robots-Tag', b'noindex, nofollow'), (b'Content-Encoding', b'gzip')]) [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.542 | INFO  | 5d3ee2aa | _client.py:1085:_send_single_request - [route] HTTP Request: POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview "HTTP/1.1 200 OK" [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.543 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [route] receive_response_body.started request=<Request [b'POST']> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.543 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [route] receive_response_body.complete [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.543 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [route] response_closed.started [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.543 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [route] response_closed.complete [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.545 | INFO  | 5d3ee2aa | callbacks.py:98:on_llm_end   - [route] LLM Call End [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.546 | INFO  | 5d3ee2aa | decorators.py:105:log_success - [route] Successfully completed route_categories_detailed [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.548 | DEBUG | 5d3ee2aa | legal_workflow.py:328:route_node - [route] [NODE:route] status=CLASSIFIED cats=['민법'] reason=주택임대차 종료 후 전세보증금 반환, 대항력·우선변제권 유지, 임차권등기명령, 동시이행관계, 반환청구소송 등 임대차 및 보증금 반환에 관한 민사상 권리구제가 핵심 쟁점입니다. [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.548 | INFO  | 5d3ee2aa | decorators.py:105:log_success - [route] Successfully completed route_node [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.578 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - Starting execution of plan_node [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.578 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - [plan] Starting execution of plan_tools [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.579 | DEBUG | 5d3ee2aa | planner.py:12:plan_tools     - [plan] [PLAN] ['민법'] -> ['civil_agent'] [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.580 | INFO  | 5d3ee2aa | decorators.py:105:log_success - [plan] Successfully completed plan_tools [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.580 | DEBUG | 5d3ee2aa | legal_workflow.py:407:plan_node - [plan] [NODE:plan] plan=['civil_agent'] [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.581 | INFO  | 5d3ee2aa | decorators.py:105:log_success - [plan] Successfully completed plan_node [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.614 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - Starting execution of run_agents_node [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.614 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - [run_agents] Starting execution of run_specialist_agent [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.615 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - [run_agents] Starting execution of make_fixed_retrieval_tool [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.615 | INFO  | 5d3ee2aa | decorators.py:105:log_success - [run_agents] Successfully completed make_fixed_retrieval_tool [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.616 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - [run_agents] Starting execution of build_react_agent [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.618 | DEBUG | 5d3ee2aa | base_agent.py:213:build_react_agent - [run_agents] [AGENT] built: category=민법 tools=1 primary_tool=civil_retrieval_tool [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.618 | INFO  | 5d3ee2aa | decorators.py:105:log_success - [run_agents] Successfully completed build_react_agent [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.622 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - [civil_agent >> run_agents] Starting execution of _run [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.622 | DEBUG | 5d3ee2aa | retrieval_factory.py:51:_run - [civil_agent >> run_agents] [TOOL:civil_retrieval_tool] query_len=344 label=민법 eng=civil [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.622 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - [civil_agent >> run_agents] Starting execution of rewrite_query [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.627 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] connect_tcp.started host='skax.ai-talentlab.com' port=443 local_address=None timeout=None socket_options=None [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.634 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] connect_tcp.complete return_value=<httpcore2._backends.sync.SyncStream object at 0x000001B314CD95D0> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.634 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] start_tls.started ssl_context=<truststore._api.SSLContext object at 0x000001B3151F1EB0> server_hostname='skax.ai-talentlab.com' timeout=None [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.642 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] start_tls.complete return_value=<httpcore2._backends.sync.SyncStream object at 0x000001B315130C10> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.642 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] send_request_headers.started request=<Request [b'POST']> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.642 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] send_request_headers.complete [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.643 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] send_request_body.started request=<Request [b'POST']> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.643 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] send_request_body.complete [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.643 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] receive_response_headers.started request=<Request [b'POST']> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:08.865 | INFO  | c234134a | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.2ms) [req:d08ec7de]
+2026-10-27 21:56:10.003 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Tue, 27 Oct 2026 12:56:08 GMT'), (b'Content-Type', b'application/json'), (b'Transfer-Encoding', b'chunked'), (b'Connection', b'keep-alive'), (b'Server', b'nginx'), (b'Vary', b'Accept-Encoding'), (b'vary', b'Origin'), (b'azureai-fe-is-streaming', b'False'), (b'azureai-fe-offer-type', b'paygo'), (b'azureml-model-session', b'd20261025055357-9951d457'), (b'skip-error-remapping', b'true'), (b'x-ms-is-spilled-over', b'false'), (b'x-ms-rai-invoked', b'true'), (b'x-ms-served-model', b'gpt-5.4-2026-03-05'), (b'x-ratelimit-abusepenalty-active', b'False'), (b'x-ratelimit-key', b'aitl-prd-gpt-5.4'), (b'x-ratelimit-limit-requests', b'79970'), (b'x-ratelimit-limit-tokens', b'7997000'), (b'x-ratelimit-remaining-requests', b'79969'), (b'x-ratelimit-remaining-tokens', b'7996294'), (b'x-ratelimit-renewalperiod-requests', b'60'), (b'x-ratelimit-renewalperiod-tokens', b'60'), (b'x-ratelimit-reset-requests', b'0'), (b'x-ratelimit-reset-tokens', b'0'), (b'x-request-id', b'c54f5eeb-60df-4aad-9e5f-b9034869403e'), (b'apim-request-id', b'f9941146-cba2-465f-88db-814fe03b8467'), (b'x-http2-stream-id', b'861'), (b'strict-transport-security', b'max-age=31536000; includeSubDomains; preload'), (b'x-content-type-options', b'nosniff'), (b'x-ms-region', b'Korea Central'), (b'X-Robots-Tag', b'noindex, nofollow'), (b'Content-Encoding', b'gzip')]) [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.004 | INFO  | 5d3ee2aa | _client.py:1085:_send_single_request - [civil_agent >> run_agents] HTTP Request: POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview "HTTP/1.1 200 OK" [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.004 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] receive_response_body.started request=<Request [b'POST']> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.004 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] receive_response_body.complete [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.004 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] response_closed.started [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.004 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] response_closed.complete [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.006 | INFO  | 5d3ee2aa | callbacks.py:98:on_llm_end   - [civil_agent >> run_agents] LLM Call End [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.007 | DEBUG | 5d3ee2aa | query_rewrite.py:118:rewrite_query - [civil_agent >> run_agents] [REWRITE] llm_terms=['주택임대차보호법 제3조·제3조의2', '임차권등기명령'] (from effective_q='임차인 김차인이 경기도 수원시 영통구 영통동 소재 다세대주택 502호에 ...') [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.008 | DEBUG | 5d3ee2aa | query_rewrite.py:130:rewrite_query - [civil_agent >> run_agents] [REWRITE] final_len=377 final=[임차인 김차인이 경기도 수원시 영통구 영통동 소재 다세대주택 502호에 관하여 보증금 2억 2천만 원의 주택임대차계약을 체결하고, 2024년 9월 1일 입주, 2024년 9월 2일 전입신고, 2024년 9월 3일 확정일자를 받은 상태에서 2026년 6월 15일 갱신 거절 및 2026년 8월 31일 만기 종료 의사를 통지하였으나 임대인이 만기 후 보증금을 반환하지 않는 사안에서, 임차인의 대항력·우선변제권 유지, 계약 종료의 효력, 임차권등기명령 신청 필요성, 동시이행관계, 내용증명 발송, 지급명령·보증금반환청구소송, 지연손해금, 점유 이전(이사) 전후 주의사항 등 전세보증금 반환을 위한 단계별 법적 조치 분석
+키워드: 주택임대차보호법 제3조·제3조의2, 임차권등기명령] [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.008 | INFO  | 5d3ee2aa | decorators.py:105:log_success - [civil_agent >> run_agents] Successfully completed rewrite_query [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.018 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - [civil_agent >> run_agents] Starting execution of retrieve_with_status [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.019 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] close.started [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.020 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] close.complete [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.020 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] close.started [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.021 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] close.complete [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.021 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - [civil_agent >> run_agents] Starting execution of _list_collections [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.021 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - [civil_agent >> run_agents] Starting execution of _get_client [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.352 | DEBUG | 5d3ee2aa | config.py:355:start          - [civil_agent >> run_agents] Starting component System [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.352 | DEBUG | 5d3ee2aa | config.py:355:start          - [civil_agent >> run_agents] Starting component Posthog [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.352 | DEBUG | 5d3ee2aa | config.py:355:start          - [civil_agent >> run_agents] Starting component OpenTelemetryClient [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.353 | DEBUG | 5d3ee2aa | config.py:355:start          - [civil_agent >> run_agents] Starting component FastAPI [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.360 | INFO  | 1aec1b6e | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (3.7ms) [req:f09260ea]
+2026-10-27 21:56:10.597 | DEBUG | 5d3ee2aa | config.py:355:start          - [civil_agent >> run_agents] Starting component System [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.597 | DEBUG | 5d3ee2aa | config.py:355:start          - [civil_agent >> run_agents] Starting component Posthog [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.598 | DEBUG | 5d3ee2aa | config.py:355:start          - [civil_agent >> run_agents] Starting component OpenTelemetryClient [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.598 | DEBUG | 5d3ee2aa | config.py:355:start          - [civil_agent >> run_agents] Starting component FastAPI [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.662 | DEBUG | 5d3ee2aa | retrieval.py:201:_get_client - [civil_agent >> run_agents] [RET] HttpClient connected: 127.0.0.1:8001 (25 collections) [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.663 | INFO  | 5d3ee2aa | decorators.py:105:log_success - [civil_agent >> run_agents] Successfully completed _get_client [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.677 | DEBUG | 5d3ee2aa | retrieval.py:232:_list_collections - [civil_agent >> run_agents] [RET] collections=['law_docs_criminal', 'law_docs_article_administrative', 'law_docs_article_labor', 'law_docs_fixed_criminal', 'law_docs_tax', 'law_docs_fixed_international', 'law_docs_international', 'law_docs_fixed_civil', 'law_docs_fixed_commercial', 'law_docs_article_international', 'law_docs_labor', 'law_docs_article_constitution', 'case_evidence', 'law_docs_commercial', 'law_docs_fixed_tax', 'law_docs_fixed_administrative', 'law_docs_article_tax', 'law_docs_civil', 'law_docs_article_criminal', 'law_docs_constitution', 'law_docs_fixed_constitution', 'law_docs_article_commercial', 'law_docs_fixed_labor', 'law_docs_article_civil', 'law_docs_administrative'] [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.677 | INFO  | 5d3ee2aa | decorators.py:105:log_success - [civil_agent >> run_agents] Successfully completed _list_collections [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.678 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - [civil_agent >> run_agents] Starting execution of _get_vs [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.679 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - [civil_agent >> run_agents] Starting execution of _get_client [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.680 | INFO  | 5d3ee2aa | decorators.py:105:log_success - [civil_agent >> run_agents] Successfully completed _get_client [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.724 | INFO  | 5d3ee2aa | decorators.py:105:log_success - [civil_agent >> run_agents] Successfully completed _get_vs [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.853 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] connect_tcp.started host='skax.ai-talentlab.com' port=443 local_address=None timeout=None socket_options=None [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.868 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] connect_tcp.complete return_value=<httpcore2._backends.sync.SyncStream object at 0x000001B315284810> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.868 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] start_tls.started ssl_context=<truststore._api.SSLContext object at 0x000001B3151F2180> server_hostname='skax.ai-talentlab.com' timeout=None [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.875 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] start_tls.complete return_value=<httpcore2._backends.sync.SyncStream object at 0x000001B31506E0D0> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.875 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] send_request_headers.started request=<Request [b'POST']> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.876 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] send_request_headers.complete [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.876 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] send_request_body.started request=<Request [b'POST']> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.876 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] send_request_body.complete [case:case_300, req:0a6766e6]
+2026-10-27 21:56:10.877 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] receive_response_headers.started request=<Request [b'POST']> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:11.045 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Tue, 27 Oct 2026 12:56:09 GMT'), (b'Content-Type', b'application/json'), (b'Transfer-Encoding', b'chunked'), (b'Connection', b'keep-alive'), (b'Server', b'nginx'), (b'Vary', b'Accept-Encoding'), (b'vary', b'Origin'), (b'apim-request-id', b'5fa71e28-bef7-41b7-bb18-06fa4bfd03eb'), (b'strict-transport-security', b'max-age=31536000; includeSubDomains; preload'), (b'x-content-type-options', b'nosniff'), (b'x-ms-region', b'Korea Central'), (b'x-ratelimit-remaining-tokens', b'9995603'), (b'x-ratelimit-limit-tokens', b'9996000'), (b'azureml-model-session', b'd20261027123758-aa22ddfe'), (b'x-ms-served-model', b'text-embedding-3-large-1'), (b'x-request-id', b'f96e1346-6d27-495e-87db-5aca99f4ae90'), (b'x-http2-stream-id', b'411'), (b'x-ms-deployment-name', b'aitl-prd-text-embedding-3-large'), (b'X-Robots-Tag', b'noindex, nofollow'), (b'Content-Encoding', b'gzip')]) [case:case_300, req:0a6766e6]
+2026-10-27 21:56:11.045 | INFO  | 5d3ee2aa | _client.py:1085:_send_single_request - [civil_agent >> run_agents] HTTP Request: POST https://skax.ai-talentlab.com/openai/deployments/text-embedding-3-large/embeddings?api-version=2024-12-01-preview "HTTP/1.1 200 OK" [case:case_300, req:0a6766e6]
+2026-10-27 21:56:11.046 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] receive_response_body.started request=<Request [b'POST']> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:11.046 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] receive_response_body.complete [case:case_300, req:0a6766e6]
+2026-10-27 21:56:11.047 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] response_closed.started [case:case_300, req:0a6766e6]
+2026-10-27 21:56:11.047 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] response_closed.complete [case:case_300, req:0a6766e6]
+2026-10-27 21:56:11.204 | DEBUG | 5d3ee2aa | retrieval.py:302:retrieve_with_status - [civil_agent >> run_agents] [RET] hits=2 coll=law_docs_civil [case:case_300, req:0a6766e6]
+2026-10-27 21:56:11.205 | INFO  | 5d3ee2aa | decorators.py:105:log_success - [civil_agent >> run_agents] Successfully completed retrieve_with_status [case:case_300, req:0a6766e6]
+2026-10-27 21:56:11.206 | INFO  | 5d3ee2aa | decorators.py:105:log_success - [civil_agent >> run_agents] Successfully completed _run [case:case_300, req:0a6766e6]
+2026-10-27 21:56:11.209 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] connect_tcp.started host='skax.ai-talentlab.com' port=443 local_address=None timeout=None socket_options=None [case:case_300, req:0a6766e6]
+2026-10-27 21:56:11.217 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] connect_tcp.complete return_value=<httpcore2._backends.sync.SyncStream object at 0x000001B31532A410> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:11.218 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] start_tls.started ssl_context=<truststore._api.SSLContext object at 0x000001B3151F2210> server_hostname='skax.ai-talentlab.com' timeout=None [case:case_300, req:0a6766e6]
+2026-10-27 21:56:11.227 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] start_tls.complete return_value=<httpcore2._backends.sync.SyncStream object at 0x000001B315337150> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:11.227 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] send_request_headers.started request=<Request [b'POST']> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:11.228 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] send_request_headers.complete [case:case_300, req:0a6766e6]
+2026-10-27 21:56:11.228 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] send_request_body.started request=<Request [b'POST']> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:11.228 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] send_request_body.complete [case:case_300, req:0a6766e6]
+2026-10-27 21:56:11.229 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] receive_response_headers.started request=<Request [b'POST']> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:11.853 | INFO  | 0940b693 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (5.0ms) [req:f8f16926]
+2026-10-27 21:56:13.354 | INFO  | da47707f | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.1ms) [req:72159217]
+2026-10-27 21:56:15.474 | INFO  | cce0f947 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (5.1ms) [req:dd1d0dac]
+2026-10-27 21:56:16.485 | INFO  | a23578b9 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (3.7ms) [req:9730d7a7]
+2026-10-27 21:56:18.476 | INFO  | c5e797e8 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.5ms) [req:33ffde27]
+2026-10-27 21:56:19.474 | INFO  | e0ed6d5d | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.0ms) [req:ef39206c]
+2026-10-27 21:56:21.482 | INFO  | 03738560 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.1ms) [req:5646b5a8]
+2026-10-27 21:56:22.481 | INFO  | 23e39c93 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (3.7ms) [req:744d3fec]
+2026-10-27 21:56:24.473 | INFO  | ed4c5ee1 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.4ms) [req:faa12fba]
+2026-10-27 21:56:25.485 | INFO  | e2310d04 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (3.1ms) [req:502ff31f]
+2026-10-27 21:56:27.481 | INFO  | e3c0cb4c | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (3.9ms) [req:14d70fdf]
+2026-10-27 21:56:28.479 | INFO  | 1c96ae92 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.7ms) [req:87afcfb0]
+2026-10-27 21:56:30.483 | INFO  | bc5457dc | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.6ms) [req:7a8cc913]
+2026-10-27 21:56:31.475 | INFO  | 65d923bc | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.2ms) [req:eea21326]
+2026-10-27 21:56:33.481 | INFO  | fc8ab689 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.6ms) [req:8e4ad8c5]
+2026-10-27 21:56:34.477 | INFO  | bfae69d2 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.0ms) [req:b9a608ad]
+2026-10-27 21:56:36.482 | INFO  | 70bfc13f | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (5.2ms) [req:cba1efef]
+2026-10-27 21:56:37.480 | INFO  | 9b18c892 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (3.7ms) [req:31450c10]
+2026-10-27 21:56:39.486 | INFO  | fb6673bc | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.3ms) [req:eba4cfdd]
+2026-10-27 21:56:40.472 | INFO  | 81a85e6a | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.0ms) [req:c9a97b1b]
+2026-10-27 21:56:41.267 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Tue, 27 Oct 2026 12:56:39 GMT'), (b'Content-Type', b'application/json'), (b'Transfer-Encoding', b'chunked'), (b'Connection', b'keep-alive'), (b'Server', b'nginx'), (b'Vary', b'Accept-Encoding'), (b'vary', b'Origin'), (b'azureai-fe-is-streaming', b'False'), (b'azureai-fe-offer-type', b'paygo'), (b'azureml-model-session', b'd20261024055230-9fc62192'), (b'skip-error-remapping', b'true'), (b'x-ms-is-spilled-over', b'false'), (b'x-ms-rai-invoked', b'true'), (b'x-ms-served-model', b'gpt-5.4-2026-03-05'), (b'x-ratelimit-abusepenalty-active', b'False'), (b'x-ratelimit-key', b'aitl-prd-gpt-5.4'), (b'x-ratelimit-limit-requests', b'79970'), (b'x-ratelimit-limit-tokens', b'7997000'), (b'x-ratelimit-remaining-requests', b'79969'), (b'x-ratelimit-remaining-tokens', b'7994381'), (b'x-ratelimit-renewalperiod-requests', b'60'), (b'x-ratelimit-renewalperiod-tokens', b'60'), (b'x-ratelimit-reset-requests', b'0'), (b'x-ratelimit-reset-tokens', b'0'), (b'x-request-id', b'05b90070-54d9-4dbe-9791-89d7f99776a3'), (b'apim-request-id', b'7a7a3562-0422-4e4d-9629-03c2edcc0ed9'), (b'x-http2-stream-id', b'503'), (b'strict-transport-security', b'max-age=31536000; includeSubDomains; preload'), (b'x-content-type-options', b'nosniff'), (b'x-ms-region', b'Korea Central'), (b'X-Robots-Tag', b'noindex, nofollow'), (b'Content-Encoding', b'gzip')]) [case:case_300, req:0a6766e6]
+2026-10-27 21:56:41.268 | INFO  | 5d3ee2aa | _client.py:1085:_send_single_request - [civil_agent >> run_agents] HTTP Request: POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview "HTTP/1.1 200 OK" [case:case_300, req:0a6766e6]
+2026-10-27 21:56:41.268 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] receive_response_body.started request=<Request [b'POST']> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:41.268 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] receive_response_body.complete [case:case_300, req:0a6766e6]
+2026-10-27 21:56:41.268 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] response_closed.started [case:case_300, req:0a6766e6]
+2026-10-27 21:56:41.269 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [civil_agent >> run_agents] response_closed.complete [case:case_300, req:0a6766e6]
+2026-10-27 21:56:41.270 | INFO  | 5d3ee2aa | callbacks.py:98:on_llm_end   - [civil_agent >> run_agents] LLM Call End [case:case_300, req:0a6766e6]
+2026-10-27 21:56:41.271 | INFO  | 5d3ee2aa | decorators.py:105:log_success - [civil_agent >> run_agents] Successfully completed run_specialist_agent [case:case_300, req:0a6766e6]
+2026-10-27 21:56:41.273 | DEBUG | 5d3ee2aa | legal_workflow.py:437:run_agents_node - [run_agents] [NODE:run_agents] done: ['민법'] [case:case_300, req:0a6766e6]
+2026-10-27 21:56:41.273 | INFO  | 5d3ee2aa | decorators.py:105:log_success - [run_agents] Successfully completed run_agents_node [case:case_300, req:0a6766e6]
+2026-10-27 21:56:41.296 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - Starting execution of synthesize_node [case:case_300, req:0a6766e6]
+2026-10-27 21:56:41.297 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - [synthesize] Starting execution of synthesize [case:case_300, req:0a6766e6]
+2026-10-27 21:56:41.305 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [synthesize] connect_tcp.started host='skax.ai-talentlab.com' port=443 local_address=None timeout=None socket_options=None [case:case_300, req:0a6766e6]
+2026-10-27 21:56:41.314 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [synthesize] connect_tcp.complete return_value=<httpcore2._backends.sync.SyncStream object at 0x000001B3150F4D10> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:41.314 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [synthesize] start_tls.started ssl_context=<truststore._api.SSLContext object at 0x000001B3152E6450> server_hostname='skax.ai-talentlab.com' timeout=None [case:case_300, req:0a6766e6]
+2026-10-27 21:56:41.321 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [synthesize] start_tls.complete return_value=<httpcore2._backends.sync.SyncStream object at 0x000001B31530EC90> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:41.322 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [synthesize] send_request_headers.started request=<Request [b'POST']> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:41.322 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [synthesize] send_request_headers.complete [case:case_300, req:0a6766e6]
+2026-10-27 21:56:41.322 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [synthesize] send_request_body.started request=<Request [b'POST']> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:41.323 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [synthesize] send_request_body.complete [case:case_300, req:0a6766e6]
+2026-10-27 21:56:41.323 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [synthesize] receive_response_headers.started request=<Request [b'POST']> [case:case_300, req:0a6766e6]
+2026-10-27 21:56:42.473 | DEBUG | -------- | _trace.py:45:trace           - close.started
+2026-10-27 21:56:42.474 | DEBUG | -------- | _trace.py:45:trace           - close.complete
+2026-10-27 21:56:42.478 | INFO  | 9d54d459 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (7.2ms) [req:2b130f6e]
+2026-10-27 21:56:43.484 | INFO  | 456a6562 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.4ms) [req:c1ad7198]
+2026-10-27 21:56:45.486 | INFO  | 1febd624 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.0ms) [req:c6a584c1]
+2026-10-27 21:56:46.481 | INFO  | d5280e6b | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.0ms) [req:243339b9]
+2026-10-27 21:56:48.475 | INFO  | 2e96175f | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.2ms) [req:e7fbf724]
+2026-10-27 21:56:49.483 | INFO  | fce023e2 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (5.0ms) [req:7b92c71e]
+2026-10-27 21:56:51.478 | INFO  | c5e6a729 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.7ms) [req:b7dcf77f]
+2026-10-27 21:56:52.473 | INFO  | cb1fb638 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.8ms) [req:ca27936b]
+2026-10-27 21:56:54.479 | INFO  | 08e2b8a9 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.0ms) [req:b43c9199]
+2026-10-27 21:56:55.474 | INFO  | 385e3f68 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.3ms) [req:9befe40a]
+2026-10-27 21:56:57.486 | INFO  | 734e3cc2 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.7ms) [req:7612c93a]
+2026-10-27 21:56:58.479 | INFO  | cb4b24ba | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.2ms) [req:05e8892d]
+2026-10-27 21:57:00.472 | INFO  | 37ac0a52 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (3.8ms) [req:f5be83ba]
+2026-10-27 21:57:01.483 | INFO  | b02bbac4 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.2ms) [req:5ef3eec8]
+2026-10-27 21:57:03.487 | INFO  | e2482ff4 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (3.9ms) [req:4daa1308]
+2026-10-27 21:57:04.486 | INFO  | 2ec57ec5 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (5.1ms) [req:c54de405]
+2026-10-27 21:57:06.484 | INFO  | c4507ce2 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (3.9ms) [req:54cb828a]
+2026-10-27 21:57:07.481 | INFO  | e68e125a | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.2ms) [req:5cb71681]
+2026-10-27 21:57:09.485 | INFO  | dbf3f168 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.2ms) [req:2edcbfd7]
+2026-10-27 21:57:10.481 | INFO  | 696e4865 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (3.7ms) [req:e0c8584b]
+2026-10-27 21:57:12.474 | INFO  | 52996394 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (5.1ms) [req:6a3bcde1]
+2026-10-27 21:57:13.487 | INFO  | 00e95447 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.1ms) [req:462950dd]
+2026-10-27 21:57:51.248 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [synthesize] receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Tue, 27 Oct 2026 12:57:49 GMT'), (b'Content-Type', b'application/json'), (b'Transfer-Encoding', b'chunked'), (b'Connection', b'keep-alive'), (b'Server', b'nginx'), (b'Vary', b'Accept-Encoding'), (b'vary', b'Origin'), (b'azureai-fe-is-streaming', b'False'), (b'azureai-fe-offer-type', b'paygo'), (b'azureml-model-session', b'd20261026082430-010cce24'), (b'skip-error-remapping', b'true'), (b'x-ms-is-spilled-over', b'false'), (b'x-ms-rai-invoked', b'true'), (b'x-ms-served-model', b'gpt-5.4-2026-03-05'), (b'x-ratelimit-abusepenalty-active', b'False'), (b'x-ratelimit-key', b'aitl-prd-gpt-5.4'), (b'x-ratelimit-limit-requests', b'79970'), (b'x-ratelimit-limit-tokens', b'7997000'), (b'x-ratelimit-remaining-requests', b'79969'), (b'x-ratelimit-remaining-tokens', b'7992466'), (b'x-ratelimit-renewalperiod-requests', b'60'), (b'x-ratelimit-renewalperiod-tokens', b'60'), (b'x-ratelimit-reset-requests', b'0'), (b'x-ratelimit-reset-tokens', b'0'), (b'x-request-id', b'4c6bbb61-ff20-4e00-a8b9-a6790b34d93a'), (b'apim-request-id', b'acfb3333-c3f0-4820-bd8a-ea09aca74ad0'), (b'x-http2-stream-id', b'895'), (b'strict-transport-security', b'max-age=31536000; includeSubDomains; preload'), (b'x-content-type-options', b'nosniff'), (b'x-ms-region', b'Korea Central'), (b'X-Robots-Tag', b'noindex, nofollow'), (b'Content-Encoding', b'gzip')]) [case:case_300, req:0a6766e6]
+2026-10-27 21:57:51.249 | INFO  | 5d3ee2aa | _client.py:1085:_send_single_request - [synthesize] HTTP Request: POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview "HTTP/1.1 200 OK" [case:case_300, req:0a6766e6]
+2026-10-27 21:57:51.249 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [synthesize] receive_response_body.started request=<Request [b'POST']> [case:case_300, req:0a6766e6]
+2026-10-27 21:57:51.249 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [synthesize] receive_response_body.complete [case:case_300, req:0a6766e6]
+2026-10-27 21:57:51.250 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [synthesize] response_closed.started [case:case_300, req:0a6766e6]
+2026-10-27 21:57:51.250 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [synthesize] response_closed.complete [case:case_300, req:0a6766e6]
+2026-10-27 21:57:51.252 | INFO  | 5d3ee2aa | callbacks.py:98:on_llm_end   - [synthesize] LLM Call End [case:case_300, req:0a6766e6]
+2026-10-27 21:57:51.256 | INFO  | 5d3ee2aa | decorators.py:105:log_success - [synthesize] Successfully completed synthesize [case:case_300, req:0a6766e6]
+2026-10-27 21:57:51.256 | INFO  | 5d3ee2aa | decorators.py:105:log_success - [synthesize] Successfully completed synthesize_node [case:case_300, req:0a6766e6]
+2026-10-27 21:57:51.294 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - Starting execution of verification_node [case:case_300, req:0a6766e6]
+2026-10-27 21:57:51.309 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - [verification] Starting execution of run_verification [case:case_300, req:0a6766e6]
+2026-10-27 21:57:51.317 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [verification_agent >> verification] connect_tcp.started host='skax.ai-talentlab.com' port=443 local_address=None timeout=None socket_options=None [case:case_300, req:0a6766e6]
+2026-10-27 21:57:51.337 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [verification_agent >> verification] connect_tcp.complete return_value=<httpcore2._backends.sync.SyncStream object at 0x000001B315253910> [case:case_300, req:0a6766e6]
+2026-10-27 21:57:51.337 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [verification_agent >> verification] start_tls.started ssl_context=<truststore._api.SSLContext object at 0x000001B3152E7E30> server_hostname='skax.ai-talentlab.com' timeout=None [case:case_300, req:0a6766e6]
+2026-10-27 21:57:51.347 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [verification_agent >> verification] start_tls.complete return_value=<httpcore2._backends.sync.SyncStream object at 0x000001B3154D5650> [case:case_300, req:0a6766e6]
+2026-10-27 21:57:51.347 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [verification_agent >> verification] send_request_headers.started request=<Request [b'POST']> [case:case_300, req:0a6766e6]
+2026-10-27 21:57:51.348 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [verification_agent >> verification] send_request_headers.complete [case:case_300, req:0a6766e6]
+2026-10-27 21:57:51.348 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [verification_agent >> verification] send_request_body.started request=<Request [b'POST']> [case:case_300, req:0a6766e6]
+2026-10-27 21:57:51.348 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [verification_agent >> verification] send_request_body.complete [case:case_300, req:0a6766e6]
+2026-10-27 21:57:51.348 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [verification_agent >> verification] receive_response_headers.started request=<Request [b'POST']> [case:case_300, req:0a6766e6]
+2026-10-27 21:57:53.485 | INFO  | 86e48874 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.7ms) [req:5cefb7c7]
+2026-10-27 21:58:28.727 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [verification_agent >> verification] receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Tue, 27 Oct 2026 12:58:27 GMT'), (b'Content-Type', b'application/json'), (b'Transfer-Encoding', b'chunked'), (b'Connection', b'keep-alive'), (b'Server', b'nginx'), (b'Vary', b'Accept-Encoding'), (b'vary', b'Origin'), (b'azureai-fe-is-streaming', b'False'), (b'azureai-fe-offer-type', b'paygo'), (b'azureml-model-session', b'd20261024055230-9fc62192'), (b'skip-error-remapping', b'true'), (b'x-ms-is-spilled-over', b'false'), (b'x-ms-rai-invoked', b'true'), (b'x-ms-served-model', b'gpt-5.4-2026-03-05'), (b'x-ratelimit-abusepenalty-active', b'False'), (b'x-ratelimit-key', b'aitl-prd-gpt-5.4'), (b'x-ratelimit-limit-requests', b'79970'), (b'x-ratelimit-limit-tokens', b'7997000'), (b'x-ratelimit-remaining-requests', b'79969'), (b'x-ratelimit-remaining-tokens', b'7986416'), (b'x-ratelimit-renewalperiod-requests', b'60'), (b'x-ratelimit-renewalperiod-tokens', b'60'), (b'x-ratelimit-reset-requests', b'0'), (b'x-ratelimit-reset-tokens', b'0'), (b'x-request-id', b'489d15a3-cdf6-4848-8929-ff36c548bc8c'), (b'apim-request-id', b'3b399cb1-495d-4b84-abad-ad1c1cf4c6a4'), (b'x-http2-stream-id', b'809'), (b'strict-transport-security', b'max-age=31536000; includeSubDomains; preload'), (b'x-content-type-options', b'nosniff'), (b'x-ms-region', b'Korea Central'), (b'X-Robots-Tag', b'noindex, nofollow'), (b'Content-Encoding', b'gzip')]) [case:case_300, req:0a6766e6]
+2026-10-27 21:58:28.727 | INFO  | 5d3ee2aa | _client.py:1085:_send_single_request - [verification_agent >> verification] HTTP Request: POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview "HTTP/1.1 200 OK" [case:case_300, req:0a6766e6]
+2026-10-27 21:58:28.727 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [verification_agent >> verification] receive_response_body.started request=<Request [b'POST']> [case:case_300, req:0a6766e6]
+2026-10-27 21:58:28.728 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [verification_agent >> verification] receive_response_body.complete [case:case_300, req:0a6766e6]
+2026-10-27 21:58:28.728 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [verification_agent >> verification] response_closed.started [case:case_300, req:0a6766e6]
+2026-10-27 21:58:28.729 | DEBUG | 5d3ee2aa | _trace.py:45:trace           - [verification_agent >> verification] response_closed.complete [case:case_300, req:0a6766e6]
+2026-10-27 21:58:28.730 | INFO  | 5d3ee2aa | callbacks.py:98:on_llm_end   - [verification_agent >> verification] LLM Call End [case:case_300, req:0a6766e6]
+2026-10-27 21:58:28.732 | INFO  | 5d3ee2aa | verification.py:877:run_verification - [verification_agent >> verification] [VERIFICATION] status=REVISE, claims=26, unverified=7, unsupported=0 [case:case_300, req:0a6766e6]
+2026-10-27 21:58:28.734 | INFO  | 5d3ee2aa | decorators.py:105:log_success - [verification_agent >> verification] Successfully completed run_verification [case:case_300, req:0a6766e6]
+2026-10-27 21:58:28.756 | DEBUG | 5d3ee2aa | issue_verifier.py:835:verify_issue - [verification_agent >> verification] [ISSUE_VERIFIER] ISSUE_NOTICE_REACH -> CONDITIONAL (Facts=0, Statutes=0) [case:case_300, req:0a6766e6]
+2026-10-27 21:58:28.756 | DEBUG | 5d3ee2aa | issue_verifier.py:835:verify_issue - [verification_agent >> verification] [ISSUE_VERIFIER] ISSUE_LEASE_TERMINATION -> CONDITIONAL (Facts=1, Statutes=0) [case:case_300, req:0a6766e6]
+2026-10-27 21:58:28.757 | DEBUG | 5d3ee2aa | issue_verifier.py:835:verify_issue - [verification_agent >> verification] [ISSUE_VERIFIER] ISSUE_RIGHT_PRESERVATION -> CONDITIONAL (Facts=0, Statutes=0) [case:case_300, req:0a6766e6]
+2026-10-27 21:58:28.757 | DEBUG | 5d3ee2aa | issue_verifier.py:835:verify_issue - [verification_agent >> verification] [ISSUE_VERIFIER] ISSUE_NEXT_ACTIONS -> NEEDS_EVIDENCE (Facts=0, Statutes=0) [case:case_300, req:0a6766e6]
+2026-10-27 21:58:28.758 | INFO  | 5d3ee2aa | decorators.py:105:log_success - [verification_agent >> verification] Successfully completed verification_node [case:case_300, req:0a6766e6]
+2026-10-27 21:58:28.794 | INFO  | 5d3ee2aa | legal_workflow.py:689:verification_condition - [DISPOSITION] 쟁점 기반 처분 결정: CAUTIONARY (검증 완료 쟁점 0건, 조건부 쟁점 3건이 식별되어 확인된 범위 내에서 실질적 분석을 제공합니다.) [case:case_300, req:0a6766e6]
+2026-10-27 21:58:28.794 | INFO  | 5d3ee2aa | legal_workflow.py:698:verification_condition - [DISPOSITION] 후보 법령(['주택임대차보호법', '민법']) 검증을 위해 HILT 법령 검색 승인 요청 노드로 분기합니다. [case:case_300, req:0a6766e6]
+2026-10-27 21:58:28.953 | INFO  | 5d3ee2aa | decorators.py:74:log_entry   - Starting execution of statute_search_approval_node [case:case_300, req:0a6766e6]
+2026-10-27 21:58:28.954 | WARN  | 5d3ee2aa | status.py:45:__init__        - [statute_search_approval] description should only be set when status_code is set to StatusCode.ERROR [case:case_300, req:0a6766e6]
+2026-10-27 21:58:28.955 | INFO  | 5d3ee2aa | decorators.py:123:log_interrupt - [statute_search_approval] [HILT_INTERRUPT] statute_search_approval_node paused for Human-in-the-Loop decision: (Interrupt(value={'type': 'STATUTE_SEARCH_APPROVAL', 'case_id': 'case_300m_f6dc6d9a', 'thread_id': '0a6766e6-0822-4d77-9b60-b9d03f8104a3', 'trace_id': '5d3ee2aa-a18d-4c1d-9dfd-d7b200f9f49c', 'approval_request_id': 'APPR-735b34b6', 'reason': 'LEGAL_SOURCE_MISSING', 'explanation': '질문하신 사안은 주택 임대차 종료 후 전세보증금 반환, 전입·확정일자에 따른 권리보전, 이사 시 임차권등기명령 등 주택임대차보호법이 핵심적으로 적용되는 유형입니다. 그런데 현재 확인된 검색 결과에는 주택임대차보호법 조문이 포함되어 있지 않고, 민법도 이 사안의 핵심 쟁점을 직접 뒷받침하는 조문이 검색되지 않았습니다. 따라서 보증금 반환 시점, 묵시적 갱신 배제, 대항력·우선변제권, 임차권등기명령의 정확한 법적 근거를 신뢰성 있게 안내하려면 주택임대차보호법 및 관련 민법 조문의 공식 원문을 추가로 확인할 필요가 있습니다. 또한 현재 사건 맥락에 등록된 증거는 다른 보증금 사건 자료로 보이므로, 본건 사실관계는 사용자 진술과 제시 자료를 전제로만 정리되어야 합니다.', 'missing_issue': '주택임대차 기간만료 종료 및 묵시적 갱신 관련 규정, 주택임차인의 대항력 발생요건, 확정일자에 기한 우선변제권, 임차권등기명령의 요건과 효과, 보증금 반환채무와 목적물 인도의 동시이행 관계, 지연손해금의 법적 근거', 'missing_legal_issues': ['주택임대차 기간만료 종료 및 묵시적 갱신 관련 규정', '주택임차인의 대항력 발생요건', '확정일자에 기한 우선변제권', '임차권등기명령의 요건과 효과', '보증금 반환채무와 목적물 인도의 동시이행 관계', '지연손해금의 법적 근거'], 'candidate_laws': ['주택임대차보호법', '민법'], 'search_scope': '공식 법령 원문 (국가법령정보공동활용 open.law.go.kr)', 'approval_required': True}, id='fb21815424c1e66bfa0aa5ebe6a7ea33', response_schema=None),) [case:case_300, req:0a6766e6]
+2026-10-27 21:58:28.967 | WARN  | 5d3ee2aa | jsonplus.py:80:_warn_once    - Deserializing unregistered type ai_legal_helper.agents.intent_analyzer.ConsultationIntent from checkpoint. This will be blocked in a future version. Set LANGGRAPH_STRICT_MSGPACK=true to block now, or add to allowed_msgpack_modules to allow explicitly: [('ai_legal_helper.agents.intent_analyzer', 'ConsultationIntent')] [case:case_300, req:0a6766e6]
+2026-10-27 21:58:31.445 | DEBUG | -------- | _trace.py:45:trace           - close.started
+2026-10-27 21:58:31.445 | DEBUG | -------- | _trace.py:45:trace           - close.complete
+2026-10-27 21:58:32.262 | INFO  | 5d3ee2aa | legal_workflow.py:1744:_execute_consultation - [RUN_LEGAL_CONSULTATION] Interrupted for approval on thread 0a6766e6-0822-4d77-9b60-b9d03f8104a3 [case:case_300, req:0a6766e6]
+2026-10-27 21:58:32.263 | INFO  | 5d3ee2aa | decorators.py:105:log_success - Successfully completed run_legal_consultation [case:case_300, req:0a6766e6]
+2026-10-27 21:58:53.479 | INFO  | 67498c43 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/consultations/0a6766e6-0822-4d77-9b60-b9d03f8104a3" 200 (4.7ms) [req:8eae7ad8]
+2026-10-27 22:07:34.291 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 22:07:34.406 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 22:07:34.407 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 22:07:34.407 | INFO  | -------- | server.py:113:_serve         - Finished server process [3524]
+2026-10-27 22:07:35.689 | DEBUG | -------- | _trace.py:45:trace           - close.started
+2026-10-27 22:07:35.690 | DEBUG | -------- | _trace.py:45:trace           - close.complete
+2026-10-27 22:07:35.690 | DEBUG | -------- | _trace.py:45:trace           - close.started
+2026-10-27 22:07:35.690 | DEBUG | -------- | _trace.py:45:trace           - close.complete
+2026-10-27 22:07:35.690 | DEBUG | -------- | _trace.py:45:trace           - close.started
+2026-10-27 22:07:35.690 | DEBUG | -------- | _trace.py:45:trace           - close.complete
+2026-10-27 22:07:40.633 | INFO  | -------- | server.py:103:_serve         - Started server process [21808]
+2026-10-27 22:07:40.634 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 22:07:40.657 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 22:07:40.658 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 22:07:40.676 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 22:08:07.043 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 22:08:07.157 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 22:08:07.619 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 22:08:07.636 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 22:08:07.637 | INFO  | -------- | server.py:113:_serve         - Finished server process [21808]
+2026-10-27 22:08:14.150 | INFO  | -------- | server.py:103:_serve         - Started server process [50156]
+2026-10-27 22:08:14.151 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 22:08:14.166 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 22:08:14.167 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 22:08:14.184 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 22:08:34.654 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 22:08:34.757 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 22:08:35.218 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 22:08:35.234 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 22:08:35.235 | INFO  | -------- | server.py:113:_serve         - Finished server process [50156]
+2026-10-27 22:08:41.898 | INFO  | -------- | server.py:103:_serve         - Started server process [13236]
+2026-10-27 22:08:41.898 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 22:08:41.926 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 22:08:41.926 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 22:08:41.932 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-27 22:09:46.411 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-27 22:09:46.515 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-27 22:09:47.017 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-27 22:09:47.037 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-27 22:09:47.037 | INFO  | -------- | server.py:113:_serve         - Finished server process [13236]
+2026-10-27 22:09:53.301 | INFO  | -------- | server.py:103:_serve         - Started server process [45520]
+2026-10-27 22:09:53.301 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-27 22:09:53.328 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-27 22:09:53.328 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-27 22:09:53.335 | INFO  | -------- | on.py:62:startup             - Application startup complete.

@@ -1,0 +1,1714 @@
+2026-10-25 08:50:56.001 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 08:50:56.117 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 08:50:56.571 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 08:50:56.587 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 08:50:56.587 | INFO  | -------- | server.py:113:_serve         - Finished server process [32036]
+2026-10-25 08:51:03.287 | INFO  | -------- | server.py:103:_serve         - Started server process [37024]
+2026-10-25 08:51:03.287 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 08:51:03.328 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 08:51:03.328 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 08:51:03.343 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 08:51:04.616 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 08:51:04.729 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 08:51:05.183 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 08:51:05.197 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 08:51:05.197 | INFO  | -------- | server.py:113:_serve         - Finished server process [37024]
+2026-10-25 08:51:11.659 | INFO  | -------- | server.py:103:_serve         - Started server process [13776]
+2026-10-25 08:51:11.660 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 08:51:11.677 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 08:51:11.677 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 08:51:11.685 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 08:51:20.495 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 08:51:20.608 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 08:51:21.070 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 08:51:21.083 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 08:51:21.083 | INFO  | -------- | server.py:113:_serve         - Finished server process [13776]
+2026-10-25 08:51:27.402 | INFO  | -------- | server.py:103:_serve         - Started server process [36944]
+2026-10-25 08:51:27.402 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 08:51:27.447 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 08:51:27.448 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 08:51:27.465 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 08:51:27.488 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 08:51:27.600 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 08:51:28.054 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 08:51:28.067 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 08:51:28.068 | INFO  | -------- | server.py:113:_serve         - Finished server process [36944]
+2026-10-25 08:51:34.334 | INFO  | -------- | server.py:103:_serve         - Started server process [20940]
+2026-10-25 08:51:34.334 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 08:51:34.354 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 08:51:34.354 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 08:51:34.375 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 08:51:42.151 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 08:51:42.251 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 08:51:42.718 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 08:51:42.732 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 08:51:42.732 | INFO  | -------- | server.py:113:_serve         - Finished server process [20940]
+2026-10-25 08:51:48.968 | INFO  | -------- | server.py:103:_serve         - Started server process [42716]
+2026-10-25 08:51:48.969 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 08:51:49.000 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 08:51:49.001 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 08:51:49.019 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 08:51:50.397 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 08:51:50.510 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 08:51:50.985 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 08:51:50.998 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 08:51:50.998 | INFO  | -------- | server.py:113:_serve         - Finished server process [42716]
+2026-10-25 08:51:57.396 | INFO  | -------- | server.py:103:_serve         - Started server process [42852]
+2026-10-25 08:51:57.401 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 08:51:57.416 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 08:51:57.417 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 08:51:57.432 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 08:52:05.189 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 08:52:05.292 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 08:52:05.756 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 08:52:05.770 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 08:52:05.770 | INFO  | -------- | server.py:113:_serve         - Finished server process [42852]
+2026-10-25 08:52:12.183 | INFO  | -------- | server.py:103:_serve         - Started server process [38260]
+2026-10-25 08:52:12.184 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 08:52:12.199 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 08:52:12.200 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 08:52:12.214 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 08:52:27.547 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 08:52:27.662 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 08:52:28.147 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 08:52:28.161 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 08:52:28.161 | INFO  | -------- | server.py:113:_serve         - Finished server process [38260]
+2026-10-25 08:52:34.473 | INFO  | -------- | server.py:103:_serve         - Started server process [30164]
+2026-10-25 08:52:34.473 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 08:52:34.500 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 08:52:34.500 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 08:52:34.521 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 08:52:34.968 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 08:52:35.069 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 08:52:35.588 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 08:52:35.602 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 08:52:35.602 | INFO  | -------- | server.py:113:_serve         - Finished server process [30164]
+2026-10-25 08:52:42.046 | INFO  | -------- | server.py:103:_serve         - Started server process [20680]
+2026-10-25 08:52:42.046 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 08:52:42.062 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 08:52:42.062 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 08:52:42.078 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 08:53:29.744 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 08:53:29.859 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 08:53:30.315 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 08:53:30.331 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 08:53:30.331 | INFO  | -------- | server.py:113:_serve         - Finished server process [20680]
+2026-10-25 08:53:36.713 | INFO  | -------- | server.py:103:_serve         - Started server process [42812]
+2026-10-25 08:53:36.715 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 08:53:36.746 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 08:53:36.747 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 08:53:36.754 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 08:53:37.218 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 08:53:37.332 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 08:53:37.799 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 08:53:37.815 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 08:53:37.815 | INFO  | -------- | server.py:113:_serve         - Finished server process [42812]
+2026-10-25 08:53:44.194 | INFO  | -------- | server.py:103:_serve         - Started server process [2600]
+2026-10-25 08:53:44.195 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 08:53:44.210 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 08:53:44.211 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 08:53:44.223 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 08:53:44.252 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 08:53:44.343 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 08:53:44.850 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 08:53:44.865 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 08:53:44.866 | INFO  | -------- | server.py:113:_serve         - Finished server process [2600]
+2026-10-25 08:53:51.196 | INFO  | -------- | server.py:103:_serve         - Started server process [34008]
+2026-10-25 08:53:51.196 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 08:53:51.224 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 08:53:51.225 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 08:53:51.241 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 08:54:07.814 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 08:54:07.915 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 08:54:08.372 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 08:54:08.386 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 08:54:08.386 | INFO  | -------- | server.py:113:_serve         - Finished server process [34008]
+2026-10-25 08:54:14.694 | INFO  | -------- | server.py:103:_serve         - Started server process [44384]
+2026-10-25 08:54:14.694 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 08:54:14.711 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 08:54:14.711 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 08:54:14.722 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 08:54:53.773 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 08:54:53.883 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 08:54:54.628 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 08:54:54.645 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 08:54:54.645 | INFO  | -------- | server.py:113:_serve         - Finished server process [44384]
+2026-10-25 08:55:01.124 | INFO  | -------- | server.py:103:_serve         - Started server process [34696]
+2026-10-25 08:55:01.125 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 08:55:01.142 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 08:55:01.142 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 08:55:01.162 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 08:55:15.267 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 08:55:15.375 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 08:55:16.076 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 08:55:16.092 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 08:55:16.093 | INFO  | -------- | server.py:113:_serve         - Finished server process [34696]
+2026-10-25 08:55:22.471 | INFO  | -------- | server.py:103:_serve         - Started server process [42808]
+2026-10-25 08:55:22.471 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 08:55:22.493 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 08:55:22.494 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 08:55:22.502 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 08:55:49.058 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 08:55:49.167 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 08:55:49.864 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 08:55:49.882 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 08:55:49.882 | INFO  | -------- | server.py:113:_serve         - Finished server process [42808]
+2026-10-25 08:55:56.303 | INFO  | -------- | server.py:103:_serve         - Started server process [44364]
+2026-10-25 08:55:56.304 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 08:55:56.321 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 08:55:56.321 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 08:55:56.333 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 08:56:06.723 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 08:56:06.828 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 08:56:07.498 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 08:56:07.513 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 08:56:07.513 | INFO  | -------- | server.py:113:_serve         - Finished server process [44364]
+2026-10-25 08:56:13.875 | INFO  | -------- | server.py:103:_serve         - Started server process [33732]
+2026-10-25 08:56:13.876 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 08:56:13.895 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 08:56:13.895 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 08:56:13.910 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 08:56:17.099 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 08:56:17.207 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 08:56:17.774 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 08:56:17.789 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 08:56:17.789 | INFO  | -------- | server.py:113:_serve         - Finished server process [33732]
+2026-10-25 08:56:24.178 | INFO  | -------- | server.py:103:_serve         - Started server process [22188]
+2026-10-25 08:56:24.178 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 08:56:24.199 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 08:56:24.199 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 08:56:24.216 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 08:56:24.256 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 08:56:24.379 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 08:56:25.000 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 08:56:25.015 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 08:56:25.015 | INFO  | -------- | server.py:113:_serve         - Finished server process [22188]
+2026-10-25 08:56:31.386 | INFO  | -------- | server.py:103:_serve         - Started server process [40820]
+2026-10-25 08:56:31.386 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 08:56:31.401 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 08:56:31.401 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 08:56:31.414 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 08:56:31.991 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 08:56:32.092 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 08:56:32.638 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 08:56:32.654 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 08:56:32.654 | INFO  | -------- | server.py:113:_serve         - Finished server process [40820]
+2026-10-25 08:56:39.023 | INFO  | -------- | server.py:103:_serve         - Started server process [38796]
+2026-10-25 08:56:39.024 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 08:56:39.042 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 08:56:39.042 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 08:56:39.058 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 08:56:39.415 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 08:56:39.525 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 08:56:40.166 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 08:56:40.182 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 08:56:40.183 | INFO  | -------- | server.py:113:_serve         - Finished server process [38796]
+2026-10-25 08:56:46.531 | INFO  | -------- | server.py:103:_serve         - Started server process [42136]
+2026-10-25 08:56:46.532 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 08:56:46.573 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 08:56:46.573 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 08:56:46.591 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 09:01:07.154 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case 72b58992-a14c-45f7-88e7-57d2c2ea20a2
+2026-10-25 09:01:07.159 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 09:01:07.861 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=72b58992-a14c-45f7-88e7-57d2c2ea20a2 nodes=2 links=0
+2026-10-25 09:01:07.868 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case d15c6dd3-2969-484e-8120-ddeefcf9f88f
+2026-10-25 09:01:07.980 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=d15c6dd3-2969-484e-8120-ddeefcf9f88f nodes=2 links=0
+2026-10-25 09:01:33.030 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case 47c4cab4-c40d-429b-8ee5-b7508845049e
+2026-10-25 09:01:33.174 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=47c4cab4-c40d-429b-8ee5-b7508845049e nodes=1 links=0
+2026-10-25 09:02:20.410 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 09:02:20.510 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 09:02:21.056 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 09:02:21.056 | INFO  | -------- | server.py:113:_serve         - Finished server process [42136]
+2026-10-25 09:02:27.515 | INFO  | -------- | server.py:103:_serve         - Started server process [43072]
+2026-10-25 09:02:27.515 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 09:02:27.547 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 09:02:27.547 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 09:02:27.560 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 09:02:27.585 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 09:02:27.710 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 09:02:28.191 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 09:02:28.205 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 09:02:28.205 | INFO  | -------- | server.py:113:_serve         - Finished server process [43072]
+2026-10-25 09:02:34.452 | INFO  | -------- | server.py:103:_serve         - Started server process [37876]
+2026-10-25 09:02:34.452 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 09:02:34.476 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 09:02:34.476 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 09:02:34.484 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 09:05:14.491 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 09:05:14.594 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 09:05:15.063 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 09:05:15.076 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 09:05:15.076 | INFO  | -------- | server.py:113:_serve         - Finished server process [37876]
+2026-10-25 09:05:21.614 | INFO  | -------- | server.py:103:_serve         - Started server process [40888]
+2026-10-25 09:05:21.615 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 09:05:21.630 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 09:05:21.631 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 09:05:21.644 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 09:05:21.889 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 09:05:21.998 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 09:05:22.493 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 09:05:22.505 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 09:05:22.505 | INFO  | -------- | server.py:113:_serve         - Finished server process [40888]
+2026-10-25 09:05:29.046 | INFO  | -------- | server.py:103:_serve         - Started server process [34676]
+2026-10-25 09:05:29.046 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 09:05:29.069 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 09:05:29.070 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 09:05:29.079 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 09:05:29.129 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 09:05:29.243 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 09:05:29.733 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 09:05:29.746 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 09:05:29.746 | INFO  | -------- | server.py:113:_serve         - Finished server process [34676]
+2026-10-25 09:05:36.387 | INFO  | -------- | server.py:103:_serve         - Started server process [12356]
+2026-10-25 09:05:36.387 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 09:05:36.414 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 09:05:36.414 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 09:05:36.433 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 09:05:57.478 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 09:05:57.578 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 09:05:58.095 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 09:05:58.108 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 09:05:58.108 | INFO  | -------- | server.py:113:_serve         - Finished server process [12356]
+2026-10-25 09:06:04.454 | INFO  | -------- | server.py:103:_serve         - Started server process [5700]
+2026-10-25 09:06:04.454 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 09:06:04.478 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 09:06:04.478 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 09:06:04.497 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 09:32:32.295 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 09:32:32.411 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 09:32:32.895 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 09:32:32.908 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 09:32:32.908 | INFO  | -------- | server.py:113:_serve         - Finished server process [5700]
+2026-10-25 09:32:39.246 | INFO  | -------- | server.py:103:_serve         - Started server process [34068]
+2026-10-25 09:32:39.246 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 09:32:39.280 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 09:32:39.280 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 09:32:39.286 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 10:17:55.470 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 10:17:55.586 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 10:17:56.079 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 10:17:56.103 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 10:17:56.103 | INFO  | -------- | server.py:113:_serve         - Finished server process [34068]
+2026-10-25 10:18:02.602 | INFO  | -------- | server.py:103:_serve         - Started server process [42560]
+2026-10-25 10:18:02.602 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 10:18:02.619 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 10:18:02.619 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 10:18:02.627 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 10:18:52.445 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 10:18:52.555 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 10:18:53.042 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 10:18:53.065 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 10:18:53.065 | INFO  | -------- | server.py:113:_serve         - Finished server process [42560]
+2026-10-25 10:18:59.501 | INFO  | -------- | server.py:103:_serve         - Started server process [28268]
+2026-10-25 10:18:59.501 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 10:18:59.517 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 10:18:59.517 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 10:18:59.535 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 10:19:00.769 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 10:19:00.878 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 10:19:01.331 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 10:19:01.347 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 10:19:01.347 | INFO  | -------- | server.py:113:_serve         - Finished server process [28268]
+2026-10-25 10:19:07.770 | INFO  | -------- | server.py:103:_serve         - Started server process [28844]
+2026-10-25 10:19:07.771 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 10:19:07.788 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 10:19:07.788 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 10:19:07.807 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 10:19:07.829 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 10:19:07.931 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 10:19:08.408 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 10:19:08.425 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 10:19:08.425 | INFO  | -------- | server.py:113:_serve         - Finished server process [28844]
+2026-10-25 10:19:15.018 | INFO  | -------- | server.py:103:_serve         - Started server process [42984]
+2026-10-25 10:19:15.019 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 10:19:15.034 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 10:19:15.034 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 10:19:15.052 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 10:19:23.848 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 10:19:23.958 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 10:19:24.423 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 10:19:24.438 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 10:19:24.438 | INFO  | -------- | server.py:113:_serve         - Finished server process [42984]
+2026-10-25 10:19:31.106 | INFO  | -------- | server.py:103:_serve         - Started server process [38692]
+2026-10-25 10:19:31.107 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 10:19:31.124 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 10:19:31.124 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 10:19:31.143 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 10:21:14.561 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 10:21:14.670 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 10:21:15.205 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 10:21:15.222 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 10:21:15.222 | INFO  | -------- | server.py:113:_serve         - Finished server process [38692]
+2026-10-25 10:21:21.789 | INFO  | -------- | server.py:103:_serve         - Started server process [26764]
+2026-10-25 10:21:21.789 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 10:21:21.805 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 10:21:21.805 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 10:21:21.821 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 10:21:21.962 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 10:21:22.069 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 10:21:22.566 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 10:21:22.582 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 10:21:22.583 | INFO  | -------- | server.py:113:_serve         - Finished server process [26764]
+2026-10-25 10:21:29.163 | INFO  | -------- | server.py:103:_serve         - Started server process [34836]
+2026-10-25 10:21:29.163 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 10:21:29.181 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 10:21:29.181 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 10:21:29.201 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 10:27:36.896 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 10:27:37.006 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 10:27:37.583 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 10:27:37.599 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 10:27:37.600 | INFO  | -------- | server.py:113:_serve         - Finished server process [34836]
+2026-10-25 10:27:44.309 | INFO  | -------- | server.py:103:_serve         - Started server process [30212]
+2026-10-25 10:27:44.310 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 10:27:44.326 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 10:27:44.326 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 10:27:44.344 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 10:27:55.816 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 10:27:55.925 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 10:27:56.444 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 10:27:56.460 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 10:27:56.460 | INFO  | -------- | server.py:113:_serve         - Finished server process [30212]
+2026-10-25 10:28:03.111 | INFO  | -------- | server.py:103:_serve         - Started server process [41676]
+2026-10-25 10:28:03.112 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 10:28:03.130 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 10:28:03.130 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 10:28:03.137 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 10:28:03.178 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 10:28:03.293 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 10:28:03.892 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 10:28:03.911 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 10:28:03.911 | INFO  | -------- | server.py:113:_serve         - Finished server process [41676]
+2026-10-25 10:28:10.633 | INFO  | -------- | server.py:103:_serve         - Started server process [26056]
+2026-10-25 10:28:10.633 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 10:28:10.653 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 10:28:10.653 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 10:28:10.671 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 10:29:55.457 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 10:29:55.572 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 10:29:56.047 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 10:29:56.063 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 10:29:56.063 | INFO  | -------- | server.py:113:_serve         - Finished server process [26056]
+2026-10-25 10:30:02.590 | INFO  | -------- | server.py:103:_serve         - Started server process [39980]
+2026-10-25 10:30:02.590 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 10:30:02.611 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 10:30:02.611 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 10:30:02.630 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 10:30:09.037 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 10:30:09.138 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 10:30:09.596 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 10:30:09.611 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 10:30:09.612 | INFO  | -------- | server.py:113:_serve         - Finished server process [39980]
+2026-10-25 10:30:16.129 | INFO  | -------- | server.py:103:_serve         - Started server process [15992]
+2026-10-25 10:30:16.130 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 10:30:16.147 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 10:30:16.147 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 10:30:16.162 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 10:30:16.189 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 10:30:16.295 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 10:30:16.782 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 10:30:16.797 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 10:30:16.797 | INFO  | -------- | server.py:113:_serve         - Finished server process [15992]
+2026-10-25 10:30:23.289 | INFO  | -------- | server.py:103:_serve         - Started server process [43120]
+2026-10-25 10:30:23.289 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 10:30:23.311 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 10:30:23.312 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 10:30:23.335 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 10:30:23.348 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 10:30:23.465 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 10:30:23.962 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 10:30:23.979 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 10:30:23.979 | INFO  | -------- | server.py:113:_serve         - Finished server process [43120]
+2026-10-25 10:30:30.622 | INFO  | -------- | server.py:103:_serve         - Started server process [41240]
+2026-10-25 10:30:30.622 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 10:30:30.641 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 10:30:30.641 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 10:30:30.649 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 10:30:30.682 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 10:30:30.797 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 10:30:31.255 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 10:30:31.270 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 10:30:31.271 | INFO  | -------- | server.py:113:_serve         - Finished server process [41240]
+2026-10-25 10:30:37.935 | INFO  | -------- | server.py:103:_serve         - Started server process [44508]
+2026-10-25 10:30:37.935 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 10:30:37.951 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 10:30:37.951 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 10:30:37.967 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 10:30:37.990 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 10:30:38.101 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 10:30:38.585 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 10:30:38.604 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 10:30:38.604 | INFO  | -------- | server.py:113:_serve         - Finished server process [44508]
+2026-10-25 10:30:45.197 | INFO  | -------- | server.py:103:_serve         - Started server process [37000]
+2026-10-25 10:30:45.197 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 10:30:45.215 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 10:30:45.216 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 10:30:45.228 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 10:30:48.612 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 10:30:48.727 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 10:30:49.186 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 10:30:49.203 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 10:30:49.203 | INFO  | -------- | server.py:113:_serve         - Finished server process [37000]
+2026-10-25 10:30:55.874 | INFO  | -------- | server.py:103:_serve         - Started server process [30156]
+2026-10-25 10:30:55.874 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 10:30:55.889 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 10:30:55.890 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 10:30:55.905 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 10:31:17.746 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 10:31:17.847 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 10:31:18.388 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 10:31:18.405 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 10:31:18.405 | INFO  | -------- | server.py:113:_serve         - Finished server process [30156]
+2026-10-25 10:31:24.932 | INFO  | -------- | server.py:103:_serve         - Started server process [40136]
+2026-10-25 10:31:24.947 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 10:31:24.961 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 10:31:24.962 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 10:31:24.982 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 10:31:24.999 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 10:31:25.115 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 10:31:25.601 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 10:31:25.615 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 10:31:25.616 | INFO  | -------- | server.py:113:_serve         - Finished server process [40136]
+2026-10-25 10:31:32.262 | INFO  | -------- | server.py:103:_serve         - Started server process [25876]
+2026-10-25 10:31:32.262 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 10:31:32.279 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 10:31:32.280 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 10:31:32.289 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 11:33:34.273 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case a86dc154-8372-492f-b243-b328b73e0d57
+2026-10-25 11:33:34.285 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 11:33:34.478 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=a86dc154-8372-492f-b243-b328b73e0d57 nodes=2 links=0
+2026-10-25 11:33:34.487 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case f3433435-3804-4b36-8f59-f687f5fd89ad
+2026-10-25 11:33:34.521 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=f3433435-3804-4b36-8f59-f687f5fd89ad nodes=2 links=0
+2026-10-25 11:33:54.609 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case cc5a958d-596e-40fb-b734-3923619feaf7
+2026-10-25 11:33:54.714 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=cc5a958d-596e-40fb-b734-3923619feaf7 nodes=1 links=0
+2026-10-25 11:40:57.401 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 11:40:57.511 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 11:40:58.291 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 11:40:58.291 | INFO  | -------- | server.py:113:_serve         - Finished server process [25876]
+2026-10-25 11:41:06.218 | INFO  | -------- | server.py:103:_serve         - Started server process [36080]
+2026-10-25 11:41:06.218 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 11:41:06.240 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 11:41:06.240 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 11:41:06.258 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 11:41:38.079 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 11:41:38.188 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 11:41:38.818 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 11:41:38.841 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 11:41:38.842 | INFO  | -------- | server.py:113:_serve         - Finished server process [36080]
+2026-10-25 11:41:47.027 | INFO  | -------- | server.py:103:_serve         - Started server process [7508]
+2026-10-25 11:41:47.027 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 11:41:47.048 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 11:41:47.049 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 11:41:47.068 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 14:21:52.654 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 14:21:52.764 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 14:21:53.308 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 14:21:53.322 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 14:21:53.322 | INFO  | -------- | server.py:113:_serve         - Finished server process [7508]
+2026-10-25 14:22:01.111 | INFO  | -------- | server.py:103:_serve         - Started server process [5460]
+2026-10-25 14:22:01.111 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 14:22:01.139 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 14:22:01.139 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 14:22:01.151 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 14:22:10.512 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 14:22:10.622 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 14:22:11.259 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 14:22:11.275 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 14:22:11.275 | INFO  | -------- | server.py:113:_serve         - Finished server process [5460]
+2026-10-25 14:22:18.795 | INFO  | -------- | server.py:103:_serve         - Started server process [45504]
+2026-10-25 14:22:18.795 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 14:22:18.815 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 14:22:18.816 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 14:22:18.836 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 14:22:19.102 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 14:22:19.212 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 14:22:19.898 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 14:22:19.917 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 14:22:19.917 | INFO  | -------- | server.py:113:_serve         - Finished server process [45504]
+2026-10-25 14:22:27.597 | INFO  | -------- | server.py:103:_serve         - Started server process [11756]
+2026-10-25 14:22:27.598 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 14:22:27.618 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 14:22:27.619 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 14:22:27.633 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 14:22:27.677 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 14:22:27.789 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 14:22:28.343 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 14:22:28.358 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 14:22:28.359 | INFO  | -------- | server.py:113:_serve         - Finished server process [11756]
+2026-10-25 14:22:35.883 | INFO  | -------- | server.py:103:_serve         - Started server process [40252]
+2026-10-25 14:22:35.883 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 14:22:35.906 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 14:22:35.907 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 14:22:35.918 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 14:22:37.920 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 14:22:38.030 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 14:22:38.549 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 14:22:38.564 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 14:22:38.565 | INFO  | -------- | server.py:113:_serve         - Finished server process [40252]
+2026-10-25 14:22:46.040 | INFO  | -------- | server.py:103:_serve         - Started server process [47192]
+2026-10-25 14:22:46.040 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 14:22:46.060 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 14:22:46.061 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 14:22:46.069 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 14:22:46.115 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 14:22:46.225 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 14:22:46.819 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 14:22:46.835 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 14:22:46.835 | INFO  | -------- | server.py:113:_serve         - Finished server process [47192]
+2026-10-25 14:22:54.433 | INFO  | -------- | server.py:103:_serve         - Started server process [46688]
+2026-10-25 14:22:54.434 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 14:22:54.454 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 14:22:54.454 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 14:22:54.469 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 14:23:00.981 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 14:23:01.092 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 14:23:01.641 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 14:23:01.657 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 14:23:01.658 | INFO  | -------- | server.py:113:_serve         - Finished server process [46688]
+2026-10-25 14:23:09.207 | INFO  | -------- | server.py:103:_serve         - Started server process [8956]
+2026-10-25 14:23:09.207 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 14:23:09.228 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 14:23:09.229 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 14:23:09.245 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 14:23:12.350 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 14:23:12.460 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 14:23:12.999 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 14:23:13.015 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 14:23:13.015 | INFO  | -------- | server.py:113:_serve         - Finished server process [8956]
+2026-10-25 14:23:20.490 | INFO  | -------- | server.py:103:_serve         - Started server process [35076]
+2026-10-25 14:23:20.491 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 14:23:20.510 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 14:23:20.511 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 14:23:20.529 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 14:25:51.160 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 14:25:51.271 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 14:25:51.886 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 14:25:51.899 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 14:25:51.900 | INFO  | -------- | server.py:113:_serve         - Finished server process [35076]
+2026-10-25 14:25:59.497 | INFO  | -------- | server.py:103:_serve         - Started server process [47960]
+2026-10-25 14:25:59.498 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 14:25:59.518 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 14:25:59.518 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 14:25:59.528 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 14:26:19.360 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 14:26:19.469 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 14:26:20.048 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 14:26:20.061 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 14:26:20.061 | INFO  | -------- | server.py:113:_serve         - Finished server process [47960]
+2026-10-25 14:26:27.527 | INFO  | -------- | server.py:103:_serve         - Started server process [45480]
+2026-10-25 14:26:27.527 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 14:26:27.547 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 14:26:27.548 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 14:26:27.557 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 14:26:38.114 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 14:26:38.223 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 14:26:38.743 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 14:26:38.757 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 14:26:38.757 | INFO  | -------- | server.py:113:_serve         - Finished server process [45480]
+2026-10-25 14:26:46.311 | INFO  | -------- | server.py:103:_serve         - Started server process [30200]
+2026-10-25 14:26:46.311 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 14:26:46.330 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 14:26:46.330 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 14:26:46.341 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 14:26:46.715 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 14:26:46.825 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 14:26:47.343 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 14:26:47.358 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 14:26:47.358 | INFO  | -------- | server.py:113:_serve         - Finished server process [30200]
+2026-10-25 14:26:54.963 | INFO  | -------- | server.py:103:_serve         - Started server process [37136]
+2026-10-25 14:26:54.963 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 14:26:54.981 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 14:26:54.981 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 14:26:54.998 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 14:27:11.850 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 14:27:11.961 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 14:27:12.497 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 14:27:12.513 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 14:27:12.513 | INFO  | -------- | server.py:113:_serve         - Finished server process [37136]
+2026-10-25 14:27:20.213 | INFO  | -------- | server.py:103:_serve         - Started server process [37000]
+2026-10-25 14:27:20.213 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 14:27:20.231 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 14:27:20.232 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 14:27:20.245 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 14:28:41.298 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 14:28:41.408 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 14:28:42.107 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 14:28:42.123 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 14:28:42.123 | INFO  | -------- | server.py:113:_serve         - Finished server process [37000]
+2026-10-25 14:28:50.133 | INFO  | -------- | server.py:103:_serve         - Started server process [46384]
+2026-10-25 14:28:50.133 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 14:28:50.155 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 14:28:50.155 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 14:28:50.167 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 14:29:10.846 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 14:29:10.958 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 14:29:11.478 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 14:29:11.492 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 14:29:11.492 | INFO  | -------- | server.py:113:_serve         - Finished server process [46384]
+2026-10-25 14:29:19.215 | INFO  | -------- | server.py:103:_serve         - Started server process [47828]
+2026-10-25 14:29:19.216 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 14:29:19.237 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 14:29:19.237 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 14:29:19.245 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 14:29:28.089 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 14:29:28.201 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 14:29:28.756 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 14:29:28.770 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 14:29:28.770 | INFO  | -------- | server.py:113:_serve         - Finished server process [47828]
+2026-10-25 14:29:36.807 | INFO  | -------- | server.py:103:_serve         - Started server process [45456]
+2026-10-25 14:29:36.808 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 14:29:36.831 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 14:29:36.831 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 14:29:36.852 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 14:30:10.502 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 14:30:10.614 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 14:30:11.129 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 14:30:11.143 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 14:30:11.143 | INFO  | -------- | server.py:113:_serve         - Finished server process [45456]
+2026-10-25 14:30:18.843 | INFO  | -------- | server.py:103:_serve         - Started server process [37712]
+2026-10-25 14:30:18.843 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 14:30:18.865 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 14:30:18.866 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 14:30:18.887 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 14:30:19.028 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 14:30:19.139 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 14:30:19.663 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 14:30:19.679 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 14:30:19.679 | INFO  | -------- | server.py:113:_serve         - Finished server process [37712]
+2026-10-25 14:30:27.719 | INFO  | -------- | server.py:103:_serve         - Started server process [45740]
+2026-10-25 14:30:27.719 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 14:30:27.739 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 14:30:27.739 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 14:30:27.753 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 14:30:44.298 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 14:30:44.407 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 14:30:44.955 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 14:30:44.969 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 14:30:44.969 | INFO  | -------- | server.py:113:_serve         - Finished server process [45740]
+2026-10-25 14:30:52.572 | INFO  | -------- | server.py:103:_serve         - Started server process [45592]
+2026-10-25 14:30:52.573 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 14:30:52.590 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 14:30:52.591 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 14:30:52.600 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 14:30:52.638 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 14:30:52.755 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 14:30:53.281 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 14:30:53.297 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 14:30:53.297 | INFO  | -------- | server.py:113:_serve         - Finished server process [45592]
+2026-10-25 14:31:01.232 | INFO  | -------- | server.py:103:_serve         - Started server process [41868]
+2026-10-25 14:31:01.233 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 14:31:01.255 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 14:31:01.256 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 14:31:01.264 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 14:31:21.762 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 14:31:21.874 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 14:31:22.444 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 14:31:22.460 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 14:31:22.460 | INFO  | -------- | server.py:113:_serve         - Finished server process [41868]
+2026-10-25 14:31:30.513 | INFO  | -------- | server.py:103:_serve         - Started server process [43504]
+2026-10-25 14:31:30.513 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 14:31:30.531 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 14:31:30.531 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 14:31:30.546 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 14:31:50.788 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 14:31:50.898 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 14:31:51.434 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 14:31:51.447 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 14:31:51.448 | INFO  | -------- | server.py:113:_serve         - Finished server process [43504]
+2026-10-25 14:31:59.460 | INFO  | -------- | server.py:103:_serve         - Started server process [44988]
+2026-10-25 14:31:59.460 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 14:31:59.479 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 14:31:59.479 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 14:31:59.498 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 14:32:04.559 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_6ec84b
+2026-10-25 14:32:04.577 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 14:32:04.883 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_6ec84b nodes=4 links=0
+2026-10-25 14:32:59.107 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 14:32:59.219 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 14:32:59.737 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 14:32:59.737 | INFO  | -------- | server.py:113:_serve         - Finished server process [44988]
+2026-10-25 14:33:07.779 | INFO  | -------- | server.py:103:_serve         - Started server process [46284]
+2026-10-25 14:33:07.780 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 14:33:07.800 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 14:33:07.801 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 14:33:07.815 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 14:33:27.764 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 14:33:27.874 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 14:33:28.435 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 14:33:28.450 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 14:33:28.451 | INFO  | -------- | server.py:113:_serve         - Finished server process [46284]
+2026-10-25 14:33:36.457 | INFO  | -------- | server.py:103:_serve         - Started server process [33760]
+2026-10-25 14:33:36.458 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 14:33:36.476 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 14:33:36.477 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 14:33:36.497 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 14:33:41.567 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_876288
+2026-10-25 14:33:41.588 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 14:33:41.681 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_876288 nodes=3 links=0
+2026-10-25 14:34:00.764 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 14:34:00.873 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 14:34:01.393 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 14:34:01.393 | INFO  | -------- | server.py:113:_serve         - Finished server process [33760]
+2026-10-25 14:34:09.421 | INFO  | -------- | server.py:103:_serve         - Started server process [17072]
+2026-10-25 14:34:09.423 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 14:34:09.444 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 14:34:09.445 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 14:34:09.463 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 14:34:14.539 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_4aecdc
+2026-10-25 14:34:14.544 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 14:34:14.632 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_4aecdc nodes=3 links=0
+2026-10-25 14:34:39.695 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_aedabd
+2026-10-25 14:34:39.797 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_aedabd nodes=3 links=0
+2026-10-25 14:55:25.747 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 14:55:25.854 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 14:55:26.413 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 14:55:26.413 | INFO  | -------- | server.py:113:_serve         - Finished server process [17072]
+2026-10-25 14:55:33.547 | INFO  | -------- | server.py:103:_serve         - Started server process [43072]
+2026-10-25 14:55:33.547 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 14:55:33.567 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 14:55:33.567 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 14:55:33.587 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 14:55:33.608 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 14:55:33.711 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 14:55:34.202 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 14:55:34.216 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 14:55:34.216 | INFO  | -------- | server.py:113:_serve         - Finished server process [43072]
+2026-10-25 14:55:41.277 | INFO  | -------- | server.py:103:_serve         - Started server process [47604]
+2026-10-25 14:55:41.278 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 14:55:41.294 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 14:55:41.295 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 14:55:41.309 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 20:20:13.980 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 20:20:14.092 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 20:20:14.747 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 20:20:14.766 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 20:20:14.766 | INFO  | -------- | server.py:113:_serve         - Finished server process [47604]
+2026-10-25 20:20:24.451 | INFO  | -------- | server.py:103:_serve         - Started server process [19648]
+2026-10-25 20:20:24.452 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 20:20:24.474 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 20:20:24.474 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 20:20:24.485 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 20:20:24.522 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 20:20:24.639 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 20:20:25.248 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 20:20:25.263 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 20:20:25.264 | INFO  | -------- | server.py:113:_serve         - Finished server process [19648]
+2026-10-25 20:20:33.272 | INFO  | -------- | server.py:103:_serve         - Started server process [44004]
+2026-10-25 20:20:33.273 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 20:20:33.297 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 20:20:33.297 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 20:20:33.307 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 20:22:55.898 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 20:22:56.007 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 20:22:56.725 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 20:22:56.743 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 20:22:56.744 | INFO  | -------- | server.py:113:_serve         - Finished server process [44004]
+2026-10-25 20:23:04.609 | INFO  | -------- | server.py:103:_serve         - Started server process [29940]
+2026-10-25 20:23:04.610 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 20:23:04.632 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 20:23:04.632 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 20:23:04.642 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 20:23:44.960 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 20:23:45.069 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 20:23:45.851 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 20:23:45.868 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 20:23:45.868 | INFO  | -------- | server.py:113:_serve         - Finished server process [29940]
+2026-10-25 20:23:53.595 | INFO  | -------- | server.py:103:_serve         - Started server process [11424]
+2026-10-25 20:23:53.595 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 20:23:53.614 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 20:23:53.614 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 20:23:53.630 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 20:23:58.467 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 20:23:58.576 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 20:23:59.263 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 20:23:59.279 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 20:23:59.279 | INFO  | -------- | server.py:113:_serve         - Finished server process [11424]
+2026-10-25 20:24:07.561 | INFO  | -------- | server.py:103:_serve         - Started server process [8412]
+2026-10-25 20:24:07.562 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 20:24:07.587 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 20:24:07.587 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 20:24:07.605 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 20:24:17.719 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_227b5d
+2026-10-25 20:24:17.723 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 20:24:18.012 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_227b5d nodes=3 links=0
+2026-10-25 20:24:40.487 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 20:24:40.598 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 20:24:41.172 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 20:24:41.173 | INFO  | -------- | server.py:113:_serve         - Finished server process [8412]
+2026-10-25 20:24:48.985 | INFO  | -------- | server.py:103:_serve         - Started server process [49364]
+2026-10-25 20:24:48.986 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 20:24:49.008 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 20:24:49.008 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 20:24:49.021 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 20:24:49.068 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 20:24:49.193 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 20:24:49.784 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 20:24:49.801 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 20:24:49.802 | INFO  | -------- | server.py:113:_serve         - Finished server process [49364]
+2026-10-25 20:24:57.832 | INFO  | -------- | server.py:103:_serve         - Started server process [22332]
+2026-10-25 20:24:57.833 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 20:24:57.873 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 20:24:57.873 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 20:24:57.887 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 20:25:02.974 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_f7d585
+2026-10-25 20:25:02.978 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 20:25:03.041 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_f7d585 nodes=3 links=0
+2026-10-25 20:25:47.942 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 20:25:48.052 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 20:25:48.863 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 20:25:48.863 | INFO  | -------- | server.py:113:_serve         - Finished server process [22332]
+2026-10-25 20:25:56.950 | INFO  | -------- | server.py:103:_serve         - Started server process [52588]
+2026-10-25 20:25:56.951 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 20:25:56.993 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 20:25:56.993 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 20:25:57.007 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 20:26:03.284 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 20:26:03.393 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 20:26:04.293 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 20:26:04.313 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 20:26:04.313 | INFO  | -------- | server.py:113:_serve         - Finished server process [52588]
+2026-10-25 20:26:12.343 | INFO  | -------- | server.py:103:_serve         - Started server process [52188]
+2026-10-25 20:26:12.343 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 20:26:12.361 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 20:26:12.361 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 20:26:12.378 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 20:26:17.431 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_18a4da
+2026-10-25 20:26:17.436 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 20:26:17.511 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_18a4da nodes=3 links=0
+2026-10-25 20:27:57.951 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 20:27:58.060 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 20:27:58.784 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 20:27:58.784 | INFO  | -------- | server.py:113:_serve         - Finished server process [52188]
+2026-10-25 20:28:06.912 | INFO  | -------- | server.py:103:_serve         - Started server process [52208]
+2026-10-25 20:28:06.912 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 20:28:06.932 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 20:28:06.933 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 20:28:06.944 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 20:28:53.017 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 20:28:53.124 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 20:28:53.792 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 20:28:53.810 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 20:28:53.810 | INFO  | -------- | server.py:113:_serve         - Finished server process [52208]
+2026-10-25 20:29:01.924 | INFO  | -------- | server.py:103:_serve         - Started server process [50460]
+2026-10-25 20:29:01.925 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 20:29:01.946 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 20:29:01.947 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 20:29:01.954 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 20:29:19.919 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 20:29:20.028 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 20:29:20.657 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 20:29:20.672 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 20:29:20.673 | INFO  | -------- | server.py:113:_serve         - Finished server process [50460]
+2026-10-25 20:29:28.771 | INFO  | -------- | server.py:103:_serve         - Started server process [2888]
+2026-10-25 20:29:28.772 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 20:29:28.793 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 20:29:28.793 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 20:29:28.814 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 20:29:38.889 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_06d5b59a
+2026-10-25 20:29:38.893 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 20:29:39.170 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_06d5b59a nodes=11 links=2
+2026-10-25 20:31:14.397 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_a3dd0476
+2026-10-25 20:31:14.473 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_a3dd0476 nodes=11 links=2
+2026-10-25 20:33:34.731 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case test_dbc6759b
+2026-10-25 20:33:35.021 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=test_dbc6759b nodes=5 links=1
+2026-10-25 20:34:00.118 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_9c764d13
+2026-10-25 20:34:00.185 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_9c764d13 nodes=11 links=2
+2026-10-25 20:34:10.802 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 20:34:10.913 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 20:34:11.492 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 20:34:11.493 | INFO  | -------- | server.py:113:_serve         - Finished server process [2888]
+2026-10-25 20:34:19.857 | INFO  | -------- | server.py:103:_serve         - Started server process [52196]
+2026-10-25 20:34:19.858 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 20:34:19.881 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 20:34:19.881 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 20:34:19.891 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 20:34:24.979 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_ba55bf6f
+2026-10-25 20:34:24.985 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 20:34:25.059 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_ba55bf6f nodes=11 links=2
+2026-10-25 20:37:13.505 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 20:37:13.612 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 20:37:14.322 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 20:37:14.322 | INFO  | -------- | server.py:113:_serve         - Finished server process [52196]
+2026-10-25 20:37:22.074 | INFO  | -------- | server.py:103:_serve         - Started server process [52532]
+2026-10-25 20:37:22.075 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 20:37:22.097 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 20:37:22.097 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 20:37:22.110 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 20:37:36.117 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 20:37:36.226 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 20:37:36.803 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 20:37:36.818 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 20:37:36.818 | INFO  | -------- | server.py:113:_serve         - Finished server process [52532]
+2026-10-25 20:37:44.494 | INFO  | -------- | server.py:103:_serve         - Started server process [46204]
+2026-10-25 20:37:44.494 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 20:37:44.514 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 20:37:44.514 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 20:37:44.530 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 20:38:18.902 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 20:38:19.010 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 20:38:19.547 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 20:38:19.561 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 20:38:19.561 | INFO  | -------- | server.py:113:_serve         - Finished server process [46204]
+2026-10-25 20:38:27.800 | INFO  | -------- | server.py:103:_serve         - Started server process [48196]
+2026-10-25 20:38:27.800 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 20:38:27.824 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 20:38:27.825 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 20:38:27.845 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 20:38:32.927 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_e3421b32
+2026-10-25 20:38:32.932 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 20:38:33.122 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_e3421b32 nodes=11 links=1
+2026-10-25 20:38:58.129 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_6101c0f7
+2026-10-25 20:38:58.247 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_6101c0f7 nodes=11 links=1
+2026-10-25 20:40:05.712 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 20:40:05.820 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 20:40:06.454 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 20:40:06.454 | INFO  | -------- | server.py:113:_serve         - Finished server process [48196]
+2026-10-25 20:40:14.322 | INFO  | -------- | server.py:103:_serve         - Started server process [50464]
+2026-10-25 20:40:14.323 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 20:40:14.344 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 20:40:14.345 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 20:40:14.356 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 20:40:19.436 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_36db2d68
+2026-10-25 20:40:19.459 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 20:40:19.576 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_36db2d68 nodes=11 links=1
+2026-10-25 20:40:44.666 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_adcf58
+2026-10-25 20:40:44.833 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_adcf58 nodes=3 links=0
+2026-10-25 20:42:01.203 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 20:42:01.315 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 20:42:02.067 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 20:42:02.067 | INFO  | -------- | server.py:113:_serve         - Finished server process [50464]
+2026-10-25 20:42:09.705 | INFO  | -------- | server.py:103:_serve         - Started server process [52736]
+2026-10-25 20:42:09.706 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 20:42:09.748 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 20:42:09.749 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 20:42:09.763 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 20:42:13.751 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 20:42:13.860 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 20:42:14.617 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 20:42:14.634 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 20:42:14.634 | INFO  | -------- | server.py:113:_serve         - Finished server process [52736]
+2026-10-25 20:42:22.295 | INFO  | -------- | server.py:103:_serve         - Started server process [28820]
+2026-10-25 20:42:22.297 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 20:42:22.315 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 20:42:22.315 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 20:42:22.328 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 20:42:32.422 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_df16b02b
+2026-10-25 20:42:32.445 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 20:42:32.612 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_df16b02b nodes=11 links=1
+2026-10-25 20:42:37.645 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_6ae3fd
+2026-10-25 20:42:37.757 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_6ae3fd nodes=3 links=0
+2026-10-25 20:51:59.255 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 20:51:59.364 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 20:52:00.062 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 20:52:00.062 | INFO  | -------- | server.py:113:_serve         - Finished server process [28820]
+2026-10-25 20:52:09.143 | INFO  | -------- | server.py:103:_serve         - Started server process [49572]
+2026-10-25 20:52:09.144 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 20:52:09.165 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 20:52:09.166 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 20:52:09.175 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 20:52:09.226 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 20:52:09.331 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 20:52:09.912 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 20:52:09.928 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 20:52:09.928 | INFO  | -------- | server.py:113:_serve         - Finished server process [49572]
+2026-10-25 20:52:17.585 | INFO  | -------- | server.py:103:_serve         - Started server process [56036]
+2026-10-25 20:52:17.585 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 20:52:17.603 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 20:52:17.604 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 20:52:17.624 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 21:24:42.792 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 21:24:42.903 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 21:24:43.649 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 21:24:43.665 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 21:24:43.665 | INFO  | -------- | server.py:113:_serve         - Finished server process [56036]
+2026-10-25 21:24:51.217 | INFO  | -------- | server.py:103:_serve         - Started server process [43740]
+2026-10-25 21:24:51.218 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 21:24:51.236 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 21:24:51.237 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 21:24:51.252 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 21:25:34.712 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 21:25:34.822 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 21:25:35.591 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 21:25:35.608 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 21:25:35.608 | INFO  | -------- | server.py:113:_serve         - Finished server process [43740]
+2026-10-25 21:25:43.065 | INFO  | -------- | server.py:103:_serve         - Started server process [49640]
+2026-10-25 21:25:43.065 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 21:25:43.083 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 21:25:43.083 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 21:25:43.097 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 21:25:49.469 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 21:25:49.579 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 21:25:50.314 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 21:25:50.329 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 21:25:50.330 | INFO  | -------- | server.py:113:_serve         - Finished server process [49640]
+2026-10-25 21:25:57.977 | INFO  | -------- | server.py:103:_serve         - Started server process [38312]
+2026-10-25 21:25:57.977 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 21:25:58.013 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 21:25:58.013 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 21:25:58.028 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 21:26:28.190 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_85759b61
+2026-10-25 21:26:28.194 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 21:26:28.495 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_85759b61 nodes=11 links=1
+2026-10-25 21:27:24.502 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 21:27:24.610 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 21:27:25.360 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 21:27:25.360 | INFO  | -------- | server.py:113:_serve         - Finished server process [38312]
+2026-10-25 21:27:33.024 | INFO  | -------- | server.py:103:_serve         - Started server process [50448]
+2026-10-25 21:27:33.024 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 21:27:33.043 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 21:27:33.043 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 21:27:33.054 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 21:27:38.150 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_e981ec71
+2026-10-25 21:27:38.168 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 21:27:38.232 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_e981ec71 nodes=11 links=1
+2026-10-25 21:28:52.117 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 21:28:52.227 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 21:28:52.743 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 21:28:52.744 | INFO  | -------- | server.py:113:_serve         - Finished server process [50448]
+2026-10-25 21:29:00.138 | INFO  | -------- | server.py:103:_serve         - Started server process [51524]
+2026-10-25 21:29:00.140 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 21:29:00.160 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 21:29:00.160 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 21:29:00.174 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 21:30:30.459 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case 077dfd8e-160f-46e4-9d37-d442cc529a05
+2026-10-25 21:30:30.464 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 21:30:30.809 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=077dfd8e-160f-46e4-9d37-d442cc529a05 nodes=1 links=0
+2026-10-25 21:32:21.005 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case f2f2b94d-9025-47f2-a3d2-5f9458d24bd2
+2026-10-25 21:32:21.056 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=f2f2b94d-9025-47f2-a3d2-5f9458d24bd2 nodes=1 links=0
+2026-10-25 21:32:26.084 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case f2f2b94d-9025-47f2-a3d2-5f9458d24bd2
+2026-10-25 21:32:26.185 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=f2f2b94d-9025-47f2-a3d2-5f9458d24bd2 nodes=7 links=0
+2026-10-25 21:35:29.044 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 21:35:29.152 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 21:35:29.716 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 21:35:29.717 | INFO  | -------- | server.py:113:_serve         - Finished server process [51524]
+2026-10-25 21:35:37.271 | INFO  | -------- | server.py:103:_serve         - Started server process [50168]
+2026-10-25 21:35:37.271 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 21:35:37.292 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 21:35:37.293 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 21:35:37.309 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 21:35:46.290 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 21:35:46.398 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 21:35:47.134 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 21:35:47.151 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 21:35:47.151 | INFO  | -------- | server.py:113:_serve         - Finished server process [50168]
+2026-10-25 21:35:54.475 | INFO  | -------- | server.py:103:_serve         - Started server process [57312]
+2026-10-25 21:35:54.476 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 21:35:54.496 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 21:35:54.497 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 21:35:54.511 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 21:36:22.209 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 21:36:22.318 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 21:36:22.847 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 21:36:22.860 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 21:36:22.860 | INFO  | -------- | server.py:113:_serve         - Finished server process [57312]
+2026-10-25 21:36:30.115 | INFO  | -------- | server.py:103:_serve         - Started server process [54428]
+2026-10-25 21:36:30.116 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 21:36:30.148 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 21:36:30.148 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 21:36:30.163 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 21:37:26.397 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 21:37:26.506 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 21:37:27.059 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 21:37:27.072 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 21:37:27.072 | INFO  | -------- | server.py:113:_serve         - Finished server process [54428]
+2026-10-25 21:37:34.264 | INFO  | -------- | server.py:103:_serve         - Started server process [53092]
+2026-10-25 21:37:34.265 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 21:37:34.285 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 21:37:34.285 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 21:37:34.299 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 21:37:34.780 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 21:37:34.889 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 21:37:35.427 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 21:37:35.440 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 21:37:35.440 | INFO  | -------- | server.py:113:_serve         - Finished server process [53092]
+2026-10-25 21:37:42.958 | INFO  | -------- | server.py:103:_serve         - Started server process [55376]
+2026-10-25 21:37:42.959 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 21:37:42.978 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 21:37:42.979 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 21:37:42.996 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 21:37:47.603 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 21:37:47.712 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 21:37:48.258 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 21:37:48.275 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 21:37:48.275 | INFO  | -------- | server.py:113:_serve         - Finished server process [55376]
+2026-10-25 21:37:55.409 | INFO  | -------- | server.py:103:_serve         - Started server process [32584]
+2026-10-25 21:37:55.409 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 21:37:55.428 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 21:37:55.428 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 21:37:55.443 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 21:38:46.273 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 21:38:46.384 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 21:38:46.963 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 21:38:46.979 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 21:38:46.980 | INFO  | -------- | server.py:113:_serve         - Finished server process [32584]
+2026-10-25 21:38:54.670 | INFO  | -------- | server.py:103:_serve         - Started server process [54904]
+2026-10-25 21:38:54.671 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 21:38:54.692 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 21:38:54.692 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 21:38:54.711 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 21:39:04.833 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_a9f81bdf
+2026-10-25 21:39:04.839 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 21:39:04.978 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_a9f81bdf nodes=11 links=1
+2026-10-25 21:40:49.426 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 21:40:49.537 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 21:40:50.058 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 21:40:50.059 | INFO  | -------- | server.py:113:_serve         - Finished server process [54904]
+2026-10-25 21:40:57.035 | INFO  | -------- | server.py:103:_serve         - Started server process [53192]
+2026-10-25 21:40:57.036 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 21:40:57.059 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 21:40:57.059 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 21:40:57.070 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 21:40:58.208 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 21:40:58.319 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 21:40:58.853 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 21:40:58.865 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 21:40:58.865 | INFO  | -------- | server.py:113:_serve         - Finished server process [53192]
+2026-10-25 21:41:06.396 | INFO  | -------- | server.py:103:_serve         - Started server process [47588]
+2026-10-25 21:41:06.396 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 21:41:06.416 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 21:41:06.416 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 21:41:06.432 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 21:42:17.717 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 21:42:17.827 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 21:42:18.596 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 21:42:18.610 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 21:42:18.610 | INFO  | -------- | server.py:113:_serve         - Finished server process [47588]
+2026-10-25 21:42:25.557 | INFO  | -------- | server.py:103:_serve         - Started server process [47964]
+2026-10-25 21:42:25.558 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 21:42:25.579 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 21:42:25.579 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 21:42:25.586 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 21:42:27.164 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 21:42:27.275 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 21:42:28.033 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 21:42:28.048 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 21:42:28.048 | INFO  | -------- | server.py:113:_serve         - Finished server process [47964]
+2026-10-25 21:42:35.195 | INFO  | -------- | server.py:103:_serve         - Started server process [43356]
+2026-10-25 21:42:35.195 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 21:42:35.214 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 21:42:35.214 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 21:42:35.227 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 21:42:35.263 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 21:42:35.382 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 21:42:35.965 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 21:42:35.983 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 21:42:35.983 | INFO  | -------- | server.py:113:_serve         - Finished server process [43356]
+2026-10-25 21:42:42.959 | INFO  | -------- | server.py:103:_serve         - Started server process [44244]
+2026-10-25 21:42:42.959 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 21:42:42.975 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 21:42:42.975 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 21:42:42.993 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 21:42:46.518 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 21:42:46.627 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 21:42:47.367 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 21:42:47.381 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 21:42:47.381 | INFO  | -------- | server.py:113:_serve         - Finished server process [44244]
+2026-10-25 21:42:54.511 | INFO  | -------- | server.py:103:_serve         - Started server process [17820]
+2026-10-25 21:42:54.511 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 21:42:54.533 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 21:42:54.533 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 21:42:54.544 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 21:43:02.009 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 21:43:02.120 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 21:43:02.657 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 21:43:02.673 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 21:43:02.673 | INFO  | -------- | server.py:113:_serve         - Finished server process [17820]
+2026-10-25 21:43:09.679 | INFO  | -------- | server.py:103:_serve         - Started server process [57028]
+2026-10-25 21:43:09.680 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 21:43:09.698 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 21:43:09.699 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 21:43:09.714 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 21:43:36.901 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 21:43:37.010 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 21:43:37.580 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 21:43:37.592 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 21:43:37.593 | INFO  | -------- | server.py:113:_serve         - Finished server process [57028]
+2026-10-25 21:43:44.214 | INFO  | -------- | server.py:103:_serve         - Started server process [33088]
+2026-10-25 21:43:44.215 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 21:43:44.232 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 21:43:44.232 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 21:43:44.242 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 21:43:48.297 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 21:43:48.407 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 21:43:48.943 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 21:43:48.955 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 21:43:48.955 | INFO  | -------- | server.py:113:_serve         - Finished server process [33088]
+2026-10-25 21:43:55.547 | INFO  | -------- | server.py:103:_serve         - Started server process [22224]
+2026-10-25 21:43:55.547 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 21:43:55.565 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 21:43:55.565 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 21:43:55.575 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 21:43:57.461 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 21:43:57.570 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 21:43:58.134 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 21:43:58.146 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 21:43:58.146 | INFO  | -------- | server.py:113:_serve         - Finished server process [22224]
+2026-10-25 21:44:04.933 | INFO  | -------- | server.py:103:_serve         - Started server process [55204]
+2026-10-25 21:44:04.933 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 21:44:04.954 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 21:44:04.954 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 21:44:04.974 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 21:44:15.069 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_81e6ae4f
+2026-10-25 21:44:15.084 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 21:44:15.179 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_81e6ae4f nodes=11 links=1
+2026-10-25 21:44:47.941 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 21:44:48.050 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 21:44:48.546 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 21:44:48.546 | INFO  | -------- | server.py:113:_serve         - Finished server process [55204]
+2026-10-25 21:44:55.238 | INFO  | -------- | server.py:103:_serve         - Started server process [54300]
+2026-10-25 21:44:55.238 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 21:44:55.256 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 21:44:55.256 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 21:44:55.274 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 21:45:09.351 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 21:45:09.461 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 21:45:09.987 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 21:45:10.000 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 21:45:10.001 | INFO  | -------- | server.py:113:_serve         - Finished server process [54300]
+2026-10-25 21:45:16.571 | INFO  | -------- | server.py:103:_serve         - Started server process [52916]
+2026-10-25 21:45:16.571 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 21:45:16.587 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 21:45:16.587 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 21:45:16.605 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 21:45:17.403 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 21:45:17.512 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 21:45:18.045 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 21:45:18.057 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 21:45:18.057 | INFO  | -------- | server.py:113:_serve         - Finished server process [52916]
+2026-10-25 21:45:24.738 | INFO  | -------- | server.py:103:_serve         - Started server process [51960]
+2026-10-25 21:45:24.738 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 21:45:24.756 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 21:45:24.757 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 21:45:24.763 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 21:45:24.802 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 21:45:24.918 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 21:45:25.474 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 21:45:25.488 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 21:45:25.488 | INFO  | -------- | server.py:113:_serve         - Finished server process [51960]
+2026-10-25 21:45:32.097 | INFO  | -------- | server.py:103:_serve         - Started server process [49544]
+2026-10-25 21:45:32.098 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 21:45:32.114 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 21:45:32.115 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 21:45:32.132 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 21:45:32.161 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 21:45:32.270 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 21:45:32.802 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 21:45:32.815 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 21:45:32.815 | INFO  | -------- | server.py:113:_serve         - Finished server process [49544]
+2026-10-25 21:45:39.974 | INFO  | -------- | server.py:103:_serve         - Started server process [53560]
+2026-10-25 21:45:39.975 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 21:45:39.993 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 21:45:39.994 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 21:45:40.007 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 21:45:45.067 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_1c464eae
+2026-10-25 21:45:45.072 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 21:45:45.183 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_1c464eae nodes=11 links=1
+2026-10-25 21:45:45.190 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_205fe6b2
+2026-10-25 21:45:45.271 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_205fe6b2 nodes=11 links=1
+2026-10-25 21:45:45.277 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_392d032d
+2026-10-25 21:45:45.411 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_392d032d nodes=13 links=1
+2026-10-25 21:45:50.443 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_392d032d
+2026-10-25 21:45:50.503 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_392d032d nodes=15 links=3
+2026-10-25 21:45:50.508 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_b4a726ce
+2026-10-25 21:45:50.550 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_b4a726ce nodes=11 links=1
+2026-10-25 21:46:21.667 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 21:46:21.774 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 21:46:22.274 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 21:46:22.274 | INFO  | -------- | server.py:113:_serve         - Finished server process [53560]
+2026-10-25 21:46:29.229 | INFO  | -------- | server.py:103:_serve         - Started server process [57388]
+2026-10-25 21:46:29.229 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 21:46:29.249 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 21:46:29.249 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 21:46:29.263 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 21:46:34.333 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_702ff2a3
+2026-10-25 21:46:34.338 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 21:46:34.410 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_702ff2a3 nodes=11 links=1
+2026-10-25 21:46:39.425 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_16e508e9
+2026-10-25 21:46:39.469 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_16e508e9 nodes=11 links=1
+2026-10-25 21:46:39.475 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_5668b994
+2026-10-25 21:46:39.557 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_5668b994 nodes=15 links=3
+2026-10-25 21:46:39.563 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_ea55d2b0
+2026-10-25 21:46:39.645 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_ea55d2b0 nodes=11 links=1
+2026-10-25 21:47:22.247 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 21:47:22.356 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 21:47:22.920 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 21:47:22.921 | INFO  | -------- | server.py:113:_serve         - Finished server process [57388]
+2026-10-25 21:47:30.233 | INFO  | -------- | server.py:103:_serve         - Started server process [37660]
+2026-10-25 21:47:30.233 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 21:47:30.254 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 21:47:30.254 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 21:47:30.268 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 21:47:35.366 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_ef7b7036
+2026-10-25 21:47:35.387 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 21:47:35.444 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_ef7b7036 nodes=11 links=1
+2026-10-25 21:47:40.469 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_7e90aac7
+2026-10-25 21:47:40.523 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_7e90aac7 nodes=11 links=1
+2026-10-25 21:47:40.528 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_0b64420e
+2026-10-25 21:47:40.567 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_0b64420e nodes=15 links=3
+2026-10-25 21:47:40.573 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_733c9a80
+2026-10-25 21:47:40.609 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_733c9a80 nodes=11 links=1
+2026-10-25 21:48:20.725 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_596a37
+2026-10-25 21:48:20.802 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_596a37 nodes=3 links=0
+2026-10-25 21:53:24.893 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 21:53:25.004 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 21:53:25.481 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 21:53:25.481 | INFO  | -------- | server.py:113:_serve         - Finished server process [37660]
+2026-10-25 21:53:32.292 | INFO  | -------- | server.py:103:_serve         - Started server process [57292]
+2026-10-25 21:53:32.293 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 21:53:32.311 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 21:53:32.312 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 21:53:32.331 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 22:04:53.412 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_90d27746
+2026-10-25 22:04:53.416 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 22:04:53.528 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_90d27746 nodes=11 links=1
+2026-10-25 22:04:58.556 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_06fbb5ea
+2026-10-25 22:04:58.586 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_06fbb5ea nodes=11 links=1
+2026-10-25 22:04:58.591 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_50be3e1a
+2026-10-25 22:04:58.623 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_50be3e1a nodes=15 links=3
+2026-10-25 22:04:58.629 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_d4d6511a
+2026-10-25 22:04:58.685 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_d4d6511a nodes=11 links=1
+2026-10-25 22:08:29.834 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 22:08:29.942 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 22:08:30.410 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 22:08:30.412 | INFO  | -------- | server.py:113:_serve         - Finished server process [57292]
+2026-10-25 22:08:36.802 | INFO  | -------- | server.py:103:_serve         - Started server process [52584]
+2026-10-25 22:08:36.802 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 22:08:36.844 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 22:08:36.844 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 22:08:36.866 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 22:09:26.115 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 22:09:26.217 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 22:09:26.700 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 22:09:26.714 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 22:09:26.714 | INFO  | -------- | server.py:113:_serve         - Finished server process [52584]
+2026-10-25 22:09:33.055 | INFO  | -------- | server.py:103:_serve         - Started server process [41816]
+2026-10-25 22:09:33.056 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 22:09:33.070 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 22:09:33.071 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 22:09:33.088 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 22:09:44.921 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 22:09:45.031 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 22:09:45.521 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 22:09:45.533 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 22:09:45.533 | INFO  | -------- | server.py:113:_serve         - Finished server process [41816]
+2026-10-25 22:09:51.892 | INFO  | -------- | server.py:103:_serve         - Started server process [52260]
+2026-10-25 22:09:51.892 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 22:09:51.918 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 22:09:51.918 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 22:09:51.926 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 22:10:01.920 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 22:10:02.016 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 22:10:02.488 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 22:10:02.502 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 22:10:02.503 | INFO  | -------- | server.py:113:_serve         - Finished server process [52260]
+2026-10-25 22:10:08.861 | INFO  | -------- | server.py:103:_serve         - Started server process [55340]
+2026-10-25 22:10:08.862 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 22:10:08.887 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 22:10:08.887 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 22:10:08.910 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 22:10:15.266 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 22:10:15.366 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 22:10:15.836 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 22:10:15.848 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 22:10:15.848 | INFO  | -------- | server.py:113:_serve         - Finished server process [55340]
+2026-10-25 22:10:22.242 | INFO  | -------- | server.py:103:_serve         - Started server process [31948]
+2026-10-25 22:10:22.242 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 22:10:22.268 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 22:10:22.268 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 22:10:22.277 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 22:10:32.234 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 22:10:32.347 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 22:10:32.822 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 22:10:32.834 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 22:10:32.834 | INFO  | -------- | server.py:113:_serve         - Finished server process [31948]
+2026-10-25 22:10:39.194 | INFO  | -------- | server.py:103:_serve         - Started server process [47592]
+2026-10-25 22:10:39.194 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 22:10:39.219 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 22:10:39.220 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 22:10:39.240 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 22:11:04.715 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 22:11:04.818 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 22:11:05.287 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 22:11:05.299 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 22:11:05.299 | INFO  | -------- | server.py:113:_serve         - Finished server process [47592]
+2026-10-25 22:11:11.725 | INFO  | -------- | server.py:103:_serve         - Started server process [37032]
+2026-10-25 22:11:11.725 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 22:11:11.740 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 22:11:11.740 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 22:11:11.758 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 22:11:39.785 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 22:11:39.886 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 22:11:40.356 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 22:11:40.368 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 22:11:40.368 | INFO  | -------- | server.py:113:_serve         - Finished server process [37032]
+2026-10-25 22:11:46.686 | INFO  | -------- | server.py:103:_serve         - Started server process [24644]
+2026-10-25 22:11:46.688 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 22:11:46.703 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 22:11:46.704 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 22:11:46.727 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 22:12:05.730 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 22:12:05.844 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 22:12:06.307 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 22:12:06.325 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 22:12:06.325 | INFO  | -------- | server.py:113:_serve         - Finished server process [24644]
+2026-10-25 22:12:12.806 | INFO  | -------- | server.py:103:_serve         - Started server process [50076]
+2026-10-25 22:12:12.806 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 22:12:12.823 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 22:12:12.823 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 22:12:12.837 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 22:12:17.903 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_838093c3
+2026-10-25 22:12:17.906 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 22:12:18.118 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_838093c3 nodes=11 links=1
+2026-10-25 22:12:23.127 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_74a74d99
+2026-10-25 22:12:23.192 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_74a74d99 nodes=11 links=1
+2026-10-25 22:12:23.198 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_be72908d
+2026-10-25 22:12:23.282 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_be72908d nodes=15 links=3
+2026-10-25 22:12:23.288 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_0148bfac
+2026-10-25 22:12:23.354 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_0148bfac nodes=11 links=1
+2026-10-25 22:13:16.225 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 22:13:16.335 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 22:13:16.996 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 22:13:16.997 | INFO  | -------- | server.py:113:_serve         - Finished server process [50076]
+2026-10-25 22:13:23.694 | INFO  | -------- | server.py:103:_serve         - Started server process [45928]
+2026-10-25 22:13:23.694 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 22:13:23.710 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 22:13:23.710 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 22:13:23.725 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 22:13:28.759 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_33548698
+2026-10-25 22:13:28.785 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 22:13:28.895 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_33548698 nodes=11 links=1
+2026-10-25 22:13:33.943 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_ae2f39db
+2026-10-25 22:13:34.032 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_ae2f39db nodes=11 links=1
+2026-10-25 22:13:34.037 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_2d0d5b2c
+2026-10-25 22:13:34.087 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_2d0d5b2c nodes=15 links=3
+2026-10-25 22:13:34.093 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_249bc469
+2026-10-25 22:13:34.177 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_249bc469 nodes=11 links=1
+2026-10-25 22:14:12.910 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 22:14:13.010 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 22:14:13.632 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 22:14:13.632 | INFO  | -------- | server.py:113:_serve         - Finished server process [45928]
+2026-10-25 22:14:20.223 | INFO  | -------- | server.py:103:_serve         - Started server process [39168]
+2026-10-25 22:14:20.223 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 22:14:20.243 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 22:14:20.243 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 22:14:20.251 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 22:14:55.373 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_ea6002
+2026-10-25 22:14:55.391 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 22:14:55.593 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_ea6002 nodes=3 links=0
+2026-10-25 22:16:03.457 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 22:16:03.567 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 22:16:04.235 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 22:16:04.236 | INFO  | -------- | server.py:113:_serve         - Finished server process [39168]
+2026-10-25 22:16:10.922 | INFO  | -------- | server.py:103:_serve         - Started server process [26960]
+2026-10-25 22:16:10.922 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 22:16:11.030 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 22:16:11.030 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 22:16:11.049 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 22:16:16.147 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_b1f8fa
+2026-10-25 22:16:16.151 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 22:16:16.206 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_b1f8fa nodes=3 links=0
+2026-10-25 22:17:04.269 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 22:17:04.379 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 22:17:05.007 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 22:17:05.007 | INFO  | -------- | server.py:113:_serve         - Finished server process [26960]
+2026-10-25 22:17:11.641 | INFO  | -------- | server.py:103:_serve         - Started server process [45484]
+2026-10-25 22:17:11.642 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 22:17:11.659 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 22:17:11.659 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 22:17:11.673 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 22:17:51.820 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_f122e372
+2026-10-25 22:17:51.835 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 22:17:51.981 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_f122e372 nodes=11 links=1
+2026-10-25 22:17:51.988 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_0d48f26f
+2026-10-25 22:17:52.141 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_0d48f26f nodes=11 links=1
+2026-10-25 22:17:52.148 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_0e6f80c0
+2026-10-25 22:17:52.246 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_0e6f80c0 nodes=15 links=3
+2026-10-25 22:17:57.266 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_0e6f80c0
+2026-10-25 22:17:57.350 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_0e6f80c0 nodes=15 links=3
+2026-10-25 22:17:57.356 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_775c2452
+2026-10-25 22:17:57.481 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_775c2452 nodes=11 links=1
+2026-10-25 22:19:06.209 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 22:19:06.319 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 22:19:06.928 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 22:19:06.929 | INFO  | -------- | server.py:113:_serve         - Finished server process [45484]
+2026-10-25 22:19:13.505 | INFO  | -------- | server.py:103:_serve         - Started server process [43776]
+2026-10-25 22:19:13.505 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 22:19:13.525 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 22:19:13.525 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 22:19:13.547 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 23:07:59.903 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 23:08:00.007 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 23:08:00.476 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 23:08:00.491 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 23:08:00.491 | INFO  | -------- | server.py:113:_serve         - Finished server process [43776]
+2026-10-25 23:08:06.865 | INFO  | -------- | server.py:103:_serve         - Started server process [57484]
+2026-10-25 23:08:06.868 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 23:08:06.884 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 23:08:06.885 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 23:08:06.906 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 23:23:36.270 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 23:23:36.379 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 23:23:37.083 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 23:23:37.097 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 23:23:37.097 | INFO  | -------- | server.py:113:_serve         - Finished server process [57484]
+2026-10-25 23:23:43.707 | INFO  | -------- | server.py:103:_serve         - Started server process [9116]
+2026-10-25 23:23:43.707 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 23:23:43.733 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 23:23:43.734 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 23:23:43.751 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 23:23:56.206 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 23:23:56.317 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 23:23:57.030 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 23:23:57.047 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 23:23:57.047 | INFO  | -------- | server.py:113:_serve         - Finished server process [9116]
+2026-10-25 23:24:03.678 | INFO  | -------- | server.py:103:_serve         - Started server process [48724]
+2026-10-25 23:24:03.678 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 23:24:03.700 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 23:24:03.701 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 23:24:03.716 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 23:24:03.751 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 23:24:03.856 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 23:24:04.404 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 23:24:04.418 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 23:24:04.418 | INFO  | -------- | server.py:113:_serve         - Finished server process [48724]
+2026-10-25 23:24:11.340 | INFO  | -------- | server.py:103:_serve         - Started server process [37156]
+2026-10-25 23:24:11.341 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 23:24:11.357 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 23:24:11.358 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 23:24:11.368 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 23:24:11.403 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 23:24:11.508 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 23:24:12.166 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 23:24:12.178 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 23:24:12.178 | INFO  | -------- | server.py:113:_serve         - Finished server process [37156]
+2026-10-25 23:24:18.709 | INFO  | -------- | server.py:103:_serve         - Started server process [51984]
+2026-10-25 23:24:18.709 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 23:24:18.726 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 23:24:18.726 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 23:24:18.746 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 23:24:32.725 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 23:24:32.836 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 23:24:33.547 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 23:24:33.560 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 23:24:33.561 | INFO  | -------- | server.py:113:_serve         - Finished server process [51984]
+2026-10-25 23:24:40.206 | INFO  | -------- | server.py:103:_serve         - Started server process [40616]
+2026-10-25 23:24:40.206 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 23:24:40.223 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 23:24:40.224 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 23:24:40.235 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 23:25:00.213 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 23:25:00.321 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 23:25:00.954 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 23:25:00.967 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 23:25:00.967 | INFO  | -------- | server.py:113:_serve         - Finished server process [40616]
+2026-10-25 23:25:07.434 | INFO  | -------- | server.py:103:_serve         - Started server process [30648]
+2026-10-25 23:25:07.435 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 23:25:07.451 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 23:25:07.452 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 23:25:07.464 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 23:25:25.687 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 23:25:25.795 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 23:25:26.412 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 23:25:26.423 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 23:25:26.424 | INFO  | -------- | server.py:113:_serve         - Finished server process [30648]
+2026-10-25 23:25:33.235 | INFO  | -------- | server.py:103:_serve         - Started server process [40380]
+2026-10-25 23:25:33.235 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 23:25:33.253 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 23:25:33.254 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 23:25:33.274 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 23:25:38.340 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_c7b159f1
+2026-10-25 23:25:38.362 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 23:25:38.511 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_c7b159f1 nodes=11 links=1
+2026-10-25 23:25:43.531 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_42ddaf20
+2026-10-25 23:25:43.573 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_42ddaf20 nodes=11 links=1
+2026-10-25 23:25:43.580 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_48ac1f64
+2026-10-25 23:25:43.657 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_48ac1f64 nodes=15 links=3
+2026-10-25 23:25:43.663 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_8098dd77
+2026-10-25 23:25:43.711 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_8098dd77 nodes=11 links=1
+2026-10-25 23:27:23.888 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_763733bf
+2026-10-25 23:27:23.927 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_763733bf nodes=11 links=1
+2026-10-25 23:29:18.002 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 23:29:18.117 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 23:29:18.690 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 23:29:18.691 | INFO  | -------- | server.py:113:_serve         - Finished server process [40380]
+2026-10-25 23:29:25.607 | INFO  | -------- | server.py:103:_serve         - Started server process [47900]
+2026-10-25 23:29:25.608 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 23:29:25.625 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 23:29:25.625 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 23:29:25.643 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 23:29:25.670 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 23:29:25.698 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_8f325b5f
+2026-10-25 23:29:25.702 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 23:29:25.772 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_8f325b5f nodes=11 links=1
+2026-10-25 23:29:25.778 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 23:29:26.299 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 23:29:26.300 | INFO  | -------- | server.py:113:_serve         - Finished server process [47900]
+2026-10-25 23:29:33.339 | INFO  | -------- | server.py:103:_serve         - Started server process [56464]
+2026-10-25 23:29:33.340 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 23:29:33.355 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 23:29:33.356 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 23:29:33.371 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 23:31:32.228 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 23:31:32.339 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 23:31:32.989 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 23:31:33.002 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 23:31:33.003 | INFO  | -------- | server.py:113:_serve         - Finished server process [56464]
+2026-10-25 23:31:39.485 | INFO  | -------- | server.py:103:_serve         - Started server process [52688]
+2026-10-25 23:31:39.486 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 23:31:39.505 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 23:31:39.506 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 23:31:39.521 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 23:31:43.056 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-10-25 23:31:43.166 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-10-25 23:31:43.832 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 23:31:43.845 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-10-25 23:31:43.845 | INFO  | -------- | server.py:113:_serve         - Finished server process [52688]
+2026-10-25 23:31:50.827 | INFO  | -------- | server.py:103:_serve         - Started server process [54160]
+2026-10-25 23:31:50.827 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-10-25 23:31:50.862 | INFO  | -------- | legal_workflow.py:91:init_checkpointer - [CHECKPOINTER] PostgreSQL checkpoint tables initialized successfully
+2026-10-25 23:31:50.863 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - Graph Sync Worker started.
+2026-10-25 23:31:50.879 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-10-25 23:31:55.974 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_48953724
+2026-10-25 23:31:55.994 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-10-25 23:31:56.140 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_48953724 nodes=11 links=1
+2026-10-25 23:33:46.386 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_22d1e103
+2026-10-25 23:33:46.462 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_22d1e103 nodes=11 links=1
+2026-10-25 23:33:46.468 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_8818b746
+2026-10-25 23:33:46.502 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_8818b746 nodes=11 links=1
+2026-10-25 23:33:46.507 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_d86e70d0
+2026-10-25 23:33:46.606 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_d86e70d0 nodes=15 links=3
+2026-10-25 23:33:51.670 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_d86e70d0
+2026-10-25 23:33:51.711 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_d86e70d0 nodes=15 links=3
+2026-10-25 23:33:51.716 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_7a0ffb4c
+2026-10-25 23:33:51.790 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_7a0ffb4c nodes=11 links=1
+2026-10-25 23:35:31.970 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_ad7abf85
+2026-10-25 23:35:32.004 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_ad7abf85 nodes=11 links=1
+2026-10-25 23:38:17.280 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_eb0145
+2026-10-25 23:38:17.373 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_eb0145 nodes=3 links=0
+2026-10-25 23:40:35.811 | INFO  | 22c48eaa | cases.py:75:list_cases       - 사건 목록 조회 완료 (총 373건) [req:5c161c85]
+2026-10-25 23:40:35.813 | INFO  | 22c48eaa | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases" 200 (25.3ms) [req:5c161c85]
+2026-10-25 23:40:35.820 | INFO  | b5ac8b93 | cases.py:75:list_cases       - 사건 목록 조회 완료 (총 373건) [req:7c0af334]
+2026-10-25 23:40:35.822 | INFO  | b5ac8b93 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases" 200 (7.3ms) [req:7c0af334]
+2026-10-25 23:40:46.410 | INFO  | 21643436 | decorators.py:74:log_entry   - Starting execution of build_timeline_from_facts [case:case_300, req:f5af7f2f]
+2026-10-25 23:40:46.412 | INFO  | 21643436 | decorators.py:105:log_success - Successfully completed build_timeline_from_facts [case:case_300, req:f5af7f2f]
+2026-10-25 23:40:46.429 | INFO  | 21643436 | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: '보증금 3억 원 반환 분쟁 사건' [case:case_300, req:f5af7f2f]
+2026-10-25 23:40:46.433 | INFO  | 21643436 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_1dac5619" 200 (39.7ms) [case:case_300, req:f5af7f2f]
+2026-10-25 23:40:46.462 | INFO  | 16149b5e | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: '보증금 3억 원 반환 분쟁 사건' [case:case_300, req:7b5e0bcb]
+2026-10-25 23:40:46.464 | INFO  | 16149b5e | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_1dac5619" 200 (28.3ms) [case:case_300, req:7b5e0bcb]
+2026-10-25 23:40:46.525 | INFO  | b4750fda | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_1dac5619/workflow/summary" 200 (83.1ms) [case:case_300, req:e740a021]
+2026-10-25 23:40:46.546 | INFO  | 2ad7bb41 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_1dac5619/workflow/summary" 200 (19.7ms) [case:case_300, req:6b81d666]
+2026-10-25 23:40:47.641 | INFO  | -------- | graph_sync_worker.py:116:_process_pending_tasks - [GRAPH_WORKER] Processing sync task for case case_300m_1dac5619
+2026-10-25 23:40:47.754 | INFO  | -------- | graph_sync.py:371:sync_case_to_graph - [GRAPH_SYNC] case=case_300m_1dac5619 nodes=10 links=0
+2026-10-25 23:41:24.736 | INFO  | 8f2b4329 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_1dac5619/evidence" 200 (26.4ms) [case:case_300, req:ed2e7fea]
+2026-10-25 23:41:24.741 | INFO  | 36c10879 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_1dac5619/evidence/conflicts" 200 (29.7ms) [case:case_300, req:4e275cfb]
+2026-10-25 23:41:24.750 | INFO  | 1c2b865f | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_1dac5619/evidence/adjudications" 200 (33.8ms) [case:case_300, req:86bab415]
+2026-10-25 23:41:24.752 | INFO  | c02a7efe | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_1dac5619/evidence/gaps" 200 (35.9ms) [case:case_300, req:73da8206]
+2026-10-25 23:41:24.756 | INFO  | 3297744e | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_1dac5619/evidence" 200 (15.9ms) [case:case_300, req:bf405576]
+2026-10-25 23:41:24.764 | INFO  | b5a08474 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_1dac5619/evidence/conflicts" 200 (20.0ms) [case:case_300, req:9c88fbbf]
+2026-10-25 23:41:24.764 | INFO  | 9e4354be | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_1dac5619/evidence/gaps" 200 (10.0ms) [case:case_300, req:f3e400a1]
+2026-10-25 23:41:24.767 | INFO  | 68871773 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_1dac5619/evidence/adjudications" 200 (15.9ms) [case:case_300, req:9b95ea11]
+2026-10-25 23:41:24.854 | INFO  | c0aaf550 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_1dac5619/evidence/doc_initial_2a4a5a34/claims" 200 (10.7ms) [case:case_300, req:9059d5da]
+2026-10-25 23:41:28.177 | INFO  | 3319c3bd | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: '보증금 3억 원 반환 분쟁 사건' [case:case_300, req:10b7d0ad]
+2026-10-25 23:41:28.179 | INFO  | 3319c3bd | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_1dac5619" 200 (10.8ms) [case:case_300, req:10b7d0ad]
+2026-10-25 23:41:28.192 | INFO  | 1d693c37 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_1dac5619/workflow/summary" 200 (24.6ms) [case:case_300, req:0e28d1e6]
+2026-10-25 23:41:28.214 | INFO  | 7bbee753 | main.py:161:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/case_300m_1dac5619/workflow/summary" 200 (20.4ms) [case:case_300, req:d0d23095]

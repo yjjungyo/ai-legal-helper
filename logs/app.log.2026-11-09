@@ -1,0 +1,417 @@
+2026-11-09 19:43:49.000 | INFO  | 0c113aad | decorators.py:181:log_entry  - [6단계: 일반 대화 안내] 단계 시작 (general_conversation_node)
+2026-11-09 19:43:49.578 | INFO  | 0c113aad | legal_workflow.py:4872:general_conversation_node - [1단계: 일반 대화 안내(general)] [GENERAL_CONV] 일상 대화 응답 완료 | 질의=도움 주셔서 대단히 감사합니다! | 길이=74
+2026-11-09 19:43:49.578 | INFO  | 0c113aad | decorators.py:214:log_success - [1단계: 일반 대화 안내(general)] [6단계: 일반 대화 안내] 단계 완료 (578.8ms)
+2026-11-09 19:43:52.128 | INFO  | 05686d61 | decorators.py:181:log_entry  - [1단계: 일반 대화 안내(general)] [6단계: 일반 대화 안내] 단계 시작 (general_conversation_node)
+2026-11-09 19:43:52.128 | WARN  | 05686d61 | langfuse_client.py:399:_resolve_parent_span - [1단계: 일반 대화 안내(general)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=05686d61-4820-41d9-979d-b7d9cc6bb452, 스팬=general_conversation_node(12b590a2-c788-43a8-9848-e82214fe6e50), 요청 상위='general_conversation'
+2026-11-09 19:43:52.128 | INFO  | 05686d61 | legal_workflow.py:4872:general_conversation_node - [1단계: 일반 대화 안내(general)] [GENERAL_CONV] 일상 대화 응답 완료 | 질의=안녕하세요 변호사님 | 길이=99
+2026-11-09 19:43:52.128 | INFO  | 05686d61 | decorators.py:214:log_success - [1단계: 일반 대화 안내(general)] [6단계: 일반 대화 안내] 단계 완료 (0.0ms)
+2026-11-09 19:43:52.686 | INFO  | 32611a64 | decorators.py:181:log_entry  - [1단계: 일반 대화 안내(general)] [4단계: 후속 조치 가이드] 단계 시작 (followup_action_node)
+2026-11-09 19:43:52.687 | WARN  | 32611a64 | langfuse_client.py:399:_resolve_parent_span - [1단계: 일반 대화 안내(general)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=32611a64-03e2-4296-a332-d56e2c51d12e, 스팬=followup_action_node(ebe00b59-55e0-45c6-b242-8f7a7449aa11), 요청 상위='general_conversation'
+2026-11-09 19:43:52.688 | INFO  | 32611a64 | legal_workflow.py:5020:followup_action_node - [후속턴: 실무 행동 가이드(followup_action)] [실무 행동 가이드 작성 완료] 생성 분량=152자
+2026-11-09 19:43:52.689 | INFO  | 32611a64 | decorators.py:214:log_success - [후속턴: 실무 행동 가이드(followup_action)] [4단계: 후속 조치 가이드] 단계 완료 (2.1ms)
+2026-11-09 19:43:53.218 | INFO  | e81bc775 | decorators.py:181:log_entry  - [후속턴: 실무 행동 가이드(followup_action)] [1단계: 의도 분석] 단계 시작 (intent_analysis_node)
+2026-11-09 19:43:53.218 | WARN  | e81bc775 | langfuse_client.py:399:_resolve_parent_span - [후속턴: 실무 행동 가이드(followup_action)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=e81bc775-9d7f-41c2-a8bc-28e7d5185615, 스팬=intent_analysis_node(d88ae6b8-f7b8-4fb7-98c6-4140cd725387), 요청 상위='followup_action'
+2026-11-09 19:43:53.219 | INFO  | e81bc775 | decorators.py:181:log_entry  - [1단계: 질문 의도 분석(intent)] [상담 질문 의도 분석] 단계 시작 (analyze_consultation_intent)
+2026-11-09 19:43:54.091 | INFO  | e81bc775 | callbacks.py:104:on_chat_model_start - [1단계: 질문 의도 분석(intent)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 1건)
+2026-11-09 19:43:57.999 | INFO  | e81bc775 | callbacks.py:176:on_llm_end  - [1단계: 질문 의도 분석(intent)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 3908ms, 입력: 1,873토큰, 출력: 215토큰, 총: 2,088토큰)
+2026-11-09 19:43:58.000 | INFO  | e81bc775 | intent_analyzer.py:396:analyze_consultation_intent - [1단계: 질문 의도 분석(intent)] [INTENT_ANALYZER] 질문 의도 판정 완료: 의도=FACT_CLARIFICATION, 전문분석=False, 자료검색=False, 복원질의길이=78자
+2026-11-09 19:43:58.000 | INFO  | e81bc775 | decorators.py:214:log_success - [1단계: 질문 의도 분석(intent)] [상담 질문 의도 분석] 단계 완료 (4781.1ms)
+2026-11-09 19:43:58.001 | INFO  | e81bc775 | legal_workflow.py:4482:intent_analysis_node - [1단계: 질문 의도 분석(intent)] [INTENT_ANALYSIS] 표준상담 의도분석 완료 | 판정의도=FACT_CLARIFICATION | 복원질의길이=78 | 사유=이전 답변에서 우선변제권 판단에 확정일자가 필요하다고 안내된 상황에서, 사용자가 자신의 사건 사실인 확정일자 날짜를 새로 보강했습니다. 이는 기존 판단을 수정·보완하는 사실관계 정
+... (총 131자 중 100자만 표시됨)
+2026-11-09 19:43:58.001 | INFO  | e81bc775 | legal_workflow.py:4674:intent_analysis_node - [1단계: 질문 의도 분석(intent)] [INTENT_MODE] mode=CASE_EVIDENCE document_count=0 answer_mode=STANDARD
+2026-11-09 19:43:58.001 | INFO  | e81bc775 | decorators.py:214:log_success - [1단계: 질문 의도 분석(intent)] [1단계: 의도 분석] 단계 완료 (4783.2ms)
+2026-11-09 19:43:58.437 | INFO  | 2ef63a53 | decorators.py:181:log_entry  - [1단계: 질문 의도 분석(intent)] [법률 상담 워크플로우 그래프 빌드] 단계 시작 (build_legal_graph)
+2026-11-09 19:43:58.438 | WARN  | 2ef63a53 | langfuse_client.py:399:_resolve_parent_span - [1단계: 질문 의도 분석(intent)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=2ef63a53-f5fe-4094-a72d-12b11755446c, 스팬=build_legal_graph(e0aaab40-0770-4ad5-8c06-4f2c6c55a0df), 요청 상위='intent_analysis'
+2026-11-09 19:43:58.484 | INFO  | 2ef63a53 | legal_workflow.py:5242:build_legal_graph - [1단계: 질문 의도 분석(intent)] [워크플로우 그래프] 통합 법률 상담 엔진(공식 법령 검색 포함) 그래프 빌드 완료
+2026-11-09 19:43:58.484 | INFO  | 2ef63a53 | decorators.py:214:log_success - [1단계: 질문 의도 분석(intent)] [법률 상담 워크플로우 그래프 빌드] 단계 완료 (46.7ms)
+2026-11-09 19:43:58.961 | INFO  | b97093af | decorators.py:181:log_entry  - [1단계: 질문 의도 분석(intent)] [1단계: 사건·맥락 확인] 단계 시작 (supervisor_initialize_node)
+2026-11-09 19:43:58.961 | WARN  | b97093af | langfuse_client.py:399:_resolve_parent_span - [1단계: 질문 의도 분석(intent)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=b97093af-c6bc-499a-b076-ac40c1fab8dc, 스팬=supervisor_initialize_node(0de5a686-cd65-44a3-a67d-5315aac9493e), 요청 상위='intent_analysis'
+2026-11-09 19:43:58.962 | INFO  | b97093af | legal_workflow.py:450:supervisor_initialize_node - [1단계: 사건·맥락 확인(init)] [SUPERVISOR_INIT] 초기화 완료 | 답변모드=PENDING_INTENT | case_id=(없음) | 등록문서수=0 | 단위쟁점수=0 | 사건증거출처수=0 | 컨텍스트길이=0 | graph_ev_mode=NONE
+2026-11-09 19:43:58.962 | INFO  | b97093af | decorators.py:214:log_success - [1단계: 사건·맥락 확인(init)] [1단계: 사건·맥락 확인] 단계 완료 (1.0ms)
+2026-11-09 19:43:59.479 | INFO  | 22adc9ae | decorators.py:181:log_entry  - [1단계: 질문 의도 분석(intent)] [1단계: 의도 분석] 단계 시작 (intent_analysis_node)
+2026-11-09 19:43:59.480 | WARN  | 22adc9ae | langfuse_client.py:399:_resolve_parent_span - [1단계: 질문 의도 분석(intent)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=22adc9ae-5f97-47f5-b594-26eeabb78185, 스팬=intent_analysis_node(76727c0d-77d8-49a0-993b-d24a7905232f), 요청 상위='intent_analysis'
+2026-11-09 19:43:59.480 | INFO  | 22adc9ae | decorators.py:181:log_entry  - [1단계: 질문 의도 분석(intent)] [상담 질문 의도 분석] 단계 시작 (analyze_consultation_intent)
+2026-11-09 19:43:59.968 | INFO  | 22adc9ae | callbacks.py:104:on_chat_model_start - [1단계: 질문 의도 분석(intent)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 1건)
+2026-11-09 19:44:02.050 | INFO  | 22adc9ae | callbacks.py:176:on_llm_end  - [1단계: 질문 의도 분석(intent)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 2082ms, 입력: 1,756토큰, 출력: 123토큰, 총: 1,879토큰)
+2026-11-09 19:44:02.050 | INFO  | 22adc9ae | intent_analyzer.py:396:analyze_consultation_intent - [1단계: 질문 의도 분석(intent)] [INTENT_ANALYZER] 질문 의도 판정 완료: 의도=GENERAL_CONVERSATION, 전문분석=False, 자료검색=False, 복원질의길이=20자
+2026-11-09 19:44:02.052 | INFO  | 22adc9ae | decorators.py:214:log_success - [1단계: 질문 의도 분석(intent)] [상담 질문 의도 분석] 단계 완료 (2571.8ms)
+2026-11-09 19:44:02.052 | INFO  | 22adc9ae | legal_workflow.py:4482:intent_analysis_node - [1단계: 질문 의도 분석(intent)] [INTENT_ANALYSIS] 표준상담 의도분석 완료 | 판정의도=GENERAL_CONVERSATION | 복원질의길이=20 | 사유=법률 분석이나 사건 사실 확인을 요청한 것이 아니라 단순한 감사 표현입니다.
+2026-11-09 19:44:02.052 | INFO  | 22adc9ae | legal_workflow.py:4674:intent_analysis_node - [1단계: 질문 의도 분석(intent)] [INTENT_MODE] mode=GENERAL_LEGAL document_count=0 answer_mode=STANDARD
+2026-11-09 19:44:02.052 | INFO  | 22adc9ae | decorators.py:214:log_success - [1단계: 질문 의도 분석(intent)] [1단계: 의도 분석] 단계 완료 (2572.8ms)
+2026-11-09 19:44:02.577 | INFO  | a6925fd2 | decorators.py:181:log_entry  - [1단계: 질문 의도 분석(intent)] [6단계: 일반 대화 안내] 단계 시작 (general_conversation_node)
+2026-11-09 19:44:02.577 | WARN  | a6925fd2 | langfuse_client.py:399:_resolve_parent_span - [1단계: 질문 의도 분석(intent)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=a6925fd2-9a3b-4f76-9b71-414867d22151, 스팬=general_conversation_node(e27d1bf4-dfdf-4518-9b7e-aa8f9b986da7), 요청 상위='intent_analysis'
+2026-11-09 19:44:02.577 | INFO  | a6925fd2 | legal_workflow.py:4872:general_conversation_node - [1단계: 일반 대화 안내(general)] [GENERAL_CONV] 일상 대화 응답 완료 | 질의=감사합니다! | 길이=74
+2026-11-09 19:44:02.578 | INFO  | a6925fd2 | decorators.py:214:log_success - [1단계: 일반 대화 안내(general)] [6단계: 일반 대화 안내] 단계 완료 (1.6ms)
+2026-11-09 19:44:03.117 | INFO  | b4ca8881 | decorators.py:181:log_entry  - [1단계: 질문 의도 분석(intent)] [4단계: 후속 조치 가이드] 단계 시작 (followup_action_node)
+2026-11-09 19:44:03.117 | WARN  | b4ca8881 | langfuse_client.py:399:_resolve_parent_span - [1단계: 질문 의도 분석(intent)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=b4ca8881-2ae1-4877-81d6-a689680c2275, 스팬=followup_action_node(01d0c9c2-6434-46fd-9095-79f662a771fb), 요청 상위='intent_analysis'
+2026-11-09 19:44:03.118 | INFO  | b4ca8881 | legal_workflow.py:5020:followup_action_node - [후속턴: 실무 행동 가이드(followup_action)] [실무 행동 가이드 작성 완료] 생성 분량=134자
+2026-11-09 19:44:03.119 | INFO  | b4ca8881 | decorators.py:214:log_success - [후속턴: 실무 행동 가이드(followup_action)] [4단계: 후속 조치 가이드] 단계 완료 (2.1ms)
+2026-11-09 19:44:03.657 | INFO  | -------- | document_consultation.py:224:verify_answer - [후속턴: 실무 행동 가이드(followup_action)] [DOC_CONSULTATION] 원문 근거 검증 시작 (검증 대상 초안: 47자 | 참조 출처: 1건)
+2026-11-09 19:44:03.657 | INFO  | -------- | document_consultation.py:269:verify_answer - [후속턴: 실무 행동 가이드(followup_action)] [DOC_CONSULTATION] 원문 근거 검증 완료 (판정=PASS | 사유=NONE | 주장=1건[지지=1, 미흡=0] | 후보법령=[])
+2026-11-09 19:44:03.659 | INFO  | -------- | legal_workflow.py:2421:supervisor_verification_decision - [후속턴: 실무 행동 가이드(followup_action)] [VERIFY_ROUTING] 최초 검증 실패 재검토 분기 -> revise (status=INSUFFICIENT, reason_code=NONE, revision_count=0/1)
+2026-11-09 19:44:03.660 | INFO  | -------- | legal_workflow.py:2567:supervisor_verification_decision - [후속턴: 실무 행동 가이드(followup_action)] [VERIFY_ROUTING] 기본 안전 게이팅 분기 -> insufficient (status=INSUFFICIENT, reason_code=NONE)
+2026-11-09 19:44:03.661 | INFO  | -------- | legal_workflow.py:2315:supervisor_verification_decision - [후속턴: 실무 행동 가이드(followup_action)] [VERIFY_ROUTING] 검증 통과(PASS) 분기 -> finalize (revision_count=0)
+2026-11-09 19:44:03.661 | INFO  | 62a9e304 | decorators.py:181:log_entry  - [후속턴: 실무 행동 가이드(followup_action)] [6단계: 판단 유보 안내 작성] 단계 시작 (insufficient_node)
+2026-11-09 19:44:03.662 | WARN  | 62a9e304 | langfuse_client.py:399:_resolve_parent_span - [후속턴: 실무 행동 가이드(followup_action)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=62a9e304-f3cd-4af1-96b1-06b5816bfe40, 스팬=insufficient_node(dadef848-ee7b-447f-a597-32a6e2ffa6fb), 요청 상위='followup_action'
+2026-11-09 19:44:03.663 | INFO  | 62a9e304 | legal_workflow.py:3164:insufficient_node - [6단계: 판단 유보·보완 안내(insufficient)] [INSUFFICIENT] 판단 유보 안내 확정 완료 | 처분=WITHHELD | 사유코드=LEGAL_SOURCE_MISSING | 안내문길이=552 | 안내문해시=7ab6bfc0 | 누락법령=['주택임대차보호법'] | 누락쟁점수=1
+2026-11-09 19:44:03.664 | INFO  | 62a9e304 | decorators.py:214:log_success - [6단계: 판단 유보·보완 안내(insufficient)] [6단계: 판단 유보 안내 작성] 단계 완료 (2.1ms)
+2026-11-09 19:44:04.202 | INFO  | 15f13dff | decorators.py:181:log_entry  - [6단계: 판단 유보·보완 안내(insufficient)] [sample_sync_func] 단계 시작 (sample_sync_func)
+2026-11-09 19:44:04.203 | WARN  | 15f13dff | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=15f13dff-12f3-4a79-8af9-3291b3dda981, 스팬=sample_sync_func(7cdb4560-5bd3-425b-b9b9-8b96a1f39616), 요청 상위='insufficient'
+2026-11-09 19:44:04.203 | INFO  | 15f13dff | decorators.py:214:log_success - [6단계: 판단 유보·보완 안내(insufficient)] [sample_sync_func] 단계 완료 (1.1ms)
+2026-11-09 19:44:04.737 | ERROR | cb18258d | decorators.py:286:log_error  - [6단계: 판단 유보·보완 안내(insufficient)] [sample_sync_error] 단계 처리 오류 발생: Test Error with API_KEY=***, sk-***, Bearer ***, AZURE_OPENAI_ENDPOINT=*** email: ***@***.***, SSN: ******-*******, Phone: 010-****-****
+2026-11-09 19:44:05.319 | DEBUG | -------- | selector_events.py:54:__init__ - [6단계: 판단 유보·보완 안내(insufficient)] [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-09 19:44:05.321 | INFO  | e7cdc8dc | decorators.py:181:log_entry  - [6단계: 판단 유보·보완 안내(insufficient)] [sample_async_func] 단계 시작 (sample_async_func)
+2026-11-09 19:44:05.321 | WARN  | e7cdc8dc | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=e7cdc8dc-6f73-4a80-beb9-09ab359f77fb, 스팬=sample_async_func(6daf5bab-b197-4e48-8580-f90c8fc8b7b7), 요청 상위='insufficient'
+2026-11-09 19:44:05.343 | INFO  | e7cdc8dc | decorators.py:214:log_success - [6단계: 판단 유보·보완 안내(insufficient)] [sample_async_func] 단계 완료 (22.8ms)
+2026-11-09 19:44:05.867 | DEBUG | -------- | selector_events.py:54:__init__ - [6단계: 판단 유보·보완 안내(insufficient)] [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-09 19:44:05.868 | INFO  | 9b81aaa9 | decorators.py:181:log_entry  - [6단계: 판단 유보·보완 안내(insufficient)] [sample_async_error] 단계 시작 (sample_async_error)
+2026-11-09 19:44:05.869 | WARN  | 9b81aaa9 | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=9b81aaa9-1c7a-48a9-b467-c1f7a5c42786, 스팬=sample_async_error(f29218cd-a4f2-4cd4-adde-6add3b47ff73), 요청 상위='insufficient'
+2026-11-09 19:44:05.870 | ERROR | 9b81aaa9 | decorators.py:286:log_error  - [6단계: 판단 유보·보완 안내(insufficient)] [sample_async_error] 단계 처리 오류 발생: Async Test Error
+2026-11-09 19:44:06.422 | INFO  | 75cc7b6a | decorators.py:181:log_entry  - [6단계: 판단 유보·보완 안내(insufficient)] [nested_func_outer] 단계 시작 (nested_func_outer)
+2026-11-09 19:44:06.423 | WARN  | 75cc7b6a | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=75cc7b6a-9745-4df3-b23d-3a19f56a5857, 스팬=nested_func_outer(8e34c9c6-86d7-405f-8a04-6f1043484f44), 요청 상위='insufficient'
+2026-11-09 19:44:06.423 | INFO  | 75cc7b6a | decorators.py:181:log_entry  - [6단계: 판단 유보·보완 안내(insufficient)] [nested_func_inner] 단계 시작 (nested_func_inner)
+2026-11-09 19:44:06.424 | INFO  | 75cc7b6a | decorators.py:214:log_success - [6단계: 판단 유보·보완 안내(insufficient)] [nested_func_inner] 단계 완료 (0.5ms)
+2026-11-09 19:44:06.424 | INFO  | 75cc7b6a | decorators.py:214:log_success - [6단계: 판단 유보·보완 안내(insufficient)] [nested_func_outer] 단계 완료 (1.6ms)
+2026-11-09 19:44:06.958 | DEBUG | -------- | selector_events.py:54:__init__ - [6단계: 판단 유보·보완 안내(insufficient)] [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-09 19:44:06.959 | INFO  | a8ee2028 | decorators.py:181:log_entry  - [6단계: 판단 유보·보완 안내(insufficient)] [get_my_trace_id] 단계 시작 (get_my_trace_id)
+2026-11-09 19:44:06.959 | WARN  | a8ee2028 | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=a8ee2028-fd6c-494f-b8e0-cbc65037e740, 스팬=get_my_trace_id(995a22a5-19ea-4534-8ad4-d9cb4ed52003), 요청 상위='insufficient'
+2026-11-09 19:44:06.960 | INFO  | 2dc71b00 | decorators.py:181:log_entry  - [6단계: 판단 유보·보완 안내(insufficient)] [get_my_trace_id] 단계 시작 (get_my_trace_id)
+2026-11-09 19:44:06.960 | WARN  | 2dc71b00 | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=2dc71b00-f7fa-4b04-b92c-5593255da898, 스팬=get_my_trace_id(464d2b72-8ca8-4eca-a4c9-b1ce6ec08a52), 요청 상위='insufficient'
+2026-11-09 19:44:07.022 | INFO  | a8ee2028 | decorators.py:214:log_success - [6단계: 판단 유보·보완 안내(insufficient)] [get_my_trace_id] 단계 완료 (63.0ms)
+2026-11-09 19:44:07.543 | INFO  | 2dc71b00 | decorators.py:214:log_success - [6단계: 판단 유보·보완 안내(insufficient)] [get_my_trace_id] 단계 완료 (583.4ms)
+2026-11-09 19:44:08.055 | INFO  | threadpo | decorators.py:181:log_entry  - [6단계: 판단 유보·보완 안내(insufficient)] [get_my_trace_id_sync] 단계 시작 (get_my_trace_id_sync)
+2026-11-09 19:44:08.056 | WARN  | threadpo | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=threadpool-trace, 스팬=get_my_trace_id_sync(39d66550-2859-4c4e-a725-625fff182479), 요청 상위='insufficient'
+2026-11-09 19:44:08.056 | INFO  | threadpo | decorators.py:214:log_success - [6단계: 판단 유보·보완 안내(insufficient)] [get_my_trace_id_sync] 단계 완료 (1.0ms)
+2026-11-09 19:44:08.072 | DEBUG | -------- | selector_events.py:54:__init__ - [6단계: 판단 유보·보완 안내(insufficient)] [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-09 19:44:08.074 | INFO  | trace-te | consultation.py:448:process_consultation - [6단계: 판단 유보·보완 안내(insufficient)] [상담 분석 시작] 의뢰인 질문 접수 (사건: case-test-123, 요청: req-test) [case:case-test-123]
+2026-11-09 19:44:08.075 | INFO  | trace-te | consultation.py:593:process_consultation - [6단계: 판단 유보·보완 안내(insufficient)] [상담 분석 완료] 6단계 분석 및 검증 완료 (요청: req-test | 소요: 0.5ms | 처분: DELIVERED | 검증: PASS | 인용출처: 1건) [case:case-test-123]
+2026-11-09 19:44:08.076 | ERROR | trace-te | consultation.py:705:process_consultation - [6단계: 판단 유보·보완 안내(insufficient)] [상담 DB 저장 실패] 상담 결과 데이터베이스 커밋 실패 (요청: req-test): FROZEN_PRESENTATION_RECORD_CHANGED [case:case-test-123]
+2026-11-09 19:44:08.646 | INFO  | d8ebaa0e | decorators.py:181:log_entry  - [6단계: 판단 유보·보완 안내(insufficient)] [사건 유형 자동 분류] 단계 시작 (classify_case_type)
+2026-11-09 19:44:08.647 | WARN  | d8ebaa0e | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=d8ebaa0e-d214-4f04-b6cc-400dd5daf8d7, 스팬=classify_case_type(b2d869ed-616d-4f6c-870f-355d19b83d4c), 요청 상위='insufficient'
+2026-11-09 19:44:08.647 | INFO  | d8ebaa0e | decorators.py:214:log_success - [6단계: 판단 유보·보완 안내(insufficient)] [사건 유형 자동 분류] 단계 완료 (0.6ms)
+2026-11-09 19:44:09.226 | INFO  | c95183c2 | decorators.py:181:log_entry  - [6단계: 판단 유보·보완 안내(insufficient)] [사건 유형 자동 분류] 단계 시작 (classify_case_type)
+2026-11-09 19:44:09.226 | WARN  | c95183c2 | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=c95183c2-723f-45f2-b71f-47af87d6c7f0, 스팬=classify_case_type(13ac55a6-8184-4555-99e5-baff2ae663c9), 요청 상위='insufficient'
+2026-11-09 19:44:09.725 | INFO  | c95183c2 | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 1건)
+2026-11-09 19:44:13.320 | INFO  | c95183c2 | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 3595ms, 입력: 338토큰, 출력: 90토큰, 총: 428토큰)
+2026-11-09 19:44:13.320 | INFO  | c95183c2 | decorators.py:214:log_success - [6단계: 판단 유보·보완 안내(insufficient)] [사건 유형 자동 분류] 단계 완료 (4093.3ms)
+2026-11-09 19:44:13.857 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:44:15.463 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1605ms, 입력: 449토큰, 출력: 58토큰, 총: 507토큰)
+2026-11-09 19:44:15.463 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:44:15.465 | DEBUG | -------- | issue_verifier.py:1000:verify_issue - [6단계: 판단 유보·보완 안내(insufficient)] [ISSUE_VERIFIER] 쟁점 검증(ISSUE_NO_WAIT_DUTY) -> 상태=VERIFIED (확인사실=1건, 법령근거=1건)
+2026-11-09 19:44:15.942 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:44:17.319 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1377ms, 입력: 442토큰, 출력: 54토큰, 총: 496토큰)
+2026-11-09 19:44:17.320 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:44:17.828 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:44:19.824 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1997ms, 입력: 442토큰, 출력: 113토큰, 총: 555토큰)
+2026-11-09 19:44:19.824 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:44:20.310 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:44:22.385 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 2074ms, 입력: 438토큰, 출력: 96토큰, 총: 534토큰)
+2026-11-09 19:44:22.385 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:44:22.876 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:44:24.364 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1489ms, 입력: 438토큰, 출력: 82토큰, 총: 520토큰)
+2026-11-09 19:44:24.364 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:44:24.848 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:44:26.550 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1702ms, 입력: 432토큰, 출력: 96토큰, 총: 528토큰)
+2026-11-09 19:44:26.550 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:44:27.034 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:44:28.952 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1918ms, 입력: 432토큰, 출력: 124토큰, 총: 556토큰)
+2026-11-09 19:44:28.952 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:44:28.952 | DEBUG | -------- | issue_verifier.py:1000:verify_issue - [6단계: 판단 유보·보완 안내(insufficient)] [ISSUE_VERIFIER] 쟁점 검증(ISSUE_PROOF_OF_CONTENTS) -> 상태=VERIFIED (확인사실=2건, 법령근거=2건)
+2026-11-09 19:44:29.452 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:44:31.079 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1627ms, 입력: 426토큰, 출력: 84토큰, 총: 510토큰)
+2026-11-09 19:44:31.079 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:44:31.559 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:44:33.380 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1820ms, 입력: 430토큰, 출력: 66토큰, 총: 496토큰)
+2026-11-09 19:44:33.381 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:44:33.381 | INFO  | -------- | settlement_calculator.py:219:extract_case_contract_deposit - [6단계: 판단 유보·보완 안내(insufficient)] [DEPOSIT_UNCONFIRMED] 근거가 확인된 총 보증금 원금 없음
+2026-11-09 19:44:33.865 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:44:35.105 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1240ms, 입력: 422토큰, 출력: 74토큰, 총: 496토큰)
+2026-11-09 19:44:35.105 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:44:35.576 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:44:37.072 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1496ms, 입력: 426토큰, 출력: 74토큰, 총: 500토큰)
+2026-11-09 19:44:37.072 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:44:37.077 | DEBUG | -------- | issue_verifier.py:1000:verify_issue - [6단계: 판단 유보·보완 안내(insufficient)] [ISSUE_VERIFIER] 쟁점 검증(ISSUE_NOTICE_REACH) -> 상태=CONDITIONAL (확인사실=2건, 법령근거=2건)
+2026-11-09 19:44:37.565 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:44:38.932 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1367ms, 입력: 430토큰, 출력: 72토큰, 총: 502토큰)
+2026-11-09 19:44:38.932 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:44:38.932 | INFO  | -------- | settlement_calculator.py:219:extract_case_contract_deposit - [6단계: 판단 유보·보완 안내(insufficient)] [DEPOSIT_UNCONFIRMED] 근거가 확인된 총 보증금 원금 없음
+2026-11-09 19:44:39.428 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:44:41.032 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1604ms, 입력: 430토큰, 출력: 72토큰, 총: 502토큰)
+2026-11-09 19:44:41.032 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:44:41.148 | DEBUG | -------- | issue_verifier.py:1000:verify_issue - [6단계: 판단 유보·보완 안내(insufficient)] [ISSUE_VERIFIER] 쟁점 검증(ISSUE_LEASE_TERMINATION) -> 상태=VERIFIED (확인사실=1건, 법령근거=1건)
+2026-11-09 19:44:41.632 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:44:43.448 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1816ms, 입력: 418토큰, 출력: 75토큰, 총: 493토큰)
+2026-11-09 19:44:43.448 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:44:43.933 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:44:45.469 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1537ms, 입력: 427토큰, 출력: 72토큰, 총: 499토큰)
+2026-11-09 19:44:45.469 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:44:45.469 | INFO  | -------- | settlement_calculator.py:219:extract_case_contract_deposit - [6단계: 판단 유보·보완 안내(insufficient)] [DEPOSIT_UNCONFIRMED] 근거가 확인된 총 보증금 원금 없음
+2026-11-09 19:44:45.951 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:44:47.648 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1697ms, 입력: 414토큰, 출력: 78토큰, 총: 492토큰)
+2026-11-09 19:44:47.648 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:44:48.138 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:44:49.553 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1415ms, 입력: 423토큰, 출력: 80토큰, 총: 503토큰)
+2026-11-09 19:44:49.560 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:44:50.040 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:44:52.175 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 2136ms, 입력: 408토큰, 출력: 64토큰, 총: 472토큰)
+2026-11-09 19:44:52.175 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:44:52.656 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:44:54.443 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1787ms, 입력: 417토큰, 출력: 85토큰, 총: 502토큰)
+2026-11-09 19:44:54.443 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:44:54.444 | DEBUG | -------- | issue_verifier.py:1000:verify_issue - [6단계: 판단 유보·보완 안내(insufficient)] [ISSUE_VERIFIER] 쟁점 검증(ISSUE_ATTACHMENT_RANKING) -> 상태=CONDITIONAL (확인사실=2건, 법령근거=2건)
+2026-11-09 19:44:54.927 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:44:56.941 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 2015ms, 입력: 419토큰, 출력: 71토큰, 총: 490토큰)
+2026-11-09 19:44:56.941 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:44:57.431 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:44:59.523 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 2092ms, 입력: 415토큰, 출력: 90토큰, 총: 505토큰)
+2026-11-09 19:44:59.523 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:45:00.005 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:45:01.537 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1532ms, 입력: 409토큰, 출력: 77토큰, 총: 486토큰)
+2026-11-09 19:45:01.537 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:45:01.538 | DEBUG | -------- | issue_verifier.py:1000:verify_issue - [6단계: 판단 유보·보완 안내(insufficient)] [ISSUE_VERIFIER] 쟁점 검증(ISSUE_FAKE_CITATION) -> 상태=VERIFIED (확인사실=1건, 법령근거=0건)
+2026-11-09 19:45:02.019 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:45:03.418 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1399ms, 입력: 413토큰, 출력: 63토큰, 총: 476토큰)
+2026-11-09 19:45:03.418 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:45:03.908 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:45:05.509 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1601ms, 입력: 413토큰, 출력: 63토큰, 총: 476토큰)
+2026-11-09 19:45:05.509 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:45:05.993 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:45:07.524 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1531ms, 입력: 449토큰, 출력: 69토큰, 총: 518토큰)
+2026-11-09 19:45:07.524 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:45:08.015 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:45:09.905 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1891ms, 입력: 397토큰, 출력: 79토큰, 총: 476토큰)
+2026-11-09 19:45:09.905 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:45:10.377 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:45:11.959 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1582ms, 입력: 411토큰, 출력: 79토큰, 총: 490토큰)
+2026-11-09 19:45:11.959 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:45:12.459 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:45:14.447 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1988ms, 입력: 421토큰, 출력: 101토큰, 총: 522토큰)
+2026-11-09 19:45:14.447 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:45:14.932 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:45:16.755 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1823ms, 입력: 411토큰, 출력: 79토큰, 총: 490토큰)
+2026-11-09 19:45:16.755 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:45:17.245 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:45:19.670 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 2426ms, 입력: 421토큰, 출력: 84토큰, 총: 505토큰)
+2026-11-09 19:45:19.670 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:45:19.670 | DEBUG | -------- | issue_verifier.py:1000:verify_issue - [6단계: 판단 유보·보완 안내(insufficient)] [ISSUE_VERIFIER] 쟁점 검증(ISSUE_LEASE_TERMINATION) -> 상태=CONDITIONAL (확인사실=1건, 법령근거=1건)
+2026-11-09 19:45:20.151 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:45:21.725 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1574ms, 입력: 413토큰, 출력: 63토큰, 총: 476토큰)
+2026-11-09 19:45:21.725 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:45:22.213 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:45:23.603 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1390ms, 입력: 413토큰, 출력: 63토큰, 총: 476토큰)
+2026-11-09 19:45:23.603 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:45:23.606 | INFO  | -------- | settlement_calculator.py:219:extract_case_contract_deposit - [6단계: 판단 유보·보완 안내(insufficient)] [DEPOSIT_UNCONFIRMED] 근거가 확인된 총 보증금 원금 없음
+2026-11-09 19:45:23.606 | DEBUG | -------- | issue_verifier.py:1000:verify_issue - [6단계: 판단 유보·보완 안내(insufficient)] [ISSUE_VERIFIER] 쟁점 검증(ISSUE_INSTALLMENT_PROPOSAL) -> 상태=NEEDS_EVIDENCE (확인사실=0건, 법령근거=1건)
+2026-11-09 19:45:24.114 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:45:25.632 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1519ms, 입력: 423토큰, 출력: 70토큰, 총: 493토큰)
+2026-11-09 19:45:25.632 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:45:25.632 | DEBUG | -------- | issue_verifier.py:1000:verify_issue - [6단계: 판단 유보·보완 안내(insufficient)] [ISSUE_VERIFIER] 쟁점 검증(ISSUE_EVIDENCE_GAPS) -> 상태=CONDITIONAL (확인사실=1건, 법령근거=0건)
+2026-11-09 19:45:26.122 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:45:27.630 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1507ms, 입력: 430토큰, 출력: 72토큰, 총: 502토큰)
+2026-11-09 19:45:27.630 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:45:27.630 | DEBUG | -------- | issue_verifier.py:1000:verify_issue - [6단계: 판단 유보·보완 안내(insufficient)] [ISSUE_VERIFIER] 쟁점 검증(ISSUE_EVIDENCE_GAPS) -> 상태=CONDITIONAL (확인사실=1건, 법령근거=0건)
+2026-11-09 19:45:28.129 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:45:29.516 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1387ms, 입력: 407토큰, 출력: 54토큰, 총: 461토큰)
+2026-11-09 19:45:29.516 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:45:29.995 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:45:31.555 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1560ms, 입력: 407토큰, 출력: 57토큰, 총: 464토큰)
+2026-11-09 19:45:31.555 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:45:32.042 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:45:33.795 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1752ms, 입력: 391토큰, 출력: 79토큰, 총: 470토큰)
+2026-11-09 19:45:33.795 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:45:34.285 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:45:35.637 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1352ms, 입력: 407토큰, 출력: 54토큰, 총: 461토큰)
+2026-11-09 19:45:35.637 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:45:36.125 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:45:37.488 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1362ms, 입력: 407토큰, 출력: 54토큰, 총: 461토큰)
+2026-11-09 19:45:37.488 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:45:37.956 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:45:39.380 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1424ms, 입력: 407토큰, 출력: 54토큰, 총: 461토큰)
+2026-11-09 19:45:39.380 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:45:39.860 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:45:41.611 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1751ms, 입력: 391토큰, 출력: 79토큰, 총: 470토큰)
+2026-11-09 19:45:41.611 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:45:42.113 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:45:43.528 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1416ms, 입력: 407토큰, 출력: 57토큰, 총: 464토큰)
+2026-11-09 19:45:43.528 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:45:44.010 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:45:46.031 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 2022ms, 입력: 412토큰, 출력: 98토큰, 총: 510토큰)
+2026-11-09 19:45:46.031 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:45:46.521 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:45:48.127 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1605ms, 입력: 422토큰, 출력: 73토큰, 총: 495토큰)
+2026-11-09 19:45:48.128 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:45:48.128 | INFO  | -------- | settlement_calculator.py:219:extract_case_contract_deposit - [6단계: 판단 유보·보완 안내(insufficient)] [DEPOSIT_UNCONFIRMED] 근거가 확인된 총 보증금 원금 없음
+2026-11-09 19:45:48.607 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:45:50.283 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1675ms, 입력: 418토큰, 출력: 66토큰, 총: 484토큰)
+2026-11-09 19:45:50.283 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:45:50.778 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:45:53.172 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 2394ms, 입력: 412토큰, 출력: 81토큰, 총: 493토큰)
+2026-11-09 19:45:53.172 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:45:53.657 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:45:57.171 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 3514ms, 입력: 412토큰, 출력: 98토큰, 총: 510토큰)
+2026-11-09 19:45:57.171 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:45:57.172 | DEBUG | -------- | issue_verifier.py:1000:verify_issue - [6단계: 판단 유보·보완 안내(insufficient)] [ISSUE_VERIFIER] 쟁점 검증(ISSUE_LEASE_TERMINATION) -> 상태=CONDITIONAL (확인사실=1건, 법령근거=0건)
+2026-11-09 19:45:57.652 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:45:59.171 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1519ms, 입력: 439토큰, 출력: 88토큰, 총: 527토큰)
+2026-11-09 19:45:59.171 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:45:59.665 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:46:01.218 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1554ms, 입력: 436토큰, 출력: 73토큰, 총: 509토큰)
+2026-11-09 19:46:01.218 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:46:01.219 | INFO  | -------- | settlement_calculator.py:219:extract_case_contract_deposit - [6단계: 판단 유보·보완 안내(insufficient)] [DEPOSIT_UNCONFIRMED] 근거가 확인된 총 보증금 원금 없음
+2026-11-09 19:46:01.706 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:46:03.284 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1578ms, 입력: 435토큰, 출력: 85토큰, 총: 520토큰)
+2026-11-09 19:46:03.284 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:46:03.784 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:46:05.226 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1442ms, 입력: 432토큰, 출력: 73토큰, 총: 505토큰)
+2026-11-09 19:46:05.226 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:46:05.726 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:46:07.453 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1728ms, 입력: 429토큰, 출력: 81토큰, 총: 510토큰)
+2026-11-09 19:46:07.453 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:46:07.941 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:46:09.576 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1635ms, 입력: 426토큰, 출력: 72토큰, 총: 498토큰)
+2026-11-09 19:46:09.576 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:46:09.576 | DEBUG | -------- | issue_verifier.py:1000:verify_issue - [6단계: 판단 유보·보완 안내(insufficient)] [ISSUE_VERIFIER] 쟁점 검증(ISSUE_ATTACHMENT_RANKING) -> 상태=CONDITIONAL (확인사실=2건, 법령근거=1건)
+2026-11-09 19:46:10.063 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:46:11.425 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1361ms, 입력: 423토큰, 출력: 61토큰, 총: 484토큰)
+2026-11-09 19:46:11.425 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:46:11.911 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 19:46:13.346 | INFO  | -------- | callbacks.py:176:on_llm_end  - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1435ms, 입력: 422토큰, 출력: 70토큰, 총: 492토큰)
+2026-11-09 19:46:13.346 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [6단계: 판단 유보·보완 안내(insufficient)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='insufficient'
+2026-11-09 19:46:13.348 | WARN  | -------- | settlement_calculator.py:214:extract_case_contract_deposit - [6단계: 판단 유보·보완 안내(insufficient)] [DEPOSIT_CONFLICT] 동일 계약 보증금 원금의 승인된 수치가 상충: [200000000, 300000000]
+2026-11-09 19:46:13.830 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [6단계: 판단 유보·보완 안내(insufficient)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 22:25:01.175 | INFO  | -------- | plugins.py:37:__init__       - setup plugin alembic.autogenerate.schemas
+2026-11-09 22:25:01.176 | INFO  | -------- | plugins.py:37:__init__       - setup plugin alembic.autogenerate.tables
+2026-11-09 22:25:01.176 | INFO  | -------- | plugins.py:37:__init__       - setup plugin alembic.autogenerate.types
+2026-11-09 22:25:01.177 | INFO  | -------- | plugins.py:37:__init__       - setup plugin alembic.autogenerate.constraints
+2026-11-09 22:25:01.177 | INFO  | -------- | plugins.py:37:__init__       - setup plugin alembic.autogenerate.defaults
+2026-11-09 22:25:01.177 | INFO  | -------- | plugins.py:37:__init__       - setup plugin alembic.autogenerate.comments
+2026-11-09 22:25:01.182 | INFO  | -------- | plugins.py:37:__init__       - setup plugin alembic.ext.checkconstraint_byname
+2026-11-09 22:25:01.471 | INFO  | d99dd93b | decorators.py:181:log_entry  - [statute_search_plan_node] 단계 시작 (statute_search_plan_node)
+2026-11-09 22:25:02.085 | ERROR | d99dd93b | decorators.py:286:log_error  - [statute_search_plan] [statute_search_plan_node] 단계 처리 오류 발생: test_temporal_plan_uses_resolved_query.<locals>.fake_plan() got an unexpected keyword argument 'event_date'
+2026-11-09 22:25:05.171 | INFO  | c5b4be81 | decorators.py:181:log_entry  - [statute_search_plan] [2단계: 쟁점 계획] 단계 시작 (plan_node)
+2026-11-09 22:25:05.172 | WARN  | c5b4be81 | langfuse_client.py:399:_resolve_parent_span - [statute_search_plan] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=c5b4be81-408b-4503-85c1-1ee6b30a0882, 스팬=plan_node(e7bf286f-8b99-4e9b-86e2-e0d66d3cbd17), 요청 상위='statute_search_plan'
+2026-11-09 22:25:05.172 | INFO  | c5b4be81 | legal_workflow.py:926:plan_node - [2단계: 쟁점·도구 계획(plan)] [PLAN] 실행 계획 수립 완료 | 선정도구=[] | categories=['임대차']
+2026-11-09 22:25:05.173 | INFO  | c5b4be81 | decorators.py:214:log_success - [2단계: 쟁점·도구 계획(plan)] [2단계: 쟁점 계획] 단계 완료 (1.7ms)
+2026-11-09 22:25:05.713 | WARN  | -------- | temporal_search_plan.py:101:extract_event_with_llm - [2단계: 쟁점·도구 계획(plan)] [TEMPORAL_EVENT_LLM] 추출 미확정 | reason=ValueError
+2026-11-09 22:25:05.714 | WARN  | -------- | temporal_search_plan.py:101:extract_event_with_llm - [2단계: 쟁점·도구 계획(plan)] [TEMPORAL_EVENT_LLM] 추출 미확정 | reason=ValueError
+2026-11-09 22:25:05.715 | WARN  | -------- | temporal_search_plan.py:101:extract_event_with_llm - [2단계: 쟁점·도구 계획(plan)] [TEMPORAL_EVENT_LLM] 추출 미확정 | reason=JSONDecodeError
+2026-11-09 22:25:05.716 | WARN  | -------- | temporal_search_plan.py:101:extract_event_with_llm - [2단계: 쟁점·도구 계획(plan)] [TEMPORAL_EVENT_LLM] 추출 미확정 | reason=ValueError
+2026-11-09 22:25:05.718 | WARN  | -------- | temporal_search_plan.py:101:extract_event_with_llm - [2단계: 쟁점·도구 계획(plan)] [TEMPORAL_EVENT_LLM] 추출 미확정 | reason=ValueError
+2026-11-09 22:25:05.722 | WARN  | -------- | temporal_search_plan.py:101:extract_event_with_llm - [2단계: 쟁점·도구 계획(plan)] [TEMPORAL_EVENT_LLM] 추출 미확정 | reason=ValueError
+2026-11-09 22:25:05.723 | WARN  | -------- | temporal_search_plan.py:101:extract_event_with_llm - [2단계: 쟁점·도구 계획(plan)] [TEMPORAL_EVENT_LLM] 추출 미확정 | reason=ValueError
+2026-11-09 22:25:05.725 | WARN  | -------- | temporal_search_plan.py:101:extract_event_with_llm - [2단계: 쟁점·도구 계획(plan)] [TEMPORAL_EVENT_LLM] 추출 미확정 | reason=ValueError
+2026-11-09 22:25:05.726 | WARN  | -------- | temporal_search_plan.py:101:extract_event_with_llm - [2단계: 쟁점·도구 계획(plan)] [TEMPORAL_EVENT_LLM] 추출 미확정 | reason=ValueError
+2026-11-09 22:25:05.727 | WARN  | -------- | temporal_search_plan.py:101:extract_event_with_llm - [2단계: 쟁점·도구 계획(plan)] [TEMPORAL_EVENT_LLM] 추출 미확정 | reason=ValueError
+2026-11-09 22:25:05.728 | WARN  | -------- | temporal_search_plan.py:101:extract_event_with_llm - [2단계: 쟁점·도구 계획(plan)] [TEMPORAL_EVENT_LLM] 추출 미확정 | reason=ValueError
+2026-11-09 22:25:05.735 | DEBUG | -------- | conflict_detector.py:1152:evaluate_claim_against_fact - [2단계: 쟁점·도구 계획(plan)] [CONFLICT_PAIR] claim_id=None fact_id=f-dep is_comparable=True status=COMPARABLE reason=IDENTICAL_PROPOSITION_CANDIDATE claim='보증금 3억 원 중 계약금 3천만 원은 계약 시 지급하고 잔금 2억 7천만 원은 2024년 5월 1일에 지급한다.' fact='임대차 보증금은 300,000,000원이다.'
+2026-11-09 22:25:05.735 | DEBUG | -------- | conflict_detector.py:1152:evaluate_claim_against_fact - [2단계: 쟁점·도구 계획(plan)] [CONFLICT_PAIR] claim_id=None fact_id=f-init is_comparable=True status=COMPARABLE reason=IDENTICAL_PROPOSITION_CANDIDATE claim='갱신 계약에서 증액된 변경 보증금은 3억 5천만 원이다.' fact='최초 계약 당시 보증금은 3억 원이다.'
+2026-11-09 22:25:05.743 | INFO  | b5aa8370 | decorators.py:181:log_entry  - [2단계: 쟁점·도구 계획(plan)] [국가법령정보센터 공식 조문 검색] 단계 시작 (search_official_statutes)
+2026-11-09 22:25:05.744 | WARN  | b5aa8370 | langfuse_client.py:399:_resolve_parent_span - [2단계: 쟁점·도구 계획(plan)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=b5aa8370-7b95-4ec1-a915-4d74505a2b3e, 스팬=search_official_statutes(f1a8b832-ec43-433f-b699-d789593ec749), 요청 상위='plan'
+2026-11-09 22:25:05.745 | INFO  | b5aa8370 | official_statute_search.py:330:search_official_statutes - [2단계: 쟁점·도구 계획(plan)] [OFFICIAL_STATUTE] 법제처 법령 검색 호출: 가상 특별법 시행령
+2026-11-09 22:25:05.746 | INFO  | b5aa8370 | official_statute_search.py:408:search_official_statutes - [2단계: 쟁점·도구 계획(plan)] [STATUTE_SEARCH] 검색 계획 생성
+  - 법령: 가상 특별법 시행령
+  - 쟁점: 2026년 11월 1일 계약에 개정 조문 적용 여부
+  - 명시 요청 조문: 제4조, 제50조
+2026-11-09 22:25:05.746 | INFO  | b5aa8370 | official_statute_search.py:587:search_official_statutes - [2단계: 쟁점·도구 계획(plan)] [STATUTE_SEARCH] 후보 조문 평가
+  - 제50조: 예외 (명시적 요청 조문(+100.0); 본문 일치('개정', +1.0))
+  - 제4조: 계약신고 (명시적 요청 조문(+100.0); 본문 일치('개정', +1.0))
+2026-11-09 22:25:05.747 | INFO  | b5aa8370 | official_statute_search.py:590:search_official_statutes - [2단계: 쟁점·도구 계획(plan)] [STATUTE_SEARCH] 최종 선택 조문
+  - 제50조: 예외
+  - 제4조: 계약신고
+2026-11-09 22:25:05.747 | INFO  | b5aa8370 | official_statute_search.py:596:search_official_statutes - [2단계: 쟁점·도구 계획(plan)] [STATUTE_SEARCH] 누락 필수 조문: 없음
+2026-11-09 22:25:05.747 | INFO  | b5aa8370 | official_statute_search.py:599:search_official_statutes - [2단계: 쟁점·도구 계획(plan)] [STATUTE_SEARCH] 검색 시간: 2.0ms
+2026-11-09 22:25:05.747 | INFO  | b5aa8370 | official_statute_search.py:673:search_official_statutes - [2단계: 쟁점·도구 계획(plan)] [STATUTE_TEMPORAL] 부칙 확보 | 법령=가상 특별법 시행령 | 공포=2026-06-01 | 기본시행일=UNCONFIRMED | 원문길이=108
+2026-11-09 22:25:05.747 | INFO  | b5aa8370 | official_statute_search.py:714:search_official_statutes - [2단계: 쟁점·도구 계획(plan)] [OFFICIAL_STATUTE] '가상 특별법 시행령'에서 조문 2건 확보 완료 | 부칙 1건
+2026-11-09 22:25:05.747 | INFO  | b5aa8370 | decorators.py:214:log_success - [2단계: 쟁점·도구 계획(plan)] [국가법령정보센터 공식 조문 검색] 단계 완료 (4.1ms)
+2026-11-09 22:25:06.253 | INFO  | 66a8544b | decorators.py:181:log_entry  - [2단계: 쟁점·도구 계획(plan)] [국가법령정보센터 공식 조문 검색] 단계 시작 (search_official_statutes)
+2026-11-09 22:25:06.254 | WARN  | 66a8544b | langfuse_client.py:399:_resolve_parent_span - [2단계: 쟁점·도구 계획(plan)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=66a8544b-a2c1-41d8-a5a3-bccb0bf0a495, 스팬=search_official_statutes(2c0400e0-a09f-4719-a8b3-41b61220166c), 요청 상위='plan'
+2026-11-09 22:25:06.254 | INFO  | 66a8544b | official_statute_search.py:330:search_official_statutes - [2단계: 쟁점·도구 계획(plan)] [OFFICIAL_STATUTE] 법제처 법령 검색 호출: 민간임대주택에 관한 특별법 시행령
+2026-11-09 22:25:06.255 | INFO  | 66a8544b | official_statute_search.py:408:search_official_statutes - [2단계: 쟁점·도구 계획(plan)] [STATUTE_SEARCH] 검색 계획 생성
+  - 법령: 민간임대주택에 관한 특별법 시행령
+  - 쟁점: 저는 120세대 규모의 등록 민간임대주택을 운영하는 임대사업자입니다. 2026년 11월 1일 임차인과 새로운 계약을 체결하려고 합니다. 2026년 10월 27일 개정된 시행령에 따라 관리비와 전기·수도료의 부과금액 또는 산정방식을 임대차계약 신고에 반드시 포함해야 하나요?
+  - 명시 요청 조문: 제36조
+2026-11-09 22:25:06.256 | INFO  | 66a8544b | official_statute_search.py:587:search_official_statutes - [2단계: 쟁점·도구 계획(plan)] [STATUTE_SEARCH] 후보 조문 평가
+  - 제36조: 임대차계약의 신고 (명시적 요청 조문(+100.0); 제목 일치('임대차계약', +5.0))
+2026-11-09 22:25:06.256 | INFO  | 66a8544b | official_statute_search.py:590:search_official_statutes - [2단계: 쟁점·도구 계획(plan)] [STATUTE_SEARCH] 최종 선택 조문
+  - 제36조: 임대차계약의 신고
+2026-11-09 22:25:06.256 | INFO  | 66a8544b | official_statute_search.py:596:search_official_statutes - [2단계: 쟁점·도구 계획(plan)] [STATUTE_SEARCH] 누락 필수 조문: 없음
+2026-11-09 22:25:06.256 | INFO  | 66a8544b | official_statute_search.py:599:search_official_statutes - [2단계: 쟁점·도구 계획(plan)] [STATUTE_SEARCH] 검색 시간: 2.0ms
+2026-11-09 22:25:06.257 | INFO  | 66a8544b | official_statute_search.py:673:search_official_statutes - [2단계: 쟁점·도구 계획(plan)] [STATUTE_TEMPORAL] 부칙 확보 | 법령=민간임대주택에 관한 특별법 시행령 | 공포=2026-10-27 | 기본시행일=UNCONFIRMED | 원문길이=182
+2026-11-09 22:25:06.257 | INFO  | 66a8544b | official_statute_search.py:714:search_official_statutes - [2단계: 쟁점·도구 계획(plan)] [OFFICIAL_STATUTE] '민간임대주택에 관한 특별법 시행령'에서 조문 1건 확보 완료 | 부칙 1건
+2026-11-09 22:25:06.257 | INFO  | 66a8544b | decorators.py:214:log_success - [2단계: 쟁점·도구 계획(plan)] [국가법령정보센터 공식 조문 검색] 단계 완료 (3.6ms)
+2026-11-09 22:25:07.593 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [2단계: 쟁점·도구 계획(plan)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 22:25:09.009 | INFO  | -------- | callbacks.py:176:on_llm_end  - [2단계: 쟁점·도구 계획(plan)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1416ms, 입력: 226토큰, 출력: 21토큰, 총: 247토큰)
+2026-11-09 22:25:09.009 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [2단계: 쟁점·도구 계획(plan)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='plan'
+2026-11-09 22:25:09.010 | WARN  | -------- | temporal_search_plan.py:101:extract_event_with_llm - [2단계: 쟁점·도구 계획(plan)] [TEMPORAL_EVENT_LLM] 추출 미확정 | reason=ValueError
+2026-11-09 22:25:09.503 | INFO  | -------- | callbacks.py:104:on_chat_model_start - [2단계: 쟁점·도구 계획(plan)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건)
+2026-11-09 22:25:11.706 | INFO  | -------- | callbacks.py:176:on_llm_end  - [2단계: 쟁점·도구 계획(plan)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 2203ms, 입력: 212토큰, 출력: 51토큰, 총: 263토큰)
+2026-11-09 22:25:11.707 | WARN  | -------- | langfuse_client.py:399:_resolve_parent_span - [2단계: 쟁점·도구 계획(plan)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=None, 스팬=LegalAgent(generation), 요청 상위='plan'
+2026-11-09 22:25:11.709 | WARN  | -------- | temporal_search_plan.py:194:build_temporal_search_plan - [2단계: 쟁점·도구 계획(plan)] [TEMPORAL_PLAN] 로컬 법령 카탈로그 조회 실패 | type=ConnectionError
+2026-11-09 22:25:11.710 | INFO  | 8cae104c | decorators.py:181:log_entry  - [2단계: 쟁점·도구 계획(plan)] [statute_search_plan_node] 단계 시작 (statute_search_plan_node)
+2026-11-09 22:25:11.711 | WARN  | 8cae104c | langfuse_client.py:399:_resolve_parent_span - [2단계: 쟁점·도구 계획(plan)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=8cae104c-1fee-4185-8e03-fff85b31d1f5, 스팬=statute_search_plan_node(f62762c3-a8d4-4bc8-92da-4a4c7928db0d), 요청 상위='plan'
+2026-11-09 22:25:11.711 | INFO  | 8cae104c | legal_workflow.py:976:statute_search_plan_node - [statute_search_plan] [TEMPORAL_PLAN] status=READY candidate_count=1 reason=DATE_AND_OFFICIAL_LAW_IDENTIFIED
+2026-11-09 22:25:11.712 | INFO  | 8cae104c | decorators.py:214:log_success - [statute_search_plan] [statute_search_plan_node] 단계 완료 (1.5ms)
+2026-11-09 22:25:11.906 | INFO  | c7828011 | decorators.py:181:log_entry  - [statute_search_plan] [3단계: 공식 검색 승인 대기] 단계 시작 (statute_search_approval_node)
+2026-11-09 22:25:11.906 | WARN  | c7828011 | langfuse_client.py:399:_resolve_parent_span - [statute_search_plan] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=c7828011-1b5d-4d05-bf7e-b0f19032e237, 스팬=statute_search_approval_node(5ae30363-3b8d-4e30-9b93-164e265e0bdf), 요청 상위='statute_search_plan'
+2026-11-09 22:25:11.907 | INFO  | c7828011 | legal_workflow.py:3808:statute_search_approval_node - [5단계: 외부 법령 조회 승인 대기(hilt)] [STATUTE_APPROVAL] 사용자 법령검색 승인 결과 | 승인여부=True | 승인법령=['가상 계약법 시행령'] | 사유=(없음) | req_id=APPR-2bc7fdff
+2026-11-09 22:25:11.908 | INFO  | c7828011 | decorators.py:214:log_success - [5단계: 외부 법령 조회 승인 대기(hilt)] [3단계: 공식 검색 승인 대기] 단계 완료 (2.1ms)
+2026-11-09 22:25:12.442 | INFO  | 1f1d9c60 | decorators.py:181:log_entry  - [5단계: 외부 법령 조회 승인 대기(hilt)] [3단계: 공식 법령 조회] 단계 시작 (execute_statute_search_node)
+2026-11-09 22:25:12.442 | WARN  | 1f1d9c60 | langfuse_client.py:399:_resolve_parent_span - [5단계: 외부 법령 조회 승인 대기(hilt)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=1f1d9c60-66ec-4311-8d0d-dee4b9827756, 스팬=execute_statute_search_node(fcde795d-7caa-4884-947e-1fab1d8959c8), 요청 상위='statute_search_approval'
+2026-11-09 22:25:12.443 | INFO  | 1f1d9c60 | decorators.py:214:log_success - [5단계: 국가법령정보센터 조회(statute_search)] [3단계: 공식 법령 조회] 단계 완료 (1.0ms)
+2026-11-09 22:25:12.982 | INFO  | 5c1bfd5c | decorators.py:181:log_entry  - [5단계: 국가법령정보센터 조회(statute_search)] [3단계: 공식 법령 조회] 단계 시작 (execute_statute_search_node)
+2026-11-09 22:25:12.982 | WARN  | 5c1bfd5c | langfuse_client.py:399:_resolve_parent_span - [5단계: 국가법령정보센터 조회(statute_search)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=5c1bfd5c-3c3f-4220-bf45-34a7ed535e9c, 스팬=execute_statute_search_node(04747f45-b416-4249-933d-9ec5e86b6ba1), 요청 상위='execute_statute_search'
+2026-11-09 22:25:12.983 | INFO  | 5c1bfd5c | decorators.py:214:log_success - [5단계: 국가법령정보센터 조회(statute_search)] [3단계: 공식 법령 조회] 단계 완료 (1.0ms)
+2026-11-09 22:25:13.509 | INFO  | 9136670d | decorators.py:181:log_entry  - [5단계: 국가법령정보센터 조회(statute_search)] [3단계: 공식 법령 조회] 단계 시작 (execute_statute_search_node)
+2026-11-09 22:25:13.510 | WARN  | 9136670d | langfuse_client.py:399:_resolve_parent_span - [5단계: 국가법령정보센터 조회(statute_search)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=9136670d-05a1-4209-a770-37be089692fb, 스팬=execute_statute_search_node(59201286-0cd1-4e1a-aba2-143a565b42d8), 요청 상위='execute_statute_search'
+2026-11-09 22:25:13.510 | INFO  | 9136670d | legal_workflow.py:4084:execute_statute_search_node - [5단계: 국가법령정보센터 조회(statute_search)] [STATUTE_SEARCH] 공식 법령 검색 완료 | 조회조문수=0 | 누적출처수=0 | 후보법령=['가상 계약법 시행령']
+2026-11-09 22:25:13.511 | INFO  | 9136670d | decorators.py:214:log_success - [5단계: 국가법령정보센터 조회(statute_search)] [3단계: 공식 법령 조회] 단계 완료 (1.6ms)
+2026-11-09 22:25:14.026 | INFO  | e159af0e | decorators.py:181:log_entry  - [5단계: 국가법령정보센터 조회(statute_search)] [3단계: 공식 법령 조회] 단계 시작 (execute_statute_search_node)
+2026-11-09 22:25:14.026 | WARN  | e159af0e | langfuse_client.py:399:_resolve_parent_span - [5단계: 국가법령정보센터 조회(statute_search)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=e159af0e-864f-4b71-b3c0-18dc79372359, 스팬=execute_statute_search_node(910ab786-dc06-44d5-814b-f6e53f1adf75), 요청 상위='execute_statute_search'
+2026-11-09 22:25:14.027 | INFO  | e159af0e | legal_workflow.py:4084:execute_statute_search_node - [5단계: 국가법령정보센터 조회(statute_search)] [STATUTE_SEARCH] 공식 법령 검색 완료 | 조회조문수=0 | 누적출처수=0 | 후보법령=['주택임대차보호법']
+2026-11-09 22:25:14.027 | INFO  | e159af0e | decorators.py:214:log_success - [5단계: 국가법령정보센터 조회(statute_search)] [3단계: 공식 법령 조회] 단계 완료 (1.6ms)
+2026-11-09 22:25:14.555 | DEBUG | -------- | selector_events.py:54:__init__ - [5단계: 국가법령정보센터 조회(statute_search)] [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-09 22:25:14.557 | INFO  | 2f67dd67 | decorators.py:181:log_entry  - [5단계: 국가법령정보센터 조회(statute_search)] [3단계: 법령·판례 검색] 단계 시작 (run_agents_node)
+2026-11-09 22:25:14.558 | WARN  | 2f67dd67 | langfuse_client.py:399:_resolve_parent_span - [5단계: 국가법령정보센터 조회(statute_search)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=2f67dd67-303e-48e7-96fb-9eb867e8b29e, 스팬=run_agents_node(bc26ba48-1d07-48a8-9e4b-57c64dfae61d), 요청 상위='execute_statute_search'
+2026-11-09 22:25:14.559 | INFO  | 2f67dd67 | legal_workflow.py:1281:run_agents_node - [3단계: 법령·판례 검색(run_agents)] [RUN_AGENTS] 전문 에이전트 분석 완료 | 대상분야=['민법'] | 완료분야=['민법'] | 수집출처수=2
+2026-11-09 22:25:14.559 | INFO  | 2f67dd67 | decorators.py:214:log_success - [3단계: 법령·판례 검색(run_agents)] [3단계: 법령·판례 검색] 단계 완료 (2.3ms)
+2026-11-09 22:25:15.070 | INFO  | 03d730c2 | decorators.py:181:log_entry  - [5단계: 국가법령정보센터 조회(statute_search)] [법률 상담 워크플로우 그래프 빌드] 단계 시작 (build_legal_graph)
+2026-11-09 22:25:15.070 | WARN  | 03d730c2 | langfuse_client.py:399:_resolve_parent_span - [5단계: 국가법령정보센터 조회(statute_search)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=03d730c2-228b-4452-866d-407156234927, 스팬=build_legal_graph(063bca15-b428-48fb-90ca-b6d7ce05269a), 요청 상위='execute_statute_search'
+2026-11-09 22:25:15.115 | INFO  | 03d730c2 | legal_workflow.py:5242:build_legal_graph - [5단계: 국가법령정보센터 조회(statute_search)] [워크플로우 그래프] 통합 법률 상담 엔진(공식 법령 검색 포함) 그래프 빌드 완료
+2026-11-09 22:25:15.115 | INFO  | 03d730c2 | decorators.py:214:log_success - [5단계: 국가법령정보센터 조회(statute_search)] [법률 상담 워크플로우 그래프 빌드] 단계 완료 (45.7ms)
+2026-11-09 22:25:15.651 | INFO  | -------- | legal_workflow.py:2081:supervisor_verification_decision - [5단계: 국가법령정보센터 조회(statute_search)] [TEMPORAL_ROUTING] confirmed conflict -> targeted revise
+2026-11-09 22:25:15.653 | INFO  | -------- | legal_workflow.py:2081:supervisor_verification_decision - [5단계: 국가법령정보센터 조회(statute_search)] [TEMPORAL_ROUTING] confirmed conflict -> targeted revise
+2026-11-09 22:25:15.654 | INFO  | a7de076a | decorators.py:181:log_entry  - [5단계: 국가법령정보센터 조회(statute_search)] [5단계: 근거 검증] 단계 시작 (verification_node)
+2026-11-09 22:25:15.655 | WARN  | a7de076a | langfuse_client.py:399:_resolve_parent_span - [5단계: 국가법령정보센터 조회(statute_search)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=a7de076a-374a-4456-b926-bb64425720a1, 스팬=verification_node(cbe51fd5-40b1-48d0-b7ed-3004ffb01f9e), 요청 상위='execute_statute_search'
+2026-11-09 22:25:15.655 | INFO  | a7de076a | decorators.py:181:log_entry  - [5단계: 법령·증거 근거 검증(verification)] [5단계: 조문·증거 일치성 검증] 단계 시작 (run_verification)
+2026-11-09 22:25:15.656 | INFO  | a7de076a | qa_checker.py:173:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 검사 시작 (초안길이: 44자 | 질문: '2026년 11월 1일 계약 체결에 개정 시행령 제36조가 적용되나요?...')
+2026-11-09 22:25:15.657 | INFO  | a7de076a | qa_checker.py:201:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 출처 존재 검사: PASS (인용출처: 2건 정상)
+2026-11-09 22:25:15.657 | INFO  | a7de076a | qa_checker.py:245:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 날짜·금액 검사: PASS
+2026-11-09 22:25:15.658 | INFO  | a7de076a | qa_checker.py:269:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 질문 충족: 1/1 (누락항목: 없음)
+2026-11-09 22:25:15.681 | INFO  | a7de076a | qa_checker.py:305:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 형식 검사 PASS (법률적 의미 판단 아님)
+2026-11-09 22:25:15.681 | INFO  | a7de076a | qa_checker.py:351:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 단순 법령 질의 및 결정론적 검사 통과: LLM 추가 검증 생략 (조기 PASS)
+2026-11-09 22:25:15.681 | WARN  | a7de076a | verification.py:959:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [STATUTE_TEMPORAL] 경량 PASS 생략: 시행일/계약일 충돌 1건
+2026-11-09 22:25:16.164 | INFO  | a7de076a | callbacks.py:104:on_chat_model_start - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 1건)
+2026-11-09 22:25:20.316 | INFO  | a7de076a | callbacks.py:176:on_llm_end  - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 4152ms, 입력: 2,863토큰, 출력: 484토큰, 총: 3,347토큰)
+2026-11-09 22:25:20.317 | INFO  | a7de076a | verification.py:1060:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION_SCHEMA] 검증 출력 수신 및 스키마 검증 시작
+2026-11-09 22:25:20.317 | INFO  | a7de076a | verification.py:1062:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION_SCHEMA] 스키마 검증 및 정규화 결과: SUCCESS (주장수=2, 상태=PASS)
+2026-11-09 22:25:20.318 | INFO  | a7de076a | verification.py:1063:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION] 법률 주장 검증 계속 진행
+2026-11-09 22:25:20.318 | WARN  | a7de076a | verification.py:1570:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [STATUTE_TEMPORAL] 시행일-사건일 불일치로 PASS 차단: 부칙 원문은 확보했지만 시행일을 구조화하여 확정하지 못했습니다. 부칙의 원문·예외·적용례를 확인하기 전 적용 여부를 단정하지 마세요.
+2026-11-09 22:25:20.318 | INFO  | a7de076a | verification.py:1574:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION] status=REVISE, claims=2, unverified=0, unsupported=0
+2026-11-09 22:25:20.319 | INFO  | a7de076a | decorators.py:214:log_success - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [5단계: 조문·증거 일치성 검증] 단계 완료 (4663.8ms)
+2026-11-09 22:25:20.319 | INFO  | a7de076a | legal_workflow.py:1827:verification_node - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [TEMPORAL_VERIFICATION] gate=BLOCK pre=REVISE post=REVISE reasons=['TEMPORAL_SEMANTIC_CONTRADICTION']
+2026-11-09 22:25:20.321 | DEBUG | a7de076a | legal_workflow.py:1871:verification_node - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] Langfuse 검증 점수 기록 실패: could not convert string to float: 'N/A'
+2026-11-09 22:25:20.322 | INFO  | a7de076a | legal_workflow.py:1995:verification_node - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION] 초안 검증 완료 | 판정=REVISE | 사유코드=TEMPORAL_SEMANTIC_CONTRADICTION | 후보법령=[] | 검증출처수=0 | 쟁점결과수=0 | 초안해시=705fc099
+2026-11-09 22:25:20.322 | INFO  | a7de076a | decorators.py:214:log_success - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [5단계: 근거 검증] 단계 완료 (4667.8ms)
+2026-11-09 22:25:20.773 | INFO  | e41421e1 | decorators.py:181:log_entry  - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [5단계: 근거 검증] 단계 시작 (verification_node)
+2026-11-09 22:25:20.773 | WARN  | e41421e1 | langfuse_client.py:399:_resolve_parent_span - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=e41421e1-a916-4da9-8cd9-ad1b4449e10f, 스팬=verification_node(7a6a4ee0-fd8a-47ee-aaac-5fb5c73b8170), 요청 상위='verification'
+2026-11-09 22:25:20.774 | INFO  | e41421e1 | legal_workflow.py:1827:verification_node - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [TEMPORAL_VERIFICATION] gate=BLOCK pre=PASS post=REVISE reasons=['TEMPORAL_SEMANTIC_CONTRADICTION']
+2026-11-09 22:25:20.774 | INFO  | e41421e1 | legal_workflow.py:1995:verification_node - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION] 초안 검증 완료 | 판정=REVISE | 사유코드=TEMPORAL_SEMANTIC_CONTRADICTION | 후보법령=[] | 검증출처수=1 | 쟁점결과수=0 | 초안해시=705fc099
+2026-11-09 22:25:20.775 | INFO  | e41421e1 | decorators.py:214:log_success - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [5단계: 근거 검증] 단계 완료 (2.6ms)
+2026-11-09 22:25:21.303 | INFO  | 3c8ab5b8 | decorators.py:181:log_entry  - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [5단계: 답변 보강] 단계 시작 (revise_node)
+2026-11-09 22:25:21.303 | WARN  | 3c8ab5b8 | langfuse_client.py:399:_resolve_parent_span - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=3c8ab5b8-3c40-4b9e-bc15-956130df3170, 스팬=revise_node(a4f436c0-00b9-4684-8a5e-c80b74700e06), 요청 상위='verification'
+2026-11-09 22:25:21.304 | INFO  | 3c8ab5b8 | legal_workflow.py:2621:revise_node - [verification_agent >> 5단계: 답변 보강·재작성(revise)] [REVISE] technical temporal recheck without changing draft
+2026-11-09 22:25:21.304 | INFO  | 3c8ab5b8 | decorators.py:214:log_success - [verification_agent >> 5단계: 답변 보강·재작성(revise)] [5단계: 답변 보강] 단계 완료 (1.6ms)
+2026-11-09 22:25:21.845 | INFO  | 2a89be77 | decorators.py:181:log_entry  - [verification_agent >> 5단계: 답변 보강·재작성(revise)] [5단계: 답변 보강] 단계 시작 (revise_node)
+2026-11-09 22:25:21.846 | WARN  | 2a89be77 | langfuse_client.py:399:_resolve_parent_span - [verification_agent >> 5단계: 답변 보강·재작성(revise)] [SPAN_PARENT_UNRESOLVED] 상위 스팬 미해결 (루트 트레이스에 연결): trace_id=2a89be77-e15d-4d26-ab51-12e225d316c2, 스팬=revise_node(88a6c4db-864a-4e24-99ba-8ea7ec949942), 요청 상위='revise'
+2026-11-09 22:25:21.846 | INFO  | 2a89be77 | legal_workflow.py:2621:revise_node - [verification_agent >> 5단계: 답변 보강·재작성(revise)] [REVISE] technical temporal recheck without changing draft
+2026-11-09 22:25:21.847 | INFO  | 2a89be77 | decorators.py:214:log_success - [verification_agent >> 5단계: 답변 보강·재작성(revise)] [5단계: 답변 보강] 단계 완료 (1.6ms)
