@@ -34,3 +34,40 @@ def test_qa_supports_precomputed_audit_and_standalone_fallback():
     assert len(assignments) == 1
     expression = ast.unparse(assignments[0].value)
     assert "citation_audit if citation_audit is not None else audit_citations_and_claims" in expression
+
+
+def test_audit_selection_executes_without_duplicate_call():
+    function = _function("qa_checker.py", "check_deterministic_qa")
+    assignment = next(
+        n for n in ast.walk(function)
+        if isinstance(n, ast.Assign) and any(
+            isinstance(t, ast.Name) and t.id == "audit" for t in n.targets
+        )
+    )
+    code = compile(
+        ast.fix_missing_locations(ast.Module(body=[assignment], type_ignores=[])),
+        "<qa-audit-selection>",
+        "exec",
+    )
+    calls = []
+
+    def audit_fn(*args, **kwargs):
+        calls.append((args, kwargs))
+        return {"retrieval_source_ids": ["S1"]}
+
+    provided = {"retrieval_source_ids": ["S2"]}
+    context = {
+        "citation_audit": provided,
+        "audit_citations_and_claims": audit_fn,
+        "draft_answer": "answer",
+        "retrieved_sources": [{"source_id": "S1"}],
+        "case_context": "context",
+    }
+    exec(code, context)
+    assert context["audit"] is provided
+    assert calls == []
+
+    context["citation_audit"] = None
+    exec(code, context)
+    assert context["audit"] == {"retrieval_source_ids": ["S1"]}
+    assert len(calls) == 1
