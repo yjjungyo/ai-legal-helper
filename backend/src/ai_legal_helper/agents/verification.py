@@ -1540,6 +1540,15 @@ def run_verification(
             and not unregistered_evidences
         )
         coverage_satisfied = (not require_question_coverage) or (coverage_complete and consistency_complete)
+        # The earlier gate must not be bypassed when a substantive legal issue
+        # or a malformed/ungrounded claim remains unresolved.
+        has_no_defects = (
+            has_no_defects
+            and not result.missing_legal_issues
+            and not defective_claims
+            and not malformed_claims
+            and not same_role_date_conflict
+        )
         if coverage_satisfied and has_supported_core_claims and has_no_defects and result.status == "REVISE":
             if result.reason_code in ("LEGAL_SOURCE_INSUFFICIENT", "ANSWER_REVISION_REQUIRED", "CASE_EVIDENCE_MISSING", "NONE"):
                 logger.info("[VERIFICATION] 모든 핵심 주장이 검색 출처에 의해 온전히 뒷받침(SUPPORTED 100%)되므로 PASS로 확정합니다.")
