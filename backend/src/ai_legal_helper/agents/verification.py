@@ -950,6 +950,7 @@ def run_verification(
         draft_answer=draft_answer,
         retrieved_sources=retrieved_sources,
         case_context=case_context,
+        citation_audit=audit,
     )
 
     # 단순 법령 질의이면서 결정론적 검사 ALL PASS인 경우: 불필요한 LLM 호출을 건너뛰고 조기 PASS 확정
