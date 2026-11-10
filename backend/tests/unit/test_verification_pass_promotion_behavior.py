@@ -75,18 +75,14 @@ def test_characterize_remaining_revision_instructions():
 
 
 def test_characterize_remaining_missing_legal_issues():
-    # This documents a potential risk, not a confirmed real-world legal defect:
-    # the later promotion block itself does not inspect missing_legal_issues.
+    # This isolates the final if statement; the preceding safety gate is tested below.
     verdict = _execute(missing_legal_issues=["핵심 법률 쟁점"])
     assert verdict.status == "PASS"
     assert verdict.missing_legal_issues == ["핵심 법률 쟁점"]
 
 
 def test_characterize_first_and_second_pass_gates_together():
-    """Show that a missing legal issue blocks the first gate but not the second.
-
-    This is a reproducible policy gap, not evidence of an actual wrong answer.
-    """
+    """Run both promotion paths and the production safety gate in sequence."""
     module = ast.parse(SOURCE.read_text(encoding="utf-8"))
     function = next(n for n in module.body if isinstance(n, ast.FunctionDef) and n.name == "run_verification")
     first = [
@@ -119,9 +115,15 @@ def test_characterize_first_and_second_pass_gates_together():
         "coverage_satisfied": True, "has_supported_core_claims": True,
         "has_no_defects": True, "logger": logging.getLogger(__name__),
     }
-    nodes = [first[0], second[0]]
+    gates = [
+        n for n in ast.walk(function)
+        if isinstance(n, ast.Assign)
+        and any(isinstance(t, ast.Name) and t.id == "has_no_defects" for t in n.targets)
+        and "not result.missing_legal_issues" in ast.unparse(n.value)
+    ]
+    assert len(gates) == 1
+    nodes = [first[0], gates[0], second[0]]
     code = compile(ast.fix_missing_locations(ast.Module(body=nodes, type_ignores=[])), str(SOURCE), "exec")
-    env["has_no_defects"] = not result.missing_legal_issues
     exec(code, env)
     assert result.status == "REVISE"
     assert result.missing_legal_issues == ["핵심 법률 쟁점"]
