@@ -238,19 +238,20 @@ def extract_case_contract_deposit(briefing: CaseEvidenceBriefing) -> int:
     return res_amt
 
 
-def extract_case_prior_verified_repayments(briefing: CaseEvidenceBriefing) -> Tuple[int, List[str]]:
-    """사건에 이미 공적으로 입증·확정된 임대인의 보증금 반환(일부 또는 전액) 내역을 동적으로 합산한다.
+def extract_case_prior_verified_repayments(
+    briefing: CaseEvidenceBriefing,
+) -> Tuple[int, List[str]]:
+    """객관적 증거(영수증, 이체확인증 등)로 입증된 기지급/기반환 금액을 산출한다 (P0-03).
 
-    최초 계약금·잔금 지급(임차인 -> 임대인)과 임대인의 보증금 반환(임대인 -> 임차인)을
-    엄격히 구분하고, 실제 반환 거래 단위(일자, 금액, 고유 거래번호, 계좌, 차수 등)로 식별하여
-    중복 사본은 차단하고, 동일 문서 내 복수 거래 및 식별자가 구분되는 동시/동액 거래는 각각 합산한다.
-    특정 임대인 이름 하드코딩 없이 동적 당사자 정보를 활용한다.
+    Fast-Path 필터링 및 ThreadPoolExecutor 병렬 처리를 통해 다수 증거 문장을 고속 분석하고,
+    동일 거래(동일 고유 거래번호 또는 일자+시간+금액 매칭)의 이중 산정을 방지한다.
+    반환 제안(PROPOSAL)이나 단순 약속은 실제 반환에서 철저히 배제한다.
 
     Args:
-        briefing: 현재 사건 증거 브리핑 모델.
+        briefing: 사건 브리핑 데이터 객체.
 
     Returns:
-        Tuple[int, List[str]]: (합산된 반환액, 근거 출처 목록) 튜플.
+        Tuple[int, List[str]]: (총 확인된 기지급 금액 KRW, 증거 출처 및 내역 목록)
     """
     if not briefing:
         return 0, []
@@ -265,6 +266,19 @@ def extract_case_prior_verified_repayments(briefing: CaseEvidenceBriefing) -> Tu
 
     from ai_legal_helper.case_intelligence.semantic_judgment import classify_statement
 
+    repay_task_context = (
+        "ACTUAL_REPAYMENT: 객관적 증거상 임대인이 임차인에게 "
+        "계약보증금을 실제로 돌려준 개별 거래의 완료 사실. "
+        "단순 반환 약속, 분할반환 제안, 지급 예정/요구, "
+        "임차인의 계약금·잔금 지급은 제외. "
+        "evidence_quote에는 오직 해당 실제 입금 거래 금액만 "
+        "포함해 정확히 인용해야 함."
+    )
+    repay_task_labels = ("ACTUAL_REPAYMENT", "ORIGINAL_TENANT_PAYMENT",
+                         "PROPOSAL_OR_PLAN", "ALLEGED_UNVERIFIED", "OTHER")
+
+    # [1단계: 사전 신뢰 금액 분리 및 병렬 분류 대상 라인 수집]
+    line_tasks = []  # List[Tuple[fact, line_text, doc_name, trusted_amt, trusted_quote]]
     for fact in (briefing.facts or []):
         if not is_fact_strictly_verified(fact, briefing):
             continue
@@ -272,148 +286,166 @@ def extract_case_prior_verified_repayments(briefing: CaseEvidenceBriefing) -> Tu
         doc_name = fact.document_name or fact.evidence_label or ""
         trusted_amt, trusted_quote = _approved_money_role(fact, "ACTUAL_REPAYMENT")
         if trusted_amt is None and _has_valid_reviewed_meaning(fact):
-            # Already classified as principal, proposal, balance, etc.
             continue
         for line_text in (line.strip() for line in statement.splitlines()):
             if not line_text:
                 continue
-
-            # [Fast-Path] 문장 내 금액 숫자가 전혀 없으면 반환 거래일 수 없으므로 LLM 호출 스킵
             if trusted_amt is None and not extract_amounts_from_text(line_text):
                 continue
+            repay_keywords = ("반환", "입금", "송금", "지급", "이체", "변제", "돌려", "환급", "정산")
+            if trusted_amt is None and not any(kw in line_text for kw in repay_keywords):
+                continue
+            line_tasks.append((fact, line_text, doc_name, trusted_amt, trusted_quote))
 
-            verdict = None
-            if trusted_amt is None or trusted_quote not in line_text:
-                verdict = classify_statement(
+    # [2단계: 복수 라인에 대해 ThreadPoolExecutor + copy_context로 병렬 동시 분류]
+    def _execute_repay_classification(task_tuple):
+        _, line_text, _, trusted_amt, trusted_quote = task_tuple
+        if trusted_amt is not None and trusted_quote in line_text:
+            return None
+        return classify_statement(
+            line_text,
+            task="ACTUAL_DEPOSIT_REFUND_TRANSACTION",
+            labels=repay_task_labels,
+            context=repay_task_context,
+        )
+
+    verdicts_map = {}
+    lines_needing_llm = [t for t in line_tasks if t[3] is None or t[4] not in t[1]]
+    if len(lines_needing_llm) == 1:
+        t = lines_needing_llm[0]
+        verdicts_map[t[1]] = _execute_repay_classification(t)
+    elif len(lines_needing_llm) > 1:
+        import contextvars
+        from concurrent.futures import ThreadPoolExecutor
+
+        ctx = contextvars.copy_context()
+        max_w = min(len(lines_needing_llm), 4)
+        with ThreadPoolExecutor(max_workers=max_w) as pool:
+            future_to_line = {pool.submit(ctx.run, _execute_repay_classification, t): t[1] for t in lines_needing_llm}
+            for fut in future_to_line:
+                line_key = future_to_line[fut]
+                try:
+                    verdicts_map[line_key] = fut.result()
+                except Exception as ex:
+                    logger.warning(f"[REPAY_PARALLEL] 병렬 반환 거래 분류 오류: {ex}")
+
+    # [3단계: 순차 정산 및 중복 거래 필터링 적용]
+    for fact, line_text, doc_name, trusted_amt, trusted_quote in line_tasks:
+        verdict = verdicts_map.get(line_text)
+        if trusted_amt is not None and trusted_quote in line_text:
+            amts = {trusted_amt}
+        else:
+            if verdict is None or verdict.label != "ACTUAL_REPAYMENT":
+                continue
+            amts = extract_amounts_from_text(verdict.evidence_quote)
+
+        if len(amts) > 1 and verdict is not None:
+            clarified = classify_statement(
                 line_text,
-                task="ACTUAL_DEPOSIT_REFUND_TRANSACTION",
-                labels=("ACTUAL_REPAYMENT", "ORIGINAL_TENANT_PAYMENT",
-                        "PROPOSAL_OR_PLAN", "ALLEGED_UNVERIFIED", "OTHER"),
+                task="SELECT_ACTUAL_REPAYMENT_AMOUNT",
+                labels=("ACTUAL_REPAYMENT", "AMBIGUOUS"),
                 context=(
-                    "ACTUAL_REPAYMENT: 객관적 증거상 임대인이 임차인에게 "
-                    "계약보증금을 실제로 돌려준 개별 거래의 완료 사실. "
-                    "단순 반환 약속, 분할반환 제안, 지급 예정/요구, "
-                    "임차인의 계약금·잔금 지급은 제외. "
-                    "evidence_quote에는 오직 해당 실제 입금 거래 금액만 "
-                    "포함해 정확히 인용해야 함."
+                    "이미 실제 반환 거래라는 분류는 했으나 인용구에 금액이 "
+                    "둘 이상 있습니다. 실제로 임대인이 임차인에게 반환을 완료한 "
+                    "하나의 금액만 정확히 포함하는 연속된 원문을 인용하세요. "
+                    "전체 계약 원금, 반환 전 원금, 잔액은 선택하지 마세요. "
+                    "여러 반환 거래가 구분되지 않으면 UNKNOWN."
                 ),
             )
-            if trusted_amt is not None and trusted_quote in line_text:
-                amts = {trusted_amt}
-            else:
-                if verdict is None or verdict.label != "ACTUAL_REPAYMENT":
-                    continue
-                amts = extract_amounts_from_text(verdict.evidence_quote)
-            # A quote may contain contract principal AND the returned part.
-            # Ask for the exact event amount one more time only in this
-            # ambiguous case; never select min/max or silently count principal.
-            if len(amts) > 1 and verdict is not None:
-                clarified = classify_statement(
-                    line_text,
-                    task="SELECT_ACTUAL_REPAYMENT_AMOUNT",
-                    labels=("ACTUAL_REPAYMENT", "AMBIGUOUS"),
-                    context=(
-                        "이미 실제 반환 거래라는 분류는 했으나 인용구에 금액이 "
-                        "둘 이상 있습니다. 실제로 임대인이 임차인에게 반환을 완료한 "
-                        "하나의 금액만 정확히 포함하는 연속된 원문을 인용하세요. "
-                        "전체 계약 원금, 반환 전 원금, 잔액은 선택하지 마세요. "
-                        "여러 반환 거래가 구분되지 않으면 UNKNOWN."
-                    ),
-                )
-                if (
-                    clarified.label == "ACTUAL_REPAYMENT"
-                    and clarified.evidence_quote in verdict.evidence_quote
-                ):
-                    amts = extract_amounts_from_text(clarified.evidence_quote)
-            # No 'min(amounts)' or 'max(amounts)' guess when multiple values
-            # appear (e.g. refund plus remaining balance).
-            if len(amts) != 1:
-                logger.warning(
-                    "[SETTLEMENT] 실제 반환 입금액 단일 식별 실패; 계산 보류: %s",
-                    verdict.evidence_quote if verdict is not None else line_text,
-                )
-                continue
-            amt = next(iter(amts))
-            if amt <= 0:
-                continue
-            combined_text = f"{line_text} {doc_name}"
+            if (
+                clarified.label == "ACTUAL_REPAYMENT"
+                and clarified.evidence_quote in verdict.evidence_quote
+            ):
+                amts = extract_amounts_from_text(clarified.evidence_quote)
 
-            dates = extract_dates_from_text(line_text)
-            tx_date = sorted(dates)[0] if dates else (str(getattr(fact, "occurred_at", None) or ""))
-            doc_ref = fact.source_evidence_id or fact.evidence_label or fact.document_name or ""
+        if len(amts) != 1:
+            logger.warning(
+                "[SETTLEMENT] 실제 반환 입금액 단일 식별 실패; 계산 보류: %s",
+                verdict.evidence_quote if verdict is not None else line_text,
+            )
+            continue
+        amt = next(iter(amts))
+        if amt <= 0:
+            continue
 
-            m_txid = re.search(r"(?:거래번호|승인번호|전문번호|관리번호|일련번호|tx[-_]?id|txid)[\s:]*([A-Za-z0-9_-]+)", combined_text, re.IGNORECASE)
-            tx_id = m_txid.group(1).strip() if m_txid else None
+        combined_text = f"{line_text} {doc_name}"
 
-            m_time = re.search(r"(\d{1,2}:\d{2}(?::\d{2})?)", combined_text)
-            if not m_time:
-                m_time = re.search(r"(\d{1,2}시\s*\d{1,2}분(?:\s*\d{1,2}초)?)", combined_text)
-            tx_time = m_time.group(1).strip() if m_time else None
+        dates = extract_dates_from_text(line_text)
+        tx_date = sorted(dates)[0] if dates else (str(getattr(fact, "occurred_at", None) or ""))
+        doc_ref = fact.source_evidence_id or fact.evidence_label or fact.document_name or ""
 
-            m_ord = re.search(r"(\d+)\s*(?:차|회|번째)\s*(?:입금|변제|지급|반환|이체)?", combined_text)
-            tx_ord = m_ord.group(1).strip() if m_ord else None
+        m_txid = re.search(r"(?:거래번호|승인번호|전문번호|관리번호|일련번호|tx[-_]?id|txid)[\s:]*([A-Za-z0-9_-]+)", combined_text, re.IGNORECASE)
+        tx_id = m_txid.group(1).strip() if m_txid else None
 
-            m_acc = re.search(r"(?:계좌|계좌번호)[\s:]*([0-9-]+)", combined_text)
-            tx_acc = m_acc.group(1).strip() if m_acc else None
+        m_time = re.search(r"(\d{1,2}:\d{2}(?::\d{2})?)", combined_text)
+        if not m_time:
+            m_time = re.search(r"(\d{1,2}시\s*\d{1,2}분(?:\s*\d{1,2}초)?)", combined_text)
+        tx_time = m_time.group(1).strip() if m_time else None
 
-            is_copy = any(w in combined_text for w in ["사본", "중복", "재발급", "동일 거래", "copy"])
-            src = fact.document_name or fact.evidence_label or "확인된 증거"
+        m_ord = re.search(r"(\d+)\s*(?:차|회|번째)\s*(?:입금|변제|지급|반환|이체)?", combined_text)
+        tx_ord = m_ord.group(1).strip() if m_ord else None
 
-            is_duplicate = False
-            is_ambiguous = False
+        m_acc = re.search(r"(?:계좌|계좌번호)[\s:]*([0-9-]+)", combined_text)
+        tx_acc = m_acc.group(1).strip() if m_acc else None
 
-            for ex in accepted_txs:
-                if tx_id and ex.get("tx_id"):
-                    if tx_id == ex["tx_id"]:
-                        is_duplicate = True
-                        break
-                    else:
-                        continue
+        is_copy = any(w in combined_text for w in ["사본", "중복", "재발급", "동일 거래", "copy"])
+        src = fact.document_name or fact.evidence_label or "확인된 증거"
 
-                if (is_copy or ex.get("is_copy")) and ex["amt"] == amt and (not tx_date or not ex.get("date") or ex["date"] == tx_date):
+        is_duplicate = False
+        is_ambiguous = False
+
+        for ex in accepted_txs:
+            if tx_id and ex.get("tx_id"):
+                if tx_id == ex["tx_id"]:
                     is_duplicate = True
                     break
-
-                if amt != ex["amt"]:
-                    continue
-                if tx_date and ex.get("date") and tx_date != ex["date"]:
+                else:
                     continue
 
-                if (tx_time and ex.get("tx_time") and tx_time != ex["tx_time"]) or                        (tx_ord and ex.get("tx_ord") and tx_ord != ex["tx_ord"]) or                        (tx_acc and ex.get("tx_acc") and tx_acc != ex["tx_acc"]):
-                    continue
-
-                if doc_ref and ex.get("doc_ref") and doc_ref == ex["doc_ref"]:
-                    is_duplicate = True
-                    break
-
-                is_ambiguous = True
+            if (is_copy or ex.get("is_copy")) and ex["amt"] == amt and (not tx_date or not ex.get("date") or ex["date"] == tx_date):
+                is_duplicate = True
                 break
 
-            if is_duplicate:
+            if amt != ex["amt"]:
+                continue
+            if tx_date and ex.get("date") and tx_date != ex["date"]:
                 continue
 
-            if is_ambiguous:
-                repaid_sources.append(
-                    f"[보류] {amt:,}원 [{src}] (동일 일자·금액 거래 중복 의심 / 고유 거래번호 미확인으로 합산 보류)"
-                )
+            if (tx_time and ex.get("tx_time") and tx_time != ex["tx_time"]) or                (tx_ord and ex.get("tx_ord") and tx_ord != ex["tx_ord"]) or                (tx_acc and ex.get("tx_acc") and tx_acc != ex["tx_acc"]):
                 continue
 
-            accepted_txs.append({
-                "amt": amt,
-                "date": tx_date,
-                "tx_id": tx_id,
-                "tx_time": tx_time,
-                "tx_ord": tx_ord,
-                "tx_acc": tx_acc,
-                "doc_ref": doc_ref,
-                "src": src,
-                "is_copy": is_copy,
-                "stmt": line_text,
-            })
-            total_repaid += amt
-            ord_prefix = f"{tx_ord}차 " if tx_ord else ""
-            id_suffix = f" (거래번호: {tx_id})" if tx_id else ""
-            repaid_sources.append(f"{ord_prefix}{amt:,}원 [{src}]{id_suffix}")
+            if doc_ref and ex.get("doc_ref") and doc_ref == ex["doc_ref"]:
+                is_duplicate = True
+                break
+
+            is_ambiguous = True
+            break
+
+        if is_duplicate:
+            continue
+
+        if is_ambiguous:
+            repaid_sources.append(
+                f"[보류] {amt:,}원 [{src}] (동일 일자·금액 거래 중복 의심 / 고유 거래번호 미확인으로 합산 보류)"
+            )
+            continue
+
+        accepted_txs.append({
+            "amt": amt,
+            "date": tx_date,
+            "tx_id": tx_id,
+            "tx_time": tx_time,
+            "tx_ord": tx_ord,
+            "tx_acc": tx_acc,
+            "doc_ref": doc_ref,
+            "src": src,
+            "is_copy": is_copy,
+            "stmt": line_text,
+        })
+        total_repaid += amt
+        ord_prefix = f"{tx_ord}차 " if tx_ord else ""
+        id_suffix = f" (거래번호: {tx_id})" if tx_id else ""
+        repaid_sources.append(f"{ord_prefix}{amt:,}원 [{src}]{id_suffix}")
 
     res_tuple = (total_repaid, repaid_sources)
     try:

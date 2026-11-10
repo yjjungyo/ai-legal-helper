@@ -41,12 +41,37 @@ def _sanitize_client_missing_items(items: List[str]) -> List[str]:
 
 
 def consultation_question(state: Dict[str, Any]) -> str:
-    """원문 질문을 보존하면서 검색·작성·검증에 동일한 문맥 복원 질의를 사용한다.
+    """단일 진실 공급원(SSOT) 원칙에 따라 사용자 원문 질문을 최우선으로 보존하고 문맥 복원 질의를 병기한다.
 
-    resolved_query는 Intent 단계에서 확정된 현재 턴의 해석 질문이다.
-    값이 비었거나 없는 구형 상태에서는 원문 질문을 사용하여 호환성을 유지한다.
+    Args:
+        state: 사용자 질문(question) 및 의도 분석 결과(resolved_query)가 포함된 상태 딕셔너리.
+
+    Returns:
+        str: 작성 및 검증 공통으로 사용할 단일 진실 질의 문자열.
+
+    Notes:
+        사용자 원문 질문은 의뢰인의 모든 법률 쟁점 요구가 담긴 유일한 진실 공급원(SSOT)이다.
+        resolved_query가 존재하더라도 원문 질문을 절대로 덮어써서 버리지 않으며,
+        두 값이 서로 다를 경우 원문 질문을 최상단에 배치하고 문맥 복원 질의를 함께 병기하여
+        초안 작성기와 검증기 간의 정보 비대칭 및 쟁점 누락(Early Stop / REVISE)을 원천 차단한다.
     """
-    return str(state.get("resolved_query") or state.get("question") or "")
+    orig_q = str(state.get("question") or "").strip()
+    resolved_q = str(state.get("resolved_query") or "").strip()
+
+    # 원문 질문이 없는 경우 문맥 질의 반환
+    if not orig_q:
+        return resolved_q
+    # 문맥 질의가 없거나 원문과 완전히 동일한 경우 원문 반환
+    if not resolved_q or orig_q == resolved_q:
+        return orig_q
+
+    # 원문 질문과 문맥 질의가 모두 존재하며 상이한 경우:
+    # 검증기의 진술 일치 검증(_norm_quote in question) 및 작성기의 전 쟁점 충족을 위해
+    # 원문 질문을 최우선으로 두고 대화 맥락 해석을 보조로 결합한다.
+    return (
+        f"[의뢰인 질문 원문]\n{orig_q}\n\n"
+        f"[대화 맥락 및 쟁점 해석]\n{resolved_q}"
+    )
 
 
 def document_sources(state: Dict[str, Any]) -> List[Dict[str, Any]]:

@@ -57,7 +57,7 @@ _NODE_KR_LABELS = {
     "synthesize": "4단계: 쟁점별 분석·초안 작성(synthesize)",
     "verification": "5단계: 법령·증거 근거 검증(verification)",
     "revise": "5단계: 답변 보강·재작성(revise)",
-    "statute_search_approval": "5단계: 외부 법령 조회 승인 대기(hilt)",
+    "statute_search_approval": "5단계: 외부 법령 조회 승인 대기(hitl)",
     "execute_statute_search": "5단계: 국가법령정보센터 조회(statute_search)",
     "re_analyze": "5단계: 확보 법령 기반 재분석(re_analyze)",
     "finalize": "6단계: 최종 답변 확정(finalize)",

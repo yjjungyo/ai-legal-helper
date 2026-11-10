@@ -43,6 +43,7 @@ from ai_legal_helper.case_intelligence.evidence_manager import (
     _prune_deleted_fact_references,
     _recalculate_case_disputed_facts,
     _rebuild_case_timeline,
+    delete_evidence_document_and_cascade,
 )
 from ai_legal_helper.case_intelligence.conflict_detector import (
     build_structured_slots,
@@ -698,91 +699,26 @@ def delete_evidence(
     case: Case = Depends(get_case_for_user),
     db: Session = Depends(get_db),
 ):
-    """사건에 등록된 증거 문서 및 단독 지지 추출 데이터를 정합성 있게 삭제한다.
+    """사건에 등록된 증거 문서 및 추출 사실·주장·Neo4j 그래프를 완전하고 정합성 있게 삭제한다.
 
     1. 증거 문서 및 물리 파일 삭제
-    2. 해당 증거 문서가 단독으로 지지하던 Fact만 선별 삭제하고 다른 승인 증거가 지지하는 Fact는 보존
-    3. 삭제된 Fact 참조(LegalIssue, Event) 정리, DISPUTED 상태 재계산 및 타임라인 재구축
-    4. 사건 그래프 재동기화 작업 큐 등록
+    2. 연관 Fact 선별 (단독 지지 사실 삭제, 다중 지지 사실은 source_ref 갱신 보존)
+    3. 하위 자식(Spans, Claims, Assessments, Adjudications, Gaps, Links) 연쇄 삭제
+    4. 타임라인(Event), 당사자(Party), 쟁점(LegalIssue) 참조 정합성 정리 및 상충 재계산
+    5. Neo4j Knowledge Graph 즉시 완전 재투영 (동기 동기화)
+    6. 감사 로그 기록 및 백그라운드 재시도 큐 등록
     """
-    import os
-    from ai_legal_helper.case_intelligence.evidence_ingestion import get_storage_dir
     from ai_legal_helper.database.graph_sync_worker import queue_sync_task
 
-    doc = db.query(EvidenceDocument).filter_by(id=evidence_id, case_id=case.id).first()
-    if not doc:
-        raise HTTPException(status_code=404, detail="삭제할 증거 문서를 찾을 수 없습니다.")
-
-    if doc.safe_storage_key:
-        storage_dir = get_storage_dir()
-        file_path = os.path.join(storage_dir, doc.safe_storage_key)
-        if os.path.exists(file_path):
-            try:
-                os.remove(file_path)
-            except Exception:
-                pass
-
-    fact_ids_from_links = [
-        link.target_id
-        for link in db.query(EvidenceLink).filter_by(evidence_id=evidence_id, target_type="FACT").all()
-    ]
-    candidate_facts = (
-        db.query(Fact)
-        .filter(
-            (Fact.case_id == case.id)
-            & ((Fact.source_ref == evidence_id) | (Fact.id.in_(fact_ids_from_links)))
+    try:
+        delete_result = delete_evidence_document_and_cascade(
+            db=db,
+            case_id=case.id,
+            evidence_id=evidence_id,
+            sync_graph_immediately=True,
         )
-        .all()
-    )
-
-    other_approved_claims = (
-        db.query(EvidenceClaim)
-        .filter(
-            EvidenceClaim.case_id == case.id,
-            EvidenceClaim.evidence_id != evidence_id,
-            EvidenceClaim.review_status.in_(["APPROVED", "EDITED"]),
-        )
-        .all()
-    )
-
-    deleted_fact_ids = set()
-    for fact in candidate_facts:
-        if fact.source_type == "USER_CLAIM":
-            continue
-        other_sup_links = (
-            db.query(EvidenceLink)
-            .join(EvidenceClaim, EvidenceLink.claim_id == EvidenceClaim.id)
-            .filter(
-                EvidenceLink.target_type == "FACT",
-                EvidenceLink.target_id == fact.id,
-                EvidenceLink.link_type == "SUPPORTS",
-                EvidenceLink.evidence_id != evidence_id,
-                EvidenceClaim.review_status.in_(["APPROVED", "EDITED"]),
-            )
-            .all()
-        )
-        norm_f = "".join((fact.statement or "").split())
-        same_stmt_others = [
-            oc for oc in other_approved_claims
-            if "".join((oc.statement or "").split()) == norm_f
-        ]
-        if not other_sup_links and not same_stmt_others:
-            deleted_fact_ids.add(fact.id)
-            db.delete(fact)
-        else:
-            if fact.source_ref == evidence_id:
-                if other_sup_links:
-                    fact.source_ref = other_sup_links[0].evidence_id
-                elif same_stmt_others:
-                    fact.source_ref = same_stmt_others[0].evidence_id
-
-    doc_filename = doc.original_filename
-    db.delete(doc)
-    db.flush()
-
-    _prune_deleted_fact_references(db, case.id, deleted_fact_ids)
-    _recalculate_case_disputed_facts(db, case.id)
-    _rebuild_case_timeline(db, case.id)
+    except ValueError as val_err:
+        raise HTTPException(status_code=404, detail=str(val_err))
 
     audit = AuditLog(
         actor_user_id=current_user.id,
@@ -795,4 +731,10 @@ def delete_evidence(
     queue_sync_task(db, case.id)
     db.commit()
 
-    return {"status": "SUCCESS", "deleted_id": evidence_id, "filename": doc_filename}
+    return {
+        "status": "SUCCESS",
+        "deleted_id": evidence_id,
+        "filename": delete_result["filename"],
+        "deleted_facts_count": delete_result["deleted_facts_count"],
+        "graph_sync_status": delete_result["graph_sync_status"],
+    }

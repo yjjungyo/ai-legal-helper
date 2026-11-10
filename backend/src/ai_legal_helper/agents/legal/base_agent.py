@@ -40,16 +40,18 @@ BASE_SYSTEM = """당신은 대한민국 {category} 분야 법률 분석을 지�
 
 REACT_TEMPLATE = """{system}
 
-Retrieval tools used by the executor (reference only):
+[사용 가능한 검색 도구 목록 (참고용)]
 {tools}
-Tool names: {tool_names}
+도구 목록: {tool_names}
 
-Return only the final answer in Korean. Do not output Thought, Action, Action Input, or fabricated Observation sections. You may begin with 'Final Answer:'. Cite ONLY actual Observation sources for legal claims. For legacy PDF use the exact '(파일명.pdf, p.페이지)' found there; for official sources use only the statute name, article and URL actually provided. Do not invent missing citation fields. Distinguish user statements from documentary proof and legal conclusions.
+사고 과정(Thought), 가상의 Action 또는 Observation을 출력하지 말고 오직 한국어로 작성된 최종 법률 답변만 출력하세요. 'Final Answer:' 등의 불필요한 영문 라벨을 붙이지 마세요.
+법률 주장의 근거는 실제 검색 결과(Observation)에 나타난 법령명·조문 또는 파일명만 인용하세요. 존재하지 않는 출처나 인용 필드를 임의로 꾸며내지 마세요.
+사용자 진술, 서증 확인 사실, 법률 적용 효과를 명확히 구분하세요.
 
 [사건 및 대화 맥락]
 {chat_brief}
 
-Question: {input}
+질문: {input}
 {agent_scratchpad}
 """
 

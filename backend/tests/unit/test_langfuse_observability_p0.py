@@ -11,6 +11,7 @@
 
 import os
 import time
+import json
 from unittest.mock import MagicMock, patch
 import pytest
 
@@ -588,3 +589,133 @@ def test_chat_model_io_size_counts_messages_and_cleans_up():
     assert meta["output_chars"] == len("확인")
     assert meta["usage_source"] == "unavailable"
     assert not handler.call_input_sizes
+
+
+def test_orphan_trace_prevention_binds_to_active_trace():
+    """TC-P0-12: trace_id가 누락되거나 None일 때 신규 'LLM_Trace'를 생성하지 않고 활성 상위 트레이스에 바인딩되는지 검증.
+    
+    동기 헬퍼 함수나 서브루틴에서 trace_id가 전달되지 않더라도,
+    _active_traces에 상위 'LegalAgent' 트레이스가 활성화되어 있다면 해당 트레이스에 바인딩되어야 한다.
+    """
+    mock_lf = MagicMock()
+    mock_trace = MagicMock()
+    mock_trace.name = "LegalAgent"
+    mock_trace.generation = MagicMock()
+    mock_lf.trace.return_value = mock_trace
+
+    with patch.object(langfuse_client, "get_langfuse", return_value=mock_lf):
+        parent_trace_id = "trace-parent-legalagent-999"
+        langfuse_client.start_trace(trace_id=parent_trace_id, name="LegalAgent")
+        assert mock_lf.trace.call_count == 1
+
+        # trace_id=None 으로 log_generation 호출 시도 (고아 트레이스 발생 상황 시뮬레이션)
+        langfuse_client.log_generation(
+            trace_id=None,
+            parent_span_id=None,
+            name="LegalAgent",
+            model="gpt-5.4",
+            start_time=time.time(),
+            end_time=time.time(),
+            usage={"input": 50, "output": 50, "total": 100},
+        )
+
+        # [검증] 추가적인 lf.trace() 호출(새 고아 트레이스)이 전혀 발생하지 않아야 함
+        assert mock_lf.trace.call_count == 1
+        # [검증] 기존 부모 트레이스의 generation() 메서드로 정상 바인딩되어야 함
+        mock_trace.generation.assert_called_once()
+        _, gen_kwargs = mock_trace.generation.call_args
+        assert gen_kwargs.get("name") == "LegalAgent"
+
+        # 정리
+        langfuse_client.end_trace(parent_trace_id)
+
+
+def test_semantic_judgment_cached_on_identical_input():
+    """동일한 문장과 과업으로 classify_statement가 반복 호출될 때 캐시가 작동하여 0ms로 즉시 반환되는지 검증."""
+    from ai_legal_helper.case_intelligence.semantic_judgment import classify_statement, _SEMANTIC_CACHE
+
+    _SEMANTIC_CACHE.clear()
+
+    statement = "임대인과 합의 하에 갱신 없이 계약이 종료되었다."
+    task = "TEST_TERMINATION_CLASSIFICATION"
+    labels = ("ACTUAL_TERMINATION", "CONDITIONAL_OR_PLANNED", "UNKNOWN")
+
+    call_count = 0
+
+    def mock_invoke(prompt: str) -> str:
+        nonlocal call_count
+        call_count += 1
+        return json.dumps({
+            "label": "ACTUAL_TERMINATION",
+            "evidence_quote": "갱신 없이 계약이 종료되었다",
+            "source_quote": "",
+            "explanation": "테스트 판정"
+        })
+
+    # 첫 번째 호출: mock_invoke 실행 (결과가 캐시에 자동 등록됨)
+    res1 = classify_statement(
+        statement, task=task, labels=labels, invoke_fn=mock_invoke
+    )
+    assert res1.label == "ACTUAL_TERMINATION"
+    assert res1.evidence_quote == "갱신 없이 계약이 종료되었다"
+    assert call_count == 1
+
+    # 두 번째 호출: 동일 입력으로 호출 시 LLM 함수가 실행되지 않고 캐시에서 즉시 반환됨을 검증
+    def fail_if_invoked(prompt: str) -> str:
+        raise AssertionError("캐시가 적중하지 않고 LLM이 불필요하게 재호출되었습니다.")
+
+    res2 = classify_statement(statement, task=task, labels=labels, invoke_fn=fail_if_invoked)
+    assert res2.label == "ACTUAL_TERMINATION"
+    assert res2.evidence_quote == "갱신 없이 계약이 종료되었다"
+    assert call_count == 1
+
+
+def test_settlement_calculator_parallel_execution_and_context_propagation():
+    """정산 계산기 다수 증거 라인 처리 시 ThreadPoolExecutor 동시 병렬 실행 및 ContextVar 전파 검증.
+    
+    복수의 미분류 사실/증거 라인이 존재할 때 순차 직렬 실행이 아닌 병렬 스레드로 동시 처리되며,
+    상위 워크플로우의 Trace ContextVar가 작업자 스레드에 손실 없이 전파되는지 확인한다.
+    """
+    import threading
+    from ai_legal_helper.case_intelligence.settlement_calculator import extract_case_contract_deposit
+    from ai_legal_helper.case_intelligence.case_briefing import CaseEvidenceBriefing, FactItemBrief
+    from ai_legal_helper.observability.context import set_trace_id, get_trace_id
+    from ai_legal_helper.case_intelligence.semantic_judgment import SemanticDecision
+
+    briefing = CaseEvidenceBriefing(
+        case_id="parallel-test",
+        title="병렬 처리 검증",
+        facts=[
+            FactItemBrief(
+                fact_id="f1",
+                statement="보증금 3억 원 계약 체결 완료",
+                adjudication_status="EVIDENCE_SUPPORTED",
+            ),
+            FactItemBrief(
+                fact_id="f2",
+                statement="임대보증금 5억 원 변경 계약서 확인",
+                adjudication_status="EVIDENCE_SUPPORTED",
+            ),
+        ],
+    )
+
+    caller_threads = set()
+    observed_traces = []
+
+    def stub_classify(text, *, task, **kwargs):
+        caller_threads.add(threading.current_thread().name)
+        observed_traces.append(get_trace_id())
+        return SemanticDecision(label="CONTRACT_PRINCIPAL", evidence_quote="3억 원")
+
+    set_trace_id("parent-trace-parallel-test")
+    try:
+        with patch("ai_legal_helper.case_intelligence.semantic_judgment.classify_statement", side_effect=stub_classify):
+            extract_case_contract_deposit(briefing)
+
+        # 2개 문장이 ThreadPoolExecutor 작업자 스레드에서 실행되었는지 확인
+        assert len(caller_threads) >= 1
+        # 상위 Trace ID가 병렬 스레드에 copy_context를 통해 온전히 전달되었는지 검증
+        assert len(observed_traces) == 2
+        assert all(t == "parent-trace-parallel-test" for t in observed_traces)
+    finally:
+        set_trace_id(None)

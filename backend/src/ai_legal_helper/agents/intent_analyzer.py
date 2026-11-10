@@ -34,6 +34,7 @@ from pydantic import BaseModel, Field
 from langchain_core.prompts import PromptTemplate
 
 from ai_legal_helper.llm.gateway import get_llm
+from ai_legal_helper.agents.constants import CATEGORIES
 from ai_legal_helper.case_intelligence.consultation_semantics import (
     has_repayment_assertion, is_evidence_review_request,
 )
@@ -73,6 +74,10 @@ class IntentDecision(BaseModel):
     consultation_mode: ConsultationMode = Field(
         default=ConsultationMode.CASE_EVIDENCE,
         description="질문에서 현재 사건 증거를 실제 판단 근거로 사용할지 여부",
+    )
+    categories: List[str] = Field(
+        default_factory=list,
+        description="질문과 관련된 8대 법률 분야(민법, 형법, 노동, 상법, 행정, 조세, 헌법, 국제) 목록 (최대 3개). 라우터 LLM 중복 호출을 제거하기 위해 단일 패스에서 동시 도출한다.",
     )
     resolved_query: str = Field(description="이전 대화 맥락이 연결되어 명확해진 내부 검색/작업 질의")
     requires_specialist: bool = Field(default=True, description="법률 Specialist 에이전트 실행 필요 여부")
@@ -145,6 +150,12 @@ INTENT_PROMPT = PromptTemplate.from_template(
   2. event_type: 식별된 행위 유형 ("CONTRACT_SIGNED", "CONTRACT_RENEWED", "CONTRACT_MODIFIED", "NOTICE_GIVEN", "MOVE_OUT" 등 또는 null)
   3. statute_mention_date: 질문자가 언급한 법령·시행령·규칙의 개정일, 공포일, 시행일 (예: "2026년 10월 27일 개정된 시행령" -> 2026-10-27). 날짜가 없으면 null.
 
+#### [관련 법률 분야(Categories) 분류 가이드]
+- 질문에 답변하기 위해 필요한 법률 전문 분야를 다음 8대 공식 분야 중에서만 1~3개 선택하세요 (관련성 높은 순):
+  [민법, 형법, 노동, 상법, 행정, 조세, 헌법, 국제]
+- 단순히 법률 용어가 나왔다고 무분별하게 추가하지 말고, 질문 해결에 직접 필요한 분야 1개를 기본 선택하세요.
+- 인사말, 감사, 일상 대화(GENERAL_CONVERSATION)이거나 법률과 무관한 요청(OUT_OF_SCOPE), 혹은 핵심 분쟁 분야를 알 수 없는 경우(NEEDS_CLARIFICATION)에는 빈 배열([])로 반환하세요.
+
 #### [대화 맥락]
 {conversation_context}
 
@@ -158,6 +169,7 @@ INTENT_PROMPT = PromptTemplate.from_template(
 {{
   "intent": "FOLLOWUP_ACTION | FOLLOWUP_QUESTION | FACT_CLARIFICATION | NEW_LEGAL_ANALYSIS | DOCUMENT_REQUEST | GENERAL_CONVERSATION | NEEDS_CLARIFICATION | OUT_OF_SCOPE",
   "consultation_mode": "GENERAL_LEGAL | CASE_EVIDENCE",
+  "categories": ["선택된 법률분야(예: 민법) - 최대 3개 배열, 해당없으면 []"],
   "resolved_query": "문맥이 연결되어 명확해진 내부 작업용 구체적 질의문",
   "requires_specialist": true/false,
   "requires_retrieval": true/false,
@@ -187,6 +199,7 @@ def _heuristic_rule_fallback(
     if not q:
         return IntentDecision(
             intent=ConsultationIntent.NEEDS_CLARIFICATION,
+            categories=[],
             resolved_query=q, requires_specialist=False,
             requires_retrieval=False, requires_verification=False,
             requires_full_analysis=False, reason="원질문 미입력",
@@ -200,10 +213,24 @@ def _heuristic_rule_fallback(
     ):
         return IntentDecision(
             intent=ConsultationIntent.GENERAL_CONVERSATION,
+            categories=[],
             resolved_query=q, requires_specialist=False,
             requires_retrieval=False, requires_verification=False,
             requires_full_analysis=False, reason="명시적인 인사·감사 메시지",
         )
+
+    # 기본 분야 추론 (키워드 기반 안전 폴백)
+    fallback_cats = ["민법"]
+    if any(k in q for k in ("노동", "퇴직금", "체불", "해고", "근로자", "임금")):
+        fallback_cats = ["노동"]
+    elif any(k in q for k in ("사기", "횡령", "배임", "고소", "처벌", "범죄", "경찰", "형사")):
+        fallback_cats = ["형법"]
+    elif any(k in q for k in ("법인", "상법", "주주", "이사", "회사법")):
+        fallback_cats = ["상법"]
+    elif any(k in q for k in ("세금", "부가세", "소득세", "양도세", "취득세", "조세")):
+        fallback_cats = ["조세"]
+    elif any(k in q for k in ("행정처분", "과징금", "취소소송", "영업정지")):
+        fallback_cats = ["행정"]
 
     # These are explicit *requests* to inspect already submitted data,
     # not claims that the landlord actually repaid any money.
@@ -214,6 +241,7 @@ def _heuristic_rule_fallback(
     if material_review:
         return IntentDecision(
             intent=ConsultationIntent.NEW_LEGAL_ANALYSIS,
+            categories=fallback_cats,
             resolved_query=q, requires_specialist=True,
             requires_retrieval=True, requires_verification=True,
             requires_full_analysis=True,
@@ -223,6 +251,7 @@ def _heuristic_rule_fallback(
     if not has_history:
         return IntentDecision(
             intent=ConsultationIntent.NEW_LEGAL_ANALYSIS,
+            categories=fallback_cats,
             resolved_query=q, requires_specialist=True,
             requires_retrieval=True, requires_verification=True,
             requires_full_analysis=True,
@@ -235,6 +264,7 @@ def _heuristic_rule_fallback(
     )):
         return IntentDecision(
             intent=ConsultationIntent.FOLLOWUP_ACTION,
+            categories=fallback_cats,
             resolved_query="이전 상담에 따라 지금 실행할 우선순위 조치: " + q,
             requires_specialist=False, requires_retrieval=False,
             requires_verification=True, requires_full_analysis=False,
@@ -246,6 +276,7 @@ def _heuristic_rule_fallback(
     ):
         return IntentDecision(
             intent=ConsultationIntent.FACT_CLARIFICATION,
+            categories=fallback_cats,
             resolved_query=q,
             requires_specialist=True, requires_retrieval=False,
             requires_verification=True, requires_full_analysis=False,
@@ -253,12 +284,12 @@ def _heuristic_rule_fallback(
         )
     return IntentDecision(
         intent=ConsultationIntent.FOLLOWUP_QUESTION,
+        categories=fallback_cats,
         resolved_query=q, requires_specialist=True,
         requires_retrieval=True, requires_verification=True,
         requires_full_analysis=False,
         reason="의도 모델 미응답: 법률 의미를 추정하지 않고 후속 질의 검토",
     )
-
 @trace
 def analyze_consultation_intent(
     question: str,
@@ -317,15 +348,31 @@ def analyze_consultation_intent(
             except (ValueError, TypeError):
                 consultation_mode = ConsultationMode.CASE_EVIDENCE
 
+            raw_cats = parsed.get("categories")
+            valid_cats = []
+            if isinstance(raw_cats, list):
+                for c in raw_cats:
+                    if isinstance(c, str):
+                        c_clean = c.strip()
+                        if c_clean in CATEGORIES and c_clean not in valid_cats:
+                            valid_cats.append(c_clean)
+            valid_cats = valid_cats[:3]
+            if not valid_cats and intent_enum not in (ConsultationIntent.GENERAL_CONVERSATION, ConsultationIntent.OUT_OF_SCOPE, ConsultationIntent.NEEDS_CLARIFICATION):
+                if any(k in question for k in ("노동", "퇴직금", "체불", "해고", "근로", "임금")):
+                    valid_cats = ["노동"]
+                elif any(k in question for k in ("사기", "횡령", "배임", "고소", "처벌", "형사")):
+                    valid_cats = ["형법"]
+                else:
+                    valid_cats = ["민법"]
+
             event_d = parsed.get("event_date")
             event_t = parsed.get("event_type")
             statute_d = parsed.get("statute_mention_date")
-            # If LLM did not identify an event, retain UNKNOWN.
-            # Keyword/date extraction must not invent a law-applicability date.
 
             decision = IntentDecision(
                 intent=intent_enum,
                 consultation_mode=consultation_mode,
+                categories=valid_cats,
                 resolved_query=resolved_q,
                 requires_specialist=requires_spec,
                 requires_retrieval=requires_ret,
@@ -378,6 +425,7 @@ def analyze_consultation_intent(
     # 법률 무관 요청은 일반 인사와 별도 의도로 유지하고 무거운 분석을 중지한다.
     if decision.intent in (ConsultationIntent.GENERAL_CONVERSATION, ConsultationIntent.OUT_OF_SCOPE):
         decision.consultation_mode = ConsultationMode.GENERAL_LEGAL
+        decision.categories = []
         decision.requires_specialist = False
         decision.requires_retrieval = False
         decision.requires_verification = False

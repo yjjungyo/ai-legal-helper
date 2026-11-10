@@ -690,51 +690,76 @@ def _collect_graph_evidence(db, case_id: str, question: str) -> Dict[str, Any]:
 @trace
 
 def route_node(state: LegalState) -> Dict:
+    """Router v2.0: 사용자 질문과 사건 맥락을 바탕으로 Specialist 분야를 선정하고 상태를 기록한다.
 
-    """Router v2.0: 사용자 질문과 사건 맥락을 바탕으로 Specialist 분야를 선정하고 상태를 기록한다."""
-
+    [성능 최적화 (Fast-Path)]:
+    1. intent_analysis_node에서 이미 도출된 categories가 존재하면 추가 LLM 호출 없이 Fast-Path로 즉시 채택(0.00초).
+    2. DOCUMENT_MODE(문서 상담)인 경우 8대 Specialist를 분기하지 않으므로 불필요한 LLM 호출을 건너뛰고 기본 민법/사건분야 채택(0.00초).
+    3. 사전 도출된 categories가 없거나 비어있는 경우에만 폴백으로 route_categories_detailed(LLM)를 호출한다.
+    """
     set_node_name("route")
+    from ai_legal_helper.agents.router import route_categories_detailed, RouterStatus
+    from ai_legal_helper.agents.constants import CATEGORIES
 
-    from ai_legal_helper.agents.router import route_categories_detailed
+    intent_dec = state.get("intent_decision") or {}
+    pre_categories = intent_dec.get("categories") or state.get("categories") or []
+    intent_val = state.get("intent") or intent_dec.get("intent")
 
+    # 1. DOCUMENT_MODE인 경우: 전문 Specialist 호출이 불필요하므로 LLM 호출을 스킵한다 (0.00초).
+    if state.get("answer_mode") == DOCUMENT_MODE:
+        case_type = (state.get("case_evidence_briefing") or {}).get("case_type") or "민법"
+        cat = "민법" if case_type not in CATEGORIES else case_type
+        fast_cats = pre_categories if pre_categories else [cat]
+        logger.info(f"[ROUTE_FAST_PATH] DOCUMENT_MODE 라우팅 LLM 스킵: 분야={fast_cats}")
+        return {
+            "categories": fast_cats,
+            "selected_agents": fast_cats,
+            "router_status": RouterStatus.CLASSIFIED.value,
+            "router_reason": "DOCUMENT_MODE 기본 법률 분야 적용 (LLM 호출 생략)",
+            "router_error_code": None,
+        }
 
+    # 2. 일반 상담에서 intent_analysis_node를 통해 categories가 이미 사전 분류된 경우 (Single-Pass 채택)
+    if pre_categories and isinstance(pre_categories, list):
+        valid_cats = [c for c in pre_categories if c in CATEGORIES][:3]
+        if valid_cats:
+            reason = intent_dec.get("reason", "")
+            logger.info(f"[ROUTE_FAST_PATH] Intent 통합 라우팅 채택 (LLM 호출 스킵): 분야={valid_cats}")
+            return {
+                "categories": valid_cats,
+                "selected_agents": valid_cats,
+                "router_status": RouterStatus.CLASSIFIED.value,
+                "router_reason": f"Intent 분석에서 사전 도출된 법률 분야 채택 ({reason})",
+                "router_error_code": None,
+            }
 
+    # 3. 단순 대화나 범위 밖 질문인 경우
+    if intent_val in (ConsultationIntent.GENERAL_CONVERSATION.value, ConsultationIntent.OUT_OF_SCOPE.value):
+        return {
+            "categories": [],
+            "selected_agents": [],
+            "router_status": RouterStatus.NEEDS_CLARIFICATION.value,
+            "router_reason": "법률 상담 분야 없음 (일반 대화 또는 범위 밖)",
+            "router_error_code": None,
+        }
+
+    # 4. 사전 분류가 없는 경우(단위 테스트 등 직접 호출) 폴백으로 기존 LLM 라우터 호출
     q = state.get("resolved_query") or state.get("question", "(질문 미확인)")
-
-    # 원문 작성 경로에서 분류는 검색 분야 선택 용도다. 이전 AI 판단을 분류 근거로 전달하지 않는다.
-
-    case_ctx = ((state.get("case_evidence_briefing") or {}).get("case_type") or "") if state.get("answer_mode") == DOCUMENT_MODE else (state.get("case_context") or "")
-
+    case_ctx = (state.get("case_context") or "")
     decision = route_categories_detailed(question=q, case_context=case_ctx)
 
-
-
     logger.info(
-
-        f"[ROUTE] 분야 판별 완료 | 상태={decision.status.value} | 분야={decision.categories} | "
-
+        f"[ROUTE] 분야 판별 완료(폴백) | 상태={decision.status.value} | 분야={decision.categories} | "
         f"사유={sanitize_diagnostic_text(decision.reason, max_len=150)} | "
-
         f"답변모드={state.get('answer_mode') or 'STANDARD'}"
-
     )
-
     return {
-
         "categories": decision.categories,
-
         "selected_agents": decision.categories,
-
         "router_status": decision.status.value,
-
         "router_reason": decision.reason,
-
         "router_error_code": decision.error_code,
-
     }
-
-
-
 
 
 def route_condition(state: LegalState) -> str:
@@ -961,16 +986,19 @@ def statute_search_plan_node(state: LegalState) -> Dict:
 
     # 실패 시에는 검색 계획 SKIP으로 복귀하고 법령 적용을 추정하지 않는다.
 
+
+    # intent_analyzer에서 이미 식별된 event_date가 존재할 경우, event_type이 명시되지 않았더라도
+    # 기본 행위 유형(CONTRACT_SIGNED 등)으로 보완하여 중복 LLM 시점 추출을 회피한다.
+    ev_date = state.get("event_date")
+    ev_type = state.get("event_type")
+    if ev_date and not ev_type:
+        ev_type = "CONTRACT_SIGNED"
+
     plan = build_temporal_search_plan(
-
         q_target,
-
-        event_date=state.get("event_date"),
-
-        event_type=state.get("event_type"),
-
+        event_date=ev_date,
+        event_type=ev_type,
         llm_event_extraction=True,
-
     )
 
     logger.info(
@@ -4432,15 +4460,18 @@ def intent_analysis_node(state: LegalState) -> Dict:
         )
 
         intent = ConsultationIntent.GENERAL_CONVERSATION if pure_greeting else ConsultationIntent.NEW_LEGAL_ANALYSIS
-
+        from ai_legal_helper.agents.constants import CATEGORIES
+        case_type = (state.get("case_evidence_briefing") or {}).get("case_type") or "민법"
+        cat = "민법" if case_type not in CATEGORIES else case_type
+        cats = [] if intent == ConsultationIntent.GENERAL_CONVERSATION else [cat]
         return {
-
             "intent": intent.value,
-
             "resolved_query": state.get("question", ""),
-
-            "intent_decision": {},
-
+            "categories": cats,
+            "intent_decision": {
+                "intent": intent.value,
+                "categories": cats,
+            },
         }
 
     # [변경 이유] 기존에는 등록 문서가 하나라도 있으면 Intent LLM을 우회하고
@@ -4616,7 +4647,7 @@ def intent_analysis_node(state: LegalState) -> Dict:
         "intent": decision.intent.value,
 
         "resolved_query": decision.resolved_query,
-
+        "categories": decision.categories,
         "intent_decision": decision.model_dump(),
 
         "consultation_mode": decision.consultation_mode.value,

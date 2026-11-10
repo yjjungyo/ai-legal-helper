@@ -850,10 +850,10 @@ def extract_semantic_fact(
         occurrence_status = "ACTUAL"
 
     # 6. 객체 한정자(object_key) 정밀 추출 (가압류 채권자, 계약 구분 등)
-    # 예: '동진은행 가압류', 'HUG 가압류', '은행 채권 가압류'
+    # 예: '신한은행 가압류', 'HUG 가압류', '새마을금고 가압류', '은행 채권 가압류'
     if "HUG" in stmt or "주택도시보증공사" in stmt or "HUG" in doc_name:
         object_qualifier = "CREDITOR:HUG"
-    elif "동진은행" in stmt or "은행" in stmt or "은행" in doc_name:
+    elif any(b in stmt or b in doc_name for b in ("은행", "금고", "저축은행", "캐피탈", "금융")):
         object_qualifier = "CREDITOR:BANK"
 
     # 7. 주체(subject_key) 및 서술어(predicate) 보강

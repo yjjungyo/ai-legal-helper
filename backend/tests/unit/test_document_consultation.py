@@ -754,3 +754,54 @@ def test_semantic_user_statement_does_not_override_model_rejection(document_stat
     assert result["claims"][0]["claim_type"] == "CASE_FACT"
     assert result["claims"][0]["grounding_status"] == "UNSUPPORTED"
     assert result["status"] != "PASS"
+
+
+# ---------------------------------------------------------------------------
+# SSOT(단일 진실 공급원) 질의 보존 단위 테스트
+# ---------------------------------------------------------------------------
+
+def test_consultation_question_ssot_preservation():
+    """사용자 원문 질문(question)이 resolved_query에 의해 덮어씌워지지 않고 보존되는지 검증한다.
+
+    [검증 시나리오]
+    1. question만 있는 경우: 원문 질문 그대로 반환.
+    2. resolved_query만 있는 경우: resolved_query 반환 (구형 상태 호환).
+    3. question == resolved_query인 경우: 중복 없이 원문 반환.
+    4. question과 resolved_query가 모두 있고 서로 다른 경우:
+       원문 질문과 문맥 복원 질의가 모두 포함된 구조화 질의 문자열 반환.
+       특히 원문 질문의 세부 쟁점(예: 분할반환, 지연이자)이 결코 유실되지 않음을 검증한다.
+    """
+    # 1. question만 존재
+    s1 = {"question": "분할반환 2억 먼저, 1억은 1년 뒤에 주겠다는데 수용해도 되나요?"}
+    assert consultation.consultation_question(s1) == s1["question"]
+
+    # 2. resolved_query만 존재
+    s2 = {"resolved_query": "보증금 분할반환 수용 시 대항력 및 채권 소멸 위험 분석"}
+    assert consultation.consultation_question(s2) == s2["resolved_query"]
+
+    # 3. question == resolved_query
+    s3 = {
+        "question": "임차권등기명령은 언제 신청하나요?",
+        "resolved_query": "임차권등기명령은 언제 신청하나요?",
+    }
+    assert consultation.consultation_question(s3) == s3["question"]
+
+    # 4. question != resolved_query (SSOT 병기 및 쟁점 보존)
+    orig_q = "분할반환 2억 먼저, 1억은 1년 뒤에 주겠다는데 수용해도 되나요? 지연이자는 청구 가능한가요?"
+    res_q = "보증금 일부 분할반환 제안 수용에 따른 권리관계 분석"
+    s4 = {"question": orig_q, "resolved_query": res_q}
+    combined = consultation.consultation_question(s4)
+
+    # 원문 질문의 쟁점이 100% 온전히 포함되어야 함
+    assert orig_q in combined
+    assert res_q in combined
+    assert "[의뢰인 질문 원문]" in combined
+    assert "[대화 맥락 및 쟁점 해석]" in combined
+    # 원문 질문이 상단에 위치해야 함
+    assert combined.index("[의뢰인 질문 원문]") < combined.index("[대화 맥락 및 쟁점 해석]")
+
+
+def test_consultation_question_empty_state():
+    """상태가 비어있거나 None인 경우 안전하게 빈 문자열을 반환한다."""
+    assert consultation.consultation_question({}) == ""
+    assert consultation.consultation_question({"question": None, "resolved_query": None}) == ""

@@ -1,18 +1,32 @@
 # -*- coding: utf-8 -*-
-"""Grounded semantic classification of Korean case statements and legal claims.
+"""
+모듈명: semantic_judgment.py
 
-Regex may locate literal dates, IDs and amounts; it must not decide whether
-money was repaid, a statement was an offer or a contract was terminated.
-This is a single conservative boundary shared by event/fact/QA workflows.
+[모듈 개요]
+한국어 법률 사건 기록 및 사실관계 문장에 대한 의미 기반 엄격 분류 모듈이다.
+정규식(Regex)은 단순 일자, 고유번호, 금액의 위치 탐색에만 사용하며,
+실제 계약 해지 여부, 보증금 반환 완료 여부, 단순 제안 여부 등 법률적 의미 판단은
+반드시 본 모듈의 보수적 언어모델 해석기를 통해서만 수행한다.
+
+[주요 기능]
+1. classify_statement: 문장과 허용 라벨 목록을 받아 원문 인용(grounding) 기반 의미 분류 수행
+2. 인메모리 캐시(_SEMANTIC_CACHE): 동일 문장/과업에 대한 중복 LLM 호출을 방지하여 지연시간 단축
+3. 관측성(@trace) 계측: 상위 워크플로우 트레이스 트리에 Span 및 Generation으로 완전 결속
 """
 from __future__ import annotations
 
 import json
 import logging
 from dataclasses import dataclass
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any, Callable, Dict, Mapping, Sequence, Tuple
+
+from ai_legal_helper.observability.decorators import trace
 
 logger = logging.getLogger(__name__)
+
+# [성능 최적화] 동일 문장 및 과업에 대한 중복 LLM 왕복(2~3초)을 방지하는 프로세스 레벨 캐시
+_SEMANTIC_CACHE: Dict[Tuple[str, str, Tuple[str, ...], str, str], SemanticDecision] = {}
+
 
 @dataclass(frozen=True)
 class SemanticDecision:
@@ -32,6 +46,7 @@ class SemanticDecision:
         }
 
 
+@trace
 def classify_statement(
     statement: str,
     *,
@@ -41,16 +56,32 @@ def classify_statement(
     source_text: str = "",
     invoke_fn: Callable[[str], Any] | None = None,
 ) -> SemanticDecision:
-    """Return UNKNOWN unless a permitted label has exact supporting text.
+    """원문 근거가 명확히 인용되지 않는 한 UNKNOWN을 반환하는 보수적 의미 분류 함수.
 
-    A language model proposes meaning. Python checks its label/quote/source
-    provenance, not the semantic meaning of Korean words. No regex fallback
-    is permitted when the model is unavailable, ambiguous or invalid.
+    언어모델이 의미를 제안하고 파이썬 코드가 허용 라벨, 인용구 포함 여부,
+    출처 원문 일치 여부를 엄격하게 교차 검증한다.
+
+    Args:
+        statement: 분류 대상 사실 문장
+        task: 분류 과업 식별자 (예: CONTRACT_DEPOSIT_PRINCIPAL_CLASSIFICATION)
+        labels: 허용 가능한 결과 라벨 시퀀스
+        context: 분류에 참고할 보조 맥락 설명
+        source_text: 대조할 원본 출처 텍스트
+        invoke_fn: 모의 테스트용 커스텀 호출 함수 (미지정 시 Azure OpenAI 기본 호출)
+
+    Returns:
+        SemanticDecision: 분류된 라벨 및 인용구 결과를 담은 불변 데이터 객체
     """
     statement = str(statement or "").strip()
     if not statement or not labels:
         return SemanticDecision("UNKNOWN", "", status="MISSING_INPUT")
     allowed = tuple(dict.fromkeys(str(x) for x in labels if x and x != "UNKNOWN"))
+
+    # [캐시 조회: 프로덕션 호출 시 동일 문장의 중복 호출 0ms 반환]
+    cache_key = (statement, task, allowed, str(context or "")[:1000], str(source_text or "")[:1000])
+    if cache_key in _SEMANTIC_CACHE:
+        return _SEMANTIC_CACHE[cache_key]
+
     payload = {
         "task": task,
         "statement": statement,
@@ -91,7 +122,9 @@ def classify_statement(
         quote = value.get("evidence_quote")
         source_quote = value.get("source_quote") or ""
         if label == "UNKNOWN":
-            return SemanticDecision("UNKNOWN", "", status="UNCONFIRMED")
+            decision = SemanticDecision("UNKNOWN", "", status="UNCONFIRMED")
+            _SEMANTIC_CACHE[cache_key] = decision
+            return decision
         if label not in allowed or not isinstance(quote, str) or not quote.strip():
             raise ValueError("INVALID_LABEL_OR_EVIDENCE")
         if quote not in statement:
@@ -100,10 +133,12 @@ def classify_statement(
             raise ValueError("INVALID_SOURCE_QUOTE")
         if source_text and (not source_quote or source_quote not in source_text):
             raise ValueError("UNGROUNDED_SOURCE_QUOTE")
-        return SemanticDecision(
+        decision = SemanticDecision(
             str(label), quote, source_quote,
             str(value.get("explanation") or "")[:600],
         )
+        _SEMANTIC_CACHE[cache_key] = decision
+        return decision
     except Exception as exc:
         logger.warning(
             "[SEMANTIC_JUDGMENT] task=%s unresolved=%s (no regex legal fallback)",

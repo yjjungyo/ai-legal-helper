@@ -159,9 +159,18 @@ class TokenTrackingCallbackHandler(BaseCallbackHandler):
         if not model_id or model_id == "unknown":
             model_id = os.getenv("AZURE_OPENAI_DEPLOYMENT_CHAT", "gpt-4o")
 
+        current_trace_id = get_trace_id()
+        if not current_trace_id:
+            try:
+                from ai_legal_helper.observability.langfuse_client import _active_traces
+                if _active_traces:
+                    current_trace_id = list(_active_traces.keys())[-1]
+            except Exception:
+                pass
+
         record = LLMUsageRecord(
             call_id=run_id,
-            trace_id=get_trace_id(),
+            trace_id=current_trace_id,
             case_id=get_case_id(),
             agent_name=get_agent_name(),
             node_name=get_node_name(),
@@ -203,7 +212,7 @@ class TokenTrackingCallbackHandler(BaseCallbackHandler):
             }
             LANGFUSE_SYSTEM_NAME = os.getenv("LANGFUSE_SYSTEM_NAME", "LegalAgent")
             log_generation(
-                trace_id=get_trace_id(),
+                trace_id=current_trace_id,
                 parent_span_id=get_current_span_id() or get_node_name() or get_agent_name(),
                 name=LANGFUSE_SYSTEM_NAME,
                 model=model_id,
@@ -238,9 +247,18 @@ class TokenTrackingCallbackHandler(BaseCallbackHandler):
         input_chars = self.call_input_sizes.pop(run_id, 0)
         latency_ms = (time.time() - start_time) * 1000
 
+        err_trace_id = get_trace_id()
+        if not err_trace_id:
+            try:
+                from ai_legal_helper.observability.langfuse_client import _active_traces
+                if _active_traces:
+                    err_trace_id = list(_active_traces.keys())[-1]
+            except Exception:
+                pass
+
         record = LLMUsageRecord(
             call_id=run_id,
-            trace_id=get_trace_id(),
+            trace_id=err_trace_id,
             case_id=get_case_id(),
             agent_name=get_agent_name(),
             node_name=get_node_name(),
@@ -256,7 +274,7 @@ class TokenTrackingCallbackHandler(BaseCallbackHandler):
         try:
             from ai_legal_helper.observability.langfuse_client import log_generation
             log_generation(
-                trace_id=get_trace_id(),
+                trace_id=err_trace_id,
                 parent_span_id=get_current_span_id() or get_node_name() or get_agent_name(),
                 name=LANGFUSE_SYSTEM_NAME,
                 model=model_id,

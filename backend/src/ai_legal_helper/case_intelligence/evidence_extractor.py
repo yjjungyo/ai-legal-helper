@@ -290,12 +290,19 @@ def extract_claims_from_evidence(db: Session, doc_id: str) -> bool:
         for f in existing_facts
     }
 
+    # [프롬프트 토큰 다이어트] 기존 사실관계가 수십~수백 건에 달할 경우 배치별 중복 주입으로 인한 토큰 폭증을 방지한다.
+    # 사후 상충 검증 엔진(evaluate_claim_conflicts)이 전체 existing_facts에 대해 100% 완전 검증을 수행하므로,
+    # LLM 프롬프트에는 최대 30건의 대표 사실관계만 주입하여 속도와 비용을 최적화한다.
+    max_prompt_facts = 30
+    prompt_facts = existing_facts[:max_prompt_facts]
     existing_facts_lines = []
-    for f in existing_facts:
+    for f in prompt_facts:
         src_doc_label = fact_doc_names.get(f.id, "사건 기본 사실")
         existing_facts_lines.append(
             f"- [Fact ID: {f.id} | 유형: {f.fact_type or 'GENERAL'} | 출처문서: {src_doc_label}] {f.statement}"
         )
+    if len(existing_facts) > max_prompt_facts:
+        existing_facts_lines.append(f"... (기존 사실관계 {len(existing_facts) - max_prompt_facts}건 생략: 사후 상충 엔진이 전수 검증)")
     existing_facts_str = "\n".join(existing_facts_lines) or "(등록된 기존 사실관계 없음)"
 
     prompt = ChatPromptTemplate.from_messages([

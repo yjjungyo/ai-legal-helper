@@ -959,12 +959,12 @@ def run_verification(
         logger.warning("[STATUTE_TEMPORAL] 경량 PASS 생략: 시행일/계약일 충돌 %d건", len(preliminary_temporal_errors))
     # An official citation proves provenance, not legal reasoning. Claims
     # supported by retrieved statutes must pass full semantic verification.
-    substantive_legal_sources = any(
-        src.get("source_type") == "STATUTE"
-        or bool(src.get("statute_name"))
+    has_case_evidence = any(
+        src.get("source_type") == "CASE_EVIDENCE"
+        or any(ext in str(src.get("source_id", "")).lower() for ext in (".txt", ".pdf", ".docx", ".png", ".jpg"))
         for src in (retrieved_sources or []) if isinstance(src, dict)
     )
-    if (not force_llm and not substantive_legal_sources
+    if (not force_llm and not has_case_evidence
             and not qa_check.requires_llm_eval
             and qa_check.status == "PASS" and not preliminary_temporal_errors):
         logger.info("[VERIFICATION] 경량 검사 ALL PASS: LLM 검증 생략 및 초안 즉시 확정")

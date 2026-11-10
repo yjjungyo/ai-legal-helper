@@ -19,10 +19,12 @@ SUPPORTS/CONTRADICTS/POTENTIAL_CONFLICT 링크를 생성하고 공식 Fact로 �
 - 모든 상태 전이는 단일 PostgreSQL 트랜잭션 내에서 원자적으로 수행된다.
 """
 
-from typing import List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 import logging
+import os
 
 logger = logging.getLogger(__name__)
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ai_legal_helper.database.models import (
@@ -39,6 +41,9 @@ from ai_legal_helper.database.models import (
     FactAdjudication,
     EvidenceGap,
     FactComparisonAudit,
+    EvidenceSpan,
+    EvidenceSpanClaimLink,
+    Party,
 )
 from ai_legal_helper.case_intelligence.conflict_detector import (
     StructuredFactSlots,
@@ -119,6 +124,13 @@ def _prune_deleted_fact_references(db: Session, case_id: str, deleted_fact_ids: 
             updated_ids = [fid for fid in ev.related_fact_ids if fid not in deleted_fact_ids]
             if len(updated_ids) != len(ev.related_fact_ids):
                 ev.related_fact_ids = updated_ids
+
+    parties = db.query(Party).filter_by(case_id=case_id).all()
+    for p in parties:
+        if isinstance(p.related_fact_ids, list):
+            updated_ids = [fid for fid in p.related_fact_ids if fid not in deleted_fact_ids]
+            if len(updated_ids) != len(p.related_fact_ids):
+                p.related_fact_ids = updated_ids
 
 
 def _cleanup_previous_claim_effects(
@@ -811,3 +823,320 @@ def process_evidence_review(
     except Exception:
         db.rollback()
         raise
+
+
+
+def delete_evidence_document_and_cascade(
+    db: Session,
+    case_id: str,
+    evidence_id: str,
+    sync_graph_immediately: bool = True,
+) -> Dict[str, Any]:
+    """증거 문서와 연관된 모든 추출 사실, 발췌문, 주장, 검토 이력 및 Neo4j 그래프를 완전하고 정합성 있게 삭제한다.
+
+    Args:
+        db: SQLAlchemy DB 세션.
+        case_id: 대상 사건 UUID.
+        evidence_id: 삭제할 증거 문서 UUID.
+        sync_graph_immediately: 삭제 후 Neo4j 서브그래프를 즉시 동기화할지 여부 (기본 True).
+
+    Returns:
+        Dict[str, Any]: 삭제 결과 명세 (deleted_id, filename, deleted_facts_count, graph_sync_status).
+
+    Raises:
+        ValueError: 증거 문서를 찾을 수 없는 경우.
+
+    Notes:
+        [정합성 보장 9단계 처리 절차]
+        1. 물리 파일 삭제 (safe_storage_key 기반 파일시스템 파일 제거)
+        2. 해당 증거와 연관된 Fact(단독 지지 사실) 선별:
+           - UUID, 파일명(original_filename), EvidenceLink, structured_slots 매칭
+           - 다른 승인 증거/주장이 지지하지 않는 Fact는 영구 삭제 대상 지정
+           - 다중 증거 지지 Fact는 source_ref를 다른 승인 증거로 갱신하여 보존
+        3. 증거 종속 하위 엔티티 연쇄 삭제:
+           - EvidenceSpanClaimLink (Span-Claim 다대다 매핑)
+           - EvidenceSpan (원문 발췌 구간)
+           - EvidenceReview (주장 검토 이력)
+           - EvidenceAssessment (증거 가치 평가)
+           - FactAdjudication (해당 claim_id 또는 삭제 대상 fact_id 연동 기록)
+           - EvidenceGap (해당 claim_id 또는 삭제 대상 fact_id 연동 기록)
+           - EvidenceLink (증거 연관 SUPPORTS/CONTRADICTS 링크)
+           - EvidenceClaim (추출 주장 후보)
+        4. 단독 지지 Fact 삭제 및 외래 참조 정리:
+           - Fact 삭제 및 LegalIssue, Event, Party의 related_fact_ids 정리
+           - 잔여 FactAdjudication의 supporting_evidence_ids에서 evidence_id 제거
+        5. 타임라인 이벤트(Event) 정합성 정리:
+           - 증거 파생(EVIDENCE_DERIVED) 이벤트 중 연관 사실이 모두 삭제된 고아 이벤트 삭제
+           - 사건 엔티티 및 타임라인 재구축(_rebuild_case_timeline)
+        6. 상충(DISPUTED) 상태 재계산 (_recalculate_case_disputed_facts)
+        7. EvidenceDocument 본체 삭제 및 변경사항 플러시
+        8. Neo4j Knowledge Graph 즉시 완전 재투영 (safe_sync_case)
+        9. 백그라운드 재시도 큐(queue_sync_task) 등록
+    """
+    doc = db.query(EvidenceDocument).filter_by(id=evidence_id, case_id=case_id).first()
+    if not doc:
+        raise ValueError(f"EvidenceDocument {evidence_id} not found in case {case_id}")
+
+    doc_filename = doc.original_filename
+    storage_key = doc.safe_storage_key
+
+    # 1. 물리 파일 삭제
+    if storage_key:
+        from ai_legal_helper.case_intelligence.evidence_ingestion import get_storage_dir
+        storage_dir = get_storage_dir()
+        file_path = os.path.join(storage_dir, storage_key)
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except Exception as ex:
+                logger.warning(f"[DELETE_EVIDENCE] 물리 파일 삭제 실패(무시): {file_path} ({ex})")
+
+    # 2. 하위 ID 수집
+    claims = db.query(EvidenceClaim).filter_by(evidence_id=evidence_id).all()
+    claim_ids = [c.id for c in claims]
+
+    spans = db.query(EvidenceSpan).filter_by(evidence_id=evidence_id).all()
+    span_ids = [s.id for s in spans]
+
+    # 3. 연관 Fact 수집
+    fact_ids_from_links = [
+        link.target_id
+        for link in db.query(EvidenceLink).filter(
+            EvidenceLink.evidence_id == evidence_id,
+            EvidenceLink.target_type == "FACT",
+        ).all()
+    ]
+
+    candidate_filter = (
+        (Fact.case_id == case_id)
+        & (
+            (Fact.source_ref == evidence_id)
+            | (Fact.source_ref == doc_filename)
+            | (Fact.id.in_(fact_ids_from_links) if fact_ids_from_links else False)
+        )
+    )
+    candidate_facts = db.query(Fact).filter(candidate_filter).all()
+
+    other_approved_claims = (
+        db.query(EvidenceClaim)
+        .filter(
+            EvidenceClaim.case_id == case_id,
+            EvidenceClaim.evidence_id != evidence_id,
+            EvidenceClaim.review_status.in_(["APPROVED", "EDITED"]),
+        )
+        .all()
+    )
+
+    deleted_fact_ids: Set[str] = set()
+    for fact in candidate_facts:
+        if fact.source_type == "USER_CLAIM":
+            continue
+
+        other_sup_links = (
+            db.query(EvidenceLink)
+            .join(EvidenceClaim, EvidenceLink.claim_id == EvidenceClaim.id)
+            .filter(
+                EvidenceLink.target_type == "FACT",
+                EvidenceLink.target_id == fact.id,
+                EvidenceLink.link_type == "SUPPORTS",
+                EvidenceLink.evidence_id != evidence_id,
+                EvidenceClaim.review_status.in_(["APPROVED", "EDITED"]),
+            )
+            .all()
+        )
+        norm_f = "".join((fact.statement or "").split())
+        same_stmt_others = [
+            oc for oc in other_approved_claims
+            if "".join((oc.statement or "").split()) == norm_f
+        ]
+
+        if not other_sup_links and not same_stmt_others:
+            deleted_fact_ids.add(fact.id)
+            db.delete(fact)
+        else:
+            if fact.source_ref in (evidence_id, doc_filename):
+                if other_sup_links:
+                    fact.source_ref = other_sup_links[0].evidence_id
+                elif same_stmt_others:
+                    fact.source_ref = same_stmt_others[0].evidence_id
+
+    # 4. 하위 자식 레코드 연쇄 삭제
+    if span_ids or claim_ids:
+        span_claim_conds = []
+        if span_ids:
+            span_claim_conds.append(EvidenceSpanClaimLink.span_id.in_(span_ids))
+        if claim_ids:
+            span_claim_conds.append(EvidenceSpanClaimLink.claim_id.in_(claim_ids))
+        db.query(EvidenceSpanClaimLink).filter(or_(*span_claim_conds)).delete(synchronize_session=False)
+
+    db.query(EvidenceSpan).filter_by(evidence_id=evidence_id).delete(synchronize_session=False)
+
+    if claim_ids:
+        db.query(EvidenceReview).filter(EvidenceReview.claim_id.in_(claim_ids)).delete(synchronize_session=False)
+
+    assessment_conds = [EvidenceAssessment.evidence_id == evidence_id]
+    if claim_ids:
+        assessment_conds.append(EvidenceAssessment.claim_id.in_(claim_ids))
+    db.query(EvidenceAssessment).filter(or_(*assessment_conds)).delete(synchronize_session=False)
+
+    adj_conds = []
+    if claim_ids:
+        adj_conds.append(FactAdjudication.claim_id.in_(claim_ids))
+    if deleted_fact_ids:
+        adj_conds.append(FactAdjudication.fact_id.in_(list(deleted_fact_ids)))
+    if adj_conds:
+        db.query(FactAdjudication).filter(or_(*adj_conds)).delete(synchronize_session=False)
+
+    # 잔여 FactAdjudication의 supporting_evidence_ids 정리
+    remaining_adjs = db.query(FactAdjudication).filter_by(case_id=case_id).all()
+    for adj in remaining_adjs:
+        if isinstance(adj.supporting_evidence_ids, list):
+            new_sups = [
+                seid for seid in adj.supporting_evidence_ids
+                if seid not in (evidence_id, doc_filename)
+            ]
+            if len(new_sups) != len(adj.supporting_evidence_ids):
+                adj.supporting_evidence_ids = new_sups
+                if not new_sups and adj.adjudication_status != "GENUINELY_DISPUTED":
+                    adj.adjudication_status = "UNASSESSED"
+
+    gap_conds = []
+    if claim_ids:
+        gap_conds.append(EvidenceGap.claim_id.in_(claim_ids))
+    if deleted_fact_ids:
+        gap_conds.append(EvidenceGap.fact_id.in_(list(deleted_fact_ids)))
+    if gap_conds:
+        db.query(EvidenceGap).filter(or_(*gap_conds)).delete(synchronize_session=False)
+
+    audit_conds = []
+    if claim_ids:
+        audit_conds.append(FactComparisonAudit.claim_id.in_(claim_ids))
+    if deleted_fact_ids:
+        audit_conds.append(FactComparisonAudit.fact_id.in_(list(deleted_fact_ids)))
+    if audit_conds:
+        db.query(FactComparisonAudit).filter(or_(*audit_conds)).delete(synchronize_session=False)
+
+    link_conds = [EvidenceLink.evidence_id == evidence_id]
+    if claim_ids:
+        link_conds.append(EvidenceLink.claim_id.in_(claim_ids))
+    if deleted_fact_ids:
+        link_conds.append(
+            (EvidenceLink.target_type == "FACT") & (EvidenceLink.target_id.in_(list(deleted_fact_ids)))
+        )
+    db.query(EvidenceLink).filter(or_(*link_conds)).delete(synchronize_session=False)
+
+    db.query(EvidenceClaim).filter_by(evidence_id=evidence_id).delete(synchronize_session=False)
+
+    # 5. 외래 참조 및 타임라인 정리
+    _prune_deleted_fact_references(db, case_id, deleted_fact_ids)
+
+    # Party.related_claim_ids 및 related_fact_ids 정리
+    parties = db.query(Party).filter_by(case_id=case_id).all()
+    for p in parties:
+        if isinstance(p.related_claim_ids, list) and claim_ids:
+            p.related_claim_ids = [cid for cid in p.related_claim_ids if cid not in claim_ids]
+        if isinstance(p.related_fact_ids, list) and deleted_fact_ids:
+            p.related_fact_ids = [fid for fid in p.related_fact_ids if fid not in deleted_fact_ids]
+
+    # 증거 파생 고아 Event 정리
+    derived_events = db.query(Event).filter_by(case_id=case_id, source_type="EVIDENCE_DERIVED").all()
+    for ev in derived_events:
+        if not ev.related_fact_ids or all(fid in deleted_fact_ids for fid in ev.related_fact_ids):
+            db.delete(ev)
+
+    _recalculate_case_disputed_facts(db, case_id)
+    _rebuild_case_timeline(db, case_id)
+
+    # 6. EvidenceDocument 본체 삭제
+    db.delete(doc)
+    db.flush()
+
+    # 7. Neo4j Knowledge Graph 완전 동기화 (safe_sync_case)
+    graph_sync_status = "SKIPPED"
+    if sync_graph_immediately:
+        from ai_legal_helper.database.graph_sync import safe_sync_case
+        try:
+            sync_res = safe_sync_case(case_id)
+            graph_sync_status = sync_res.get("status", "UNKNOWN")
+            logger.info(f"[DELETE_EVIDENCE] Neo4j 동기 그래프 재투영 완료: case={case_id}, status={graph_sync_status}")
+        except Exception as g_exc:
+            logger.warning(f"[DELETE_EVIDENCE] Neo4j 동기 그래프 재투영 실패: {g_exc}")
+            graph_sync_status = f"FAILED: {type(g_exc).__name__}"
+
+    return {
+        "status": "SUCCESS",
+        "deleted_id": evidence_id,
+        "filename": doc_filename,
+        "deleted_facts_count": len(deleted_fact_ids),
+        "graph_sync_status": graph_sync_status,
+    }
+
+
+def cleanup_orphaned_evidence_artifacts(
+    db: Session,
+    case_id: Optional[str] = None,
+    sync_graph: bool = True,
+) -> Dict[str, int]:
+    """증거 문서가 삭제되었으나 남아있는 고아 Spans, Claims, Links 및 잔여물을 일괄 청소한다.
+
+    Args:
+        db: SQLAlchemy DB 세션.
+        case_id: 특정 사건에 대해서만 청소할 경우 사건 UUID (None이면 전체 DB).
+        sync_graph: 청소 후 Neo4j 그래프를 동기화할지 여부.
+
+    Returns:
+        Dict[str, int]: 청소된 엔티티별 건수.
+    """
+    stats = {
+        "orphaned_spans": 0,
+        "orphaned_claims": 0,
+        "orphaned_links": 0,
+        "orphaned_assessments": 0,
+        "cleaned_facts": 0,
+    }
+
+    # 유효한 EvidenceDocument ID 목록
+    doc_q = db.query(EvidenceDocument.id)
+    if case_id:
+        doc_q = doc_q.filter(EvidenceDocument.case_id == case_id)
+    valid_doc_ids = {r[0] for r in doc_q.all()}
+
+    # 1. 고아 Spans 삭제
+    span_q = db.query(EvidenceSpan).filter(~EvidenceSpan.evidence_id.in_(valid_doc_ids))
+    orphaned_spans = span_q.all()
+    stats["orphaned_spans"] = len(orphaned_spans)
+    if orphaned_spans:
+        orphan_span_ids = [s.id for s in orphaned_spans]
+        db.query(EvidenceSpanClaimLink).filter(EvidenceSpanClaimLink.span_id.in_(orphan_span_ids)).delete(synchronize_session=False)
+        span_q.delete(synchronize_session=False)
+
+    # 2. 고아 Claims 삭제
+    claim_q = db.query(EvidenceClaim).filter(~EvidenceClaim.evidence_id.in_(valid_doc_ids))
+    if case_id:
+        claim_q = claim_q.filter(EvidenceClaim.case_id == case_id)
+    orphaned_claims = claim_q.all()
+    stats["orphaned_claims"] = len(orphaned_claims)
+    if orphaned_claims:
+        orphan_claim_ids = [c.id for c in orphaned_claims]
+        db.query(EvidenceSpanClaimLink).filter(EvidenceSpanClaimLink.claim_id.in_(orphan_claim_ids)).delete(synchronize_session=False)
+        db.query(EvidenceReview).filter(EvidenceReview.claim_id.in_(orphan_claim_ids)).delete(synchronize_session=False)
+        db.query(FactAdjudication).filter(FactAdjudication.claim_id.in_(orphan_claim_ids)).delete(synchronize_session=False)
+        db.query(EvidenceGap).filter(EvidenceGap.claim_id.in_(orphan_claim_ids)).delete(synchronize_session=False)
+        db.query(EvidenceLink).filter(EvidenceLink.claim_id.in_(orphan_claim_ids)).delete(synchronize_session=False)
+        claim_q.delete(synchronize_session=False)
+
+    # 3. 고아 Links 삭제
+    link_q = db.query(EvidenceLink).filter(~EvidenceLink.evidence_id.in_(valid_doc_ids))
+    stats["orphaned_links"] = link_q.delete(synchronize_session=False)
+
+    # 4. 고아 Assessments 삭제
+    ass_q = db.query(EvidenceAssessment).filter(~EvidenceAssessment.evidence_id.in_(valid_doc_ids))
+    stats["orphaned_assessments"] = ass_q.delete(synchronize_session=False)
+
+    db.flush()
+
+    if case_id and sync_graph:
+        from ai_legal_helper.database.graph_sync import safe_sync_case
+        safe_sync_case(case_id)
+
+    return stats

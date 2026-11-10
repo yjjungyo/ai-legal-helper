@@ -1,0 +1,86 @@
+[
+  {
+    "file": "agents\\document_answer.py",
+    "line": 34,
+    "matched": "2022.3.1",
+    "desc": "특정 사건 날짜",
+    "text": "- 핵심 날짜: 예: `**2022.3.1.~2024.2.28.**`, `**2026.4.1**`, `**2026.9.30**`"
+  },
+  {
+    "file": "agents\\document_answer.py",
+    "line": 35,
+    "matched": "7,200만",
+    "desc": "특정 사건 금액",
+    "text": "- 핵심 금액: 예: `**보증금 3억 원**`, `**잔금 2억7천만 원**`, `**7,200만 원**`"
+  },
+  {
+    "file": "agents\\document_answer.py",
+    "line": 76,
+    "matched": "E05_퇴거_및_보증금",
+    "desc": "특정 증거 파일명",
+    "text": "* 사건 문서(사실 문장)는 반드시 전체 파일명 그대로 `[E01_주택임대차계약서.txt]`, `[E05_퇴거_및_보증금_반환_요청_문자.txt]`와 같이 대괄호 안에 표기하세요."
+  },
+  {
+    "file": "agents\\document_verification_prompt.py",
+    "line": 87,
+    "matched": "E05_퇴거_및_보증금",
+    "desc": "특정 증거 파일명",
+    "text": "source_ids에는 'E01', 'E05', 'EVIDENCE:E05' 같은 축약 별칭을 절대 쓰지 말고, 반드시 [전체 근거 원문과 출처 ID]에 제공된 정확한 source_id 전체 이름(사건 문서는 'E05_퇴거_및_보증금_반환_요청_문자.txt' 등 전체 파일명, 법조문은 제공된 상세 source_id 문자열 그대로)만 기재하세요. 법률 판단에는 법률 출처, 사실에는 해당 문서를 연결하세요."
+  },
+  {
+    "file": "agents\\synthesizer.py",
+    "line": 72,
+    "matched": "E05_퇴거_및_보증금",
+    "desc": "특정 증거 파일명",
+    "text": "- 사건 증거: 반드시 전체 파일명을 보존하여 `[E01_주택임대차계약서.txt]`, `[E05_퇴거_및_보증금_반환_요청_문자.pdf]` 형태로 표기하세요."
+  },
+  {
+    "file": "case_intelligence\\entity_sync.py",
+    "line": 12,
+    "matched": "박정훈",
+    "desc": "특정 인명(당사자)",
+    "text": "- 어순(`임대인은 박정훈이다`, `임대인 박정훈`, `박정훈은 임대인이다`)에 무관하게 동일한 `(name, role)`로 정규화한다."
+  },
+  {
+    "file": "case_intelligence\\fact_semantics.py",
+    "line": 856,
+    "matched": "동진은행",
+    "desc": "특정 목적물/은행",
+    "text": "elif \"동진은행\" in stmt or \"은행\" in stmt or \"은행\" in doc_name:"
+  },
+  {
+    "file": "case_intelligence\\timeline.py",
+    "line": 19,
+    "matched": "2022-03-01",
+    "desc": "특정 사건 날짜",
+    "text": "함께 포함된 문장은 `계약 시작(2022-03-01)`과 `계약 종료(2024-02-28)`의 별도 Event로 분리한다."
+  },
+  {
+    "file": "workflows\\final_disposition.py",
+    "line": 408,
+    "matched": "2022.03.1",
+    "desc": "특정 사건 날짜",
+    "text": "고정된 사건 데이터(보증금 3억, 5천만원 변제, 2022.03.10 등)를 전면 배제하고,"
+  },
+  {
+    "file": "workflows\\final_disposition.py",
+    "line": 1191,
+    "matched": "동진은행",
+    "desc": "특정 목적물/은행",
+    "text": "for o in [\"동진은행\", \"우리은행\", \"신한은행\", \"국민은행\", \"하나은행\", \"HUG\", \"주택도시보증공사\", \"대법원\", \"인터넷등기소\", \"경매법원\"]:"
+  },
+  {
+    "file": "workflows\\final_disposition.py",
+    "line": 1195,
+    "matched": "박정훈",
+    "desc": "특정 인명(당사자)",
+    "text": "for p in [\"박정훈\", \"이수현\"]:"
+  },
+  {
+    "file": "workflows\\final_disposition.py",
+    "line": 1213,
+    "matched": "동진은행",
+    "desc": "특정 목적물/은행",
+    "text": "1. 금융기관/채권자 불일치(우리은행 vs 동진은행 등) 차단"
+  }
+]

@@ -589,27 +589,58 @@ def log_generation(
 
     sys_name = get_system_name()
 
-        # 비동기 종료 후 지연 콜백인 경우 새 Trace 생성 차단 (TC-P0-10)
-    if trace_id in _ended_traces:
+    # 비동기 종료 후 지연 콜백인 경우 새 Trace 생성 차단 (TC-P0-10)
+    if trace_id and trace_id in _ended_traces:
         logger.warning(
             f"[DELAYED_CALLBACK_IGNORED] 종료된 트레이스의 지연 LLM 기록 무시: trace_id={trace_id}, gen={name}"
         )
         return
 
-    trace = _active_traces.get(trace_id)
+    # [트레이스 분리 방지 및 부모 컨텍스트 복원]
+    # 1. 전달받은 trace_id가 없거나 _active_traces에 미등록된 경우, ContextVar에서 1차 재확인
+    if not trace_id:
+        from ai_legal_helper.observability.context import get_trace_id
+        trace_id = get_trace_id()
+
+    trace = _active_traces.get(trace_id) if trace_id else None
+
+    # 2. ContextVar에도 없으나 현재 활성화된 워크플로우 트레이스가 존재하는 경우 상위 트레이스로 강제 귀속
+    #    (동기 헬퍼/스레드 경계에서 ContextVar 유실로 인한 고아 'LLM_Trace' 분리 생성 원천 차단)
+    if not trace and _active_traces:
+        # 단일 활성 트레이스가 있는 경우 즉시 채택
+        active_ids = list(_active_traces.keys())
+        if len(active_ids) == 1:
+            trace_id = active_ids[0]
+            trace = _active_traces[trace_id]
+        else:
+            # 복수 트레이스 경합 시 상위 워크플로우(sys_name 또는 'LegalAgent')를 역순 탐색하여 결속
+            for aid, at in reversed(list(_active_traces.items())):
+                tname = getattr(at, "name", "")
+                if tname in (sys_name, "LegalAgent") or str(tname).startswith("Workflow:"):
+                    trace_id = aid
+                    trace = at
+                    break
+
+    # 3. 그럼에도 불구하고 부모 트레이스가 전혀 없는 독립 실행 환경일 때만 새 트레이스 생성
     if not trace:
         try:
             from ai_legal_helper.observability.context import get_case_id
             session_id = get_case_id()
             git_sha = get_git_commit()
+            # 고아 'LLM_Trace' 하드코딩을 제거하고 시스템 표준명(sys_name, 기본값 'LegalAgent')으로 명명
+            trace_name = sys_name if sys_name else "LegalAgent"
             trace = lf.trace(
                 id=trace_id,
-                name="LLM_Trace",
+                name=trace_name,
                 session_id=session_id,
                 metadata={"system_name": sys_name, "git_commit": git_sha, "tags": [sys_name]},
                 tags=[sys_name],
             )
-            _active_traces[trace_id] = trace
+            if trace_id:
+                _active_traces[trace_id] = trace
+            elif hasattr(trace, "id") and trace.id:
+                trace_id = trace.id
+                _active_traces[trace_id] = trace
         except Exception:
             return
 
