@@ -1100,6 +1100,13 @@ def run_verification(
                 result.reason_code = "ANSWER_REVISION_REQUIRED"
             result.revision_instructions.append("시간 순서, 의사표시 내용, 증명 수준을 원문과 대조하여 결론을 보완하세요.")
 
+        # Some non-strict consultation paths skip the detailed claim/date gate.
+        # Initialize its findings so late PASS normalization cannot raise an
+        # UnboundLocalError or accidentally inherit a previous invocation.
+        defective_claims = []
+        malformed_claims = []
+        same_role_date_conflict = False
+
         # 3. LLM이 반환한 Claim별 source_ids가 실제 Source Registry에 존재하는지 교차 검증
         def _norm_quote(txt: str) -> str:
             """마크다운 강조 기호(** 등) 및 글머리 기호 유무 차이로 인한 오탐을 방지하되 문장 변형은 차단한다."""
