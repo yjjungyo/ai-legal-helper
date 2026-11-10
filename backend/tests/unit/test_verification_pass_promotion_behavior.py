@@ -127,3 +127,33 @@ def test_characterize_first_and_second_pass_gates_together():
     exec(code, env)
     assert result.status == "REVISE"
     assert result.missing_legal_issues == ["핵심 법률 쟁점"]
+
+
+def test_late_promotion_gate_handles_non_strict_consultation_without_unbound_names():
+    """Execute production late gate with the defaults used by non-strict consultations."""
+    module = ast.parse(SOURCE.read_text(encoding="utf-8"))
+    function = next(n for n in module.body if isinstance(n, ast.FunctionDef) and n.name == "run_verification")
+    initializers = [
+        n for n in ast.walk(function)
+        if isinstance(n, ast.Assign)
+        and any(isinstance(t, ast.Name) and t.id == "defective_claims" for t in n.targets)
+        and isinstance(n.value, ast.List) and not n.value.elts
+    ]
+    assert len(initializers) == 1
+    gate = [
+        n for n in ast.walk(function)
+        if isinstance(n, ast.Assign)
+        and any(isinstance(t, ast.Name) and t.id == "has_no_defects" for t in n.targets)
+        and "not result.missing_legal_issues" in ast.unparse(n.value)
+    ]
+    assert len(gate) == 1
+    # No strict claim gate ran: only the initialized defaults are available.
+    env = {
+        "result": SimpleNamespace(missing_legal_issues=[]),
+        "has_no_defects": True,
+        "defective_claims": [],
+        "malformed_claims": [],
+        "same_role_date_conflict": False,
+    }
+    exec(compile(ast.fix_missing_locations(ast.Module(body=[gate[0]], type_ignores=[])), str(SOURCE), "exec"), env)
+    assert env["has_no_defects"] is True
