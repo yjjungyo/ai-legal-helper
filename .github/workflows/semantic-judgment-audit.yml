@@ -45,6 +45,17 @@ jobs:
           Base.metadata.create_all(bind=engine)
           print("Created test tables:", len(Base.metadata.tables))
           PY
+      - name: Verification decision characterization regressions
+        env:
+          PYTHONPATH: backend/src
+          TESTING: "1"
+          LANGFUSE_ENABLED: "false"
+          CHECKPOINTER_TYPE: memory
+        run: |
+          python -m pytest -q \
+            backend/tests/unit/test_verification_decision_trace_contract.py \
+            backend/tests/unit/test_verification_pass_promotion_behavior.py
+
       - name: Verify meaning classification, cases and statutes
         env:
           PYTHONPATH: backend/src
