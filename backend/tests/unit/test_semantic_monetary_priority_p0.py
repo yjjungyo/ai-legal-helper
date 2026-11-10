@@ -208,7 +208,7 @@ def test_one_batch_model_call_for_three_amounts_and_two_dates():
         "ai_legal_helper.case_intelligence.semantic_judgment.classify_numeric_spans",
         side_effect=reviewed_batch,
     ):
-        slots = build_structured_slots(statement, claim_type="AMOUNT_AND_DATE")
+        slots = build_structured_slots(statement, claim_type="AMOUNT_AND_DATE", allow_llm=True)
 
     assert len(calls) == 1
     assert slots.amount_roles["PRINCIPAL_DEPOSIT"] == [300_000_000]
