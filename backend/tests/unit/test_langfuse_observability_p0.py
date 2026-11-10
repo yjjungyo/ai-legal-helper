@@ -574,3 +574,17 @@ def test_llm_io_character_metrics_cleaned_on_error():
         handler.on_llm_error(RuntimeError("network unavailable"), run_id="size-error")
     assert logged.call_args.kwargs["metadata"]["input_chars"] == 6
     assert not handler.call_input_sizes
+
+
+def test_chat_model_io_size_counts_messages_and_cleans_up():
+    from langchain_core.messages import HumanMessage, SystemMessage
+    from langchain_core.outputs import LLMResult, Generation
+    handler = TokenTrackingCallbackHandler()
+    with patch("ai_legal_helper.observability.langfuse_client.log_generation") as logged:
+        handler.on_chat_model_start({}, [[SystemMessage(content="법령"), HumanMessage(content="계약일")]], run_id="chat-size")
+        handler.on_llm_end(LLMResult(generations=[[Generation(text="확인")]], llm_output={}), run_id="chat-size")
+    meta = logged.call_args.kwargs["metadata"]
+    assert meta["input_chars"] == len("법령계약일")
+    assert meta["output_chars"] == len("확인")
+    assert meta["usage_source"] == "unavailable"
+    assert not handler.call_input_sizes
