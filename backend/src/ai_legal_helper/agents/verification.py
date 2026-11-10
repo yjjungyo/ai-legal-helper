@@ -1059,6 +1059,8 @@ def run_verification(
         try:
             logger.info("[VERIFICATION_SCHEMA] 검증 출력 수신 및 스키마 검증 시작")
             result = VerificationOutput(**data)
+            initial_llm_status = result.status
+            initial_llm_reason_code = result.reason_code
             logger.info(f"[VERIFICATION_SCHEMA] 스키마 검증 및 정규화 결과: SUCCESS (주장수={len(result.claims)}, 상태={result.status})")
             logger.info("[VERIFICATION] 법률 주장 검증 계속 진행")
         except ValidationError as val_err:
@@ -1611,6 +1613,24 @@ def run_verification(
         except Exception:
             pass
         out_dict = result.model_dump()
+        # Preserve the model verdict separately from post-processing policy decisions.
+        # This is diagnostic only: it does not alter PASS/REVISE/INSUFFICIENT behavior.
+        out_dict["verification_decision_trace"] = {
+            "llm_status": initial_llm_status,
+            "llm_reason_code": initial_llm_reason_code,
+            "final_status": result.status,
+            "final_reason_code": result.reason_code,
+            "status_changed": initial_llm_status != result.status,
+            "reason_changed": initial_llm_reason_code != result.reason_code,
+            "revision_instructions": list(result.revision_instructions),
+            "missing_legal_issues": list(result.missing_legal_issues),
+        }
+        if initial_llm_status != result.status or initial_llm_reason_code != result.reason_code:
+            logger.info(
+                "[VERIFICATION_DECISION] llm=%s/%s -> final=%s/%s; revisions=%s; missing_legal=%s",
+                initial_llm_status, initial_llm_reason_code, result.status, result.reason_code,
+                result.revision_instructions, result.missing_legal_issues,
+            )
         # STEP 5: 경량 QA 검사 결과(repair_targets 및 qa_summary) 결합
         if qa_check.repair_targets and not out_dict.get("repair_targets"):
             out_dict["repair_targets"] = [rt.model_dump() for rt in qa_check.repair_targets]
