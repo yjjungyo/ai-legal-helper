@@ -276,3 +276,21 @@ def test_document_mode_temporal_recheck_never_rewrites_draft():
         out = revise_node(state)
     assert out["draft_answer"] == GOOD
     assert out["revision_method"] == "TEMPORAL_RECHECK_NO_REWRITE"
+
+
+def test_structured_temporal_snapshot_triggers_review_without_keyword():
+    """A temporal search plan must not be ignored for lack of a trigger word."""
+    gate = evaluate_temporal_answer_gate(
+        "2026년 11월 1일 체결 계약의 신고 의무를 설명해 주세요.",
+        GOOD, [source(), addendum_source()],
+        temporal_resolution=result(), review_invoke_fn=review_answer,
+    )
+    assert gate.status == "PASS"
+
+
+def test_unconfirmed_snapshot_without_keyword_is_not_skipped():
+    gate = evaluate_temporal_answer_gate(
+        "2026년 11월 1일 체결 계약의 신고 의무를 설명해 주세요.",
+        CAUTIOUS, [source()], temporal_resolution=result("UNCONFIRMED"),
+    )
+    assert gate.status == "CAUTION"
