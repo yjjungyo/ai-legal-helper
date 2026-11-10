@@ -33,6 +33,7 @@ class TokenTrackingCallbackHandler(BaseCallbackHandler):
         self.call_inputs: Dict[str, Any] = {}
         self.call_models: Dict[str, str] = {}
         self.call_params: Dict[str, Dict[str, Any]] = {}
+        self.call_input_sizes: Dict[str, int] = {}
 
     def _extract_model_from_context(
         self, serialized: Optional[Dict[str, Any]], kwargs: Dict[str, Any]
@@ -79,6 +80,7 @@ class TokenTrackingCallbackHandler(BaseCallbackHandler):
         run_id = str(kwargs.get("run_id", uuid.uuid4()))
         self.call_start_times[run_id] = time.time()
         self.call_inputs[run_id] = prompts
+        self.call_input_sizes[run_id] = sum(len(str(p)) for p in prompts)
         self.call_models[run_id] = self._extract_model_from_context(serialized, kwargs)
         self.call_params[run_id] = self._extract_model_parameters(kwargs)
         logger.info(
@@ -99,6 +101,7 @@ class TokenTrackingCallbackHandler(BaseCallbackHandler):
                 role = getattr(msg, "type", getattr(msg, "role", "message"))
                 formatted_msgs.append({"role": role, "content": content})
         self.call_inputs[run_id] = formatted_msgs
+        self.call_input_sizes[run_id] = sum(len(str(m["content"])) for m in formatted_msgs)
         self.call_models[run_id] = self._extract_model_from_context(serialized, kwargs)
         self.call_params[run_id] = self._extract_model_parameters(kwargs)
         logger.info(
@@ -113,6 +116,7 @@ class TokenTrackingCallbackHandler(BaseCallbackHandler):
         input_data = self.call_inputs.pop(run_id, None)
         start_model = self.call_models.pop(run_id, None)
         model_parameters = self.call_params.pop(run_id, None)
+        input_chars = self.call_input_sizes.pop(run_id, 0)
         latency_ms = (time.time() - start_time) * 1000
 
         output_text = None
@@ -170,6 +174,13 @@ class TokenTrackingCallbackHandler(BaseCallbackHandler):
             status="SUCCESS",
         )
         global_token_tracker.add_record(record)
+        output_chars = len(output_text or "")
+        logger.info(
+            "[LLM_IO_SIZE] agent=%s node=%s input_chars=%d output_chars=%d "
+            "input_tokens=%s output_tokens=%s latency_ms=%.0f",
+            get_agent_name(), get_node_name(), input_chars, output_chars,
+            input_tokens, output_tokens, latency_ms,
+        )
         total_tok_str = f"{total_tokens:,}" if total_tokens else "0"
         in_tok_str = f"{input_tokens:,}" if input_tokens else "0"
         out_tok_str = f"{output_tokens:,}" if output_tokens else "0"
@@ -203,7 +214,9 @@ class TokenTrackingCallbackHandler(BaseCallbackHandler):
                 model_parameters=model_parameters,
                 input=input_data,
                 output=output_text,
-                metadata={"system_name": LANGFUSE_SYSTEM_NAME, "tags": [LANGFUSE_SYSTEM_NAME]},
+                metadata={"system_name": LANGFUSE_SYSTEM_NAME, "tags": [LANGFUSE_SYSTEM_NAME],
+                          "input_chars": input_chars, "output_chars": output_chars,
+                          "latency_ms": round(latency_ms, 1), "usage_source": usage_source},
             )
         except Exception as e:
             logger.warning(f"Langfuse LLM 생성 결과 기록 실패: {e}")
@@ -222,6 +235,7 @@ class TokenTrackingCallbackHandler(BaseCallbackHandler):
             or os.getenv("AZURE_OPENAI_DEPLOYMENT_CHAT", "gpt-4o")
         )
         model_parameters = self.call_params.pop(run_id, None)
+        input_chars = self.call_input_sizes.pop(run_id, 0)
         latency_ms = (time.time() - start_time) * 1000
 
         record = LLMUsageRecord(
@@ -253,7 +267,9 @@ class TokenTrackingCallbackHandler(BaseCallbackHandler):
                 model_parameters=model_parameters,
                 input=input_data,
                 output=f"ERROR: {str(error)}",
-                metadata={"system_name": LANGFUSE_SYSTEM_NAME, "tags": [LANGFUSE_SYSTEM_NAME]},
+                metadata={"system_name": LANGFUSE_SYSTEM_NAME, "tags": [LANGFUSE_SYSTEM_NAME],
+                          "input_chars": input_chars, "output_chars": 0,
+                          "latency_ms": round(latency_ms, 1), "usage_source": "unavailable"},
             )
         except Exception as e:
             logger.warning(f"Langfuse LLM 오류 내역 기록 실패: {e}")

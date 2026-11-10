@@ -548,3 +548,43 @@ def test_tc11_privacy_masking_default_when_env_unset():
             # [검증] 환경변수 미설정 시 기본값은 마스킹이어야 함
             _, span_kwargs = mock_trace.span.call_args
             assert span_kwargs.get("input") == "[MASKED FOR PRIVACY]"
+
+
+def test_llm_io_character_metrics_recorded_without_prompt_in_metadata():
+    from langchain_core.outputs import LLMResult, Generation
+    handler = TokenTrackingCallbackHandler()
+    with patch("ai_legal_helper.observability.langfuse_client.log_generation") as logged:
+        handler.on_llm_start({}, ["가나다", "abcde"], run_id="size-1")
+        handler.on_llm_end(LLMResult(
+            generations=[[Generation(text="완료")]],
+            llm_output={"token_usage": {"prompt_tokens": 8, "completion_tokens": 2, "total_tokens": 10}},
+        ), run_id="size-1")
+    meta = logged.call_args.kwargs["metadata"]
+    assert meta["input_chars"] == 8
+    assert meta["output_chars"] == 2
+    assert meta["usage_source"] == "actual"
+    assert "가나다" not in str(meta)
+    assert not handler.call_input_sizes
+
+
+def test_llm_io_character_metrics_cleaned_on_error():
+    handler = TokenTrackingCallbackHandler()
+    with patch("ai_legal_helper.observability.langfuse_client.log_generation") as logged:
+        handler.on_llm_start({}, ["secret"], run_id="size-error")
+        handler.on_llm_error(RuntimeError("network unavailable"), run_id="size-error")
+    assert logged.call_args.kwargs["metadata"]["input_chars"] == 6
+    assert not handler.call_input_sizes
+
+
+def test_chat_model_io_size_counts_messages_and_cleans_up():
+    from langchain_core.messages import HumanMessage, SystemMessage
+    from langchain_core.outputs import LLMResult, Generation
+    handler = TokenTrackingCallbackHandler()
+    with patch("ai_legal_helper.observability.langfuse_client.log_generation") as logged:
+        handler.on_chat_model_start({}, [[SystemMessage(content="법령"), HumanMessage(content="계약일")]], run_id="chat-size")
+        handler.on_llm_end(LLMResult(generations=[[Generation(text="확인")]], llm_output={}), run_id="chat-size")
+    meta = logged.call_args.kwargs["metadata"]
+    assert meta["input_chars"] == len("법령계약일")
+    assert meta["output_chars"] == len("확인")
+    assert meta["usage_source"] == "unavailable"
+    assert not handler.call_input_sizes
