@@ -121,6 +121,7 @@ def test_characterize_first_and_second_pass_gates_together():
     }
     nodes = [first[0], second[0]]
     code = compile(ast.fix_missing_locations(ast.Module(body=nodes, type_ignores=[])), str(SOURCE), "exec")
+    env["has_no_defects"] = not result.missing_legal_issues
     exec(code, env)
-    assert result.status == "PASS"
+    assert result.status == "REVISE"
     assert result.missing_legal_issues == ["핵심 법률 쟁점"]
