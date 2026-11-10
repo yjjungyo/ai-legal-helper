@@ -80,3 +80,47 @@ def test_characterize_remaining_missing_legal_issues():
     verdict = _execute(missing_legal_issues=["핵심 법률 쟁점"])
     assert verdict.status == "PASS"
     assert verdict.missing_legal_issues == ["핵심 법률 쟁점"]
+
+
+def test_characterize_first_and_second_pass_gates_together():
+    """Show that a missing legal issue blocks the first gate but not the second.
+
+    This is a reproducible policy gap, not evidence of an actual wrong answer.
+    """
+    module = ast.parse(SOURCE.read_text(encoding="utf-8"))
+    function = next(n for n in module.body if isinstance(n, ast.FunctionDef) and n.name == "run_verification")
+    first = [
+        n for n in ast.walk(function)
+        if isinstance(n, ast.If)
+        and isinstance(n.test, ast.BoolOp)
+        and "not result.missing_legal_issues" in ast.unparse(n.test)
+        and "coverage_complete and consistency_complete" in ast.unparse(n.test)
+        and "result.status == 'REVISE'" in ast.unparse(n.test)
+    ]
+    assert len(first) == 1
+    second = [
+        n for n in ast.walk(function)
+        if isinstance(n, ast.If)
+        and "coverage_satisfied and has_supported_core_claims and has_no_defects" in ast.unparse(n.test)
+        and "result.status == 'REVISE'" in ast.unparse(n.test)
+    ]
+    assert len(second) == 1
+
+    result = SimpleNamespace(
+        status="REVISE", reason_code="ANSWER_REVISION_REQUIRED",
+        recommended_action="REVISE_DRAFT", claims=[object()],
+        contradictions=[], missing_legal_issues=["핵심 법률 쟁점"],
+        missing_issues=[], warnings=[],
+    )
+    env = {
+        "result": result, "coverage_complete": True,
+        "consistency_complete": True, "defective_claims": [],
+        "malformed_claims": [], "same_role_date_conflict": False,
+        "coverage_satisfied": True, "has_supported_core_claims": True,
+        "has_no_defects": True, "logger": logging.getLogger(__name__),
+    }
+    nodes = [first[0], second[0]]
+    code = compile(ast.fix_missing_locations(ast.Module(body=nodes, type_ignores=[])), str(SOURCE), "exec")
+    exec(code, env)
+    assert result.status == "PASS"
+    assert result.missing_legal_issues == ["핵심 법률 쟁점"]
