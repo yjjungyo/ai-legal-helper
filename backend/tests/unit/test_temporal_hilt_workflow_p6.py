@@ -47,6 +47,17 @@ def test_known_law_and_event_date_create_preflight_plan_without_network():
     assert out["event_type"] == "CONTRACT_SIGNED"
 
 
+def test_verified_event_pair_is_not_blocked_by_missing_law_keyword():
+    """Structured upstream facts bypass the old question-word prefilter."""
+    out = build_temporal_search_plan(
+        "2026년 11월 1일 체결한 계약의 신고 의무를 확인해 주세요.",
+        resolver_fn=lambda _: _catalog(),
+        event_date="2026-11-01", event_type="CONTRACT_SIGNED",
+    )
+    assert out["status"] == "READY"
+    assert out["event_type"] == "CONTRACT_SIGNED"
+
+
 def test_unknown_catalog_and_ambiguous_dates_fail_open_to_old_agent_route():
     assert build_temporal_search_plan(
         "가상법 시행령에 2026년 11월 1일 계약 체결과 2027년 6월 1일 갱신",

@@ -274,25 +274,9 @@ def interpret_addendum_with_llm(
     if not provision.strip():
         return None, "OFFICIAL_ADDENDUM_MISSING"
 
-    # [Fast-Path 1: 사건 행위 키워드 부재 배제]
-    # 부칙 원문에 계약, 체결, 갱신, 통지 등 어떠한 사건 행위 키워드도 없다면
-    # 사건 적용례(event_evidence)가 원문에 존재할 수 없으므로 LLM 호출을 건너뛰고 즉시 배제한다.
-    if not any(token in provision for token in _ALL_EVENT_TOKENS):
-        return None, "APPLICATION_PROVISION_NOT_FOUND"
-
-    # [Fast-Path 2: 조문 한정 적용례 불일치 배제]
-    # 부칙에 특정 조문의 개정규정 적용례가 명시되어 있고,
-    # 대상 조문(article)이 부칙 원문에 전혀 언급되지 않았으며 일반 적용례 문구도 없는 경우 즉시 배제한다.
-    norm_art = _norm_article(article)
-    clean_provision = re.sub(r"\s+", "", provision)
-    if norm_art and (norm_art not in clean_provision):
-        has_general_scope = any(
-            f"{scope}시행" in clean_provision or f"{scope}은" in clean_provision
-            for scope in ("이법", "이영", "이규칙", "이조례")
-        )
-        if not has_general_scope or _SPECIFIC_ARTICLE_AMENDMENT.search(provision):
-            return None, "APPLICATION_PROVISION_NOT_FOUND"
-
+    # Do not infer that an addendum is irrelevant from event keywords or
+    # article-number spelling. General application provisions and cross-article
+    # transitional clauses must reach the semantic interpreter.
     # [캐시 확인: 프로덕션 환경의 중복 LLM 호출 방지]
     cache_key = (provision, article)
     use_cache = (invoke_fn is None and review_invoke_fn is None)
