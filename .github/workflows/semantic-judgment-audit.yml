@@ -54,7 +54,8 @@ jobs:
         run: |
           python -m pytest -q \
             backend/tests/unit/test_verification_decision_trace_contract.py \
-            backend/tests/unit/test_verification_pass_promotion_behavior.py
+            backend/tests/unit/test_verification_pass_promotion_behavior.py \
+            backend/tests/unit/test_verification_audit_reuse_contract.py
 
       - name: Verify meaning classification, cases and statutes
         env:
