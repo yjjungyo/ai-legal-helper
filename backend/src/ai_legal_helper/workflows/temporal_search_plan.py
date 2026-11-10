@@ -170,12 +170,14 @@ def build_temporal_search_plan(
         "law_ids": [], "as_of_date": None, "event_type": None,
         "reason_code": "NOT_TEMPORAL_LAW_QUESTION",
     }
-    if not isinstance(question, str) or not _LAW_HINT.search(question):
+    # A caller-verified event pair can request a temporal search even when
+    # the user does not spell out a statute-related keyword.
+    explicit_pair = event_date is not None and event_type is not None
+    if not isinstance(question, str) or (not explicit_pair and not _LAW_HINT.search(question)):
         return empty
     # 법령 적용 시점 질문은 규칙의 오확정을 피하기 위해 LLM 의미 추출을 우선한다.
     # 명시적으로 확인된 사건일/유형 쌍은 재추출하지 않는다.
     # 날짜 표기는 LLM이 해석하므로 정규식으로 사전 차단하지 않는다.
-    explicit_pair = event_date is not None and event_type is not None
     if llm_event_extraction and not explicit_pair:
         event = extract_event_with_llm(question, invoke_fn=event_invoke_fn)
         if event.selected is not None and event_date is not None:
