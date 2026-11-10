@@ -68,8 +68,8 @@ SYNTH_SYSTEM = """당신은 대한민국 법률 전문가입니다.
    - 동일한 결론을 앞에서 쓰고 뒤에서 다시 반복하지 마세요.
    - 모든 질문에 무조건 소송/지급명령 절차 안내를 강제하지 마세요.
    - 불필요한 면책 문구를 여러 번 반복하지 마세요.
-4. 네 번째: 출처를 자연스럽게 표시
-   - 사건 증거: 반드시 전체 파일명을 보존하여 `[E01_주택임대차계약서.txt]`, `[E05_퇴거_및_보증금_반환_요청_문자.pdf]` 형태로 표기하세요.
+4. 네 번째: 출처를 자연스럽게 표시 (전체 파일명 보존 원칙)
+   - 사건 증거: 질문에서 증거번호를 요청하더라도 `[01]`, `[03]`, `[E01]`처럼 번호만 단독 축약하지 말고 반드시 전체 파일명을 보존하여 `[01_임대차_주요내용.txt]`, `[E01_주택임대차계약서.txt]` 형태로 표기하세요.
    - 법령 조문: 긴 공포번호나 시행일을 나열하지 말고, `(주택임대차보호법 제6조의2)` 또는 `주택임대차보호법 제6조의2`와 같이 간결하고 자연스럽게 표기하세요.
 
 [사실 및 근거 구분 원칙]
@@ -100,7 +100,7 @@ SYNTH_FOLLOWUP_SYSTEM = """당신은 대한민국 법률 전문가입니다.
      [1. 질문에 대한 핵심 결론 및 직접 답변]
      [2. 세부 법적 요건 및 근거] (관련 조문 및 판례 근거만 간결하게 설명)
      [3. 실무상 유의사항 및 다음 조치]
-  3. 사실 상태를 엄격히 구분하여 작성하고, 실제 등록되지 않은 가상의 증거 번호('증거 1', '증거 2' 등)를 절대 생성하지 마세요.
+  3. 사실 상태를 엄격히 구분하여 작성하고, 증거 인용 시 번호 축약(`[01]`, `[E01]`)을 금지하며 전체 파일명(`[01_임대차_주요내용.txt]`)을 온전히 표기하세요. 실제 등록되지 않은 가상의 증거 번호('증거 1', '증거 2' 등)를 절대 생성하지 마세요.
   4. 중요한 핵심 단어에는 **볼드** 강조를 적절히 사용하세요.
   5. 법령명·조문·파일명·페이지·URL은 입력에서 확인된 항목만 인용하세요. PDF가 아닌 문서에 PDF 파일명이나 페이지를 만들지 마세요.
 """
@@ -177,7 +177,7 @@ def synthesize(
     Returns:
         종합 답변 메시지가 추가된 대화 목록.
     """
-    from ai_legal_helper.utils.text_formatter import clean_markdown_formatting
+    from ai_legal_helper.utils.text_formatter import clean_markdown_formatting, expand_evidence_citations
 
     if not results:
         final = "관련 카테고리에서 유의미한 답변을 생성하지 못했습니다. 질문을 구체화해 주세요."
@@ -266,6 +266,20 @@ def synthesize(
     except Exception as e:
         logger.exception("[SYN] LLM 생성 실패, 원문만 반환")
         summary = "종합 답변 생성 중 오류가 발생했습니다. 아래 카테고리별 답변을 참고해 주세요."
+
+    # [Option B] 등록된 증거 출처 목록 기반으로 [01], [03], [E01] 등 축약 인용 표기 전체 파일명 자동 복원
+    briefing_dict = (
+        case_evidence_briefing
+        if isinstance(case_evidence_briefing, dict)
+        else (case_evidence_briefing.model_dump() if hasattr(case_evidence_briefing, "model_dump") else {})
+    ) if case_evidence_briefing else {}
+    evidence_sources = (
+        briefing_dict.get("source_documents", [])
+        or briefing_dict.get("evidence_files", [])
+        or (source_registry.get("sources", []) if isinstance(source_registry, dict) else [])
+    )
+    if evidence_sources:
+        summary = expand_evidence_citations(summary, evidence_sources)
 
     summary = clean_markdown_formatting(summary)
     # 분야별 원문을 중복 첨부하지 않고 질문 의도에 맞게 생성한 종합 답변만 전달한다.
