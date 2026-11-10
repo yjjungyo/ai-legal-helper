@@ -150,7 +150,13 @@ def evaluate_temporal_answer_gate(
     review_invoke_fn: Any = None,
 ) -> TemporalGateResult:
     """Evidence-backed semantic gate; never regex-classify legal conclusions."""
-    if not _temporal_question(question):
+    # A structured upstream temporal decision triggers review regardless of keywords.
+    has_temporal_snapshot = (
+        isinstance(temporal_resolution, Mapping)
+        and isinstance(temporal_resolution.get("decisions"), list)
+        and bool(temporal_resolution["decisions"])
+    )
+    if not has_temporal_snapshot and not _temporal_question(question):
         return TemporalGateResult("NOT_REQUIRED")
     official_sources = [dict(x) for x in (sources or []) if isinstance(x, Mapping)]
     provided = temporal_resolution if isinstance(temporal_resolution, Mapping) else None
