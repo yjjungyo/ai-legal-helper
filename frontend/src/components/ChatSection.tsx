@@ -5,7 +5,7 @@
  * 1. P0-01: '+ 새 대화 시작' 및 대화 분기/세션 리셋 UI를 완전히 제거하고 단일 지속 대화로 통합.
  * 2. P0-02 & P0-04: 사건당 1개의 대화 스트림(Case = One Persistent Conversation)을 시간순 렌더링.
  * 3. P0-03: 모듈화된 하위 컴포넌트(CaseChatHeader, ChatMessageList, ChatComposer, EvidenceSourceDrawer) 조립.
- * 4. P0-05: LangGraph 6단계 실시간 진행 상태 및 HILT 승인/거절 인플레이스 상호작용.
+ * 4. P0-05: LangGraph 6단계 실시간 진행 상태 및 HITL 승인/거절 인플레이스 상호작용.
  * 5. P0-06: [E01], [E02] 증거 인용 클릭 시 우측 슬라이드오버 드로어를 통한 실시간 원문/발췌 확인.
  * 6. P0-07: 하단 고정형 대화 입력기 및 한글 조합 방어.
  */
@@ -108,7 +108,7 @@ export const ChatSection: React.FC<ChatSectionProps> = ({ caseId }) => {
   }, [caseId, navigate]);
 
   /**
-   * HILT 추가 법령 검색 승인/거절 핸들러
+   * HITL 추가 법령 검색 승인/거절 핸들러
    */
   const handleApprove = useCallback((requestId: string) => {
     handleApproval(requestId, true);
