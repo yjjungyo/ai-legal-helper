@@ -1,4 +1,4 @@
-# P4.1 Verifier-Guided HILT 법령 검색 — 05. FastAPI Resume API 및 React UI 구현
+# P4.1 Verifier-Guided HITL 법령 검색 — 05. FastAPI Resume API 및 React UI 구현
 
 ## 1. 개요
 본 문서는 사용자에게 법령 검색 승인을 요청하고, 결정을 접수하여 중단된 LangGraph 워크플로우를 재개(Resume)하는 **FastAPI 백엔드 엔드포인트**와 **React 프론트엔드 UI 인터랙션 컴포넌트**의 구현 내용을 설명한다.
@@ -75,12 +75,12 @@ const respondApproval = async (requestId: string, approved: boolean, reason?: st
 };
 ```
 
-### 3.2 HILT 승인 대기 카드 UI (`ChatSection.tsx`)
+### 3.2 HITL 승인 대기 카드 UI (`ChatSection.tsx`)
 실시간 진행 카드 및 상담 이력 목록 모두에서 `item.status === 'APPROVAL_REQUIRED'`인 경우 전용 카드가 렌더링된다:
 
 ```tsx
 {result && result.status === 'APPROVAL_REQUIRED' && (
-  <div className="hilt-approval-card">
+  <div className="hitl-approval-card">
     <div className="header">
       <span>⚖️</span>
       <strong>공식 법령 원문 추가 검색 승인 요청 (Human-in-the-Loop)</strong>
