@@ -1,7 +1,7 @@
-# P4.1 Verifier-Guided HILT 법령 검색 — 08. 최종 완료 보고서 및 산출물 요약
+# P4.1 Verifier-Guided HITL 법령 검색 — 08. 최종 완료 보고서 및 산출물 요약
 
 ## 1. 개요
-본 문서는 `AI Legal Helper — P4.1 Verifier-Guided HILT 법령 검색 구현 지시서`에 따라 수행된 모든 개발 작업, 변경 파일 목록, 테스트 결과 및 운영 권고사항을 종합 정리한 최종 산출물 보고서이다.
+본 문서는 `AI Legal Helper — P4.1 Verifier-Guided HITL 법령 검색 구현 지시서`에 따라 수행된 모든 개발 작업, 변경 파일 목록, 테스트 결과 및 운영 권고사항을 종합 정리한 최종 산출물 보고서이다.
 
 ---
 
@@ -11,7 +11,7 @@
 1. [`backend/src/ai_legal_helper/tools/__init__.py`](file:///c:/myprjs/ai-legal-helper/backend/src/ai_legal_helper/tools/__init__.py): 도구 패키지 초기화
 2. [`backend/src/ai_legal_helper/tools/official_statute_search.py`](file:///c:/myprjs/ai-legal-helper/backend/src/ai_legal_helper/tools/official_statute_search.py): 법제처 국가법령정보공동활용 API(`open.law.go.kr`) 공식 연동 및 조문 파싱 도구
 3. [`backend/tests/unit/test_official_statute_search.py`](file:///c:/myprjs/ai-legal-helper/backend/tests/unit/test_official_statute_search.py): 공식 법령 검색 도구 단위 테스트 (3건)
-4. [`backend/tests/unit/test_hilt_statute_search.py`](file:///c:/myprjs/ai-legal-helper/backend/tests/unit/test_hilt_statute_search.py): T-01 ~ T-08 시나리오별 종합 테스트 스위트 (8건)
+4. [`backend/tests/unit/test_hitl_statute_search.py`](file:///c:/myprjs/ai-legal-helper/backend/tests/unit/test_hitl_statute_search.py): T-01 ~ T-08 시나리오별 종합 테스트 스위트 (8건)
 
 ### 2.2 수정 파일 (Backend & Frontend)
 1. [`backend/src/ai_legal_helper/agents/verification.py`](file:///c:/myprjs/ai-legal-helper/backend/src/ai_legal_helper/agents/verification.py):
@@ -19,9 +19,9 @@
    - `VERIFICATION_PROMPT` 특별법 누락 감지 지침 추가
    - Langfuse Span 메타데이터 기록 확장
 2. [`backend/src/ai_legal_helper/workflows/state.py`](file:///c:/myprjs/ai-legal-helper/backend/src/ai_legal_helper/workflows/state.py):
-   - `approval_request`, `approval_status`, `statute_search_results`, `hilt_executed` 필드 추가
+   - `approval_request`, `approval_status`, `statute_search_results`, `hitl_executed` 필드 추가
 3. [`backend/src/ai_legal_helper/workflows/legal_workflow.py`](file:///c:/myprjs/ai-legal-helper/backend/src/ai_legal_helper/workflows/legal_workflow.py):
-   - HILT 노드 `statute_search_approval` (`interrupt()` 호출) 구현
+   - HITL 노드 `statute_search_approval` (`interrupt()` 호출) 구현
    - `execute_statute_search_node`, `re_analyze_node` 구현
    - `verification_condition`, `statute_search_approval_condition`, `statute_search_result_condition` 조건부 에지 구성
    - `run_legal_consultation`에서 인터럽트 감지 및 `Command(resume=...)` 재개 처리
@@ -41,12 +41,12 @@
 9. [`frontend/src/hooks/useConsultation.ts`](file:///c:/myprjs/ai-legal-helper/frontend/src/hooks/useConsultation.ts):
    - `respondApproval` 함수 및 폴링 생명주기 관리
 10. [`frontend/src/components/ChatSection.tsx`](file:///c:/myprjs/ai-legal-helper/frontend/src/components/ChatSection.tsx):
-   - 실시간 및 이력 목록 내 HILT 승인 대기 전용 카드 UI 통합
+   - 실시간 및 이력 목록 내 HITL 승인 대기 전용 카드 UI 통합
 
-### 2.3 기술 문서 산출물 (`docs/development/p4-1-hilt-statute-search/`)
+### 2.3 기술 문서 산출물 (`docs/development/p4-1-hitl-statute-search/`)
 - `01-architecture-analysis.md`
 - `02-verifier-root-cause.md`
-- `03-hilt-workflow.md`
+- `03-hitl-workflow.md`
 - `04-statute-search-tool.md`
 - `05-api-and-ui.md`
 - `06-test-results.md`
@@ -63,7 +63,7 @@
    - 공식 법령(`OFFICIAL_STATUTE_SEARCH`) 조문이 출처에 존재하고 초안이 이에 부합할 시 `PASS` 판정.
 3. **워크플로우 엔진 (`legal_workflow.py`)**:
    - `re_analyze_node`에 필수 서두 섹션 **`[공식 법령 원문 연동 및 근거 보강 안내]`**를 의무화하여 보강 경과, 법제처 공식 출처, 판단 근거를 답변 최상단에 명확히 고지.
-   - `verification_condition`에서 HILT 공식 검색 완료 후 허위 인용이 없다면 강제 `insufficient` 폐기 대신 `finalize`로 정상 확정.
+   - `verification_condition`에서 HITL 공식 검색 완료 후 허위 인용이 없다면 강제 `insufficient` 폐기 대신 `finalize`로 정상 확정.
 4. **프론트엔드 UI (`ChatSection.tsx`)**:
    - 답변 완료(`item.status === 'SUCCESS'`) 시 모순된 `INSUFFICIENT` 에러 텍스트를 필터링하고 `🛡️ 실무 권고사항 및 소송상 유의사항:`으로 분리 렌더링.
 
@@ -88,7 +88,7 @@
 
 ## 4. 최종 판정 및 결론
 
-**판정: A (Agentic RAG + Adaptive Retrieval + Verifier-Guided HILT 법령 검색 구현 및 실행 검증 완료)**
+**판정: A (Agentic RAG + Adaptive Retrieval + Verifier-Guided HITL 법령 검색 구현 및 실행 검증 완료)**
 
-본 작업을 통해 내부 데이터베이스에 없는 특별법 쟁점 발생 시 발생하는 왜곡 답변을 완전히 차단하고, 사용자의 동의를 거쳐 신뢰할 수 있는 공식 법령 원문(`open.law.go.kr`)을 조회하여 답변을 재분석하는 엔드투엔드 HILT 아키텍처가 성공적으로 구축되었다. 또한, 법령 API 검색 경과와 출처 근거를 답변에 투명하게 설명하고, 검증관의 실무 권고사항과 시스템 에러를 명확히 분리함으로써 답변의 완결성과 신뢰성을 한층 더 확보하였다.
+본 작업을 통해 내부 데이터베이스에 없는 특별법 쟁점 발생 시 발생하는 왜곡 답변을 완전히 차단하고, 사용자의 동의를 거쳐 신뢰할 수 있는 공식 법령 원문(`open.law.go.kr`)을 조회하여 답변을 재분석하는 엔드투엔드 HITL 아키텍처가 성공적으로 구축되었다. 또한, 법령 API 검색 경과와 출처 근거를 답변에 투명하게 설명하고, 검증관의 실무 권고사항과 시스템 에러를 명확히 분리함으로써 답변의 완결성과 신뢰성을 한층 더 확보하였다.
 
