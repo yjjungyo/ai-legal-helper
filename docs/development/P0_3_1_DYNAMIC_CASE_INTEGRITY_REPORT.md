@@ -85,7 +85,7 @@ flowchart TD
         DELTA["detect_case_delta()\n- 기확정 변제(20M) vs 신규 주장(30M) 분리\n- 확정 2.8억 / 잠정 2.5억 calculation_basis"]
     end
 
-    subgraph LangGraph["Unified Legal Engine (HILT 파이프라인)"]
+    subgraph LangGraph["Unified Legal Engine (HITL 파이프라인)"]
         INTENT["Intent Analyzer"]
         AGENT["Civil Specialist Agent"]
         SYNTH["Synthesizer"]
@@ -201,7 +201,7 @@ flowchart TD
 1. **분산 멀티 노드 락 (Distributed Lock):**
    - 현재 구현된 `_get_conversation_lock`은 단일 OS 프로세스 내의 스레드 안전성(Mutex)을 보장합니다. 다중 컨테이너(Kubernetes Pods) 또는 다중 Uvicorn 워커가 분산 실행되는 환경에서는 DB 수준의 `UniqueConstraint`가 중복 생성을 막아주지만, 재시도 오버헤드를 줄이기 위해 **Redis 기반 분산 락(Redlock) 또는 PostgreSQL Advisory Lock**을 보완 도입할 것을 권장합니다.
 2. **실제 LLM 실시간 응답 지연 (Latency & Streaming):**
-   - 실제 LangGraph 워크플로우(HILT 인터럽트 및 의도분석->라우팅->에이전트->종합->검증 루프)는 LLM 호출이 다수 포함되어 턴당 약 30~90초가 소요됩니다. 상용 환경에서는 HTTP Long Polling 방식 대신 **Server-Sent Events(SSE) 또는 WebSocket**을 통한 진행 상태 및 스트리밍 답변 전달이 필수적입니다.
+   - 실제 LangGraph 워크플로우(HITL 인터럽트 및 의도분석->라우팅->에이전트->종합->검증 루프)는 LLM 호출이 다수 포함되어 턴당 약 30~90초가 소요됩니다. 상용 환경에서는 HTTP Long Polling 방식 대신 **Server-Sent Events(SSE) 또는 WebSocket**을 통한 진행 상태 및 스트리밍 답변 전달이 필수적입니다.
 3. **업스트림 OCR 표 레이아웃 파싱 품질:**
    - 은행거래내역서와 같은 복잡한 표(Table) 문서는 OCR 및 텍스트 추출 시 행과 열이 뒤섞일 수 있습니다. 제품 환경에서는 사실 브리핑 이전 단계에서 표 구조를 보존하는 전문 문서 파서(Document Layout Analysis / Table Transformer) 연계가 필요합니다.
 4. **외부 법령 검색 API 가용성:**
