@@ -1,4 +1,4 @@
-name: Temporal RAG P6 HILT workflow
+name: Temporal RAG P6 HITL workflow
 on:
   pull_request:
     branches: [main]
@@ -6,20 +6,20 @@ on:
       - "backend/src/ai_legal_helper/workflows/legal_workflow.py"
       - "backend/src/ai_legal_helper/workflows/temporal_search_plan.py"
       - "backend/src/ai_legal_helper/workflows/state.py"
-      - "backend/tests/unit/test_temporal_hilt_workflow_p6.py"
+      - "backend/tests/unit/test_temporal_hitl_workflow_p6.py"
       - ".github/workflows/temporal-rag-p6.yml"
   push:
-    branches: [main, feature/temporal-rag-p6-hilt-workflow]
+    branches: [main, feature/temporal-rag-p6-hitl-workflow]
     paths:
       - "backend/src/ai_legal_helper/workflows/legal_workflow.py"
       - "backend/src/ai_legal_helper/workflows/temporal_search_plan.py"
       - "backend/src/ai_legal_helper/workflows/state.py"
-      - "backend/tests/unit/test_temporal_hilt_workflow_p6.py"
+      - "backend/tests/unit/test_temporal_hitl_workflow_p6.py"
       - ".github/workflows/temporal-rag-p6.yml"
 permissions:
   contents: read
 jobs:
-  preflight-hilt:
+  preflight-hitl:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -30,11 +30,11 @@ jobs:
       - run: |
           python -m pip install --upgrade pip
           python -m pip install -r backend/requirements.txt
-      - name: P6 preflight + existing HILT + P5 regressions
+      - name: P6 preflight + existing HITL + P5 regressions
         env:
           PYTHONPATH: backend/src
           TESTING: "1"
           LANGFUSE_ENABLED: "false"
           CHECKPOINTER_TYPE: memory
         run: |
-          python -m pytest -q             backend/tests/unit/test_temporal_hilt_workflow_p6.py             backend/tests/unit/test_temporal_law_resolver_p5.py             backend/tests/unit/test_hilt_statute_search.py::test_t01_normal_pass_bypasses_hilt             backend/tests/unit/test_hilt_statute_search.py::test_t02_missing_statute_triggers_hilt_approval             backend/tests/unit/test_hilt_statute_search.py::test_t03_user_approval_executes_search_and_re_analyzes             backend/tests/unit/test_hilt_statute_search.py::test_t04_user_rejection_routes_to_insufficient             backend/tests/unit/test_hilt_statute_search.py::test_t05_empty_search_results_routes_to_insufficient             backend/tests/unit/test_statute_search_reference_normalization.py
+          python -m pytest -q             backend/tests/unit/test_temporal_hitl_workflow_p6.py             backend/tests/unit/test_temporal_law_resolver_p5.py             backend/tests/unit/test_hitl_statute_search.py::test_t01_normal_pass_bypasses_hitl             backend/tests/unit/test_hitl_statute_search.py::test_t02_missing_statute_triggers_hitl_approval             backend/tests/unit/test_hitl_statute_search.py::test_t03_user_approval_executes_search_and_re_analyzes             backend/tests/unit/test_hitl_statute_search.py::test_t04_user_rejection_routes_to_insufficient             backend/tests/unit/test_hitl_statute_search.py::test_t05_empty_search_results_routes_to_insufficient             backend/tests/unit/test_statute_search_reference_normalization.py
