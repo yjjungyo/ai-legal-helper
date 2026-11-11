@@ -56,7 +56,21 @@ def consultation_question(state: Dict[str, Any]) -> str:
         초안 작성기와 검증기 간의 정보 비대칭 및 쟁점 누락(Early Stop / REVISE)을 원천 차단한다.
     """
     orig_q = str(state.get("question") or "").strip()
+    if orig_q in ("", "(질문 미확인)"):
+        # state["messages"]의 마지막 HumanMessage에서 원문 질문 복원 시도
+        for m in reversed(state.get("messages") or []):
+            if isinstance(m, HumanMessage) and isinstance(m.content, str) and m.content.strip():
+                orig_q = m.content.strip()
+                break
+            elif isinstance(m, dict) and m.get("type") in ("human", "user") and m.get("content"):
+                orig_q = str(m.get("content")).strip()
+                break
+        if orig_q == "(질문 미확인)":
+            orig_q = ""
+
     resolved_q = str(state.get("resolved_query") or "").strip()
+    if resolved_q == "(질문 미확인)":
+        resolved_q = ""
 
     # 원문 질문이 없는 경우 문맥 질의 반환
     if not orig_q:
@@ -85,12 +99,23 @@ def document_sources(state: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
     sources = []
     for document in (state.get("case_evidence_briefing") or {}).get("source_documents", []):
-        usable_content = document.get("content", "") if document.get("review_status") == "APPROVED" else ""
+        usable_content = (document.get("content") or "").strip() if document.get("review_status") == "APPROVED" else ""
+        # 본문 발췌가 비어있더라도 승인된 사실 목록(approved_claims)이 있으면 안전하게 대체 보강
+        if not usable_content and document.get("review_status") == "APPROVED":
+            approved_claims = document.get("approved_claims") or []
+            if approved_claims:
+                usable_content = "\n".join(approved_claims)
+            elif document.get("claim_review_guide"):
+                usable_content = str(document.get("claim_review_guide"))
+
         # "E05", "EVIDENCE:E05" 같은 축약 별칭 대신 실제 전체 파일명(예: "E05_퇴거_및_보증금_반환_요청_문자.txt")을 출처 ID로 사용한다.
         full_doc_name = str(
             document.get("document_name") or document.get("filename") or document.get("evidence_id") or ""
         ).strip()
-        doc_without_alias = {k: v for k, v in document.items() if k not in ("evidence_label", "label")}
+        doc_without_alias = {
+            k: v for k, v in document.items()
+            if k not in ("evidence_label", "label", "filename", "file_name", "title", "file")
+        }
         # 승인되지 않은 원문은 출처 레지스트리에도 포함하지 않는다.
         # 빈 내용의 문서가 인용 후보로 남으면 사실 근거로 오인될 수 있다.
         if not str(usable_content or "").strip():
@@ -100,11 +125,7 @@ def document_sources(state: Dict[str, Any]) -> List[Dict[str, Any]]:
             "content": usable_content,
             "source_id": full_doc_name,
             "source_type": "CASE_EVIDENCE",
-            "title": full_doc_name,
             "document_name": full_doc_name,
-            "filename": full_doc_name,
-            "file_name": full_doc_name,
-            "file": full_doc_name,
             "retrieval_method": "CASE_DOCUMENT_SPANS",
         })
     # 과거 그래프 Fact와 기존 증거 청크가 원문과 이중으로 들어가 결론을 오염시키지 않게 한다.
@@ -148,8 +169,11 @@ def generate_answer(
                               "answer_generation_error": None}
     if repair and increment_revision:
         result["revision_count"] = (state.get("revision_count") or 0) + 1
-    history = [m.content for m in (state.get("messages") or [])[:-1]
-               if isinstance(m, HumanMessage) and isinstance(m.content, str)]
+    raw_history = [
+        m.content for m in (state.get("messages") or [])[:-1]
+        if isinstance(m, HumanMessage) and isinstance(m.content, str) and m.content.strip()
+    ]
+    history = list(dict.fromkeys(raw_history))
     ver_res = state.get("verification_result") or {}
     preserved = list(dict.fromkeys(
         list(state.get("preserved_points") or [])

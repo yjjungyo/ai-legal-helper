@@ -315,6 +315,14 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
     conv_ctx = state.get("conversation_context")
     turn_idx = state.get("turn_index") or 1
     q = (state.get("question") or "").strip()
+    if not q or q == "(질문 미확인)":
+        for m in reversed(state.get("messages") or []):
+            if isinstance(m, HumanMessage) and isinstance(m.content, str) and m.content.strip():
+                q = m.content.strip()
+                break
+            elif isinstance(m, dict) and m.get("type") in ("human", "user") and m.get("content"):
+                q = str(m.get("content")).strip()
+                break
 
     # 1. 사건 ID 복원: 컨텍스트 변수, 상태, 또는 대화 맥락 객체/딕셔너리에서 순차 탐색
     case_id = (
@@ -5410,6 +5418,8 @@ async def _execute_consultation(
 
 
             inputs = {
+
+                "question": question,
 
                 "messages": history_messages + [HumanMessage(content=question)],
 

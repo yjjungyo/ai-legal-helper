@@ -45,19 +45,60 @@ def format_grounding_sources(
             sid = ""
         else:
             seen[sid] = content
-        meta = {key: source.get(key) for key in (
-            "source_id", "source_type", "evidence_id", "filename", "file_name", "title",
-            "statute_name", "article", "article_title", "paragraph_no", "part", "chapter", "section",
-            "promulgation_number", "promulgation_date", "effective_date", "version_date",
-            "page", "source_url", "retrieval_method", "review_status", "source_kind", "document_name",
-            "approval_scope", "approval_scope_label", "approved_claim_count", "rejected_claim_count", "pending_claim_count",
-        ) if source.get(key) is not None}
+        # [메타데이터 토큰 다이어트]
+        # 동일한 파일명(title, filename, file_name, document_name)이 5번 반복되는 중복을 제거하고,
+        # LLM 인용 및 시점 판단에 필수적인 필드만 선별하여 경량화한다.
+        meta = {}
+        if sid:
+            meta["source_id"] = sid
+        stype = source.get("source_type")
+        if stype:
+            meta["source_type"] = stype
 
-        # 증거 문서별 사실 승인 지침(claim_review_guide)이 존재할 경우 원문 상단에 명시 주입
+        # 법령 특화 메타데이터 (조문 번호, 시행일, 공포번호 등)
+        for law_key in (
+            "statute_name", "article", "article_title", "effective_date", "promulgation_date",
+            "version_date", "paragraph_no", "source_url",
+        ):
+            if source.get(law_key) is not None:
+                meta[law_key] = source[law_key]
+
+        # 사건 증거 검토 상태 (단위 테스트 및 안전 인용 검증 호환)
+        for rev_key in ("approval_scope", "approval_scope_label"):
+            if source.get(rev_key) is not None:
+                meta[rev_key] = source[rev_key]
+
+        # source_id와 다른 경우에만 document_name 보존
+        doc_name = source.get("document_name")
+        if doc_name and doc_name != sid:
+            meta["document_name"] = doc_name
+
+        # 증거 문서별 사실 승인 지침(claim_review_guide) 처리
+        # [사실목록과 본문의 이중 중복 제거]
+        # 본문(content)이 온전하게 존재하고 전체 사실 승인(FULL_APPROVED)인 경우,
+        # 수십 개의 사실 문장 목록 나열을 생략하고 핵심 승인 지침만 남겨 토큰을 절감한다.
         guide = source.get("claim_review_guide")
-        guide_section = f"\n[사실 검토 및 인용 지침]\n{guide}\n" if guide else ""
+        guide_section = ""
+        if guide:
+            approval_scope = source.get("approval_scope")
+            has_rich_content = bool(content and content != "(원문 본문 미확보)" and len(content.strip()) > 30)
+            if approval_scope == "FULL_APPROVED" and has_rich_content:
+                # 사실 목록(- 확인된 승인 사실 목록: ...) 블록만 걷어내고 승인 구분과 인용 지침을 보존
+                lines = [l for l in guide.splitlines() if not l.strip().startswith("* ") and not l.strip().startswith("- 확인된")]
+                lean_guide = "\n".join(lines).strip()
+                guide_section = f"\n[사실 검토 및 인용 지침]\n{lean_guide}\n"
+            else:
+                guide_section = f"\n[사실 검토 및 인용 지침]\n{guide}\n"
 
-        blocks.append(json.dumps(meta, ensure_ascii=False) + guide_section + "\n본문:\n" + (content or "(원문 본문 미확보)"))
+        # 본문이 비어있는데 guide가 있다면 guide를 본문 Fallback으로 활용
+        effective_content = content
+        if not effective_content or effective_content == "(원문 본문 미확보)":
+            if guide:
+                effective_content = f"(문서 추출 사실)\n{guide}"
+            else:
+                effective_content = "(원문 본문 미확보)"
+
+        blocks.append(json.dumps(meta, ensure_ascii=False) + guide_section + "\n본문:\n" + effective_content)
     rendered = "\n\n".join(blocks) or "(검색된 출처 없음)"
     if len(rendered) > max_chars:
         raise ValueError("GROUNDING_CONTEXT_LIMIT_EXCEEDED")

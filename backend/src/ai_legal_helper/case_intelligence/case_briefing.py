@@ -381,13 +381,48 @@ def build_case_evidence_briefing(
         ))
         doc_claims = claims_by_doc.get(document.id, [])
         claim_summary = compute_document_claim_review_summary(doc_claims)
+
+        # 1. EvidenceSpan으로부터 본문 발췌문 조합
+        raw_content = "\n".join(span.text_excerpt for span in spans if span.text_excerpt).strip()
+
+        # 2. EvidenceSpan이 누락되었거나 비어있는 경우 정합성 Fallback 보강
+        # - 시딩(seeding) 스크립트나 마이그레이션 환경에서 EvidenceSpan이 미처 생성되지 않았더라도,
+        #   이미 사용자가 검토·승인한 사실관계(Fact/Claim) 및 디스크 원본 파일로부터 본문을 안전하게 복원한다.
+        if not raw_content:
+            # 2-1. 승인된 사실(approved_claims) 목록 조합 우선 적용
+            approved_statements = claim_summary.get("approved_claims") or []
+            if approved_statements:
+                raw_content = "\n".join(approved_statements)
+            # 2-2. 문서에 연결된 전체 클레임(doc_claims) 진술문 활용
+            elif doc_claims:
+                raw_content = "\n".join(c.statement for c in doc_claims if c.statement)
+
+            # 2-3. 클레임도 없는 경우 디스크 원본 파일(storage_path)에서 직접 텍스트 읽기 시도
+            if not raw_content and document.safe_storage_key:
+                from ai_legal_helper.case_intelligence.evidence_ingestion import get_storage_dir
+                storage_candidates = [
+                    os.path.join(get_storage_dir(), document.safe_storage_key),
+                    os.path.join("backend", "storage", "evidence", document.safe_storage_key),
+                    os.path.join("storage", "evidence", document.safe_storage_key),
+                ]
+                for cand in storage_candidates:
+                    if os.path.exists(cand) and os.path.isfile(cand):
+                        try:
+                            with open(cand, "r", encoding="utf-8", errors="ignore") as f:
+                                file_text = f.read().strip()
+                                if file_text:
+                                    raw_content = file_text
+                                    break
+                        except Exception as read_err:
+                            logger.warning(f"[CASE_BRIEFING] 스토리지 원본 파일 읽기 실패 ({cand}): {read_err}")
+
         source_documents.append({
             "evidence_id": document.id, "evidence_label": label_map[document.id],
             "document_name": document.original_filename, "review_status": document.status,
             "source_kind": document.source_kind,
             "sha256": document.sha256, "extraction_version": document.extraction_version,
             "extracted_at": str(document.extracted_at) if document.extracted_at else None,
-            "content": "\n".join(span.text_excerpt for span in spans),
+            "content": raw_content,
             "span_ids": [span.id for span in spans],
             "approval_scope": claim_summary["approval_scope"],
             "approval_scope_label": claim_summary["approval_scope_label"],

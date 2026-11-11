@@ -244,8 +244,9 @@ def write_document_answer(
     ) if key in review}
     repair_notes["지적된 주장"] = [c for c in review.get("claims", [])
                                   if c.get("grounding_status") in ("UNSUPPORTED", "UNCERTAIN")]
+    unique_history = list(dict.fromkeys(user_history or []))
     payload = {"현재 질문": question, "검토 기준일": as_of_date or date.today().isoformat(),
-               "이전 사용자 발언(미입증 진술)": user_history or [],
+               "이전 사용자 발언(미입증 진술)": unique_history,
                "수정 대상(사실 출처 아님)": previous_draft,
                "검증 지적": repair_notes,
                "수정 중 보존할 설명(원문과 재대조)": preserved_points or []}
