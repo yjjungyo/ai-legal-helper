@@ -3,7 +3,7 @@
 **작성:** 2026-11-02  
 **기준 소스:** P2 main `4f47a33de95ca3db9cec2931265b8f12fc2842d3`  
 **개발 브랜치:** `feature/temporal-legal-rag-p3-common-retrieval`  
-**핵심 제약:** 기존 8개 Agent 유지, 동적 Agent 생성 금지, 공식 법령 검색의 기존 HILT 유지.
+**핵심 제약:** 기존 8개 Agent 유지, 동적 Agent 생성 금지, 공식 법령 검색의 기존 HITL 유지.
 
 ## 1. 문제 정의
 
@@ -59,7 +59,7 @@
 | `tests/unit/test_law_retrieval_tool_p3.py` | 기존 8개 Tool/AgentExecutor 통합 Mock 테스트 |
 | `.github/workflows/temporal-legal-rag-p3.yml` | 두 격리 테스트 Job 자동화 |
 
-기존 PostgreSQL, Neo4j, ChromaDB 데이터 및 HILT Graph 구성은 변경하지 않는다.
+기존 PostgreSQL, Neo4j, ChromaDB 데이터 및 HITL Graph 구성은 변경하지 않는다.
 
 ## 4. 근거 확보 상태
 
@@ -78,7 +78,7 @@
 API를 옵션 `as_of_date`로 적용하되, 이를 실제 사건 날짜에서 추출하고
 정식 시행/적용례 검증으로 연결하는 작업은 P5~P8에서 진행한다.
 
-`official_search_recommended`는 **LangGraph가 추후 HILT를 처리할 수 있도록
+`official_search_recommended`는 **LangGraph가 추후 HITL를 처리할 수 있도록
 제공하는 판단용 신호**이며 P3가 OpenLaw를 자동 호출한다는 뜻이 아니다.
 벡터 서비스 장애로 법령이 조회되지 않은 경우 자동 공식 검색을 권하지 않는다.
 
@@ -162,7 +162,7 @@ CI `Temporal Legal RAG P3 regression`의 2개 Job 결과:
 - 장애/근거 없음 구분 정확도
 - Tool 검색 소요시간 P50/P95
 - LLM 호출 횟수/토큰량
-- HILT 승인·거절 및 Checkpoint 회귀
+- HITL 승인·거절 및 Checkpoint 회귀
 
 두 컬렉션을 검색하므로 P3 자체가 항상 더 빠르다고 주장하지 않는다.
 P11에서 실측값을 기준으로 캐시 및 중복 검색 최적화를 추가한다.
@@ -171,7 +171,7 @@ P11에서 실측값을 기준으로 캐시 및 중복 검색 최적화를 추가
 
 - **P4:** 공식 시행일 기준 법령·연혁 API 조회 및 부칙 원문 확보
 - **P5:** 법률 사건 기준일·부칙 적용례를 검증한 Temporal Resolver
-- **P6:** LangGraph 선행 검색 계획과 기존 HILT 승인 경로 연결
+- **P6:** LangGraph 선행 검색 계획과 기존 HITL 승인 경로 연결
 - **P7~P8:** 공통 Evidence Bundle의 Synthesizer/Verification 연동
 - **P9:** 독립 백그라운드 법령 임베딩 Worker 및 중복 작업 방지
 - **P10:** 기존 레거시 Vector 메타데이터 검증·마이그레이션
