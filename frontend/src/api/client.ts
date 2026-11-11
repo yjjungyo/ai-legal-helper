@@ -87,7 +87,7 @@ export async function getCaseConversationDetail(
 }
 
 /**
- * HILT 법령 원문 검색 승인/거절 결정을 서버로 전송한다.
+ * HITL 법령 원문 검색 승인/거절 결정을 서버로 전송한다.
  *
  * @param requestId 대상 상담 요청 ID
  * @param approved 사용자 승인 여부 (true: 승인, false: 거절)
