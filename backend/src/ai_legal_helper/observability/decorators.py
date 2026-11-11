@@ -231,9 +231,9 @@ def trace(func: Callable) -> Callable:
         }
         step_desc = get_kr_step_name(func.__name__)
         log_data["step_name_kr"] = step_desc
-        logger.info(f"[HILT_INTERRUPT] [{step_desc}] 사용자 승인(HILT) 대기 일시 중단: {e}", extra=log_data)
+        logger.info(f"[HITL_INTERRUPT] [{step_desc}] 사용자 승인(HITL) 대기 일시 중단: {e}", extra=log_data)
         try:
-            end_span(span_id=current_span_id, level="DEFAULT", status_message="Interrupted for HILT decision")
+            end_span(span_id=current_span_id, level="DEFAULT", status_message="Interrupted for HITL decision")
         except Exception as ex:
             logger.debug(f"Langfuse 중단 스팬 기록 오류: {ex}")
 
@@ -336,7 +336,7 @@ def trace(func: Callable) -> Callable:
                 except Exception as e:
                     exc_name = type(e).__name__
                     if exc_name in ("GraphInterrupt", "Interrupt"):
-                        span.set_status(Status(StatusCode.OK, "Interrupted for HILT"))
+                        span.set_status(Status(StatusCode.OK, "Interrupted for HITL"))
                         log_interrupt(start_time, current_span_id, e, parent_agent, parent_node)
                         raise e
                     import re
@@ -397,7 +397,7 @@ def trace(func: Callable) -> Callable:
                 except Exception as e:
                     exc_name = type(e).__name__
                     if exc_name in ("GraphInterrupt", "Interrupt"):
-                        span.set_status(Status(StatusCode.OK, "Interrupted for HILT"))
+                        span.set_status(Status(StatusCode.OK, "Interrupted for HITL"))
                         log_interrupt(start_time, current_span_id, e, parent_agent, parent_node)
                         raise e
                     import re
