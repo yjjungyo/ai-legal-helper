@@ -26,8 +26,8 @@ asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, a
 collecting ... collected 8 items
 
 tests/unit/test_p0_defects_reproduction.py::test_p0_01_reproduce_verification_fail_open PASSED [ 12%]
-tests/unit/test_p0_defects_reproduction.py::test_p0_02_reproduce_hilt_bypass_verification_failure PASSED [ 25%]
-tests/unit/test_p0_defects_reproduction.py::test_p0_02_reproduce_non_statute_issue_does_not_trigger_hilt PASSED [ 37%]
+tests/unit/test_p0_defects_reproduction.py::test_p0_02_reproduce_hitl_bypass_verification_failure PASSED [ 25%]
+tests/unit/test_p0_defects_reproduction.py::test_p0_02_reproduce_non_statute_issue_does_not_trigger_hitl PASSED [ 37%]
 tests/unit/test_p0_defects_reproduction.py::test_p0_04_reproduce_statute_search_no_arbitrary_law_fallback PASSED [ 50%]
 tests/unit/test_p0_defects_reproduction.py::test_p0_04_https_enforcement_and_masking PASSED [ 62%]
 tests/unit/test_p0_defects_reproduction.py::test_p0_04_retry_on_network_timeout PASSED [ 75%]
@@ -113,7 +113,7 @@ dist/assets/index-CZ9k4mG4.js   541.76 kB │ gzip: 166.40 kB
 | 결함 ID | 결함명 | 합격 기준 | 검증 결과 |
 |---|---|---|---|
 | **P0-01** | Verification Agent Fail-open 제거 | 검증기 오류(타임아웃/파싱) 발생 시 PASS 확정 불가, INSUFFICIENT(VERIFICATION_ERROR)로 안전 종료 | **PASS** (`test_p0_01_reproduce_verification_fail_open`) |
-| **P0-02** | HILT 이후 검증 우회 제거 | HILT 완료 후 2차 검증 실패 시 finalize 직행 차단, 오직 PASS일 때만 finalize 진입 | **PASS** (`test_p0_02_reproduce_hilt_bypass_verification_failure`, `test_p0_02_reproduce_non_statute_issue_does_not_trigger_hilt`) |
+| **P0-02** | HITL 이후 검증 우회 제거 | HITL 완료 후 2차 검증 실패 시 finalize 직행 차단, 오직 PASS일 때만 finalize 진입 | **PASS** (`test_p0_02_reproduce_hitl_bypass_verification_failure`, `test_p0_02_reproduce_non_statute_issue_does_not_trigger_hitl`) |
 | **P0-03** | LangGraph Checkpointer 영속화 | PostgreSQL 영속 Checkpointer 적용, 프로세스 종료/재시작 후에도 이전 thread_id 복원 및 resume 성공, 미존재 thread 예외 처리 | **PASS** (`test_p0_03_postgres_checkpointer_persistence_across_restart`, `test_p0_03_nonexistent_thread_raises_error`) |
 | **P0-04** | 법령 검색 HTTPS/보안/Fallback 제거 | HTTPS 강제 통신, API 키 마스킹, 일치하지 않는 법령의 임의 채택(find .//law) 차단, 네트워크 타임아웃 1회 재시도 | **PASS** (`test_p0_04_reproduce_statute_search_no_arbitrary_law_fallback`, `test_p0_04_https_enforcement_and_masking`, `test_p0_04_retry_on_network_timeout`) |
 
