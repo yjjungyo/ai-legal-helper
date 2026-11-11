@@ -135,7 +135,7 @@ class LawResolver:
             MULTIPLE: 질문에서 서로 다른 공식 법령명을 독립적으로 명시
             AMBIGUOUS: 동일 표현이 복수 공식 law_id에 연결
             SUGGESTED: 질문에는 법령명이 없지만 공식 이름과 일치한 제안
-            NO_MATCH: 공식 법령 후보 없음 (추후 HILT 공식 검색 필요)
+            NO_MATCH: 공식 법령 후보 없음 (추후 HITL 공식 검색 필요)
             CATALOG_EMPTY: 관리자 목록 동기화가 필요
         """
         if not question or not question.strip() or max_candidates <= 0:
