@@ -9,12 +9,12 @@ def test_ready_goes_to_verification():
 
 
 def test_missing_law_requests_approval_before_verification():
-    state = {"synthesis_law_gate": {"status": "NEED_MORE_LAW"}, "statute_search_count": 0, "hilt_executed": False}
+    state = {"synthesis_law_gate": {"status": "NEED_MORE_LAW"}, "statute_search_count": 0, "hitl_executed": False}
     assert synthesis_law_gate_condition(state) == "statute_search_approval"
 
 
 def test_missing_law_with_prior_approval_does_not_loop():
-    state = {"synthesis_law_gate": {"status": "NEED_MORE_LAW"}, "statute_search_count": 1, "hilt_executed": True}
+    state = {"synthesis_law_gate": {"status": "NEED_MORE_LAW"}, "statute_search_count": 1, "hitl_executed": True}
     assert synthesis_law_gate_condition(state) == "insufficient"
 
 
@@ -115,7 +115,7 @@ def test_post_search_synthesis_forces_draft_and_skips_need_more_law(monkeypatch)
         "question": "임대차 종료 및 보증금 반환",
         "statute_search_status": "OFFICIAL_SUCCESS",
         "statute_search_count": 1,
-        "hilt_executed": True,
+        "hitl_executed": True,
     }
     out = consultation_module.generate_answer(state)
     assert captured_allow["allow_need_more_law"] is False
