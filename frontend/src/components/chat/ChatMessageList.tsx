@@ -15,11 +15,11 @@ export interface ChatMessageListProps {
   messages: ConsultationResponse[];
   /** 증거 번호 [E01] 클릭 핸들러 */
   onEvidenceClick: (label: string, meta?: CitationMeta) => void;
-  /** HILT 법령 검색 승인 핸들러 */
+  /** HITL 법령 검색 승인 핸들러 */
   onApprove: (requestId: string) => void;
-  /** HILT 법령 검색 거절 핸들러 */
+  /** HITL 법령 검색 거절 핸들러 */
   onReject: (requestId: string) => void;
-  /** HILT 승인/거절 액션 로딩 상태 */
+  /** HITL 승인/거절 액션 로딩 상태 */
   isActionLoading?: boolean;
   onReanalyze?: (message: ConsultationResponse) => void;
   isReanalysisDisabled?: boolean;
