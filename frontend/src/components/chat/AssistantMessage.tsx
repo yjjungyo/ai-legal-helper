@@ -20,11 +20,11 @@ export interface AssistantMessageProps {
   message: ConsultationResponse;
   /** 증거 태그/출처 클릭 콜백 (사이드바 원문 Drawer 열기) */
   onEvidenceClick: (label: string, meta?: any) => void;
-  /** HILT 외부 법령 검색 승인 콜백 */
+  /** HITL 외부 법령 검색 승인 콜백 */
   onApprove: (requestId: string) => void;
-  /** HILT 외부 법령 검색 거절 콜백 */
+  /** HITL 외부 법령 검색 거절 콜백 */
   onReject: (requestId: string) => void;
-  /** HILT 버튼 처리 중 여부 */
+  /** HITL 버튼 처리 중 여부 */
   isActionLoading?: boolean;
   onReanalyze?: (message: ConsultationResponse) => void;
   isReanalysisDisabled?: boolean;
