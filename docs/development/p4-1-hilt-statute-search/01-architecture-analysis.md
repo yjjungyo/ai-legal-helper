@@ -1,7 +1,7 @@
-# P4.1 Verifier-Guided HILT 법령 검색 — 01. 기존 구조 분석 및 P4.1 설계 대비
+# P4.1 Verifier-Guided HITL 법령 검색 — 01. 기존 구조 분석 및 P4.1 설계 대비
 
 ## 1. 개요
-본 문서는 `AI Legal Helper`의 기존 Supervisor & Verification Agent 워크플로우를 분석하고, 내부 법률 RAG 데이터베이스 부재(예: 특별법인 주택임대차보호법 조문 누락) 시 발생하던 한계를 극복하기 위해 설계된 **P4.1 Verifier-Guided HILT(Human-in-the-Loop) 법령 검색 아키텍처**를 기존 구조와 비교·분석한다.
+본 문서는 `AI Legal Helper`의 기존 Supervisor & Verification Agent 워크플로우를 분석하고, 내부 법률 RAG 데이터베이스 부재(예: 특별법인 주택임대차보호법 조문 누락) 시 발생하던 한계를 극복하기 위해 설계된 **P4.1 Verifier-Guided HITL(Human-in-the-Loop) 법령 검색 아키텍처**를 기존 구조와 비교·분석한다.
 
 ---
 
@@ -32,7 +32,7 @@
 
 ---
 
-## 3. P4.1 Verifier-Guided HILT 목표 아키텍처
+## 3. P4.1 Verifier-Guided HITL 목표 아키텍처
 
 ```mermaid
 flowchart TD
@@ -44,7 +44,7 @@ flowchart TD
     F -->|PASS| Z[Finalize]
     F -->|REVISE: 일반 작성오류| G[Revise: 1회 보강 검색]
     G --> E
-    F -->|INSUFFICIENT: 법률 근거 부족| H[HILT: statute_search_approval]
+    F -->|INSUFFICIENT: 법률 근거 부족| H[HITL: statute_search_approval]
     H --> I{사용자 승인 여부}
     I -->|승인| J[공식 법령 원문 검색: open.law.go.kr]
     I -->|거절| K[Insufficient: 판단 유보 안내]
@@ -60,11 +60,11 @@ flowchart TD
 
 ## 4. 기존 아키텍처 대비 P4.1 개선 비교표
 
-| 비교 항목 | 기존 아키텍처 (P3.3) | P4.1 HILT 아키텍처 |
+| 비교 항목 | 기존 아키텍처 (P3.3) | P4.1 HITL 아키텍처 |
 | :--- | :--- | :--- |
 | **Verifier 결과 구조** | 단순 상태값 (`status: PASS/REVISE/INSUFFICIENT`) | 원인 코드화 (`reason_code`, `candidate_laws`, `missing_legal_issues`, `recommended_action`) |
-| **법률 근거 부족 대응** | `insufficient` 노드로 직행하여 판단 유보 | 법률 부족 감지 시 즉시 HILT 노드(`statute_search_approval`)로 라우팅 |
-| **인터럽트 및 재개(HILT)**| 미구현 | LangGraph 0.6+ 표준 `interrupt()` 및 `Command(resume=...)` 패턴 구현 |
+| **법률 근거 부족 대응** | `insufficient` 노드로 직행하여 판단 유보 | 법률 부족 감지 시 즉시 HITL 노드(`statute_search_approval`)로 라우팅 |
+| **인터럽트 및 재개(HITL)**| 미구현 | LangGraph 0.6+ 표준 `interrupt()` 및 `Command(resume=...)` 패턴 구현 |
 | **법령 검색 도구** | 내부 ChromaDB 로컬 벡터스토어에 한정 | 법제처 국가법령정보공동활용 API (`open.law.go.kr`) 공식 연동 |
 | **출처 무결성 보장** | 로컬 문서 인용만 검증 | `source_type: STATUTE`, 공식 URL, 조문 단위 파싱 및 허위 인용 원천 차단 |
 | **사용자 인터랙션 UI** | 일반 채팅 인터페이스 | 승인 대기 카드 (`APPROVAL_REQUIRED`) 및 [승인/재분석], [종료] 버튼 제공 |
