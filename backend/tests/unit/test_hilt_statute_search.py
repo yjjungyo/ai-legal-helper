@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-모듈명: test_hilt_statute_search.py
+모듈명: test_hitl_statute_search.py
 
 [모듈 개요]
-P4.1 Verifier-Guided HILT 법령 검색 워크플로우에 대한 종합 시나리오 테스트(T-01 ~ T-08)를 구현한다.
+P4.1 Verifier-Guided HITL 법령 검색 워크플로우에 대한 종합 시나리오 테스트(T-01 ~ T-08)를 구현한다.
 
 [테스트 시나리오]
-- T-01: 내부 RAG에 관련 법률이 있어 정상 PASS되는 사건 (HILT 미진입 검증)
-- T-02: 특별법(주택임대차보호법) 누락으로 LEGAL_SOURCE_MISSING 감지 시 HILT 인터럽트 진입 검증
+- T-01: 내부 RAG에 관련 법률이 있어 정상 PASS되는 사건 (HITL 미진입 검증)
+- T-02: 특별법(주택임대차보호법) 누락으로 LEGAL_SOURCE_MISSING 감지 시 HITL 인터럽트 진입 검증
 - T-03: 사용자 승인 시 공식 법령 원문 검색 호출, 출처 병합, 재분석 및 최종 PASS 전이 검증
 - T-04: 사용자 거절 시 외부 검색 차단 및 판단 유보 안내 검증
 - T-05: 외부 법령 검색 결과 부재 시 판단 유보 안전 종료 검증
@@ -36,12 +36,12 @@ from ai_legal_helper.workflows.legal_workflow import (
 )
 
 
-def test_t01_normal_pass_bypasses_hilt():
-    """T-01: 내부 RAG에 충분한 근거가 있어 Verifier가 PASS인 경우 HILT 없이 finalize로 직행하는지 검증한다."""
+def test_t01_normal_pass_bypasses_hitl():
+    """T-01: 내부 RAG에 충분한 근거가 있어 Verifier가 PASS인 경우 HITL 없이 finalize로 직행하는지 검증한다."""
     state: LegalState = {
         "messages": [HumanMessage(content="민법상 임대인의 수선의무는?")],
         "revision_count": 0,
-        "hilt_executed": False,
+        "hitl_executed": False,
         "verification_result": {
             "status": "PASS",
             "reason_code": "NONE",
@@ -50,15 +50,15 @@ def test_t01_normal_pass_bypasses_hilt():
         },
     }
     next_node = verification_condition(state)
-    assert next_node == "finalize", "PASS 상태에서는 HILT 노드로 진입하지 않고 finalize로 라우팅되어야 한다."
+    assert next_node == "finalize", "PASS 상태에서는 HITL 노드로 진입하지 않고 finalize로 라우팅되어야 한다."
 
 
-def test_t02_missing_statute_triggers_hilt_approval():
-    """T-02: 특별법 누락(LEGAL_SOURCE_MISSING) 및 candidate_laws 감지 시 HILT 승인 노드로 라우팅되는지 검증한다."""
+def test_t02_missing_statute_triggers_hitl_approval():
+    """T-02: 특별법 누락(LEGAL_SOURCE_MISSING) 및 candidate_laws 감지 시 HITL 승인 노드로 라우팅되는지 검증한다."""
     state: LegalState = {
         "messages": [HumanMessage(content="묵시적 갱신 후 해지 통보 효력 시점은?")],
         "revision_count": 0,
-        "hilt_executed": False,
+        "hitl_executed": False,
         "verification_result": {
             "status": "INSUFFICIENT",
             "reason_code": "LEGAL_SOURCE_MISSING",
@@ -68,7 +68,7 @@ def test_t02_missing_statute_triggers_hilt_approval():
     }
     next_node = verification_condition(state)
     assert next_node == "statute_search_approval", (
-        "법률 근거 부족(LEGAL_SOURCE_MISSING)과 후보 법령이 있을 때 HILT 승인 노드로 라우팅되어야 한다."
+        "법률 근거 부족(LEGAL_SOURCE_MISSING)과 후보 법령이 있을 때 HITL 승인 노드로 라우팅되어야 한다."
     )
 
 
@@ -137,7 +137,7 @@ def test_t05_empty_search_results_routes_to_insufficient():
     """T-05: 외부 법령 검색 결과가 비어있는 경우 무리하게 답변하지 않고 insufficient로 종료되는지 검증한다."""
     state: LegalState = {
         "question": "미지의 법률에 관한 질의",
-        # P6 이후 실제 외부 검색은 HILT 승인이 있는 경우에만 허용한다.
+        # P6 이후 실제 외부 검색은 HITL 승인이 있는 경우에만 허용한다.
         # 이 테스트는 '승인된 검색에서도 결과가 비어 있을 때'의 안전 종료를 검증한다.
         "approval_status": "APPROVED",
         "approved_statute_laws": ["가상의법률"],
@@ -305,8 +305,8 @@ def test_t08_server_restart_preserves_pending_approval():
         raise e
 
 
-def test_t09_hilt_post_reanalyze_allows_revise_and_high_support_soft_landing():
-    """T-09 (Trace d6f26e28 회귀 방지): HILT 법령 검색 후(re_analyze) 초안에 1회 재검토(revise) 기회를 부여하고, 고비율 지지 시 CAUTIONARY로 확정한다."""
+def test_t09_hitl_post_reanalyze_allows_revise_and_high_support_soft_landing():
+    """T-09 (Trace d6f26e28 회귀 방지): HITL 법령 검색 후(re_analyze) 초안에 1회 재검토(revise) 기회를 부여하고, 고비율 지지 시 CAUTIONARY로 확정한다."""
     from ai_legal_helper.workflows.legal_workflow import supervisor_verification_decision
 
     # 1. re_analyze 완료 직후(revision_count=1) REVISE 발생 시 revise 노드로 라우팅 검증
@@ -317,7 +317,7 @@ def test_t09_hilt_post_reanalyze_allows_revise_and_high_support_soft_landing():
         {"claim": "시행일은 2027.4.27.경으로 보입니다.", "claim_type": "LEGAL_RULE", "grounding_status": "UNSUPPORTED"}
     ]
     state_after_reanalyze = {
-        "hilt_executed": True,
+        "hitl_executed": True,
         "revision_count": 1,
         "verification_result": {
             "status": "REVISE",
@@ -327,7 +327,7 @@ def test_t09_hilt_post_reanalyze_allows_revise_and_high_support_soft_landing():
         },
         "retrieved_sources": [{"source_id": "OFFICIAL:1", "statute_name": "민간임대주택에 관한 특별법 시행령"}],
     }
-    assert supervisor_verification_decision(state_after_reanalyze) == "revise", "HILT 완료 후 첫 검증 REVISE 시 revise 노드로 수정 기회를 부여해야 한다."
+    assert supervisor_verification_decision(state_after_reanalyze) == "revise", "HITL 완료 후 첫 검증 REVISE 시 revise 노드로 수정 기회를 부여해야 한다."
 
     # 2. revise 완료 후(revision_count=2) 85% 이상 고비율 지지 및 무결함 시 finalize(CAUTIONARY) 소프트랜딩 검증
     state_after_revise = {
