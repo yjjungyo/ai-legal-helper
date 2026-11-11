@@ -23,7 +23,7 @@
 | Tool | `rag/retrieval_factory.py`에서 분야별 단일 Chroma 컬렉션 검색 | 공통 LawRetrievalService 어댑터로 전환 |
 | 실제 Tool 실행 | `agents/legal/base_agent.py` `AgentExecutor.invoke()`는 `tools[0]`만 실행 | 추가 Tool 연결만으로 검색이 확장된다고 가정하지 않음 |
 | LangGraph | `plan → run_agents → synthesize → verification` | 필요한 법령을 최초 synthesize 전에 선행 검색 |
-| HILT | 승인 및 공식 검색이 `verification_result` 후보 법령에 의존 | `legal_search_plan` 별도 계약 필요 |
+| HITL | 승인 및 공식 검색이 `verification_result` 후보 법령에 의존 | `legal_search_plan` 별도 계약 필요 |
 | 공식 검색 | `search_official_statutes()`는 후보 법령명 필요, 날짜 인자를 전달받음 | 전체 카탈로그 식별 및 과거/시행예정 버전 조회 보완 |
 | 현재 시간 메타 | `source_schema.py`에는 `law_id/version_id/promulgation_date/effective_date` 일부 존재 | 조문별 시행일·부칙·적용례·신뢰상태 별도 저장 |
 | 위험한 기본값 | `is_statute_applicable_to_date()`가 날짜 누락 시 `True` 반환 | 적용 여부 3상 이상 판정 API로 교체 |
@@ -75,7 +75,7 @@
 - `backend/tests/unit/test_statute_temporal_p0_law_02.py`
 - `backend/tests/unit/test_official_statute_search.py`
 - `backend/tests/integration/test_router_workflow.py`
-- 문서 Snapshot/승인 및 HILT Resume 관련 테스트
+- 문서 Snapshot/승인 및 HITL Resume 관련 테스트
 
 ## 5. 실행 방법
 
@@ -101,7 +101,7 @@ P1에 진입하기 전에 최소 다음 사항을 확인해야 한다.
 - 기존 일반 상담 Router 회귀 테스트 PASS
 - 두 건의 known-gap xfail 상태 확인 및 해결 계획 유지
 - 테스트 실행의 실제 결과와 Git SHA 기록
-- HILT 승인/거절을 포함한 후속 통합 테스트 대상 식별
+- HITL 승인/거절을 포함한 후속 통합 테스트 대상 식별
 - 현행 Trace에 대한 실제 Generation 분해 및 Critical Path 검증 계획
 
 **다음 개발 단계(P1):** 법령 시간 메타데이터 계약과 명시적인 `APPLICABLE / NOT_APPLICABLE / UNCONFIRMED` 판단 API를 추가하고, 레거시 함수의 조용한 fail-open 위험을 제거한다. 적용시점이 복잡한 부칙은 자동으로 확정하지 않고 원문·판단 근거·불확실성을 보존한다.
