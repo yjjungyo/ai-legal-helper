@@ -5,7 +5,7 @@
 ## 구현 내용
 
 - PostgreSQL official_law_index_jobs: 공식 법령 ID + MST에 Unique Constraint
-- 기존 HILT 승인을 받은 공식 검색 중 P4 HISTORY_COMPLETE/MST 정합 자료만 작업 등록
+- 기존 HITL 승인을 받은 공식 검색 중 P4 HISTORY_COMPLETE/MST 정합 자료만 작업 등록
 - LEGAL_BACKGROUND_INDEX_ENABLED=1로 승인된 검색 후 Job 등록
 - 전체 XML의 조문과 해당 공포번호 부칙을 별도 Worker에서 ChromaDB law_docs_global에 Upsert
 - 청크 ID는 법령ID/MST/조문/본문 해시 조합; 다른 역사 버전과 기존 컬렉션은 삭제하지 않음
