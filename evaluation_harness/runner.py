@@ -65,7 +65,7 @@ class EvaluationRunner:
         scenario_ids: Optional[List[str]] = None,
         run_id: Optional[str] = None,
         output_dir: Optional[Path] = None,
-        auto_approve_hilt: bool = True,
+        auto_approve_hitl: bool = True,
     ) -> EvaluationRunSummary:
         """평가 시나리오들을 순차 실행하고 종합 성적표를 생성한다.
 
@@ -74,7 +74,7 @@ class EvaluationRunner:
             scenario_ids: 실행할 시나리오 ID 목록 (None인 경우 전체 실행)
             run_id: 평가 실행 식별자 (미지정 시 타임스탬프 기반 자동 생성)
             output_dir: 산출물 저장 디렉토리
-            auto_approve_hilt: HILT 승인 요청 시 자동 승인 및 완료 여부
+            auto_approve_hitl: HITL 승인 요청 시 자동 승인 및 완료 여부
 
         Returns:
             EvaluationRunSummary: 실행 결과 통계 요약
@@ -102,7 +102,7 @@ class EvaluationRunner:
             logger.info(f"[{idx}/{len(scenarios)}] 시나리오 실행 중: {sc.scenario_id} - {sc.title}")
             try:
                 # 비파괴적 파이프라인 호출
-                actual_output = self.adapter.run_scenario(sc, auto_approve_hilt=auto_approve_hilt)
+                actual_output = self.adapter.run_scenario(sc, auto_approve_hitl=auto_approve_hitl)
                 # 결정론적 스코어러 채점
                 eval_res = evaluate_scenario(sc, actual_output, run_id=active_run_id)
             except Exception as e:
