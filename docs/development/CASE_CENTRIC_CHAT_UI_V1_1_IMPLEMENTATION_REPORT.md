@@ -50,9 +50,9 @@ AI Legal Helper는 일회성 질문에 답변하는 단순 챗봇이 아니라, 
 
 ### 3.1 자가 참조 법령 검증 결함 수정 (`issue_verifier.py`)
 - **결함 내용**: 기존 검증 로직에서 초안 답변(`draft_answer`)에 기재된 법령명이 RAG 검색 출처(`source_texts`)에 실제로 존재하지 않음에도, 초안 답변 텍스트 자체를 검증 텍스트로 합산하여 스스로 검증을 통과하는 자가참조(Self-referential) 버그 발생.
-- **수정 조치**: 법령 검증 대상을 `source_texts`로 엄격히 한정하여 RAG 또는 OpenLaw HILT를 통해 실제 입수된 법령 조문만 유효 검증 처리하도록 개선.
+- **수정 조치**: 법령 검증 대상을 `source_texts`로 엄격히 한정하여 RAG 또는 OpenLaw HITL를 통해 실제 입수된 법령 조문만 유효 검증 처리하도록 개선.
 
-### 3.2 HILT 분기 및 실시간 단계 스트리밍 (`legal_workflow.py`)
+### 3.2 HITL 분기 및 실시간 단계 스트리밍 (`legal_workflow.py`)
 - `verification_condition`: `candidate_laws`가 존재하고 필수 법령이 누락된 경우, `CAUTIONARY` 판정이라도 `statute_search_approval` 노드로 분기하도록 보장.
 - `run_legal_consultation` & `_execute_consultation`: `on_step_callback` 콜백 파라미터를 추가하여 LangGraph 노드 전이 시 실시간으로 DB 및 인메모리 `ConsultationProgress`가 즉시 갱신되도록 파이프라인 연결.
 
@@ -80,7 +80,7 @@ HTML 프로토타입 시안(`ai_legal_helper_case_chat_ui.html`)을 기반으로
 | **ChatMessage** | `components/chat/ChatMessage.tsx` | 단일 상담 턴(Turn) 통합 렌더러 (`UserMessage` + `AssistantMessage`) |
 | **UserMessage** | `components/chat/UserMessage.tsx` | 우측 정렬된 블루 그라데이션 말풍선, 턴 번호 및 발송 시각 표기 |
 | **AssistantMessage** | `components/chat/AssistantMessage.tsx` | 좌측 정렬 비서 응답. 진행 중/승인 대기 시 `ConsultationProgress` 표시, 완료 시 `LegalAnswerView`로 인플레이스 전이 |
-| **ConsultationProgress** | `components/chat/ConsultationProgress.tsx` | 6단계 LangGraph 진행 상태 체크리스트(아이콘/스피너), HILT 승인 대기 인라인 박스(법령 목록, 승인/건너뛰기 액션) |
+| **ConsultationProgress** | `components/chat/ConsultationProgress.tsx` | 6단계 LangGraph 진행 상태 체크리스트(아이콘/스피너), HITL 승인 대기 인라인 박스(법령 목록, 승인/건너뛰기 액션) |
 | **ChatComposer** | `components/chat/ChatComposer.tsx` | 하단 고정형 질문 입력창. Textarea 자동 높이 조절(최대 140px), Enter 전송, Shift+Enter 줄바꿈, **한글 IME 조합 방어(`e.nativeEvent.isComposing`)** |
 | **EvidenceCitation** | `components/chat/EvidenceCitation.tsx` | `[E01]`, `[E02]` 등 인라인 증거 번호 클릭 배지 |
 | **EvidenceSourceDrawer** | `components/chat/EvidenceSourceDrawer.tsx` | 우측 슬라이드오버 패널. 증거 문서명, 메타데이터, 추출 사실(Claims), 텍스트 발췌(Spans), 증거 탭 바로가기 링크 제공 (ESC 키 닫기) |
@@ -103,7 +103,7 @@ HTML 프로토타입 시안(`ai_legal_helper_case_chat_ui.html`)을 기반으로
 | **UI05** | 의뢰인 질문 말풍선 | 우측 정렬, 블루 그라데이션, 줄바꿈 보존, 발송 시각 및 턴 표기 | **PASS** |
 | **UI06** | 법률 비서 답변 컨테이너 | 좌측 정렬, 저울 아바타, 검증 판정 배지(`VERIFIED`, `CAUTIONARY`, `WITHHELD`) 표기 | **PASS** |
 | **UI07** | 실시간 6단계 체크리스트 | LangGraph 6개 노드 전이 시 스피너/체크마크 실시간 동기화 | **PASS** |
-| **UI08** | HILT 법령 검색 승인 카드 | 승인 대기 시 후보 법령 목록 및 사유 인라인 표시 | **PASS** |
+| **UI08** | HITL 법령 검색 승인 카드 | 승인 대기 시 후보 법령 목록 및 사유 인라인 표시 | **PASS** |
 | **UI09** | 인플레이스 상태 전이 | 승인/거절 시 별도 카드 생성 없이 동일 메시지 위치에서 전이 | **PASS** |
 | **UI10** | 구조화 답변 렌더러 | 8대 권장 구성요소 카드 서식 및 볼드/코드/목록 마크다운 서식 지원 | **PASS** |
 | **UI11** | 증거 인용 클릭 상호작용 | 본문 내 `[E01]` 클릭 시 우측 슬라이드오버 드로어 자동 개방 | **PASS** |
@@ -129,7 +129,7 @@ HTML 프로토타입 시안(`ai_legal_helper_case_chat_ui.html`)을 기반으로
 
 ### 6.1 백엔드 단위 및 통합 테스트 (Pytest)
 - `backend/tests/unit/test_conversation_context.py`: **8 passed**
-- `backend/tests/unit/test_hilt_statute_search.py`: **8 passed**
+- `backend/tests/unit/test_hitl_statute_search.py`: **8 passed**
 - `backend/tests/unit/test_issue_verification.py`: **25 passed**
 - `backend/tests/unit/test_case_centric_chat_api.py`: **5 passed**
 - **전체 백엔드 테스트 스위트 전원 통과 (총 296 passed, 0 failed)**
