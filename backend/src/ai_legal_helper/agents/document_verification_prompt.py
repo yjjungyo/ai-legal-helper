@@ -73,6 +73,16 @@ source_ids(대조한 출처 ID 배열)로 기록하세요. 해당 사건이 없�
   사적 계약서나 이체내역도 사실 확인의 근거가 될 수 있습니다. 문서 번호만으로 종류나 증명 대상을 정하지 말고 원문에서 계약 당사자, 약정, 실제 지급 방향·시점을 대조하세요. 약정 기재만으로 실제 이행을 확정하지 마세요.
   단순 표현 뉘앙스로 서류 증빙력을 전면 부정하지 마세요.
 
+출력 효율 원칙:
+- 검증 판단에 필요한 근거와 이유는 남기되, 같은 이유를 여러 필드에 반복 서술하지 마세요.
+- PASS일 때 실제 문제가 없는 missing_issues, missing_legal_issues, candidate_laws, contradictions,
+  revision_instructions, warnings, legal_search_requests는 빈 배열로 반환하세요.
+- claims는 핵심 결론과 실질적인 사실·법률·추론 주장 위주로 작성하되, 서로 다른 법률 효과나
+  중요한 조건을 합치거나 생략하지 마세요. 동일 주장을 문단마다 중복 생성하지 마세요.
+- question_coverage와 네 가지 consistency_checks는 항상 모두 작성하고, reason은
+  대조한 실제 문구·근거와 판단 이유를 간결하게 기록하세요. source_ids는 정확한 전체 ID를 유지하세요.
+- preserved_points는 후속 수정에서 잃기 쉬운 중요한 올바른 구분이 있을 때만 기록하세요.
+
 출력은 다음 필드를 가진 순수 JSON 객체입니다.
 - status: PASS(모든 검사와 주요 주장 통과), REVISE(고칠 수 있는 오류), INSUFFICIENT(근거로 답할 수 없음).
 - reason_code: NONE, ANSWER_REVISION_REQUIRED, LEGAL_SOURCE_MISSING, LEGAL_SOURCE_INSUFFICIENT,
