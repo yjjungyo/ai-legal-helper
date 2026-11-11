@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""P12-2: DB-only Law Index Resolver. No network, Chroma or HILT bypass.
+"""P12-2: DB-only Law Index Resolver. No network, Chroma or HITL bypass.
 
 The index answers whether a local *candidate* is available; it never grants
 legal applicability. Official history freshness and addenda remain mandatory.
