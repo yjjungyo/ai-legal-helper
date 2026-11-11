@@ -136,7 +136,7 @@ def interpret_with_company_llm(*, article_ids: Sequence[str],
     """Explicit opt-in entry point using the existing observable LLM gateway.
 
     Not invoked by the background indexing worker automatically: the caller
-    controls cost and whether the official source is HILT-authorized.
+    controls cost and whether the official source is HITL-authorized.
     """
     from ai_legal_helper.llm.gateway import get_llm
     llm = get_llm(temperature=0.0)
