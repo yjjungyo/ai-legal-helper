@@ -32,11 +32,11 @@ jobs:
       - run: |
           python -m pip install --upgrade pip
           python -m pip install -r backend/requirements.txt
-      - name: P7 Evidence + P6 HILT regressions
+      - name: P7 Evidence + P6 HITL regressions
         env:
           PYTHONPATH: backend/src
           TESTING: "1"
           LANGFUSE_ENABLED: "false"
           CHECKPOINTER_TYPE: memory
         run: |
-          python -m pytest -q             backend/tests/unit/test_legal_evidence_bundle_p7.py             backend/tests/unit/test_temporal_hilt_workflow_p6.py             backend/tests/unit/test_temporal_law_resolver_p5.py
+          python -m pytest -q             backend/tests/unit/test_legal_evidence_bundle_p7.py             backend/tests/unit/test_temporal_hitl_workflow_p6.py             backend/tests/unit/test_temporal_law_resolver_p5.py
