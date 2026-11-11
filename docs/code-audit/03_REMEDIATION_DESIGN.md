@@ -18,22 +18,22 @@
 
 ---
 
-## 3. P0-02: HILT 검증 정책 및 라우팅 설계
+## 3. P0-02: HITL 검증 정책 및 라우팅 설계
 
-### 3.1 HILT 진입 라우팅 정책
+### 3.1 HITL 진입 라우팅 정책
 - 오직 사유가 법률 근거 부족(`reason_code in ("LEGAL_SOURCE_MISSING", "LEGAL_SOURCE_INSUFFICIENT")`)이고 실제 후보 법령(`candidate_laws`)이 식별된 경우에만 `statute_search_approval`로 분기한다.
-- `CASE_EVIDENCE_MISSING`(증거 부족), `EVIDENCE_CONFLICT`(증거 모순) 등 사실관계 문제는 HILT 법령 검색으로 진입하지 않고 `insufficient_node`로 안전 분기한다.
+- `CASE_EVIDENCE_MISSING`(증거 부족), `EVIDENCE_CONFLICT`(증거 모순) 등 사실관계 문제는 HITL 법령 검색으로 진입하지 않고 `insufficient_node`로 안전 분기한다.
 
-### 3.2 HILT 완료 후 2차 검증 라우팅 정책
-- `hilt_executed == True`이더라도 Verifier 결과가 `PASS`인 경우에만 `finalize`로 전이한다.
+### 3.2 HITL 완료 후 2차 검증 라우팅 정책
+- `hitl_executed == True`이더라도 Verifier 결과가 `PASS`인 경우에만 `finalize`로 전이한다.
 - 2차 검증에서 `status in ("INSUFFICIENT", "REVISE", "ERROR")`인 경우:
-  - 이미 1회 재작성 및 HILT를 거쳤으므로(`revision_count >= 1`), 무한 루프를 방지하고 `insufficient_node`로 안전하게 전이하여 검증 실패 사실을 고지한다.
+  - 이미 1회 재작성 및 HITL를 거쳤으므로(`revision_count >= 1`), 무한 루프를 방지하고 `insufficient_node`로 안전하게 전이하여 검증 실패 사실을 고지한다.
 
 ```mermaid
 flowchart TD
     V[Verification Node] --> C{검증 상태}
     C -->|status == PASS| F[finalize]
-    C -->|reason_code: 법률근거부족 & hilt미실행| H[statute_search_approval]
+    C -->|reason_code: 법률근거부족 & hitl미실행| H[statute_search_approval]
     C -->|revision_count < 1 & 일반 REVISE| R[revise]
     C -->|그 외: 증거부족, 모순, 2차 검증실패| I[insufficient]
 ```
