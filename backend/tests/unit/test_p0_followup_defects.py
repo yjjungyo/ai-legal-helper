@@ -7,7 +7,7 @@ AI Legal Helper P0 핵심 결함 4건에 대한 재현(수정 전 실패 확인)
 - P0-01 (V-01 ~ V-08): Verifier의 강제 PASS 규칙 제거 및 법률 주장별/종합 PASS 조건 검증
 - P0-02 (A-01 ~ A-08): WITHHELD 상태 미검증 초안 고객 노출 차단 및 답변 전달 정책 검증
 - P0-03 (S-01 ~ S-08): 검색된 출처(retrieved_sources)와 검증된 출처(cited_sources) 계층 분리 검증
-- P0-04 (H-01 ~ H-08): HILT 재분석 프롬프트의 전세보증금 하드코딩 제거 및 도메인 중립화 검증
+- P0-04 (H-01 ~ H-08): HITL 재분석 프롬프트의 전세보증금 하드코딩 제거 및 도메인 중립화 검증
 """
 import pytest
 from unittest.mock import patch, MagicMock
@@ -192,7 +192,7 @@ def test_s02_chunk_preservation_and_deduplication():
 
 
 # ==============================================================================
-# P0-04: HILT 재분석 프롬프트의 도메인 하드코딩 제거 검증 (H-01 ~ H-08)
+# P0-04: HITL 재분석 프롬프트의 도메인 하드코딩 제거 검증 (H-01 ~ H-08)
 # ==============================================================================
 
 def test_v04_unsupported_claim_fails_pass():
@@ -350,10 +350,10 @@ def test_s04_unverified_article_citation_audit():
 
 
 # ==============================================================================
-# P0-04: HILT 노동 분쟁 및 도메인 중립화 시나리오 검증 (H-03, H-05)
+# P0-04: HITL 노동 분쟁 및 도메인 중립화 시나리오 검증 (H-03, H-05)
 # ==============================================================================
 
-def test_h03_labor_dispute_hilt():
+def test_h03_labor_dispute_hitl():
     """H-03: 노동 분쟁(임금 체불) 사건 재분석 시 근로기준법 기반 분석이 적용되고 임대차 용어가 없는지 검증."""
     state: LegalState = {
         "question": "퇴직 후 14일이 지났는데 퇴직금 1,500만원을 받지 못했습니다. 지연이자 청구가 가능한가요?",
@@ -422,11 +422,11 @@ def test_h02_h04_re_analyze_prompt_neutral_for_loan_dispute():
 
 
 # ==============================================================================
-# HILT 승인 사유 고객 친화적 정제 및 인터럽트 정상 제어 흐름 검증
+# HITL 승인 사유 고객 친화적 정제 및 인터럽트 정상 제어 흐름 검증
 # ==============================================================================
 
 def test_client_facing_approval_explanation_no_draft_words():
-    """HILT 법령 검색 승인 사유에서 '초안' 등 내부 시스템 감수 용어가 제거되고 고객 친화적 안내로 변환되는지 검증."""
+    """HITL 법령 검색 승인 사유에서 '초안' 등 내부 시스템 감수 용어가 제거되고 고객 친화적 안내로 변환되는지 검증."""
     from ai_legal_helper.workflows.legal_workflow import _format_client_approval_explanation
 
     raw_from_llm = (
@@ -451,23 +451,23 @@ def test_client_facing_approval_explanation_no_draft_words():
 
 
 def test_decorator_handles_graph_interrupt_without_error_log():
-    """LangGraph의 HILT 인터럽트(GraphInterrupt) 발생 시 데코레이터가 ERROR가 아닌 정상 제어 흐름으로 처리하는지 검증."""
+    """LangGraph의 HITL 인터럽트(GraphInterrupt) 발생 시 데코레이터가 ERROR가 아닌 정상 제어 흐름으로 처리하는지 검증."""
     from langgraph.errors import GraphInterrupt
     from ai_legal_helper.observability.decorators import trace
 
     @trace
-    def dummy_hilt_node(x: int):
+    def dummy_hitl_node(x: int):
         raise GraphInterrupt("Waiting for user decision")
 
     with patch("ai_legal_helper.observability.decorators.logger") as mock_logger:
         try:
-            dummy_hilt_node(42)
+            dummy_hitl_node(42)
         except GraphInterrupt:
             pass
 
-        # ERROR 레벨 로그가 호출되지 않아야 함 (HILT 인터럽트는 정상 흐름)
+        # ERROR 레벨 로그가 호출되지 않아야 함 (HITL 인터럽트는 정상 흐름)
         mock_logger.error.assert_not_called()
-        # 대신 INFO 레벨로 [HILT_INTERRUPT]가 기록되어야 함
-        assert any("[HILT_INTERRUPT]" in str(call) for call in mock_logger.info.call_args_list)
+        # 대신 INFO 레벨로 [HITL_INTERRUPT]가 기록되어야 함
+        assert any("[HITL_INTERRUPT]" in str(call) for call in mock_logger.info.call_args_list)
 
 
