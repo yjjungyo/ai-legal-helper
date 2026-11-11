@@ -76,7 +76,7 @@ def test_update_progress_step_lifecycle():
     assert resp.progress.steps[0].status == ConsultationStepStatus.COMPLETED
     assert resp.progress.steps[1].status == ConsultationStepStatus.RUNNING
 
-    # 2. HILT 승인 대기 상태 전이 (step_3 WAITING_APPROVAL)
+    # 2. HITL 승인 대기 상태 전이 (step_3 WAITING_APPROVAL)
     update_progress_step(req_id, "step_3", ConsultationStepStatus.WAITING_APPROVAL)
     assert resp.progress.current_step == "step_3"
     assert resp.progress.steps[2].status == ConsultationStepStatus.WAITING_APPROVAL
