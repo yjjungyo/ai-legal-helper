@@ -24,7 +24,7 @@ from typing import Annotated
 class LegalState(MessagesState):
     """법률 상담 LangGraph 파이프라인의 전역 상태 객체.
     
-    Supervisor, 병렬 분석 에이전트, Verifier Agent, HILT 법령 원문 검색,
+    Supervisor, 병렬 분석 에이전트, Verifier Agent, HITL 법령 원문 검색,
     그리고 최종 고객 응답 처분(final_disposition) 상태를 관리한다.
     
     Attributes:
@@ -62,11 +62,11 @@ class LegalState(MessagesState):
     # {available, valid_paths, invalid_count, evidence_gaps, contradictions}
     graph_evidence: Optional[Dict[str, Any]]
 
-    # P4.1: Verifier-Guided HILT 법령 원문 검색 필드
+    # P4.1: Verifier-Guided HITL 법령 원문 검색 필드
     approval_request: Optional[Dict[str, Any]]
     approval_status: Optional[str]  # NONE, PENDING, APPROVED, REJECTED, EXPIRED
     approved_statute_laws: Optional[List[str]]
-    # P6: 기존 HILT와 재개 상태에 보존되는 사건일별 사전 공식 검색 계획.
+    # P6: 기존 HITL와 재개 상태에 보존되는 사건일별 사전 공식 검색 계획.
     law_search_plan: Optional[Dict[str, Any]]
     statute_search_phase: Optional[str]  # PRE_ANALYSIS / POST_VERIFICATION
     # P5 구조화 판정은 출처 전체와 별도로 기록해 신법 오적용 추적 가능.
@@ -79,7 +79,7 @@ class LegalState(MessagesState):
     synthesis_law_gate: Optional[Dict[str, Any]]
     pre_coverage_checked: Optional[bool]
     statute_search_history: Optional[List[str]]
-    hilt_executed: Optional[bool]
+    hitl_executed: Optional[bool]
     preserved_points: Optional[List[str]]
 
     # P8/P0-LAW 시점 확정 및 법령-사건 날짜 분리 필드
