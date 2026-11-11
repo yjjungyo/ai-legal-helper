@@ -1,4 +1,4 @@
-# P4.1 Verifier-Guided HILT 법령 검색 — 04. 공식 법령 검색 Tool 구현 및 Schema
+# P4.1 Verifier-Guided HITL 법령 검색 — 04. 공식 법령 검색 Tool 구현 및 Schema
 
 ## 1. 개요
 본 문서는 법제처 국가법령정보공동활용 API(`open.law.go.kr`)를 기반으로 구현된 **공식 법령 원문 검색 도구(`search_official_statutes`)**의 아키텍처, 데이터 스키마 및 보안 원칙을 설명한다.
