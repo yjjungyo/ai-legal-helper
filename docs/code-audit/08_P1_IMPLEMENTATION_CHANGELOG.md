@@ -14,7 +14,7 @@
 | **P1-01** | 검색 결과와 검색 장애 미구분 | `rag/retrieval.py`, `rag/retrieval_factory.py` | `RetrievalStatus` Enum 및 `RetrievalResult` 도입. 컬렉션 부재(`COLLECTION_MISSING`)와 연결 장애(`RETRIEVER_UNAVAILABLE`)를 일반 검색 결과 없음(`NO_MATCH`)과 명확히 분리 |
 | **P1-02** | 법령 시행일 및 버전 관리 누락 | `rag/source_schema.py`, `tools/official_statute_search.py` | `law_id`, `version_id`, `promulgation_date`, `promulgation_number`, `effective_date` 보존 및 `is_statute_applicable_to_date()` 함수를 통한 사건 당시 시행 여부 판정 로직 구현 |
 | **P1-03** | Source Registry 및 Citation Validator 고도화 | `agents/verification.py` | 공식 법령 인용 정규식(`STATUTE_CITATION_PATTERN`) 도입, 법률 효과 왜곡(기간 유예 vs 즉시 효력 모순) 탐지, 인용 없는 답변의 제로 분모 `N/A` 및 `citation_coverage_rate` 산출 |
-| **P1-04** | 차별화된 Adaptive Retrieval 분기 | `workflows/legal_workflow.py` | 검색 인프라 장애 시 무한 루프 차단 및 `insufficient` 안전 전이, 법령 부재 시에만 HILT 승인 요청(`statute_search_approval`), 사실관계 부족 시 사용자 증거 요청 |
+| **P1-04** | 차별화된 Adaptive Retrieval 분기 | `workflows/legal_workflow.py` | 검색 인프라 장애 시 무한 루프 차단 및 `insufficient` 안전 전이, 법령 부재 시에만 HITL 승인 요청(`statute_search_approval`), 사실관계 부족 시 사용자 증거 요청 |
 | **P1-05** | 3계층 상태 모델 분리 | `database/models.py`, `api/schemas/consultation.py`, `api/routes/consultation.py`, `frontend/src/types/consultation.ts` | 단일 `status` 혼재를 `execution_status`, `verification_status`, `answer_status` 3계층으로 분리하여 파이프라인 완료와 법률적 답변 유보 상태의 모순 해소 |
 | **P1-06** | 동시 승인 호출 원자적 차단 | `api/routes/consultation.py` | PostgreSQL 원자적 조건부 UPDATE (`WHERE request_id = :id AND status = 'APPROVAL_REQUIRED'`)를 통한 동시 다중 승인/Resume 중복 가동 방지 (409 Conflict 반환) |
 
@@ -69,7 +69,7 @@
 ### 2.6 `backend/src/ai_legal_helper/workflows/legal_workflow.py`
 - `verification_condition` 분기 함수 고도화:
   - `reason_code in ("RETRIEVER_UNAVAILABLE", "COLLECTION_MISSING")`: 검색 인프라 장애 시 무의미한 외부 API 호출이나 무한 루프를 방지하고 `insufficient` 노드로 안전 전이.
-  - `LEGAL_SOURCE_MISSING`: 공식 법령 조문 검색이 필요하므로 `statute_search_approval` 노드로 HILT 전이.
+  - `LEGAL_SOURCE_MISSING`: 공식 법령 조문 검색이 필요하므로 `statute_search_approval` 노드로 HITL 전이.
   - `CASE_EVIDENCE_MISSING`: 사건 사실관계 및 증거 수집 노출을 위해 `insufficient` 노드로 전이.
   - `ANSWER_REVISION_REQUIRED`: 초안 수정이 가능한 경우 `revise` 노드로 재작성 루프 진행.
 
