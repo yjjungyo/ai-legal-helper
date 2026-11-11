@@ -844,7 +844,7 @@ async def decide_statute_search_approval(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """HILT 법령 원문 검색 승인/거절 결정을 접수하고 상담 워크플로우를 재개(Resume)한다.
+    """HITL 법령 원문 검색 승인/거절 결정을 접수하고 상담 워크플로우를 재개(Resume)한다.
 
     Args:
         request_id: 대상 상담 요청 ID (thread_id).
