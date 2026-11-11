@@ -964,7 +964,7 @@ def run_verification(
         or any(ext in str(src.get("source_id", "")).lower() for ext in (".txt", ".pdf", ".docx", ".png", ".jpg"))
         for src in (retrieved_sources or []) if isinstance(src, dict)
     )
-    if (not force_llm and not has_case_evidence
+    if (not force_llm and not require_question_coverage and not has_case_evidence
             and not qa_check.requires_llm_eval
             and qa_check.status == "PASS" and not preliminary_temporal_errors):
         logger.info("[VERIFICATION] 경량 검사 ALL PASS: LLM 검증 생략 및 초안 즉시 확정")
