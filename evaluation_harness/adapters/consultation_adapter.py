@@ -9,7 +9,7 @@ AI Legal Helper Evaluation Harness의 상담 워크플로우 어댑터(Consultat
 
 [주요 기능]
 - `run_scenario`: 골드 시나리오를 입력받아 상담 파이프라인 비동기 실행
-- HILT(Human-In-The-Loop) 승인 요청 감지 시 자동 승인(auto_approve_hilt) 및 워크플로우 완결
+- HITL(Human-In-The-Loop) 승인 요청 감지 시 자동 승인(auto_approve_hitl) 및 워크플로우 완결
 - MemorySaver 기반 격리 실행을 지원하여 운영 DB 변경 방지
 - 소요 시간(latency) 및 상태 메타데이터 정밀 기록
 """
@@ -49,14 +49,14 @@ class ConsultationAdapter:
     async def run_scenario_async(
         self,
         scenario: GoldCaseScenario,
-        auto_approve_hilt: bool = True,
+        auto_approve_hitl: bool = True,
         thread_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """시나리오 질문을 상담 파이프라인에 비동기로 전달하고 결과를 수집한다.
 
         Args:
             scenario: 평가 대상 GoldCaseScenario
-            auto_approve_hilt: HILT 승인 대기 시 자동으로 승인하고 답변 생성을 완료할지 여부
+            auto_approve_hitl: HITL 승인 대기 시 자동으로 승인하고 답변 생성을 완료할지 여부
             thread_id: 대화 스레드 ID (미지정 시 고유 UUID 생성)
 
         Returns:
@@ -107,8 +107,8 @@ class ConsultationAdapter:
             conversation_context=conv_context,
         )
 
-        # HILT 승인 대기 발생 시 후속 재개 처리
-        if result.get("status") == "APPROVAL_REQUIRED" and auto_approve_hilt:
+        # HITL 승인 대기 발생 시 후속 재개 처리
+        if result.get("status") == "APPROVAL_REQUIRED" and auto_approve_hitl:
             # 승인 데이터와 함께 워크플로우 완결 재개
             resume_data = {
                 "approved": True,
@@ -149,9 +149,9 @@ class ConsultationAdapter:
     def run_scenario(
         self,
         scenario: GoldCaseScenario,
-        auto_approve_hilt: bool = True,
+        auto_approve_hitl: bool = True,
         thread_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """동기 호출 래퍼 함수."""
-        return asyncio.run(self.run_scenario_async(scenario, auto_approve_hilt=auto_approve_hilt, thread_id=thread_id))
+        return asyncio.run(self.run_scenario_async(scenario, auto_approve_hitl=auto_approve_hitl, thread_id=thread_id))
 
