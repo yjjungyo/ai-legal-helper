@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""P6 LangGraph 사전 법령 검색계획 → HILT 승인 → 공식 시점 조회 회귀 테스트."""
+"""P6 LangGraph 사전 법령 검색계획 → HITL 승인 → 공식 시점 조회 회귀 테스트."""
 from unittest.mock import patch
 
 import pytest
@@ -83,7 +83,7 @@ def test_catalog_failure_does_not_call_openlaw_while_planning():
     assert out["reason_code"] == "CATALOG_UNAVAILABLE"
 
 
-def test_preflight_plan_routes_to_existing_hilt_node_only_when_ready():
+def test_preflight_plan_routes_to_existing_hitl_node_only_when_ready():
     with patch(
         "ai_legal_helper.workflows.temporal_search_plan.build_temporal_search_plan",
         return_value=_plan(),
@@ -92,7 +92,7 @@ def test_preflight_plan_routes_to_existing_hilt_node_only_when_ready():
     assert state["statute_search_phase"] == "PRE_ANALYSIS"
     assert statute_search_plan_condition(state) == "statute_search_approval"
     assert statute_search_plan_condition({
-        **state, "hilt_executed": True,
+        **state, "hitl_executed": True,
     }) == "run_agents"
     assert statute_search_plan_condition({
         "law_search_plan": {"status": "SKIP"},
