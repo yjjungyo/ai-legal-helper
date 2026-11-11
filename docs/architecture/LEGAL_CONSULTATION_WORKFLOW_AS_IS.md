@@ -19,7 +19,7 @@ flowchart TD
     RC -->|분류 불가·오류| RX
     P --> SP["statute_search_plan"]
     SP --> SPC{"statute_search_plan_condition"}
-    SPC -->|READY + 후보 법령 + HILT 미실행| H["statute_search_approval<br/>사용자 승인 / interrupt·resume"]
+    SPC -->|READY + 후보 법령 + HITL 미실행| H["statute_search_approval<br/>사용자 승인 / interrupt·resume"]
     SPC -->|그 외| A["run_agents"]
     H --> HC{"statute_search_approval_condition"}
     HC -->|APPROVED| ES["execute_statute_search"]
@@ -60,7 +60,7 @@ flowchart TD
 | `routing_exit` | 정보 부족 또는 Router 오류 시 안전 종료 |
 | `plan` | 전문 Agent·Tool 실행 계획 |
 | `statute_search_plan` | 선행 법령 검색 계획 및 기준일 검토 |
-| `statute_search_approval` | HILT 공식 법령 검색 사용자 승인 |
+| `statute_search_approval` | HITL 공식 법령 검색 사용자 승인 |
 | `execute_statute_search` | 승인된 공식 법령 검색 |
 | `run_agents` | 일반 상담 전문 Agent 실행 / 문서 모드 법률 자료 검색 |
 | `legal_evidence_bundle` | 법령·출처 근거 통합 |
@@ -89,8 +89,8 @@ flowchart TD
 - **후속 행동 질문:** `followup_action → verification`; 일반적인 Router/Planner/Agent 경로를 생략한다.
 - **선행 공식 검색:** `statute_search_phase == PRE_ANALYSIS`이면 공식 검색 결과가 없어도 `run_agents`로 진행한다.
 - **사후 공식 검색:** 결과가 있으면 `re_analyze → verification`, 결과가 없으면 `insufficient`로 진행한다.
-- **검증 실패:** `revise → verification` 또는 HILT 공식 검색 후 재검증. 재검토 횟수 및 HILT 실행 여부를 확인하는 제한 정책이 있다.
-- **적용시점 안전 차단:** `temporal_gate.status == BLOCK`이고 후보 법령이 있으며 HILT 미실행이면 `statute_search_approval`로, 그 외에는 `insufficient`로 분기한다.
+- **검증 실패:** `revise → verification` 또는 HITL 공식 검색 후 재검증. 재검토 횟수 및 HITL 실행 여부를 확인하는 제한 정책이 있다.
+- **적용시점 안전 차단:** `temporal_gate.status == BLOCK`이고 후보 법령이 있으며 HITL 미실행이면 `statute_search_approval`로, 그 외에는 `insufficient`로 분기한다.
 
 ## 5. Supervisor와 Verification의 실제 책임
 
@@ -103,7 +103,7 @@ flowchart TD
 ## 6. 실행 검증이 필요한 지점
 
 1. `MULTIPLE_EVENT_DATES` 등으로 선행 법령 검색 계획이 SKIP될 때 기존 검색 경로가 정확한 개정법·부칙을 확보하는가.
-2. HILT 승인·거절·Resume, OpenLaw 공식 원문 조회, 시행일·적용례 판정이 운영 환경에서 정상 연결되는가.
+2. HITL 승인·거절·Resume, OpenLaw 공식 원문 조회, 시행일·적용례 판정이 운영 환경에서 정상 연결되는가.
 3. P9 백그라운드 인덱싱의 Feature Flag, Worker, PostgreSQL Job, ChromaDB 컬렉션이 실제로 활성화돼 있는가.
 4. `revise`와 `re_analyze` 이후 Verification 결과가 개선되는가; 불필요한 재실행과 판단 유보는 없는가.
 5. `finalize`의 최종 인용 감사에서 실제 확보한 출처가 유실되지 않는가.
@@ -113,7 +113,7 @@ flowchart TD
 
 - [LangGraph 구성 및 분기: `legal_workflow.py`](../../backend/src/ai_legal_helper/workflows/legal_workflow.py)
 - [상태 정의: `state.py`](../../backend/src/ai_legal_helper/workflows/state.py)
-- [P6 HILT 설계 및 검증 한계](../development/temporal-legal-rag/06_P6_HILT_WORKFLOW.md)
+- [P6 HITL 설계 및 검증 한계](../development/temporal-legal-rag/06_P6_HITL_WORKFLOW.md)
 - [P8 적용시점 검증](../development/temporal-legal-rag/08_P8_TEMPORAL_VERIFICATION.md)
 - [P9 인덱싱 및 운영 활성화](../development/temporal-legal-rag/09_P9_BACKGROUND_INDEX.md)
 - [P11 E2E 평가 범위 및 미완료 항목](../development/temporal-legal-rag/11_P11_EVALUATION.md)
