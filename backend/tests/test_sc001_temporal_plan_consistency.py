@@ -5,7 +5,7 @@ from ai_legal_helper.workflows import legal_workflow as workflow
 
 def test_temporal_plan_uses_resolved_query(monkeypatch):
     captured = []
-    def fake_plan(question):
+    def fake_plan(question, **kwargs):
         captured.append(question)
         return {"status": "SKIP", "candidate_laws": [], "reason_code": "NO_CANDIDATE"}
     import ai_legal_helper.workflows.temporal_search_plan as temporal

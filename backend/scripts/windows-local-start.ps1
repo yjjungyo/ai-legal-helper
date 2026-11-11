@@ -29,7 +29,8 @@ if ($LASTEXITCODE -ne 0) {
 
 # 2. Launch FastAPI backend in a new window
 Write-Host "2. 백엔드 API (FastAPI / uvicorn) 실행 창을 띄웁니다..." -ForegroundColor Green
-$backendCmd = "cd '$ProjectRoot'; & '.\.venv\Scripts\Activate.ps1'; uvicorn ai_legal_helper.api.main:app --host 0.0.0.0 --port 8000 --reload"
+# [WatchFiles 리로드 최적화] tests 폴더 변경으로 인한 불필요한 서버 재시작을 방지하기 위해 src만 감시하고 tests는 제외한다.
+$backendCmd = "cd '$ProjectRoot'; & '.\.venv\Scripts\Activate.ps1'; uvicorn ai_legal_helper.api.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir src --reload-exclude 'tests/*' --reload-exclude '*/tests/*'"
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "$backendCmd"
 
 # 3. Launch React frontend in a new window

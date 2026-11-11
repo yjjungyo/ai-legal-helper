@@ -20,6 +20,7 @@
 - 다른 사용자 또는 다른 사건의 대화 세션에 접근하려는 시도는 엄격히 차단한다(403/PermissionError).
 """
 
+import re
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from pydantic import BaseModel, Field
@@ -34,6 +35,50 @@ logger = get_logger(__name__)
 
 # 대화 맥락 유지를 위한 기본 슬라이딩 윈도우 크기 (최근 3개 턴 유지)
 DEFAULT_MAX_CONTEXT_TURNS = 3
+
+
+def extract_answer_conclusion(answer: Optional[str], max_chars: int = 250) -> str:
+    """AI가 작성한 법률 답변에서 핵심 결론 문단([1. 핵심 결론])만 규칙 기반으로 신속하게 추출한다.
+
+    별도의 추가 LLM 호출 없이 정규식 및 문자열 파싱만으로 0.001초 만에 실행되며,
+    수천 자에 달하는 과거 법률 의견서 전문 대신 2~3줄의 핵심 결론만 보존하여
+    대화 연속성을 유지하면서도 토큰 낭비 및 과거 답변 환각 전파를 원천 차단한다.
+
+    Args:
+        answer: 이전 턴에서 AI가 출력한 원본 마크다운 답변 텍스트.
+        max_chars: 추출할 최대 글자 수 (기본값: 250자).
+
+    Returns:
+        str: 정제된 핵심 결론 요약문 (빈 문자열 또는 무응답 시 기본 안내문).
+    """
+    if not answer or not isinstance(answer, str) or not answer.strip():
+        return "(이전 답변 없음)"
+
+    text = answer.strip()
+
+    # 1. '[1. 핵심 결론]' 또는 '## 1. 핵심 결론' 등 핵심 결론 섹션 정규식 매칭
+    pattern = re.compile(
+        r"(?:\[1\.\s*핵심\s*결론\]|##\s*1\.\s*핵심\s*결론|###\s*1\.\s*핵심\s*결론|1\.\s*핵심\s*결론)(.*?)(?=(?:\[2\.|##\s*2\.|###\s*2\.|2\.\s*|\Z))",
+        re.DOTALL
+    )
+    match = pattern.search(text)
+    if match:
+        conclusion_part = match.group(1).strip()
+        # [1. 핵심 결론] 문단만 취함 (빈 줄 또는 다음 섹션 이전까지)
+        para = conclusion_part.split("\n\n")[0].strip()
+        conclusion_lines = [line.strip() for line in para.splitlines() if line.strip()]
+        cleaned = " ".join(conclusion_lines)
+        if len(cleaned) > max_chars:
+            return cleaned[:max_chars] + "..."
+        return cleaned if cleaned else text[:max_chars]
+
+    # 2. 핵심 결론 섹션 헤더가 없는 경우: 첫 문단 발췌
+    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+    first_para = paragraphs[0] if paragraphs else text
+    cleaned_para = " ".join(first_para.splitlines()).strip()
+    if len(cleaned_para) > max_chars:
+        return cleaned_para[:max_chars] + "..."
+    return cleaned_para
 
 
 class ConversationTurn(BaseModel):
@@ -176,11 +221,15 @@ class ConversationContext(BaseModel):
             if turn.question:
                 messages.append(HumanMessage(content=turn.question))
 
-            # 2. AI 답변을 AIMessage로 추가 (WITHHELD 상태인 경우 안내문 포함)
+            # 2. AI 답변은 전문(수천 자) 대신 핵심 결론 요약문(150~250자)으로 압축하여 AIMessage로 추가
             if turn.answer:
-                ans_text = turn.answer
-                if turn.answer_status == "WITHHELD":
-                    ans_text = f"[참고: 이전 상담에서 법률 근거 부족으로 판단이 유보된 답변입니다]\n{ans_text}"
+                ans_summary = extract_answer_conclusion(turn.answer, max_chars=250)
+                if turn.answer_status == 'WITHHELD':
+                    ans_text = f'[참고: 이전 상담에서 판단 유보됨] {ans_summary}'
+                elif turn.answer_status == 'CAUTIONARY':
+                    ans_text = f'[핵심 결론(주의 요망)]: {ans_summary}'
+                else:
+                    ans_text = f'[핵심 결론]: {ans_summary}'
                 messages.append(AIMessage(content=ans_text))
 
         return messages
@@ -217,18 +266,15 @@ class ConversationContext(BaseModel):
         if relevant_turns:
             parts.append("■ 현재 질문 관련 과거 상담 발췌:")
             for r_turn in relevant_turns:
-                r_ans = r_turn.answer.strip()
-                if len(r_ans) > 250:
-                    r_ans = r_ans[:250] + "..."
-                parts.append(f"- 턴 {r_turn.turn_index} 질의: {r_turn.question.strip()[:80]} → 답변 발췌: {r_ans}")
+                r_ans = extract_answer_conclusion(r_turn.answer, max_chars=150)
+                parts.append(f"- 턴 {r_turn.turn_index} 질의: {r_turn.question.strip()[:80]} → 결론: {r_ans}")
 
         parts.append("■ 최근 대화 진행:")
         recent_turns = self.previous_turns[-max_turns:]
         for turn in recent_turns:
             q_clean = turn.question.strip().replace("\n", " ")
-            a_clean = turn.answer.strip()
-            if len(a_clean) > max_chars_per_turn:
-                a_clean = a_clean[:max_chars_per_turn] + f"... [이하 생략 (+{len(a_clean) - max_chars_per_turn}자)]"
+            # 장문 전문 대신 핵심 결론 요약문만 추출
+            a_clean = extract_answer_conclusion(turn.answer, max_chars=max_chars_per_turn)
 
             status_note = ""
             if turn.answer_status == "WITHHELD":
@@ -239,7 +285,7 @@ class ConversationContext(BaseModel):
             parts.append(
                 f"[Turn {turn.turn_index}]\n"
                 f"의뢰인: {q_clean}\n"
-                f"법률 도우미{status_note}:\n{a_clean}\n"
+                f"법률 도우미{status_note}: {a_clean}\n"
             )
 
         return "\n".join(parts).strip()
@@ -262,8 +308,7 @@ def build_conversation_summary(turns: List[ConversationTurn]) -> str:
     for t in turns[-3:]:  # 최근 최대 3턴 요약
         short_q = t.question[:80] + ("..." if len(t.question) > 80 else "")
         # 답변의 첫 문장 또는 핵심 추출
-        first_line = t.answer.split("\n")[0] if t.answer else "(답변 없음)"
-        short_a = first_line[:100] + ("..." if len(first_line) > 100 else "")
+        short_a = extract_answer_conclusion(t.answer, max_chars=120)
         summary_lines.append(f"- 턴 {t.turn_index}: 질의 '{short_q}' → 답변 요지: {short_a}")
 
     return "\n".join(summary_lines)

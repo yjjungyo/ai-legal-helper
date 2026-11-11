@@ -47,6 +47,22 @@ def test_intent_condition_branching():
     state_action = {"intent": ConsultationIntent.FOLLOWUP_ACTION.value}
     assert intent_condition(state_action) == "followup_action"
 
+    # 3-1. 복합 쟁점(issue_tasks >= 2)이 존재하는 후속 행동 질의 -> 정규 route 분기 승격
+    state_complex_action = {
+        "intent": ConsultationIntent.FOLLOWUP_ACTION.value,
+        "issue_tasks": [{"issue_id": "ISSUE_1"}, {"issue_id": "ISSUE_2"}],
+    }
+    assert intent_condition(state_complex_action) == "route"
+
+    # 3-2. 사건 증거(CASE_EVIDENCE) 모드에서 쟁점이 도출된 경우 -> 정규 route 분기 승격
+    state_ev_action = {
+        "intent": ConsultationIntent.FOLLOWUP_ACTION.value,
+        "consultation_mode": "CASE_EVIDENCE",
+        "case_evidence_briefing": {"source_documents": ["doc1"]},
+        "issue_tasks": [{"issue_id": "ISSUE_1"}],
+    }
+    assert intent_condition(state_ev_action) == "route"
+
     # 4. 신규 심층 법률 분석 -> 정규 route 분기
     state_new = {"intent": ConsultationIntent.NEW_LEGAL_ANALYSIS.value}
     assert intent_condition(state_new) == "route"

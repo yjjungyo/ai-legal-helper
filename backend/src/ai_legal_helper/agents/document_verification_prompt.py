@@ -77,8 +77,8 @@ source_ids(대조한 출처 ID 배열)로 기록하세요. 해당 사건이 없�
 - 검증 판단에 필요한 근거와 이유는 남기되, 같은 이유를 여러 필드에 반복 서술하지 마세요.
 - PASS일 때 실제 문제가 없는 missing_issues, missing_legal_issues, candidate_laws, contradictions,
   revision_instructions, warnings, legal_search_requests는 빈 배열로 반환하세요.
-- claims는 핵심 결론과 실질적인 사실·법률·추론 주장 위주로 작성하되, 서로 다른 법률 효과나
-  중요한 조건을 합치거나 생략하지 마세요. 동일 주장을 문단마다 중복 생성하지 마세요.
+- claims는 답변의 모든 사소한 문장을 전수 분해하지 말고, 법률 효과와 분쟁 사실관계를 가르는 【핵심 6~8개 주장】 위주로 선별 작성하세요. 단순 일상 조언이나 반복 표현은 제외하고, reason은 대조 근거와 판단을 1~2문장의 간결한 핵심 요약으로 작성하세요.
+  다만 서로 다른 법률 효과나 중요한 조건을 생략하지 마세요.
 - question_coverage와 네 가지 consistency_checks는 항상 모두 작성하고, reason은
   대조한 실제 문구·근거와 판단 이유를 간결하게 기록하세요. source_ids는 정확한 전체 ID를 유지하세요.
 - preserved_points는 후속 수정에서 잃기 쉬운 중요한 올바른 구분이 있을 때만 기록하세요.

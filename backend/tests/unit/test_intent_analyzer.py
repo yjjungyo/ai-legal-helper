@@ -21,6 +21,7 @@ from unittest.mock import MagicMock, patch
 
 from ai_legal_helper.agents.intent_analyzer import (
     ConsultationIntent,
+    ConsultationMode,
     IntentDecision,
     analyze_consultation_intent,
     _heuristic_rule_fallback,
@@ -43,6 +44,7 @@ def test_first_turn_guardrail_prevents_followup():
             question="이제 뭘 해야 하죠?",
             conversation_context=None,  # 첫 번째 턴 (대화 이력 없음)
             case_context="",
+            use_llm=True,
         )
 
     # 가드레일에 의해 NEW_LEGAL_ANALYSIS로 강제 보정되어야 함
@@ -103,6 +105,7 @@ def test_followup_question_classification():
             question="임차권등기명령은 언제 신청하나요?",
             conversation_context=ctx,
             case_context="",
+            use_llm=True,
         )
 
     assert decision.intent == ConsultationIntent.FOLLOWUP_QUESTION
@@ -183,3 +186,77 @@ def test_rewrite_keeps_current_correction_separate_from_resolved_context():
     assert f"[문맥 보완 질의 — 현재 질문을 대체하지 않는 참고 자료]\n{resolved}" in prompt
     assert rewritten == f"{question}\n키워드: 해고 예고, 해고 예정"
 
+
+
+def test_followup_action_promoted_when_evidence_synthesis_requested():
+    """질문에 '증거를 종합' 및 권리 분석 요구가 포함된 경우 FOLLOWUP_ACTION에서 NEW_LEGAL_ANALYSIS로 승격되는지 검증."""
+    from unittest.mock import MagicMock, patch
+    from ai_legal_helper.agents.intent_analyzer import analyze_consultation_intent
+
+    mock_llm = MagicMock()
+    # LLM이 '조치와 순서'에 의해 FOLLOWUP_ACTION을 반환하는 상황 모의
+    mock_llm.invoke.return_value.content = '''{
+        "intent": "FOLLOWUP_ACTION",
+        "consultation_mode": "CASE_EVIDENCE",
+        "categories": ["민법"],
+        "resolved_query": "제출된 증거를 종합하여 보증금 회수 조치 실행 순서 검토",
+        "requires_specialist": false,
+        "requires_retrieval": false,
+        "requires_verification": true,
+        "requires_full_analysis": false,
+        "reason": "후속 조치 실행 순서 질의"
+    }'''
+
+    with patch("ai_legal_helper.agents.intent_analyzer.get_llm", return_value=mock_llm):
+        question = "지금까지 제출한 증거를 종합해 제 권리를 지키면서 보증금을 회수할 수 있는 현실적인 조치와 실행 순서를 정리해 주세요."
+        case_context = "보증금 2억 2천만 원 미반환 사건 (등기부, 계약서 제출)"
+        t1 = ConversationTurn(
+            turn_index=1,
+            request_id="req-1",
+            question="보증금 반환 문의",
+            answer="내용증명 발송 안내",
+            answer_status="DELIVERED",
+        )
+        ctx = ConversationContext(
+            conversation_id="conv-1",
+            current_question=question,
+            previous_turns=[t1],
+            last_answer=t1.answer,
+        )
+
+        decision = analyze_consultation_intent(
+            question=question,
+            conversation_context=ctx,
+            case_context=case_context,
+            use_llm=True,
+        )
+
+        # 가드레일에 의해 NEW_LEGAL_ANALYSIS로 자동 승격되어야 함
+        assert decision.intent == ConsultationIntent.NEW_LEGAL_ANALYSIS
+        assert decision.consultation_mode == ConsultationMode.CASE_EVIDENCE
+        assert decision.requires_specialist is True
+        assert decision.requires_retrieval is True
+        assert decision.requires_full_analysis is True
+
+
+def test_analyze_consultation_intent_fast_path_default_skips_llm():
+    """기본 모드(use_llm=False) 호출 시 LLM을 전혀 호출하지 않고 0.001초 규칙 기반으로 즉시 판정하는지 검증한다."""
+    mock_llm = MagicMock()
+    with patch("ai_legal_helper.agents.intent_analyzer.get_llm", return_value=mock_llm):
+        decision = analyze_consultation_intent(
+            question="전세보증금을 돌려받지 못하고 있습니다.",
+            conversation_context=None,
+            case_context="임대차 계약 종료 후 보증금 2억 미반환",
+        )
+
+    # LLM이 절대 호출되지 않았는지 검증
+    mock_llm.invoke.assert_not_called()
+
+    # 0초 규칙 기반 기본 결과 검증
+    assert decision.intent == ConsultationIntent.NEW_LEGAL_ANALYSIS
+    assert decision.consultation_mode == ConsultationMode.CASE_EVIDENCE
+    assert decision.categories == ["민법"]
+    assert decision.requires_specialist is True
+    assert decision.requires_retrieval is True
+    assert decision.requires_verification is True
+    assert decision.requires_full_analysis is True

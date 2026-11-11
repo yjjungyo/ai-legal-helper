@@ -52,7 +52,12 @@ def get_specialist_agent(category_ko: str) -> AgentExecutor:
     return agent
 
 @trace
-def run_specialist_agent(category_ko: str, question: str, chat_brief: str) -> tuple[str, str, list]:
+def run_specialist_agent(
+    category_ko: str,
+    question: str,
+    chat_brief: str,
+    fast_retrieval_only: bool = False,
+) -> tuple[str, str, list]:
     """
     전문 에이전트를 실행하여 질문에 대한 답변과 참조한 법률 근거를 반환한다.
 
@@ -64,6 +69,7 @@ def run_specialist_agent(category_ko: str, question: str, chat_brief: str) -> tu
         category_ko (str): 실행할 법률 분야 (예: "민법")
         question (str): 사용자 질문 내용
         chat_brief (str): 이전 대화 맥락 요약
+        fast_retrieval_only (bool): 법률 RAG 검색 및 출처 수집만 수행하고 장문 생성을 생략할지 여부 (기본값: False)
 
     Returns:
         tuple[str, str, list]: 
@@ -80,6 +86,21 @@ def run_specialist_agent(category_ko: str, question: str, chat_brief: str) -> tu
     reset_retrieved_sources()
     
     try:
+        # 단일 분야 또는 사건 증거 모드에서는 무거운 ReAct 장문 생성을 건너뛰고 빠른 검색만 수행 (약 35초 단축)
+        if fast_retrieval_only and agent.tools and hasattr(agent.tools[0], "invoke"):
+            tool = agent.tools[0]
+            try:
+                tool_obs = tool.invoke({"query": question})
+            except Exception:
+                tool_obs = tool.run(question) if hasattr(tool, "run") else ""
+            sources = get_retrieved_sources()
+            summary_text = (
+                f"[{category_ko} 전문 법률 검색 요약]\n{tool_obs}"
+                if tool_obs
+                else f"[{category_ko} 관련 검색 결과 없음]"
+            )
+            return (category_ko, summary_text, sources)
+
         out = agent.invoke({"input": question, "agent_scratchpad": "", "chat_brief": chat_brief})
         text = (out.get("output", "") or "").strip()
         sources = get_retrieved_sources()

@@ -54,27 +54,56 @@ class LegalIssueTask(BaseModel):
 def _match_facts_and_evidences(
     keywords: List[str],
     briefing: CaseEvidenceBriefing,
+    max_labels: int = 5,
+    max_facts: int = 20,
 ) -> tuple[List[str], List[str], List[str]]:
-    """요건사실 키워드와 매칭되는 브리핑 내 Fact ID 및 증거 번호를 선별한다."""
-    matched_fact_ids: List[str] = []
-    matched_evidence_ids: List[str] = []
-    matched_labels: List[str] = []
+    """요건사실 키워드와 매칭되는 브리핑 내 Fact ID 및 증거 번호를 정밀 선별한다.
 
-    compact_keywords = [re.sub(r"\s+", "", kw) for kw in keywords]
+    1. '보증금', '임대차' 등 모든 문서에 포함된 광범위 키워드의 무차별 매칭을 억제하고
+       매칭 점수(키워드 포함 개수)를 기반으로 핵심 Fact 및 증거 라벨을 상위 3~5개로 선별한다.
+    2. relevant_evidence_ids(UUID 리스트)는 실제로 사용되지 않으므로 빈 리스트([])로 축소하고,
+       가독성과 기능성을 모두 갖춘 relevant_evidence_labels를 단일 SSOT로 유지한다.
+
+    Args:
+        keywords: 해당 쟁점의 핵심 요건사실 키워드 목록.
+        briefing: 사건 증거 브리핑 모델.
+        max_labels: 선별할 최대 증거 라벨 수 (기본 5개).
+        max_facts: 선별할 최대 Fact ID 수 (기본 20개).
+
+    Returns:
+        tuple[List[str], List[str], List[str]]: (선별된 Fact ID 목록, 빈 UUID 목록, 선별된 증거 라벨 목록)
+    """
+    compact_keywords = [re.sub(r"\s+", "", kw) for kw in keywords if len(kw.strip()) >= 2]
+    if not compact_keywords:
+        return [], [], []
+
+    scored_facts: List[tuple[int, str, List[str]]] = []
+    label_scores: Dict[str, int] = {}
 
     for fact in briefing.facts:
         f_compact = re.sub(r"\s+", "", fact.statement)
-        if any(ck in f_compact for ck in compact_keywords):
-            matched_fact_ids.append(fact.fact_id)
-            if fact.source_evidence_id and fact.source_evidence_id not in matched_evidence_ids:
-                matched_evidence_ids.append(fact.source_evidence_id)
-            if fact.evidence_label and fact.evidence_label not in matched_labels:
-                matched_labels.append(fact.evidence_label)
+        score = sum(1 for ck in compact_keywords if ck in f_compact)
+        if score > 0:
+            fact_labels: List[str] = []
+            if fact.evidence_label:
+                fact_labels.append(fact.evidence_label)
+                label_scores[fact.evidence_label] = label_scores.get(fact.evidence_label, 0) + score
             for sl in fact.supporting_evidence_labels:
-                if sl not in matched_labels:
-                    matched_labels.append(sl)
+                if sl not in fact_labels:
+                    fact_labels.append(sl)
+                    label_scores[sl] = label_scores.get(sl, 0) + score
+            scored_facts.append((score, fact.fact_id, fact_labels))
 
-    return matched_fact_ids, matched_evidence_ids, matched_labels
+    # 점수 높은 순으로 정렬하여 상위 max_facts 개만 선별
+    scored_facts.sort(key=lambda x: x[0], reverse=True)
+    matched_fact_ids = [fid for _, fid, _ in scored_facts[:max_facts]]
+
+    # 증거 라벨도 빈도/점수 높은 순으로 정렬하여 상위 max_labels 개만 선별
+    sorted_labels = sorted(label_scores.keys(), key=lambda l: label_scores[l], reverse=True)
+    matched_labels = sorted_labels[:max_labels]
+
+    # relevant_evidence_ids는 축소/생략하여 빈 리스트 반환
+    return matched_fact_ids, [], matched_labels
 
 
 def detect_unregistered_evidence_references(
@@ -213,15 +242,13 @@ def plan_legal_issues(
     # 1-1. 쟁점: 문자메시지에 의한 해지의사표시 도달 및 효력 (SC01-T03 대응)
     has_text_notice_mention = any(k in q_compact for k in ("문자", "카톡", "메시지", "메세지")) and any(k in q_compact for k in ("해지", "도달", "효력", "퇴거", "요청", "문자가"))
     if has_text_notice_mention:
-        f_ids, e_ids, e_lbls = _match_facts_and_evidences(
-            ["계약기간", "해지", "문자", "퇴거", "도달", "답장", "분할", "제안"], briefing
+        f_ids, _, e_lbls = _match_facts_and_evidences(
+            ["계약기간", "해지", "문자", "퇴거", "도달", "답장", "분할", "제안"], briefing, max_labels=4
         )
-        for ev in briefing.evidences:
+        for ev in (briefing.evidences or []):
             if any(k in (ev.document_name or "") for k in ("문자", "통지", "통보", "퇴거", "해지", "답장", "분할", "제안")):
                 if ev.evidence_label not in e_lbls:
                     e_lbls.append(ev.evidence_label)
-                if ev.evidence_id not in e_ids:
-                    e_ids.append(ev.evidence_id)
 
         issues.append(
             LegalIssueTask(
@@ -234,8 +261,8 @@ def plan_legal_issues(
                 ],
                 required_fact_keys=["문자발신일", "임대인답장", "도달사실", "3개월경과"],
                 relevant_fact_ids=f_ids,
-                relevant_evidence_ids=e_ids,
-                relevant_evidence_labels=sorted(e_lbls),
+                relevant_evidence_ids=[],
+                relevant_evidence_labels=sorted(list(dict.fromkeys(e_lbls)))[:5],
                 required_statutes=["주택임대차보호법 제6조의2", "민법 제111조"],
                 missing_evidence=[],
                 priority="HIGH",
@@ -244,16 +271,14 @@ def plan_legal_issues(
 
     # 1. 쟁점: 임대차계약 종료 시점 및 효력 발생
     if is_comprehensive or (not has_text_notice_mention and any(k in q_compact for k in ("종료", "해지", "만료", "끝", "퇴거", "갱신", "반환", "돌려"))):
-        f_ids, e_ids, e_lbls = _match_facts_and_evidences(
-            ["계약기간", "종료", "해지", "만료", "퇴거", "보증금", "임대차"], briefing
+        f_ids, _, e_lbls = _match_facts_and_evidences(
+            ["기간", "종료", "해지", "만료", "퇴거", "통고", "통지", "도달"], briefing, max_labels=4
         )
-        # 계약서(E01) 및 통지(E05 등) 증거 라벨 보강
-        for ev in briefing.evidences:
-            if any(k in (ev.document_name or "") for k in ("계약서", "퇴거", "해지", "통보", "통지", "요청")):
+        # 계약서(E01 등) 및 통지(E05 등) 핵심 증거 라벨 보강
+        for ev in (briefing.evidences or []):
+            if any(k in (ev.document_name or "") for k in ("계약서", "퇴거", "해지", "통보", "통지", "내용증명")):
                 if ev.evidence_label not in e_lbls:
                     e_lbls.append(ev.evidence_label)
-                if ev.evidence_id not in e_ids:
-                    e_ids.append(ev.evidence_id)
 
         issues.append(
             LegalIssueTask(
@@ -266,8 +291,8 @@ def plan_legal_issues(
                 ],
                 required_fact_keys=["임대차기간", "만료일", "퇴거요청일", "통지도달", "보증금액"],
                 relevant_fact_ids=f_ids,
-                relevant_evidence_ids=e_ids,
-                relevant_evidence_labels=sorted(e_lbls),
+                relevant_evidence_ids=[],
+                relevant_evidence_labels=sorted(list(dict.fromkeys(e_lbls)))[:5],
                 required_statutes=["주택임대차보호법 제6조", "주택임대차보호법 제6조의2", "민법 제544조", "민법 제623조"],
                 missing_evidence=[],
                 priority="HIGH",
@@ -276,15 +301,13 @@ def plan_legal_issues(
 
     # 2. 쟁점: 가압류 및 담보권과 임차인 대항력/우선변제권 권리 순위
     if any(k in q_compact for k in ("가압류", "근저당", "저당", "담보", "순위", "권리관계", "등기")) or (is_comprehensive and has_attachment_evidence):
-        f_ids, e_ids, e_lbls = _match_facts_and_evidences(
-            ["가압류", "전입신고", "확정일자", "등기", "근저당", "주민등록"], briefing
+        f_ids, _, e_lbls = _match_facts_and_evidences(
+            ["가압류", "전입신고", "확정일자", "등기부", "근저당"], briefing, max_labels=4
         )
-        for ev in briefing.evidences:
-            if any(k in (ev.document_name or "") for k in ("전입", "확정일자", "가압류", "등기", "열람")):
+        for ev in (briefing.evidences or []):
+            if any(k in (ev.document_name or "") for k in ("전입", "확정일자", "가압류", "등기", "을구")):
                 if ev.evidence_label not in e_lbls:
                     e_lbls.append(ev.evidence_label)
-                if ev.evidence_id not in e_ids:
-                    e_ids.append(ev.evidence_id)
 
         # 등기부 최신본 부재 여부 체크
         missing = []
@@ -303,8 +326,8 @@ def plan_legal_issues(
                 ],
                 required_fact_keys=["전입신고일", "주택인도일", "확정일자일", "가압류접수일", "청구금액"],
                 relevant_fact_ids=f_ids,
-                relevant_evidence_ids=e_ids,
-                relevant_evidence_labels=sorted(e_lbls),
+                relevant_evidence_ids=[],
+                relevant_evidence_labels=sorted(list(dict.fromkeys(e_lbls)))[:5],
                 required_statutes=["주택임대차보호법 제3조", "주택임대차보호법 제3조의2", "민사집행법 제91조", "민사집행법 제148조"],
                 missing_evidence=missing,
                 priority="HIGH",
@@ -313,16 +336,15 @@ def plan_legal_issues(
 
     # 3. 쟁점: 경매 실행 시 보증금 회수 위험 및 배당 관계 (선순위 대항력 임차인의 배당요구권과 대항력 선택권)
     if any(k in q_compact for k in ("경매", "위험", "배당", "회수", "우선변제", "낙찰자", "인수", "인수시켜야")):
-        f_ids, e_ids, e_lbls = _match_facts_and_evidences(
-            ["보증금", "확정일자", "가압류", "배당", "시세", "대항력", "전입", "점유"], briefing
+        f_ids, _, e_lbls = _match_facts_and_evidences(
+            ["확정일자", "가압류", "배당요구", "시세", "대항력", "우선변제"], briefing, max_labels=4
         )
-        for ev in briefing.evidences:
-            if any(k in (ev.document_name or "") for k in ("계약서", "가압류", "확정일자", "전입", "점유", "카드", "열쇠")):
+        for ev in (briefing.evidences or []):
+            if any(k in (ev.document_name or "") for k in ("등기", "가압류", "확정일자", "계약서")):
                 if ev.evidence_label not in e_lbls:
                     e_lbls.append(ev.evidence_label)
-                if ev.evidence_id not in e_ids:
-                    e_ids.append(ev.evidence_id)
 
+        auction_labels = sorted(list(dict.fromkeys(e_lbls)))[:5]
         issues.append(
             LegalIssueTask(
                 issue_id="ISSUE_AUCTION_STRATEGY",
@@ -334,8 +356,8 @@ def plan_legal_issues(
                 ],
                 required_fact_keys=["대항요건구비일", "확정일자일", "배당요구종기", "선순위채권총액", "시세/낙찰가"],
                 relevant_fact_ids=f_ids,
-                relevant_evidence_ids=e_ids,
-                relevant_evidence_labels=sorted(e_lbls),
+                relevant_evidence_ids=[],
+                relevant_evidence_labels=auction_labels,
                 required_statutes=[
                     "주택임대차보호법 제3조 제1항",
                     "주택임대차보호법 제3조의2 제2항",
@@ -358,8 +380,8 @@ def plan_legal_issues(
                 ],
                 required_fact_keys=["대항요건구비일", "확정일자일", "배당요구종기", "선순위채권총액"],
                 relevant_fact_ids=f_ids,
-                relevant_evidence_ids=e_ids,
-                relevant_evidence_labels=sorted(e_lbls),
+                relevant_evidence_ids=[],
+                relevant_evidence_labels=auction_labels,
                 required_statutes=[
                     "주택임대차보호법 제3조의2",
                     "주택임대차보호법 제3조의5",
@@ -372,11 +394,11 @@ def plan_legal_issues(
 
     # 4. 쟁점: 이사 전 권리보전 절차 (임차권등기명령, 대항력 유지)
     if is_comprehensive or any(k in q_compact for k in ("이사", "보전", "임차권등기", "대항력", "점유", "전입유지", "짐", "열쇠", "비밀번호", "퇴거", "비우", "나가")):
-        f_ids, e_ids, e_lbls = _match_facts_and_evidences(
-            ["전입신고", "점유", "거주", "열쇠", "출입카드", "이사"], briefing
+        f_ids, _, e_lbls = _match_facts_and_evidences(
+            ["전입신고", "점유", "출입카드", "열쇠", "임차권등기", "이사"], briefing, max_labels=4
         )
-        for ev in briefing.evidences:
-            if any(k in (ev.document_name or "") for k in ("전입", "주민등록", "확정일자", "퇴거")):
+        for ev in (briefing.evidences or []):
+            if any(k in (ev.document_name or "") for k in ("전입", "주민등록", "점유", "확정일자", "등기")):
                 if ev.evidence_label not in e_lbls:
                     e_lbls.append(ev.evidence_label)
 
@@ -391,8 +413,8 @@ def plan_legal_issues(
                 ],
                 required_fact_keys=["계약종료사실", "미반환사실", "전입유지상태", "점유상태"],
                 relevant_fact_ids=f_ids,
-                relevant_evidence_ids=e_ids,
-                relevant_evidence_labels=sorted(e_lbls),
+                relevant_evidence_ids=[],
+                relevant_evidence_labels=sorted(list(dict.fromkeys(e_lbls)))[:5],
                 required_statutes=["주택임대차보호법 제3조의3", "주택임대차보호법 제3조 제1항"],
                 missing_evidence=[],
                 priority="HIGH",
@@ -407,11 +429,11 @@ def plan_legal_issues(
         or (any(k in q_compact for k in ("제안", "합의", "동의")) and any(k in q_compact for k in ("보증금", "반환", "1년", "나중", "임대인", "집주인")))
     )
     if has_installment_mention:
-        f_ids, e_ids, e_lbls = _match_facts_and_evidences(
-            ["분할", "제안", "거절", "일부반환", "문자"], briefing
+        f_ids, _, e_lbls = _match_facts_and_evidences(
+            ["분할", "제안", "거절", "일부반환", "문자"], briefing, max_labels=4
         )
-        for ev in briefing.evidences:
-            if any(k in (ev.document_name or "") for k in ("제안", "분할", "대화", "녹음", "문자")):
+        for ev in (briefing.evidences or []):
+            if any(k in (ev.document_name or "") for k in ("제안", "분할", "대화", "녹음", "문자", "카톡")):
                 if ev.evidence_label not in e_lbls:
                     e_lbls.append(ev.evidence_label)
 
@@ -426,8 +448,8 @@ def plan_legal_issues(
                 ],
                 required_fact_keys=["분할제안내용", "임차인거절의사표시", "동시이행항변권", "전액반환채무"],
                 relevant_fact_ids=f_ids,
-                relevant_evidence_ids=e_ids,
-                relevant_evidence_labels=sorted(e_lbls),
+                relevant_evidence_ids=[],
+                relevant_evidence_labels=sorted(list(dict.fromkeys(e_lbls)))[:5],
                 required_statutes=["민법 제536조", "민법 제460조", "민법 제468조", "민법 제397조", "소송촉진 등에 관한 특례법 제3조"],
                 missing_evidence=[],
                 priority="MEDIUM",
@@ -436,9 +458,14 @@ def plan_legal_issues(
 
     # 5-2. 쟁점: 내용증명 우편의 법적 효과 및 필수적 기재사항 (SC01-T10 대응)
     if any(k in q_compact for k in ("내용증명", "배달증명", "최고장", "우체국")):
-        f_ids, e_ids, e_lbls = _match_facts_and_evidences(
-            ["보증금", "종료", "해지", "내용증명", "최고"], briefing
+        f_ids, _, e_lbls = _match_facts_and_evidences(
+            ["내용증명", "최고", "배달증명", "도달"], briefing, max_labels=4
         )
+        for ev in (briefing.evidences or []):
+            if any(k in (ev.document_name or "") for k in ("내용증명", "배달증명", "최고장")):
+                if ev.evidence_label not in e_lbls:
+                    e_lbls.append(ev.evidence_label)
+
         issues.append(
             LegalIssueTask(
                 issue_id="ISSUE_PROOF_OF_CONTENTS",
@@ -450,8 +477,8 @@ def plan_legal_issues(
                 ],
                 required_fact_keys=["계약종료경위", "보증금전액", "동시이행제공", "도달입증"],
                 relevant_fact_ids=f_ids,
-                relevant_evidence_ids=e_ids,
-                relevant_evidence_labels=sorted(e_lbls),
+                relevant_evidence_ids=[],
+                relevant_evidence_labels=sorted(list(dict.fromkeys(e_lbls)))[:5],
                 required_statutes=["주택임대차보호법 제6조의2", "민법 제536조", "민법 제111조"],
                 missing_evidence=[],
                 priority="HIGH",
@@ -460,8 +487,8 @@ def plan_legal_issues(
 
     # 5-3. 쟁점: 임대인의 자력 상실 및 연락 두절 시 사법절차 전환 (SC01-T11 대응)
     if any(k in q_compact for k in ("연락두절", "연락이두절", "연락안됨", "연락도잘안", "연락이잘안", "잠적", "파산", "회생", "자력악화", "자력상실", "대출거절", "추가대출도거절")):
-        f_ids, e_ids, e_lbls = _match_facts_and_evidences(
-            ["보증금", "가압류", "대출", "연락"], briefing
+        f_ids, _, e_lbls = _match_facts_and_evidences(
+            ["가압류", "대출", "연락두절", "잠적"], briefing, max_labels=4
         )
         issues.append(
             LegalIssueTask(
@@ -474,8 +501,8 @@ def plan_legal_issues(
                 ],
                 required_fact_keys=["연락두절사실", "자력상실정황", "집행권원필요성"],
                 relevant_fact_ids=f_ids,
-                relevant_evidence_ids=e_ids,
-                relevant_evidence_labels=sorted(e_lbls),
+                relevant_evidence_ids=[],
+                relevant_evidence_labels=sorted(list(dict.fromkeys(e_lbls)))[:5],
                 required_statutes=["주택임대차보호법 제3조의3", "민사소송법 제462조", "민사집행법 제88조"],
                 missing_evidence=[],
                 priority="HIGH",
@@ -484,8 +511,8 @@ def plan_legal_issues(
 
     # 5-4. 쟁점: 가압류 상태에서의 무담보 단순 확약서 수용 위험성 (SC01-V03 대응)
     if any(k in q_compact for k in ("확약서", "공증없이", "공증이없이", "합의하고기다려", "기다려주는게")):
-        f_ids, e_ids, e_lbls = _match_facts_and_evidences(
-            ["보증금", "가압류", "확약서", "1년", "공증"], briefing
+        f_ids, _, e_lbls = _match_facts_and_evidences(
+            ["가압류", "확약서", "공증", "변제약속"], briefing, max_labels=4
         )
         issues.append(
             LegalIssueTask(
@@ -498,8 +525,8 @@ def plan_legal_issues(
                 ],
                 required_fact_keys=["가압류등재사실", "무담보확약서", "동시이행관계"],
                 relevant_fact_ids=f_ids,
-                relevant_evidence_ids=e_ids,
-                relevant_evidence_labels=sorted(e_lbls),
+                relevant_evidence_ids=[],
+                relevant_evidence_labels=sorted(list(dict.fromkeys(e_lbls)))[:5],
                 required_statutes=["민법 제536조", "주택임대차보호법 제3조"],
                 missing_evidence=[],
                 priority="HIGH",
@@ -508,8 +535,8 @@ def plan_legal_issues(
 
     # 5-5. 쟁점: 새 임차인 유치 조건부 반환의 부당성 (SC01-V08 대응)
     if any(k in q_compact for k in ("새세입자", "다음세입자", "신규세입자", "새로운세입자")) and any(k in q_compact for k in ("기다려", "의무", "기다려야", "들어올때까지")):
-        f_ids, e_ids, e_lbls = _match_facts_and_evidences(
-            ["보증금", "종료", "새세입자", "신규임차인"], briefing
+        f_ids, _, e_lbls = _match_facts_and_evidences(
+            ["새세입자", "신규임차인", "대기의무"], briefing, max_labels=4
         )
         issues.append(
             LegalIssueTask(
@@ -522,8 +549,8 @@ def plan_legal_issues(
                 ],
                 required_fact_keys=["계약종료사실", "새세입자유치조건의부당성", "동시이행관계"],
                 relevant_fact_ids=f_ids,
-                relevant_evidence_ids=e_ids,
-                relevant_evidence_labels=sorted(e_lbls),
+                relevant_evidence_ids=[],
+                relevant_evidence_labels=sorted(list(dict.fromkeys(e_lbls)))[:5],
                 required_statutes=["민법 제536조", "주택임대차보호법 제3조"],
                 missing_evidence=[],
                 priority="HIGH",
@@ -532,15 +559,13 @@ def plan_legal_issues(
 
     # 6-1. 쟁점: 소송 및 보전처분을 위한 필수 증빙 서류 보완 (SC01-T08 대응)
     if any(k in q_compact for k in ("서류", "준비서류", "신청서류", "필요서류", "구비서류", "추가로확인", "발급받아야")):
-        f_ids, e_ids, e_lbls = _match_facts_and_evidences(
-            ["계약서", "전입", "확정일자", "등기", "서류"], briefing
+        f_ids, _, e_lbls = _match_facts_and_evidences(
+            ["계약서", "전입", "확정일자", "등기부", "서류"], briefing, max_labels=4
         )
-        for ev in briefing.evidences:
+        for ev in (briefing.evidences or []):
             if any(k in (ev.document_name or "") for k in ("계약서", "전입", "확정일자", "등기")):
                 if ev.evidence_label not in e_lbls:
                     e_lbls.append(ev.evidence_label)
-                if ev.evidence_id not in e_ids:
-                    e_ids.append(ev.evidence_id)
 
         issues.append(
             LegalIssueTask(
@@ -553,8 +578,8 @@ def plan_legal_issues(
                 ],
                 required_fact_keys=["임대차계약서", "주민등록초본", "확정일자부여현황", "등기사항전부증명서"],
                 relevant_fact_ids=f_ids,
-                relevant_evidence_ids=e_ids,
-                relevant_evidence_labels=sorted(e_lbls),
+                relevant_evidence_ids=[],
+                relevant_evidence_labels=sorted(list(dict.fromkeys(e_lbls)))[:5],
                 required_statutes=["주택임대차보호법 제3조의3", "주택임대차보호법 제3조"],
                 missing_evidence=["최신 등기사항전부증명서", "전세대출 반환보증 가입 확인 문서"],
                 priority="HIGH",
@@ -571,6 +596,15 @@ def plan_legal_issues(
     )
     if is_lease_context and (is_comprehensive or any(k in q_compact for k in ("추가증거", "다음행동", "미확인", "보완", "행동", "조치", "대처", "단계별"))):
         missing_props = [g.target_proposition for g in briefing.evidence_gaps]
+        # [정밀화] 17개 전수를 무차별 나열하지 않고, 입증 보완(증거 공백)과 직결된 핵심 기준 증거 상위 3~5개만 선별
+        next_action_labels: List[str] = []
+        for ev in (briefing.evidences or []):
+            if any(k in (ev.document_name or "") for k in ("계약서", "등기", "내용증명", "가압류", "전입")):
+                if ev.evidence_label not in next_action_labels:
+                    next_action_labels.append(ev.evidence_label)
+        if not next_action_labels and briefing.evidences:
+            next_action_labels = [ev.evidence_label for ev in briefing.evidences[:5]]
+
         issues.append(
             LegalIssueTask(
                 issue_id="ISSUE_NEXT_ACTIONS",
@@ -580,9 +614,9 @@ def plan_legal_issues(
                     "권리 상실을 방지하기 위해 임차인이 취해야 할 단계별 실무 조치는 무엇인가?",
                 ],
                 required_fact_keys=["증거공백목록", "등기부열람", "내용증명도달", "보증보험가입증명"],
-                relevant_fact_ids=[f.fact_id for f in briefing.facts if f.adjudication_status == "EVIDENCE_INCOMPLETE"],
-                relevant_evidence_ids=[ev.evidence_id for ev in briefing.evidences],
-                relevant_evidence_labels=[ev.evidence_label for ev in briefing.evidences],
+                relevant_fact_ids=[f.fact_id for f in briefing.facts if f.adjudication_status == "EVIDENCE_INCOMPLETE"][:15],
+                relevant_evidence_ids=[],
+                relevant_evidence_labels=sorted(list(dict.fromkeys(next_action_labels)))[:5],
                 required_statutes=["주택임대차보호법 제3조", "주택임대차보호법 제3조의3"],
                 missing_evidence=missing_props,
                 priority="HIGH",
@@ -591,8 +625,8 @@ def plan_legal_issues(
 
     # 7. 쟁점: 허위 법령 배제 및 형사처벌/민사 권리구제 (SC01-V04 대응)
     if any(k in q_compact for k in ("99조", "처벌", "형사", "징역", "고소", "사기", "벌금")):
-        f_ids, e_ids, e_lbls = _match_facts_and_evidences(
-            ["보증금", "계약기간", "미반환"], briefing
+        f_ids, _, e_lbls = _match_facts_and_evidences(
+            ["계약체결경위", "사기", "기망", "고의"], briefing, max_labels=4
         )
         issues.append(
             LegalIssueTask(
@@ -605,8 +639,8 @@ def plan_legal_issues(
                 ],
                 required_fact_keys=["보증금미반환", "계약체결경위", "변제자력"],
                 relevant_fact_ids=f_ids,
-                relevant_evidence_ids=e_ids,
-                relevant_evidence_labels=sorted(e_lbls),
+                relevant_evidence_ids=[],
+                relevant_evidence_labels=sorted(list(dict.fromkeys(e_lbls)))[:5],
                 required_statutes=["주택임대차보호법 제3조의2", "민사집행법 제41조", "형법 제347조"],
                 missing_evidence=["기망행위 입증 자료", "계약 당시 편취 고의 증빙"],
                 priority="HIGH",
@@ -616,8 +650,7 @@ def plan_legal_issues(
     # 8. 일반 질문 또는 기타 도메인 (노동, 대여금 등) 기본 폴백 쟁점
     if not issues:
         f_ids = [f.fact_id for f in briefing.facts]
-        e_ids = [e.evidence_id for e in briefing.evidences]
-        e_lbls = [e.evidence_label for e in briefing.evidences]
+        e_lbls = [e.evidence_label for e in (briefing.evidences or [])]
         missing_props = [g.target_proposition for g in briefing.evidence_gaps]
 
         issues.append(
@@ -627,8 +660,8 @@ def plan_legal_issues(
                 legal_questions=[q],
                 required_fact_keys=["주요사실", "요건사실"],
                 relevant_fact_ids=f_ids[:10],
-                relevant_evidence_ids=e_ids[:5],
-                relevant_evidence_labels=sorted(e_lbls[:5]),
+                relevant_evidence_ids=[],
+                relevant_evidence_labels=sorted(list(dict.fromkeys(e_lbls)))[:5],
                 required_statutes=[],
                 missing_evidence=missing_props,
                 priority="HIGH",

@@ -68,20 +68,23 @@ export const VerifiedPresentationView = ({
         </div>
       )}
 
-      <details className="chat-digest-full-answer" open>
-        <summary>
-          <span className="chat-digest-expand-icon" aria-hidden="true">▸</span>
-          <span className="chat-digest-expand-title">전체 법률 분석 · 조건 및 주의사항</span>
-          <span className="chat-digest-expand-hint">사실관계 · 법률 판단 · 증거별 근거</span>
-        </summary>
-        <div className="chat-digest-full-content">
-          <LegalAnswerView
-            content={digest.fullAnswer}
-            claimCitations={claimCitations}
-            onEvidenceClick={onEvidenceClick}
-          />
-        </div>
-      </details>
+      {/* 상단 핵심 요약 카드에 이미 노출된 결론 블록은 하단에서 제외하여 중복 노출을 방지한다 */}
+      {(digest.lead && digest.detailedAnswer.trim() ? digest.detailedAnswer.trim() : digest.fullAnswer.trim()) && (
+        <details className="chat-digest-full-answer" open>
+          <summary>
+            <span className="chat-digest-expand-icon" aria-hidden="true">▸</span>
+            <span className="chat-digest-expand-title">전체 법률 분석 · 조건 및 주의사항</span>
+            <span className="chat-digest-expand-hint">사실관계 · 법률 판단 · 증거별 근거</span>
+          </summary>
+          <div className="chat-digest-full-content">
+            <LegalAnswerView
+              content={digest.lead && digest.detailedAnswer.trim() ? digest.detailedAnswer : digest.fullAnswer}
+              claimCitations={claimCitations}
+              onEvidenceClick={onEvidenceClick}
+            />
+          </div>
+        </details>
+      )}
     </div>
   );
 };

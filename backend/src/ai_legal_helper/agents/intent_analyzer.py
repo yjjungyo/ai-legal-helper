@@ -124,6 +124,8 @@ INTENT_PROMPT = PromptTemplate.from_template(
 
 #### [분류 원칙]
 - 현재 질문이 첫 번째 질문(이전 대화 없음)인 경우, FOLLOWUP_ACTION이나 FOLLOWUP_QUESTION으로 분류하지 마세요.
+- 질문에 행동/절차 표현("조치", "실행 순서", "어떻게 해야")이 있더라도, "제출한 증거를 종합해", "권리를 지키면서", "보증금 회수 방안", "대항력/우선변제권 분석" 등 사건 증거의 법률적 종합 분석이 전제된 복합 질문은 FOLLOWUP_ACTION이 아니라 NEW_LEGAL_ANALYSIS로 분류하세요.
+- FOLLOWUP_ACTION은 이미 이전 턴에서 모든 증거와 권리관계 분석이 완료되어 추가적인 법률/증거 분석 없이 순수한 다음 행동 목록만 필요로 하는 단문 질의(예: "이제 뭘 해야 하죠?", "어디로 방문해야 하나요?")에만 적용하세요.
 - 짧은 질문이라도 이전 대화가 있다면 생략된 법률적 의미를 살려 'resolved_query'를 구체적으로 작성하세요.
   * 예: 현재 질문 "이제 뭘 해야 하죠?" + 이전 대화 "보증금 미반환 및 가압류 분쟁"
     → resolved_query: "앞선 보증금 반환 지연 및 가압류 분쟁 분석을 바탕으로 의뢰인이 지금 우선적으로 취해야 할 단계별 조치 가이드"
@@ -232,6 +234,28 @@ def _heuristic_rule_fallback(
     elif any(k in q for k in ("행정처분", "과징금", "취소소송", "영업정지")):
         fallback_cats = ["행정"]
 
+    # 날짜 정규식 매칭 (질문 내 의뢰인의 행위 기준일 추출: YYYY-MM-DD)
+    extracted_date = None
+    date_match = re.search(r"(\d{4})[.\-/년]\s*(\d{1,2})[.\-/월]\s*(\d{1,2})일?", q)
+    if date_match:
+        try:
+            y, m, d = int(date_match.group(1)), int(date_match.group(2)), int(date_match.group(3))
+            extracted_date = f"{y:04d}-{m:02d}-{d:02d}"
+        except (ValueError, TypeError):
+            extracted_date = None
+
+    # 문서 작성 요청 (내용증명, 지급명령 등)
+    if any(doc in q for doc in ("내용증명", "지급명령", "소장", "합의서", "고소장")) and any(act in q for act in ("작성", "써줘", "초안", "만들어")):
+        return IntentDecision(
+            intent=ConsultationIntent.DOCUMENT_REQUEST,
+            categories=fallback_cats,
+            resolved_query=q, requires_specialist=True,
+            requires_retrieval=True, requires_verification=True,
+            requires_full_analysis=True,
+            reason="명시적인 법률 문서 작성 요청",
+            event_date=extracted_date,
+        )
+
     # These are explicit *requests* to inspect already submitted data,
     # not claims that the landlord actually repaid any money.
     material_review = (
@@ -246,6 +270,7 @@ def _heuristic_rule_fallback(
             requires_retrieval=True, requires_verification=True,
             requires_full_analysis=True,
             reason="등록 자료의 사실·법률 분석 요청(반환 사실 주장은 아님)",
+            event_date=extracted_date,
         )
 
     if not has_history:
@@ -256,6 +281,7 @@ def _heuristic_rule_fallback(
             requires_retrieval=True, requires_verification=True,
             requires_full_analysis=True,
             reason="사건의 첫 법률 상담",
+            event_date=extracted_date,
         )
 
     if any(term in q for term in (
@@ -269,6 +295,7 @@ def _heuristic_rule_fallback(
             requires_specialist=False, requires_retrieval=False,
             requires_verification=True, requires_full_analysis=False,
             reason="명시적인 다음 행동 요청(기존 검증 결과 재사용)",
+            event_date=extracted_date,
         )
     if (
         any(term in q for term in ("정정", "잘못 알았", "확정일자는", "날짜가 달라"))
@@ -281,6 +308,7 @@ def _heuristic_rule_fallback(
             requires_specialist=True, requires_retrieval=False,
             requires_verification=True, requires_full_analysis=False,
             reason="사용자의 명시적인 사실 정정 요청(원문은 USER_ALLEGED)",
+            event_date=extracted_date,
         )
     return IntentDecision(
         intent=ConsultationIntent.FOLLOWUP_QUESTION,
@@ -289,22 +317,27 @@ def _heuristic_rule_fallback(
         requires_retrieval=True, requires_verification=True,
         requires_full_analysis=False,
         reason="의도 모델 미응답: 법률 의미를 추정하지 않고 후속 질의 검토",
+        event_date=extracted_date,
     )
 @trace
 def analyze_consultation_intent(
     question: str,
     conversation_context: Optional[ConversationContext] = None,
     case_context: str = "",
+    use_llm: bool = False,
 ) -> IntentDecision:
     """사용자 질문의 법률적 의도를 분석하고, 문맥이 연결된 resolved_query 및 실행 플래그를 결정한다.
 
-    LLM을 통한 맥락 분석과 코드 레벨의 엄격한 정책 검증(Guardrail)을 결합하여,
-    환각이나 엉뚱한 분기를 원천 차단한다.
+    1단계 패스스루 최적화:
+    - 기본 모드(use_llm=False): 6~8초 소요되는 무거운 LLM 호출을 건너뛰고,
+      0.001초 규칙 기반(_heuristic_rule_fallback) 및 결정론적 가드레일 정책으로 즉시 판정한다.
+    - LLM 모드(use_llm=True): 심층 문맥 복원이 필요한 특수 케이스나 단위 테스트 검증 시 LLM을 사용한다.
 
     Args:
         question: 사용자의 현재 질문 문자열
         conversation_context: 이전 상담 턴들이 담긴 ConversationContext 객체 (선택)
         case_context: 현재 사건의 기본 사실관계 및 타임라인 문자열 (선택)
+        use_llm: LLM 의도 분석 실행 여부 (기본값 False: 초고속 규칙 패스스루 적용)
 
     Returns:
         IntentDecision: 질문 의도, 해석된 쿼리, 실행 필요 플래그를 담은 결정 객체
@@ -312,79 +345,80 @@ def analyze_consultation_intent(
     has_history = bool(conversation_context and conversation_context.previous_turns)
     conv_text = conversation_context.format_context_for_prompt(max_turns=3) if conversation_context else "(이전 상담 대화 없음 — 신규 대화)"
 
-    # 1. LLM 호출 준비
+    # 1. LLM 호출 분기 (use_llm=True일 때만 실행하여 6~8초 레이턴시 단축)
     decision: Optional[IntentDecision] = None
-    try:
-        llm = get_llm(temperature=0.0)
-        prompt_val = INTENT_PROMPT.format(
-            question=question.strip(),
-            conversation_context=conv_text,
-            case_context=case_context[:1000] if case_context else "(사건 정보 없음)",
-        )
-        response = llm.invoke(prompt_val)
-        raw_content = getattr(response, "content", str(response)).strip()
-
-        # JSON 블록 추출
-        match = re.search(r"\{.*\}", raw_content, re.DOTALL)
-        if match:
-            parsed = json.loads(match.group(0))
-            intent_raw = parsed.get("intent", "NEW_LEGAL_ANALYSIS")
-            try:
-                intent_enum = ConsultationIntent(intent_raw)
-            except ValueError:
-                intent_enum = ConsultationIntent.NEW_LEGAL_ANALYSIS
-
-            resolved_q = parsed.get("resolved_query") or question
-            requires_spec = bool(parsed.get("requires_specialist", True))
-            requires_ret = bool(parsed.get("requires_retrieval", True))
-            requires_ver = bool(parsed.get("requires_verification", True))
-            requires_full = bool(parsed.get("requires_full_analysis", True))
-            reason_str = parsed.get("reason", "")
-
-            # 오래된 LLM 응답이 consultation_mode를 생략하면 사건 상담을 유지한다.
-            # 알 수 없는 값도 사건 증거를 버리는 방향으로 추측하지 않는다.
-            try:
-                consultation_mode = ConsultationMode(parsed.get("consultation_mode", "CASE_EVIDENCE"))
-            except (ValueError, TypeError):
-                consultation_mode = ConsultationMode.CASE_EVIDENCE
-
-            raw_cats = parsed.get("categories")
-            valid_cats = []
-            if isinstance(raw_cats, list):
-                for c in raw_cats:
-                    if isinstance(c, str):
-                        c_clean = c.strip()
-                        if c_clean in CATEGORIES and c_clean not in valid_cats:
-                            valid_cats.append(c_clean)
-            valid_cats = valid_cats[:3]
-            if not valid_cats and intent_enum not in (ConsultationIntent.GENERAL_CONVERSATION, ConsultationIntent.OUT_OF_SCOPE, ConsultationIntent.NEEDS_CLARIFICATION):
-                if any(k in question for k in ("노동", "퇴직금", "체불", "해고", "근로", "임금")):
-                    valid_cats = ["노동"]
-                elif any(k in question for k in ("사기", "횡령", "배임", "고소", "처벌", "형사")):
-                    valid_cats = ["형법"]
-                else:
-                    valid_cats = ["민법"]
-
-            event_d = parsed.get("event_date")
-            event_t = parsed.get("event_type")
-            statute_d = parsed.get("statute_mention_date")
-
-            decision = IntentDecision(
-                intent=intent_enum,
-                consultation_mode=consultation_mode,
-                categories=valid_cats,
-                resolved_query=resolved_q,
-                requires_specialist=requires_spec,
-                requires_retrieval=requires_ret,
-                requires_verification=requires_ver,
-                requires_full_analysis=requires_full,
-                reason=reason_str,
-                event_date=event_d,
-                event_type=event_t,
-                statute_mention_date=statute_d,
+    if use_llm:
+        try:
+            llm = get_llm(temperature=0.0)
+            prompt_val = INTENT_PROMPT.format(
+                question=question.strip(),
+                conversation_context=conv_text,
+                case_context=case_context[:1000] if case_context else "(사건 정보 없음)",
             )
-    except Exception as e:
-        logger.warning(f"[INTENT_ANALYZER] LLM 질문 의도 분석 실패(규칙 폴백 적용): {e}")
+            response = llm.invoke(prompt_val)
+            raw_content = getattr(response, "content", str(response)).strip()
+
+            # JSON 블록 추출
+            match = re.search(r"\{.*\}", raw_content, re.DOTALL)
+            if match:
+                parsed = json.loads(match.group(0))
+                intent_raw = parsed.get("intent", "NEW_LEGAL_ANALYSIS")
+                try:
+                    intent_enum = ConsultationIntent(intent_raw)
+                except ValueError:
+                    intent_enum = ConsultationIntent.NEW_LEGAL_ANALYSIS
+
+                resolved_q = parsed.get("resolved_query") or question
+                requires_spec = bool(parsed.get("requires_specialist", True))
+                requires_ret = bool(parsed.get("requires_retrieval", True))
+                requires_ver = bool(parsed.get("requires_verification", True))
+                requires_full = bool(parsed.get("requires_full_analysis", True))
+                reason_str = parsed.get("reason", "")
+
+                # 오래된 LLM 응답이 consultation_mode를 생략하면 사건 상담을 유지한다.
+                # 알 수 없는 값도 사건 증거를 버리는 방향으로 추측하지 않는다.
+                try:
+                    consultation_mode = ConsultationMode(parsed.get("consultation_mode", "CASE_EVIDENCE"))
+                except (ValueError, TypeError):
+                    consultation_mode = ConsultationMode.CASE_EVIDENCE
+
+                raw_cats = parsed.get("categories")
+                valid_cats = []
+                if isinstance(raw_cats, list):
+                    for c in raw_cats:
+                        if isinstance(c, str):
+                            c_clean = c.strip()
+                            if c_clean in CATEGORIES and c_clean not in valid_cats:
+                                valid_cats.append(c_clean)
+                valid_cats = valid_cats[:3]
+                if not valid_cats and intent_enum not in (ConsultationIntent.GENERAL_CONVERSATION, ConsultationIntent.OUT_OF_SCOPE, ConsultationIntent.NEEDS_CLARIFICATION):
+                    if any(k in question for k in ("노동", "퇴직금", "체불", "해고", "근로", "임금")):
+                        valid_cats = ["노동"]
+                    elif any(k in question for k in ("사기", "횡령", "배임", "고소", "처벌", "형사")):
+                        valid_cats = ["형법"]
+                    else:
+                        valid_cats = ["민법"]
+
+                event_d = parsed.get("event_date")
+                event_t = parsed.get("event_type")
+                statute_d = parsed.get("statute_mention_date")
+
+                decision = IntentDecision(
+                    intent=intent_enum,
+                    consultation_mode=consultation_mode,
+                    categories=valid_cats,
+                    resolved_query=resolved_q,
+                    requires_specialist=requires_spec,
+                    requires_retrieval=requires_ret,
+                    requires_verification=requires_ver,
+                    requires_full_analysis=requires_full,
+                    reason=reason_str,
+                    event_date=event_d,
+                    event_type=event_t,
+                    statute_mention_date=statute_d,
+                )
+        except Exception as e:
+            logger.warning(f"[INTENT_ANALYZER] LLM 질문 의도 분석 실패(규칙 폴백 적용): {e}")
 
     # On model failure, the product must not dispose of a potentially valid
     # legal question as unknown merely because intent classification failed.
@@ -415,11 +449,27 @@ def analyze_consultation_intent(
         decision.requires_full_analysis = True
 
     # 정책 B: FOLLOWUP_ACTION인 경우 Specialist와 RAG는 비활성화하되, Verifier는 유지
+    # 단, 증거 종합 분석이나 권리 분석 키워드가 질문에 포함된 복합 질문인 경우 NEW_LEGAL_ANALYSIS로 승격
+    complex_evidence_kws = (
+        "증거를 종합", "증거 종합", "자료를 종합", "권리를 지키", "대항력",
+        "우선변제", "가압류", "배당", "실제 청구할 수 있는", "회수할 수 있는",
+    )
     if decision.intent == ConsultationIntent.FOLLOWUP_ACTION:
-        decision.requires_specialist = False
-        decision.requires_retrieval = False
-        decision.requires_verification = True
-        decision.requires_full_analysis = False
+        if any(kw in question for kw in complex_evidence_kws) and case_context:
+            logger.info(
+                "[INTENT_GUARDRAIL] FOLLOWUP_ACTION으로 분류되었으나 증거 종합 및 법률 권리 분석 요구가 포함되어 NEW_LEGAL_ANALYSIS로 승격합니다."
+            )
+            decision.intent = ConsultationIntent.NEW_LEGAL_ANALYSIS
+            decision.consultation_mode = ConsultationMode.CASE_EVIDENCE
+            decision.requires_specialist = True
+            decision.requires_retrieval = True
+            decision.requires_full_analysis = True
+            decision.requires_verification = True
+        else:
+            decision.requires_specialist = False
+            decision.requires_retrieval = False
+            decision.requires_verification = True
+            decision.requires_full_analysis = False
 
     # 정책 C: GENERAL_CONVERSATION인 경우 모든 무거운 파이프라인 비활성화
     # 법률 무관 요청은 일반 인사와 별도 의도로 유지하고 무거운 분석을 중지한다.

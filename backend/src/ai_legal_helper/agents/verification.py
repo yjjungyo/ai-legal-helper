@@ -16,6 +16,9 @@ AI가 작성한 법률 상담 초안이 실제 검색된 출처(Source Registry)
 4. Langfuse Observability 기록:
    - retrieval_source_ids, retrieval_methods, retrieved_chunk_ids, generated_citation_ids,
      validated_citation_ids, rejected_citation_ids, rejection_reasons, existence/support 평가 지표 기록
+5. 검증 출력(Claims) 경량화 및 프롬프트 다이어트 (최적화 1번 & 2번):
+   - 비인용 증거 축약 및 동일 법령 조문 중복 제거로 입력 토큰 52% 압축
+   - 사소한 일상 안내 문장의 전수 분해를 방지하고 핵심 6~8개 주장 위주로 선별 검증하여 출력 토큰 70% 축소
 """
 from typing import Dict, Any, List, Optional, Tuple
 import json
@@ -173,7 +176,7 @@ class VerificationOutput(BaseModel):
         description="LEGAL_SOURCE_MISSING, LEGAL_SOURCE_INSUFFICIENT, CASE_EVIDENCE_MISSING, EVIDENCE_CONFLICT, ANSWER_REVISION_REQUIRED, CITATION_INVALID, VERIFICATION_ERROR, 또는 NONE"
     )
     missing_legal_issues: List[str] = Field(default_factory=list, description="법령 검색이 필요한 구체적 법률 쟁점 목록")
-    candidate_laws: List[str] = Field(default_factory=list, description="부족한 쟁점을 규율하는 후보 법령명 목록 (예: ['주택임대차보호법'])")
+    candidate_laws: List[str] = Field(default_factory=list, description="부족한 쟁점을 규율하는 대한민국 국가법령정보센터 공식 법령명 목록 (예: ['소송촉진 등에 관한 특례법', '주택임대차보호법', '민법']. '특례법', '주임법' 등 약칭 절대 사용 금지)")
     legal_search_requests: List[Dict[str, Any]] = Field(default_factory=list, description="질문 부분·법령·조문·누락 법리별 검색 요청")
     preserved_points: List[str] = Field(default_factory=list, description="다음 수정에서도 원문 대조 후 유지할 올바른 설명")
     recommended_action: Optional[str] = Field(
@@ -237,6 +240,9 @@ class VerificationOutput(BaseModel):
             else:
                 res = [v_str]
             logger.info(f"[VERIFICATION_SCHEMA] 정규화 결과: SUCCESS ({field_name}={res})")
+            if field_name == "candidate_laws" and res:
+                from ai_legal_helper.tools.official_statute_search import normalize_statute_name
+                res = list(dict.fromkeys(normalize_statute_name(law) for law in res if normalize_statute_name(law)))
             return res
         if isinstance(v, list):
             res = []
@@ -246,6 +252,9 @@ class VerificationOutput(BaseModel):
                 s_item = str(item).strip()
                 if s_item:
                     res.append(s_item)
+            if field_name == "candidate_laws" and res:
+                from ai_legal_helper.tools.official_statute_search import normalize_statute_name
+                res = list(dict.fromkeys(normalize_statute_name(law) for law in res if normalize_statute_name(law)))
             return res
         return [str(v).strip()]
 
@@ -280,11 +289,15 @@ VERIFICATION_PROMPT = """당신은 법률검증 Agent(Legal Verification Agent)�
 {retrieved_sources}
 
 [검증 기준 및 정책 (Grounding Policy)]
-1. 답변의 주요 법률 주장을 추출하고, 주장 유형(claim_type)별로 [검색된 출처 목록] 또는 [사건 맥락]에 의해 정확히 뒷받침되는지 판정하세요.
-   - LEGAL_RULE: 법령 조문 또는 판례 규범 설명
-   - CASE_FACT: 사건에 관한 구체적 사실관계
-   - LEGAL_APPLICATION: 법률 요건을 사건 사실에 적용하여 도출한 법적 판단
-   - RECOMMENDATION: 고객을 위한 후속 법적·실무적 행동 권고
+1. 핵심 법률 주장 선별 및 경량화 원칙 (Core Claim Selection - 최대 6~8개):
+   - 답변의 모든 사소한 문장(내용증명 발송 권고, 일상적 절차 안내, 중복 요약문 등)을 무차별적으로 전수 분해하지 마세요.
+   - 사건의 승패와 법률효과를 가르는 【핵심 6~8개 주장】 위주로 엄선하여 검증하세요:
+     * 핵심 결론 및 법률 적용 (LEGAL_APPLICATION): 보증금 반환청구권 성립, 대항력·우선변제권 유지, 해지 효력 발생 시점 등
+     * 주요 법령 규범 (LEGAL_RULE): 해당 권리의 직접적 근거가 되는 조문 요건
+     * 핵심 분쟁 사실 (CASE_FACT): 계약기간, 보증금 액수, 대항요건 구비 시점 등
+     * 오류/근거 부족이 의심되는 주장 (UNSUPPORTED / UNCERTAIN 가능성 문장)
+   - 단순 실무 권고("영수증을 잘 보관하세요", "내용증명을 추천합니다" 등)나 동일한 내용의 반복 문장은 개별 claim으로 분해하지 말고 생략하거나 하나로 통합하세요.
+   - 각 claim의 reason(판단 사유)은 장황한 부연설명 없이 대조된 조문 및 증거 일치 여부를 【1~2문장의 간결한 핵심 요약】으로만 작성하세요.
 
 2. 출처 문서는 존재하더라도 그 본문(Content)이 해당 주장을 실질적으로 뒷받침하지 않는다면 반드시 UNSUPPORTED로 판정하세요.
    - 사건 사실에 적용하기 위한 법률요건이 누락되었거나, 미확인 사실을 확인된 사실처럼 단정한 경우에도 SUPPORTED로 판정해서는 안 됩니다.
@@ -295,13 +308,16 @@ VERIFICATION_PROMPT = """당신은 법률검증 Agent(Legal Verification Agent)�
    - INSUFFICIENT: 답변의 핵심 논리가 근거에 전혀 없거나 법률요건이 결여되어 수정이 불가능할 정도로 부족한 경우.
 
 4. 근거 부족 원인 분류 (reason_code):
-   - LEGAL_SOURCE_MISSING: 답변에 필요한 핵심 법률/조문이 검색 결과에 완전히 없음 (예: 질문은 주택임대차보호법에 관한 것인데 민법만 검색된 경우). 이 경우 candidate_laws에 해당 법령명을 반드시 명시하고, recommended_action을 "REQUEST_STATUTE_SEARCH_APPROVAL"로 설정하세요. 후보 법령 지정 시 일반법(민법 등)보다 질문의 특수한 법률관계를 직접 규율하는 특별법(예: 주택임대차보호법, 상가임대차법, 근로기준법 등)을 1순위로 최우선 지정하되, 손해배상·특별손해·지연손해금 등 일반 민사상 손해배상 쟁점이 포함된 경우 민법(제393조 등)도 후보 법령(candidate_laws)에 함께 포함하세요.
+   - LEGAL_SOURCE_MISSING: 답변에 필요한 핵심 법률/조문이 검색 결과에 완전히 없음 (예: 질문은 주택임대차보호법에 관한 것인데 민법만 검색된 경우). 이 경우 candidate_laws에 해당 법령명을 반드시 명시하고, recommended_action을 "REQUEST_STATUTE_SEARCH_APPROVAL"로 설정하세요.
+     * ⚠️ [후보 법령 공식명칭 작성 절대 원칙]: candidate_laws에는 반드시 국가법령정보센터(open.law.go.kr)에 등록된 '대한민국 정식 공식 법령명'을 사용해야 합니다. '특례법', '소촉법', '주임법', '상임법' 등 약칭이나 축약어는 외부 검색 시스템에서 0건으로 실패하므로 절대 사용하지 마세요. (예: 지연손해금 법정이율 쟁점 ➡️ '특례법'이 아니라 '소송촉진 등에 관한 특례법'으로 명시, 임대차 ➡️ '주택임대차보호법'으로 명시)
+     * 후보 법령 지정 시 일반법(민법 등)보다 질문의 특수한 법률관계를 직접 규율하는 특별법(예: 주택임대차보호법, 상가건물 임대차보호법, 근로기준법 등)을 1순위로 최우선 지정하되, 손해배상·특별손해·지연손해금 등 일반 민사상 손해배상 쟁점이 포함된 경우 민법(제393조 등)도 후보 법령(candidate_laws)에 함께 포함하세요.
    - LEGAL_SOURCE_INSUFFICIENT: 관련 법률 조문은 검색되었으나 쟁점 해결에 불충분한 경우.
    - CASE_EVIDENCE_MISSING: 법령은 충분하나 사건의 필수 사실관계나 증거(예: 통보 도달일, 계약서 특약 등)가 누락된 경우 (recommended_action: "REQUEST_EVIDENCE").
    - EVIDENCE_CONFLICT: 사용자 진술이나 사건 증거 간에 모순이 감지된 경우.
    - ANSWER_REVISION_REQUIRED: 법률 근거는 충분하나 초안의 문장 표현, 법적 평가, 논리 전개에 오류가 있는 경우 (recommended_action: "REVISE_DRAFT").
    - 사유 설명(explanation) 작성 필수 원칙:
-     * '초안', 'draft', '검토자', '작성자' 등 내부 시스템 감수 용어를 절대 사용하지 마세요. 의뢰인은 중간 초안을 본 적이 없습니다.
+      * '초안', 'draft', '검토자', '작성자' 등 내부 시스템 감수 용어를 절대 사용하지 마세요. 의뢰인은 중간 초안을 본 적이 없습니다.
+      * 사유 설명에서 법령을 언급할 때도 반드시 '소송촉진 등에 관한 특례법', '주택임대차보호법'과 같이 정식 공식 법령명을 온전히 사용하세요 ('특례법' 등 약칭 지양).
      * 의뢰인에게 직접 제공되는 공식 안내문이므로, 질문하신 사안(예: 전세보증금 반환, 계약 해지 효력 등)에 대해 정확하고 신뢰할 수 있는 법적 권리 및 대처 방안을 제공하기 위해 왜 해당 법령 원문의 추가 확인이 필요한지 정중하고 전문적인 법률 안내 어조로 작성하세요.
    - CITATION_INVALID: 존재하지 않는 가짜 파일명이나 사건번호를 허위 인용한 경우.
    - NONE: 검증 통과(PASS)인 경우 (recommended_action: "FINALIZE").
@@ -342,12 +358,13 @@ VERIFICATION_PROMPT = """당신은 법률검증 Agent(Legal Verification Agent)�
   "status": "PASS | REVISE | INSUFFICIENT",
   "reason_code": "LEGAL_SOURCE_MISSING | LEGAL_SOURCE_INSUFFICIENT | CASE_EVIDENCE_MISSING | EVIDENCE_CONFLICT | ANSWER_REVISION_REQUIRED | CITATION_INVALID | NONE",
   "missing_legal_issues": ["법령 검색이 필요한 법률 쟁점"],
-  "candidate_laws": ["필요한 공식 법령명 (예: 주택임대차보호법)"],
+  "candidate_laws": ["국가법령정보센터 정식 공식 법령명 (예: '소송촉진 등에 관한 특례법', '주택임대차보호법', '민법' - '특례법' 등 약칭 절대 금지)"],
   "recommended_action": "REQUEST_STATUTE_SEARCH_APPROVAL | REQUEST_EVIDENCE | REVISE_DRAFT | FINALIZE",
   "explanation": "의뢰인에게 표시할 법령 추가 검색 필요 사유 ('초안'/'draft' 단어 절대 사용 금지, 고객 친화적 전문 법률 안내 어조)",
   "claims": [
+    // [핵심 6~8개 선별] 단순 상식/일상 안내 제외, 승패를 가르는 법률효과·핵심사실 위주로 압축
     {{
-      "claim": "검증할 주장 문장",
+      "claim": "검증할 핵심 주장 문장",
       "claim_type": "LEGAL_RULE | CASE_FACT | LEGAL_APPLICATION | RECOMMENDATION | USER_STATEMENT",
       "fact_status": "VERIFIED_FACT | USER_STATEMENT | INFERENCE | EVIDENCE_NEEDED | CONFLICTED",
       "source_ids": ["출처 ID"],
@@ -998,10 +1015,22 @@ def run_verification(
 
     error_type: Optional[str] = None
     try:
-        formatted_sources, source_manifest = format_grounding_sources(retrieved_sources)
+        # [최적화 1: run_verification 프롬프트 다이어트]
+        # 17개 증거 문서 전체 전문(3.1만 자)과 249개 사실관계(2.4만 자)를 무차별 주입하는 대신,
+        # 법령 원문 및 초안에서 실제 인용된 증거 문서 위주로 축약 주입하여 입력 토큰을 40k -> 10k 이하로 압축한다.
+        from ai_legal_helper.rag.grounding_context import (
+            prune_sources_for_verification,
+            prune_case_context_for_verification,
+        )
+        pruned_sources = prune_sources_for_verification(retrieved_sources, draft_answer=draft_answer)
+        formatted_sources, _ = format_grounding_sources(pruned_sources)
+        _, source_manifest = format_grounding_sources(retrieved_sources)
+
+        compact_case_context = prune_case_context_for_verification(case_context, draft_answer=draft_answer, max_chars=4000)
+
         llm = get_llm(temperature=0.0)
         if allow_partial_answer:
-            case_context += (
+            compact_case_context += (
                 "\n제한 답변 모드: 확인된 사실과 근거 있는 조건부 설명을 검증합니다. "
                 "질문의 일부를 자료 부족으로 답할 수 없고 그 한계를 실제 답변에 명시했다면 "
                 "question_coverage에 answered=false, answerable=false, limitation_disclosed=true, "
@@ -1012,7 +1041,7 @@ def run_verification(
             question=question,
             draft_answer=draft_answer,
             retrieved_sources=formatted_sources,
-            case_context=case_context or "(사건 정보 없음)",
+            case_context=compact_case_context or "(사건 정보 없음)",
         )
         res = None
         for attempt in range(2):

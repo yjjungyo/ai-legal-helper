@@ -43,6 +43,50 @@ KST = timezone(timedelta(hours=9))
 _ARTICLE_REFERENCE = re.compile(r"제\s*(\d+)\s*조(?:\s*의\s*(\d+))?")
 _LAW_ENDING = r"(?:법률|법|령|규칙|규정)"
 
+# 법률 실무 및 LLM 추론 시 통용되는 법령 약칭을 국가법령정보센터(open.law.go.kr) 공식 법령명으로 정규화하는 매핑 사전
+_STATUTE_NAME_ALIASES: Dict[str, str] = {
+    "특례법": "소송촉진 등에 관한 특례법",
+    "소촉법": "소송촉진 등에 관한 특례법",
+    "소송촉진특례법": "소송촉진 등에 관한 특례법",
+    "소송촉진법": "소송촉진 등에 관한 특례법",
+    "주임법": "주택임대차보호법",
+    "상임법": "상가건물 임대차보호법",
+    "가담법": "가등기담보 등에 관한 법률",
+    "가등기담보법": "가등기담보 등에 관한 법률",
+    "공정추심법": "채권의 공정한 추심에 관한 법률",
+    "채권추심법": "채권의 공정한 추심에 관한 법률",
+    "민집법": "민사집행법",
+    "민소법": "민사소송법",
+    "형소법": "형사소송법",
+    "근기법": "근로기준법",
+    "부등법": "부동산등기법",
+}
+
+
+def normalize_statute_name(name: str) -> str:
+    """법령 약칭이나 비정형 표기를 국가법령정보센터 공식 법령명으로 정규화한다.
+
+    약칭(예: '특례법', '주임법')이 입력되었을 때 공식 명칭으로 치환하여
+    국가법령정보공동활용 API 조회 시 검색 실패(0건)가 발생하는 문제를 원천 방지한다.
+
+    Args:
+        name: 원본 법령명 또는 약칭 문자열.
+
+    Returns:
+        str: 매핑된 공식 법령명(예: '소송촉진 등에 관한 특례법'), 매핑 부재 시 정리된 원본.
+    """
+    if not isinstance(name, str) or not name.strip():
+        return ""
+    clean = name.strip(" \t\r\n「」『』〈〉《》\"'")
+    # 1. 원본 그대로 매칭
+    if clean in _STATUTE_NAME_ALIASES:
+        return _STATUTE_NAME_ALIASES[clean]
+    # 2. 공백 및 괄호 제거 후 매칭
+    condensed = re.sub(r"[\s\(\)\[\]]", "", clean)
+    if condensed in _STATUTE_NAME_ALIASES:
+        return _STATUTE_NAME_ALIASES[condensed]
+    return clean
+
 _KOREAN_STOPWORDS = {
     "경우", "등의", "따른", "관한", "의한", "위한", "대한", "통한",
     "따라", "대해", "위해", "통해", "인한", "인해", "관련", "관련된",
@@ -138,6 +182,9 @@ def _split_statute_reference(reference: str) -> Optional[StatuteSearchTarget]:
             law_name = described.group(1)
     if not law_name or not re.search(rf"{_LAW_ENDING}$", law_name):
         return None
+
+    # [약칭 정규화] '특례법', '주임법' 등 통용 약칭을 국가법령정보센터 공식 법령명으로 치환
+    law_name = normalize_statute_name(law_name)
 
     # 다른 법까지 섞인 표현의 조문을 첫 법의 조문으로 잘못 배정하지 않는다.
     article_text = text[first_article.start():] if first_article else ""
@@ -310,7 +357,7 @@ def search_official_statutes(
     retrieved_sources: List[Dict[str, Any]] = []
 
     for target in _prepare_search_targets(candidate_laws):
-        law_name = clean_law_name = target.law_name
+        law_name = clean_law_name = normalize_statute_name(target.law_name)
         requested_articles = set(target.articles)
         all_explicit = bool(requested_articles) and not any(not _article_references(ref) for ref in target.references)
         # 후보에 붙은 조문·제목은 외부 법령명 쿼리에서 제외하되 내부 검색 목적은 보존한다.

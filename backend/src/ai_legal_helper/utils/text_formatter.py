@@ -47,6 +47,81 @@ def _extract_evidence_filename(item: Any) -> str:
     return ""
 
 
+def extract_all_registered_evidence_sources(state: Any) -> List[Any]:
+    """LangGraph State 또는 상담 컨텍스트에서 등록된 모든 사건 증거 파일 출처를 안전하게 수집한다.
+
+    1. case_evidence_briefing (source_documents, evidence_files, source_registry)
+    2. retrieved_sources
+    3. DB EvidenceDocument (case_id 기준 - 인메모리 누락 시 안전한 Fallback)
+
+    Args:
+        state (Any): LangGraph 워크플로우 상태 객체(LegalState 또는 딕셔너리).
+
+    Returns:
+        List[Any]: 중복이 제거된 사건 증거 파일명 및 출처 객체 리스트.
+    """
+    sources: List[Any] = []
+    seen_names = set()
+
+    def _add(item: Any):
+        if not item:
+            return
+        fn = _extract_evidence_filename(item)
+        if fn and fn.lower() not in seen_names:
+            seen_names.add(fn.lower())
+            sources.append(item)
+
+    if not isinstance(state, dict):
+        if hasattr(state, "get"):
+            pass
+        else:
+            return sources
+
+    # 1. case_evidence_briefing
+    briefing = state.get("case_evidence_briefing")
+    briefing_dict = (
+        briefing
+        if isinstance(briefing, dict)
+        else (briefing.model_dump() if hasattr(briefing, "model_dump") else {})
+    ) if briefing else {}
+
+    for doc in (briefing_dict.get("source_documents") or []):
+        _add(doc)
+    for doc in (briefing_dict.get("evidence_files") or []):
+        _add(doc)
+
+    s_reg = briefing_dict.get("source_registry") or {}
+    if isinstance(s_reg, dict):
+        for val in s_reg.values():
+            _add(val)
+
+    # 2. retrieved_sources
+    for src in (state.get("retrieved_sources") or []):
+        _add(src)
+
+    # 3. DB EvidenceDocument Fallback
+    case_id = (
+        state.get("case_id")
+        or briefing_dict.get("case_id")
+        or (state.get("conversation_context") or {}).get("case_id")
+        if isinstance(state.get("conversation_context"), dict)
+        else getattr(state.get("conversation_context"), "case_id", None)
+    )
+    if case_id:
+        try:
+            from ai_legal_helper.database.session import SessionLocal
+            from ai_legal_helper.database.models import EvidenceDocument
+            with SessionLocal() as db:
+                db_docs = db.query(EvidenceDocument).filter(EvidenceDocument.case_id == str(case_id)).all()
+                for d in db_docs:
+                    if d.original_filename:
+                        _add(d.original_filename)
+        except Exception:
+            pass
+
+    return sources
+
+
 def expand_evidence_citations(
     text: str,
     registered_sources: List[Union[str, Dict[str, Any]]] | None = None,

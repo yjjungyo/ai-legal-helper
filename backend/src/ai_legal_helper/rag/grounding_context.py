@@ -10,7 +10,7 @@
 
 import json
 import hashlib
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Optional
 
 
 def format_grounding_sources(
@@ -66,3 +66,186 @@ def format_grounding_sources(
         "content_sha256": hashlib.sha256(rendered.encode("utf-8")).hexdigest(),
         "complete": True, "omitted_source_ids": [],
     }
+
+
+def normalize_statute_key(src: Dict[str, Any]) -> Optional[str]:
+    """법령명과 조문 번호로 고유 키를 정규화한다 (예: '주택임대차보호법:제3조의2').
+
+    [최적화 1: 법령 조문 중복 제거]
+    - 동일 조문이 공식 검색(OFFICIAL), 로컬 인덱스, Chroma Vector 등으로
+      서로 다른 source_id를 가진 채 다중 수집되어 수만 자로 증폭되는 현상을 방지한다.
+
+    Args:
+        src: 법령 출처 메타데이터 딕셔너리.
+
+    Returns:
+        Optional[str]: '법령명:조문' 정규화 문자열 (판별 불가 시 None).
+    """
+    import re
+    statute_name = src.get("statute_name") or ""
+    article = src.get("article") or ""
+    title = src.get("title") or src.get("filename") or ""
+
+    # 1. statute_name과 article 필드가 명시된 경우
+    if statute_name and article:
+        return f"{statute_name.strip()}:{article.strip()}"
+
+    # 2. title / filename 정규식 파싱
+    m = re.search(r"([가-힣\s]+법(?:률)?)\s*(제\d+조(?:의\d+)?)", title)
+    if m:
+        return f"{m.group(1).strip()}:{m.group(2).strip()}"
+
+    # 3. source_id 접두사 및 파트 파싱 (OFFICIAL:001248:... / STATUTE:001248:...)
+    sid = str(src.get("source_id") or "")
+    if sid.startswith("OFFICIAL:") or sid.startswith("STATUTE:"):
+        parts = sid.split(":")
+        if len(parts) >= 4 and parts[3].startswith("제"):
+            law_id = parts[1]
+            law_name = statute_name or (
+                "주택임대차보호법" if law_id == "001248"
+                else "민법" if law_id == "001706"
+                else "민사집행법" if law_id == "009290"
+                else law_id
+            )
+            return f"{law_name}:{parts[3]}"
+
+    return None
+
+
+def prune_sources_for_verification(
+    sources: List[Dict[str, Any]],
+    draft_answer: str = "",
+    max_unreferenced_snippet: int = 150,
+) -> List[Dict[str, Any]]:
+    """검증 Agent 프롬프트 컨텍스트 다이어트를 위해 중복 법령 조문 및 비인용 증거를 경량화한다.
+
+    [최적화 1: run_verification 프롬프트 다이어트]
+    1. 동일 법령 조문 중복 제거:
+       공식 법령(OFFICIAL), 로컬 사전적재, Vector 검색 간 동일 조문 중복을 1개(공식 우선)로 통일 (약 1.3만 자 감축).
+    2. 비인용 증거 문서 본문 축약:
+       초안에서 한 번도 인용되지 않은 증거 문서는 메타데이터와 150자 스니펫만 남기고 상세 본문을 생략.
+    3. 법령 및 초안 인용 핵심 증거는 원문 전문 100% 보존.
+
+    Args:
+        sources: 전체 출처 메타데이터 및 본문 목록.
+        draft_answer: 검증 대상 답변 초안 문자열.
+        max_unreferenced_snippet: 비인용 증거에 남겨둘 최대 앞부분 글자 수 (기본값: 150).
+
+    Returns:
+        List[Dict[str, Any]]: 중복 제거 및 비인용 증거가 경량화된 출처 목록.
+    """
+    if not sources:
+        return []
+
+    draft_lower = (draft_answer or "").lower()
+
+    # 1단계: 법령 조문 의미적 중복 제거 (Dedup by law_name + article)
+    seen_statutes: Dict[str, Dict[str, Any]] = {}
+    non_statute_sources: List[Dict[str, Any]] = []
+
+    for src in sources:
+        if not isinstance(src, dict):
+            continue
+
+        st_key = normalize_statute_key(src)
+        if st_key:
+            if st_key in seen_statutes:
+                existing = seen_statutes[st_key]
+                # 공식 법령 검색 결과(OFFICIAL_STATUTE_SEARCH)가 최우선
+                if src.get("retrieval_method") == "OFFICIAL_STATUTE_SEARCH" and existing.get("retrieval_method") != "OFFICIAL_STATUTE_SEARCH":
+                    seen_statutes[st_key] = src
+                elif len(str(src.get("content") or "")) > len(str(existing.get("content") or "")) and existing.get("retrieval_method") != "OFFICIAL_STATUTE_SEARCH":
+                    seen_statutes[st_key] = src
+                continue
+            seen_statutes[st_key] = src
+        else:
+            non_statute_sources.append(src)
+
+    deduped_statutes = list(seen_statutes.values())
+
+    # 2단계: 비인용 증거 문서 본문 다이어트
+    pruned_evidence_sources = []
+    for src in non_statute_sources:
+        is_cited = False
+        check_keys = ["filename", "file_name", "evidence_label", "source_id", "evidence_id", "document_name"]
+        for key in check_keys:
+            val = str(src.get(key) or "").strip().lower()
+            if val and len(val) >= 2 and val in draft_lower:
+                is_cited = True
+                break
+
+        if not is_cited and src.get("filename"):
+            base_name = str(src.get("filename")).split(".")[0].lower()
+            if len(base_name) >= 3 and base_name in draft_lower:
+                is_cited = True
+
+        # 초안에 실제 인용된 증거는 원문 전문 100% 보존
+        if is_cited:
+            pruned_evidence_sources.append(src)
+            continue
+
+        # 미인용 증거는 메타데이터 유지 + 본문 스니펫 축약
+        raw_content = str(src.get("content") or "").strip()
+        if len(raw_content) > max_unreferenced_snippet:
+            condensed = dict(src)
+            condensed["content"] = f"{raw_content[:max_unreferenced_snippet]}... (초안 미인용 증거: 상세 본문 생략)"
+            pruned_evidence_sources.append(condensed)
+        else:
+            pruned_evidence_sources.append(src)
+
+    return deduped_statutes + pruned_evidence_sources
+
+
+def prune_case_context_for_verification(
+    case_context: str,
+    draft_answer: str = "",
+    max_chars: int = 4000,
+) -> str:
+    """수만 자에 달하는 사건 사실관계 및 누적 대화 브리핑을 핵심 정보 위주로 압축한다.
+
+    [최적화 1: run_verification 프롬프트 다이어트]
+    - 다중 턴 상담에서 누적 복사된 과거 AI 답변과 249개 사실관계를 압축하여
+      2.7만 자의 컨텍스트를 4,000자 이내로 정돈한다 (85% 이상 절감).
+
+    Args:
+        case_context: 사건 기본 정보, 과거 대화 누적, 사실관계 전체 문자열.
+        draft_answer: 검증 대상 답변 초안.
+        max_chars: 압축 목표 최대 글자 수 (기본값: 4000).
+
+    Returns:
+        str: 4,000자 이내로 경량화된 사건 맥락 문자열.
+    """
+    if not case_context or len(case_context) <= max_chars:
+        return case_context or ""
+
+    import re
+
+    # 1. 사건 사실관계 섹션([2. 사건 사실관계 및 증거] 또는 [입증된 사실]) 분리
+    m = re.search(r"(\[\d+\.\s*사건 사실관계.*?\]|\[입증된 사실.*?\]|\[사건 사실관계.*?\])", case_context)
+    if m:
+        header_part = case_context[:m.start()].strip()
+        facts_part = case_context[m.start():].strip()
+    else:
+        header_part = case_context[:1500].strip()
+        facts_part = case_context[1500:].strip()
+
+    # 2. header_part에서 과거 턴들 중 최신 요약만 남기고 중간 턴 본문 축약
+    turn_matches = list(re.finditer(r"\[Turn\s*\d+\]|턴\s*\d+\s*:", header_part))
+    if len(turn_matches) > 1:
+        first_turn = turn_matches[0]
+        last_turn = turn_matches[-1]
+        compact_header = (
+            header_part[:first_turn.start()].strip()
+            + f"\n\n[이전 {len(turn_matches)}개 상담 턴 경과 - 과거 문답 상세 생략]\n"
+            + header_part[last_turn.start():].strip()
+        )
+    else:
+        compact_header = header_part[:1200]
+
+    # 3. facts_part를 남은 예산 이내로 정돈
+    budget_for_facts = max(1000, max_chars - len(compact_header) - 100)
+    if len(facts_part) > budget_for_facts:
+        facts_part = facts_part[:budget_for_facts] + "\n... (외 세부 사실관계 및 증거 등록됨 - 상세 생략)"
+
+    res = f"{compact_header}\n\n{facts_part}".strip()
+    return res

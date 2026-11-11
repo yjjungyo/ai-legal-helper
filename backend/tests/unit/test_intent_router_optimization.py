@@ -56,6 +56,7 @@ def test_intent_analyzer_extracts_categories():
             question="보증금을 돌려받지 못했는데 형사 고소도 가능한가요?",
             conversation_context=None,
             case_context="",
+            use_llm=True,
         )
 
     # 1. 의도 및 쿼리 복원 확인

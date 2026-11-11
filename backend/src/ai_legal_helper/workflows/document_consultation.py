@@ -498,7 +498,9 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
         sources = []
         disposition = "WITHHELD"
     else:
-        final = draft
+        from ai_legal_helper.utils.text_formatter import expand_evidence_citations, extract_all_registered_evidence_sources
+        all_sources = extract_all_registered_evidence_sources(state) or sources_list
+        final = expand_evidence_citations(draft, all_sources)
         cited_ids = {sid for claim in result.get("claims", [])
                      if claim.get("grounding_status") == "SUPPORTED" for sid in claim.get("source_ids", [])}
         sources = [s for s in sources_list if s.get("source_id") in cited_ids] or [

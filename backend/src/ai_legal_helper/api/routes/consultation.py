@@ -75,7 +75,7 @@ NODE_TO_PROGRESS_STEP: Dict[str, tuple[str, str]] = {
     "general_conversation": ("step_6", "일반 안내 답변 생성 완료"),
     "followup_action": ("step_4", "후속 실행 조치 분석 완료"),
     "route": ("step_2", "사실관계 및 타임라인 조회 중"),
-    "plan": ("step_2", "증거 및 사실관계 조회 완료"),
+    "statute_search_plan": ("step_2", "법령 적용 시점 및 사실관계 검토 완료"),
     "run_agents": ("step_3", "법령 및 판례 검색 중"),
     "synthesize": ("step_4", "법률 쟁점별 분석 중"),
     "verification": ("step_5", "증거 및 법률 근거 검증 중"),

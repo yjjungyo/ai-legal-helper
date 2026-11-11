@@ -318,10 +318,12 @@ def extract_case_prior_verified_repayments(
         import contextvars
         from concurrent.futures import ThreadPoolExecutor
 
-        ctx = contextvars.copy_context()
         max_w = min(len(lines_needing_llm), 4)
         with ThreadPoolExecutor(max_workers=max_w) as pool:
-            future_to_line = {pool.submit(ctx.run, _execute_repay_classification, t): t[1] for t in lines_needing_llm}
+            future_to_line = {
+                pool.submit(contextvars.copy_context().run, _execute_repay_classification, t): t[1]
+                for t in lines_needing_llm
+            }
             for fut in future_to_line:
                 line_key = future_to_line[fut]
                 try:

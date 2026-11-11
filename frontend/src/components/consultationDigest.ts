@@ -15,9 +15,14 @@ export interface PreviewSection {
   kind: 'change' | 'action' | 'caution';
 }
 export interface ConsultationDigest {
+  /** 상단 핵심 요약 카드에 표시할 문안 (결론/LEAD) */
   lead: string | null;
+  /** 중간 중요 항목 프리뷰 카드 목록 */
   sections: PreviewSection[];
+  /** 원본 전체 답변 문자열 */
   fullAnswer: string;
+  /** 상단 핵심 요약 카드로 추출된 결론 블록을 제외한 하단 상세 분석 본문 (중복 표시 방지) */
+  detailedAnswer: string;
 }
 
 const CLASSIFIERS: Array<{kind: PreviewSection['kind']; test: RegExp; title: string}> = [
@@ -51,8 +56,13 @@ export function splitAnswerForDisplay(answer: string): PresentationBlock[] {
     const line = value.trim();
     const md = line.match(/^#{1,4}\s+(.+)$/);
     if (md) return md[1].replace(/^\*\*|\*\*$/g, '').trim();
+    // [제목] 또는 명시적 번호 매김 섹션 헤딩 (예: '1. 핵심 결론 및 직접 답변') 지원
     const bracket = line.match(/^\[([^\[\]\r\n]+)\]$/);
-    if (!bracket) return null;
+    if (!bracket) {
+      const numberedSection = line.match(/^(\d+\.\s*(?:핵심\s*결론|세부\s*법적\s*요건|실무상\s*유의사항|주의사항|대응\s*방안|확인할\s*사항|다음\s*조치|질문\s*답변|상담\s*요지)[^\r\n]*)$/);
+      if (numberedSection) return numberedSection[1].trim();
+      return null;
+    }
     const title = bracket[1].trim();
     if (/^E\d{1,3}(?:$|[_.\s-])/i.test(title) ||
         /\.(?:pdf|docx|txt|png|jpg|jpeg)$/i.test(title)) return null;
@@ -95,27 +105,47 @@ export function cleanLeadCitationNoise(text: string): string {
   return s.trim();
 }
 
-/** 입력 문자열과 정확히 동일한 전체 답변만 구성한다. */
+/**
+ * 입력 블록 목록에서 핵심 요약과 상세 분석을 분리하여 구성한다.
+ *
+ * - 상단 '상담 핵심 답변'에 노출된 결론 블록은 하단 상세 분석(detailedAnswer)에서
+ *   제외하여 동일 내용이 연속 2번 반복 노출되는 현상을 방지한다.
+ * - 원본 전체 텍스트는 fullAnswer 필드에 변경 없이 그대로 보존한다.
+ */
 export function buildConsultationDigest(presentation: Pick<ConsultationPresentation, 'blocks'>): ConsultationDigest {
   const blocks = presentation.blocks || [];
   const fullAnswer = blocks.map((b) => b.markdown).join('');
-  const leadBlock = blocks.find((b) => b.kind === 'LEAD' && b.markdown.trim());
-  let lead = leadBlock?.markdown.trim() || null;
 
-  // 결론 제목으로 시작하는 답변은 그 섹션의 본문을 그대로 사용한다.
-  if (!lead) {
-    const explicit = blocks.find((b) =>
-      b.kind === 'SECTION' && /(?:핵심\s*결론|최종\s*결론|상담\s*요지|핵심\s*답변)/i.test(b.title || '')
-    );
-    if (explicit) {
-      const firstLineEnd = explicit.markdown.search(/\r?\n/);
-      const body = firstLineEnd < 0 ? '' : explicit.markdown.slice(firstLineEnd).trim();
-      lead = body || null;
+  // 1. 명시적인 결론 섹션이 있으면 최우선으로 핵심 답변으로 채택
+  const explicit = blocks.find((b) =>
+    b.kind === 'SECTION' && /(?:핵심\s*결론|최종\s*결론|상담\s*요지|핵심\s*답변)/i.test(b.title || '')
+  );
+  let lead: string | null = null;
+  let leadBlockId: string | null = null;
+
+  if (explicit) {
+    leadBlockId = explicit.block_id;
+    const firstLineEnd = explicit.markdown.search(/\r?\n/);
+    const body = firstLineEnd < 0 ? '' : explicit.markdown.slice(firstLineEnd).trim();
+    lead = body || null;
+  } else {
+    // 2. 명시적 결론 섹션이 없으면 첫머리 LEAD 블록 사용
+    const leadBlock = blocks.find((b) => b.kind === 'LEAD' && b.markdown.trim());
+    if (leadBlock) {
+      leadBlockId = leadBlock.block_id;
+      lead = leadBlock.markdown.trim();
     }
   }
 
   if (lead) {
     lead = cleanLeadCitationNoise(lead);
+  }
+
+  // 상단 핵심 요약 카드로 추출된 블록을 제외하여 하단 상세 분석 본문과의 중복 노출을 방지한다.
+  let detailedAnswer = fullAnswer;
+  if (lead && leadBlockId) {
+    const remainingBlocks = blocks.filter((b) => b.block_id !== leadBlockId);
+    detailedAnswer = remainingBlocks.map((b) => b.markdown).join('').trimStart();
   }
 
   const sections: PreviewSection[] = [];
@@ -131,5 +161,5 @@ export function buildConsultationDigest(presentation: Pick<ConsultationPresentat
       items: getExactBulletLines(block),
     });
   }
-  return {lead, sections, fullAnswer};
+  return {lead, sections, fullAnswer, detailedAnswer};
 }

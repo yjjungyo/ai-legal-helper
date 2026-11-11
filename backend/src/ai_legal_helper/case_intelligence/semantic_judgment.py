@@ -11,7 +11,7 @@
 [주요 기능]
 1. classify_statement: 문장과 허용 라벨 목록을 받아 원문 인용(grounding) 기반 의미 분류 수행
 2. 인메모리 캐시(_SEMANTIC_CACHE): 동일 문장/과업에 대한 중복 LLM 호출을 방지하여 지연시간 단축
-3. 관측성(@trace) 계측: 상위 워크플로우 트레이스 트리에 Span 및 Generation으로 완전 결속
+3. 관측성: 실제 언어모델 호출 시 Langfuse CallbackHandler를 통해 상위 노드(Agent/Node)에 Generation으로 직접 기록 (0.0ms 껍데기 Span 방지)
 """
 from __future__ import annotations
 
@@ -20,7 +20,6 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Mapping, Sequence, Tuple
 
-from ai_legal_helper.observability.decorators import trace
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +45,6 @@ class SemanticDecision:
         }
 
 
-@trace
 def classify_statement(
     statement: str,
     *,

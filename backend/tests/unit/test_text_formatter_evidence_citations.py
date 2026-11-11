@@ -8,7 +8,7 @@
 (Option B: 전체 파일명 보존 표준)
 """
 import pytest
-from ai_legal_helper.utils.text_formatter import expand_evidence_citations
+from ai_legal_helper.utils.text_formatter import expand_evidence_citations, extract_all_registered_evidence_sources
 
 
 @pytest.fixture
@@ -137,3 +137,62 @@ def test_empty_or_none_inputs():
     assert expand_evidence_citations("", ["01_계약서.txt"]) == ""
     assert expand_evidence_citations("기존 답변 [01]", None) == "기존 답변 [01]"
     assert expand_evidence_citations("기존 답변 [01]", []) == "기존 답변 [01]"
+
+
+def test_user_reported_actual_deposit_citations():
+    """사용자가 지적한 실제 보증금 반환 관련 인용 표기([01], [04], [05], [06]) 복원 검증."""
+    case_sources = [
+        "01_주택임대차계약_주요내용.txt",
+        "02_전입신고_확정일자_입주확인.txt",
+        "03_계약종료_통지_문자대화_202606.txt",
+        "04_최초보증금_임차인송금내역.txt",
+        "05_1차반환_이체확인내용_20260920.txt",
+        "06_은행거래내역_반환2건_20261010.txt",
+    ]
+    input_text = (
+        "1.\n"
+        "현재 자료상 바로 청구할 수 있는 미반환 보증금 원금은 1억 7천만 원으로 보는 것이 가장 안전합니다.\n"
+        "•\n"
+        "계약상 보증금: 2억 2천만 원 [01]\n"
+        "•\n"
+        "임차인이 실제 지급한 보증금 확인: 2억 2천만 원 [04]\n"
+        "•\n"
+        "객관적으로 확인되는 반환액: 5천만 원 [05], [06]"
+    )
+    expected = (
+        "1.\n"
+        "현재 자료상 바로 청구할 수 있는 미반환 보증금 원금은 1억 7천만 원으로 보는 것이 가장 안전합니다.\n"
+        "•\n"
+        "계약상 보증금: 2억 2천만 원 [01_주택임대차계약_주요내용.txt]\n"
+        "•\n"
+        "임차인이 실제 지급한 보증금 확인: 2억 2천만 원 [04_최초보증금_임차인송금내역.txt]\n"
+        "•\n"
+        "객관적으로 확인되는 반환액: 5천만 원 [05_1차반환_이체확인내용_20260920.txt], [06_은행거래내역_반환2건_20261010.txt]"
+    )
+    result = expand_evidence_citations(input_text, case_sources)
+    assert result == expected
+
+
+def test_extract_all_registered_evidence_sources_from_state():
+    """State 객체의 여러 경로(briefing, retrieved_sources, source_registry)에서 증거 파일이 통합 수집되는지 검증."""
+    state = {
+        "case_evidence_briefing": {
+            "source_documents": [
+                {"document_name": "01_주택임대차계약_주요내용.txt"},
+                {"document_name": "04_최초보증금_임차인송금내역.txt"},
+            ],
+            "source_registry": {
+                "05": {"document_name": "05_1차반환_이체확인내용_20260920.txt"}
+            }
+        },
+        "retrieved_sources": [
+            {"source_id": "06_은행거래내역_반환2건_20261010.txt", "document_name": "06_은행거래내역_반환2건_20261010.txt"},
+            {"source_id": "주택임대차보호법_제6조", "source_type": "STATUTE"}
+        ]
+    }
+    sources = extract_all_registered_evidence_sources(state)
+    names = [s if isinstance(s, str) else (s.get("document_name") or s.get("source_id")) for s in sources]
+    assert "01_주택임대차계약_주요내용.txt" in names
+    assert "04_최초보증금_임차인송금내역.txt" in names
+    assert "05_1차반환_이체확인내용_20260920.txt" in names
+    assert "06_은행거래내역_반환2건_20261010.txt" in names

@@ -19,5 +19,14 @@ if sys.platform == "win32":
 import uvicorn
 
 if __name__ == "__main__":
-    uvicorn.run("ai_legal_helper.api.main:app", host="127.0.0.1", port=8000, loop="asyncio")
+    # [WatchFiles 리로드 최적화] tests 폴더 및 로그 파일 변경으로 인한 불필요한 서버 재시작을 방지한다.
+    uvicorn.run(
+        "ai_legal_helper.api.main:app",
+        host="127.0.0.1",
+        port=8000,
+        loop="asyncio",
+        reload=True,
+        reload_dirs=["src"],
+        reload_excludes=["tests/*", "*/tests/*", "*.log", "logs/*"],
+    )
 
