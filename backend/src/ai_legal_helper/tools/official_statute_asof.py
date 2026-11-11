@@ -2,7 +2,7 @@
 """
 P4 시행일 기준 공식 조문·부칙 원문 검색.
 
-반드시 기존 HILT 승인 후 official_statute_search.search_official_statutes()
+반드시 기존 HITL 승인 후 official_statute_search.search_official_statutes()
 경로에서 호출한다. 이 모듈은 승인 요청도, 사용자 질문에서 법령명 추측도,
 원문 자동 임베딩도 하지 않는다.
 
@@ -266,7 +266,7 @@ def search_official_statutes_by_date(
     """승인된 법령명 목록을 시행일 시점 후보별로 조회하여 표준 Source 반환.
 
     조회가 불완전할 때는 검색된 일부 버전만으로 단정할 수 없으므로 해당
-    법령의 출처를 비워 둔다. HILT 미승인 상태로 직접 호출하면 안 된다.
+    법령의 출처를 비워 둔다. HITL 미승인 상태로 직접 호출하면 안 된다.
     """
     from ai_legal_helper.tools.official_statute_search import (
         _prepare_search_targets, _fetch_xml_with_retry,
@@ -275,7 +275,7 @@ def search_official_statutes_by_date(
     if not api_key or not candidate_laws or not max_articles_per_law > 0:
         return []
     if fetch_xml is None:
-        # 기존 재시도 및 API 키 마스킹 활용. 호출자는 반드시 HILT 승인 후 진입.
+        # 기존 재시도 및 API 키 마스킹 활용. 호출자는 반드시 HITL 승인 후 진입.
         fetch_xml = lambda url: _fetch_xml_with_retry(url, api_key=api_key)
 
     collected: list[dict[str, Any]] = []
@@ -295,7 +295,7 @@ def search_official_statutes_by_date(
             logger.warning("[OFFICIAL_P4] 시행일 연혁 미확인 | law=%s status=%s reason=%s",
                            target.law_name, lookup.status, lookup.reason_code)
             continue
-        # The call site is reached only after existing HILT approval. Cache the
+        # The call site is reached only after existing HITL approval. Cache the
         # complete eflaw history independently of the immediate article response.
         # DB failures must not suppress already-authorized official retrieval.
         from ai_legal_helper.legal_knowledge.history_snapshot import store_approved_lookup
