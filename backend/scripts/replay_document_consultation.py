@@ -108,7 +108,7 @@ def main() -> None:
     state = {"question": question, "messages": [HumanMessage(content=question)],
              "answer_mode": DOCUMENT_MODE, "case_evidence_briefing": briefing,
              "retrieved_sources": sources, "revision_count": 0,
-             "hilt_executed": True, "warnings": []}
+             "hitl_executed": True, "warnings": []}
     records = []
     try:
         for step in range(3):
