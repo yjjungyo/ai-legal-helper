@@ -8,7 +8,7 @@ AI Legal Helper 개발지시서 P0 필수 결함(P0-01 ~ P0-04)에 대한
 
 [검증 항목]
 - P0-01: Verification Agent Fail-open 취약점 (LLM 오류 시 PASS 반환 차단)
-- P0-02: HILT 실행 후 검증 우회 취약점 (HILT 완료 후에도 검증 실패 시 finalize 강제 전이 차단)
+- P0-02: HITL 실행 후 검증 우회 취약점 (HITL 완료 후에도 검증 실패 시 finalize 강제 전이 차단)
 - P0-03: LangGraph Checkpointer 영속화 (PostgreSQL 영구 보존 및 프로세스 간 재개)
 - P0-04: 공식 법령 검색의 임의 법령 채택 차단 및 HTTPS/보안 보장
 """
@@ -48,11 +48,11 @@ def test_p0_01_reproduce_verification_fail_open():
         assert res["reason_code"] in ("VERIFICATION_ERROR", "SYSTEM_ERROR", "LEGAL_SOURCE_MISSING")
 
 
-def test_p0_02_reproduce_hilt_bypass_verification_failure():
-    """P0-02: HILT가 실행되었더라도 2차 검증이 실패(INSUFFICIENT)했다면 finalize로 강제 우회하지 않는지 검증."""
+def test_p0_02_reproduce_hitl_bypass_verification_failure():
+    """P0-02: HITL가 실행되었더라도 2차 검증이 실패(INSUFFICIENT)했다면 finalize로 강제 우회하지 않는지 검증."""
     state: LegalState = {
         "messages": [HumanMessage(content="묵시적 갱신 해지 효력은?")],
-        "hilt_executed": True,
+        "hitl_executed": True,
         "revision_count": 1,
         "verification_result": {
             "status": "INSUFFICIENT",
@@ -66,18 +66,18 @@ def test_p0_02_reproduce_hilt_bypass_verification_failure():
     }
 
     next_node = verification_condition(state)
-    # HILT가 수행되었더라도 검증 실패 시 finalize로 직행해서는 안 됨
+    # HITL가 수행되었더라도 검증 실패 시 finalize로 직행해서는 안 됨
     assert next_node != "finalize", (
-        f"HILT 검증 우회 결함: 2차 검증이 INSUFFICIENT임에도 {next_node}로 전이되었습니다."
+        f"HITL 검증 우회 결함: 2차 검증이 INSUFFICIENT임에도 {next_node}로 전이되었습니다."
     )
     assert next_node == "insufficient"
 
 
-def test_p0_02_reproduce_non_statute_issue_does_not_trigger_hilt():
-    """P0-02 추가: 사실관계/사건 증거 부족(CASE_EVIDENCE_MISSING)은 HILT 법령 검색으로 분기하지 않는지 검증."""
+def test_p0_02_reproduce_non_statute_issue_does_not_trigger_hitl():
+    """P0-02 추가: 사실관계/사건 증거 부족(CASE_EVIDENCE_MISSING)은 HITL 법령 검색으로 분기하지 않는지 검증."""
     state: LegalState = {
         "messages": [HumanMessage(content="보증금 반환 통보일 입증 여부")],
-        "hilt_executed": False,
+        "hitl_executed": False,
         "revision_count": 0,
         "verification_result": {
             "status": "INSUFFICIENT",
@@ -89,9 +89,9 @@ def test_p0_02_reproduce_non_statute_issue_does_not_trigger_hilt():
     }
 
     next_node = verification_condition(state)
-    # 사건 증거 부족은 법령 검색 HILT 노드로 잘못 분기하면 안 됨
+    # 사건 증거 부족은 법령 검색 HITL 노드로 잘못 분기하면 안 됨
     assert next_node != "statute_search_approval", (
-        f"사건 증거 부족 시 법령 검색 HILT로 잘못 라우팅되었습니다: {next_node}"
+        f"사건 증거 부족 시 법령 검색 HITL로 잘못 라우팅되었습니다: {next_node}"
     )
 
 
