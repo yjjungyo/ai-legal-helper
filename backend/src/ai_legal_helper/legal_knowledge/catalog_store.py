@@ -126,7 +126,7 @@ def sync_official_catalog(
 
     max_pages=0이면 공식 totalCnt를 끝까지 따라가되 1000페이지 절대 상한을 둔다.
     양수이면 지정 페이지까지만 수집한다. 부분 수집은 PARTIAL로 기록한다.
-    기본 경로에서 HILT 승인 없이 이 함수를 호출하지 않는다.
+    기본 경로에서 HITL 승인 없이 이 함수를 호출하지 않는다.
     """
     if not api_key:
         raise ValueError("LAW_OPENAPI_KEY_MISSING")
