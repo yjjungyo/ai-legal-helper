@@ -14,7 +14,7 @@
 | **기존 P0 회귀** | `tests/unit/test_p0_defects_reproduction.py` | 8건 | **8 Passed** (100%) | 4.12s |
 | **기존 P1 회귀** | `tests/unit/test_p1_defects_reproduction.py` | 6건 | **6 Passed** (100%) | 3.85s |
 | **기존 P2 회귀** | `tests/unit/test_p2_defects_reproduction.py` | 3건 | **3 Passed** (100%) | 2.91s |
-| **HILT 공식 검색** | `tests/unit/test_hilt_statute_search.py` | 8건 | **8 Passed** (100%) | 39.26s |
+| **HITL 공식 검색** | `tests/unit/test_hitl_statute_search.py` | 8건 | **8 Passed** (100%) | 39.26s |
 | **프론트엔드 빌드**| `npm run build` (`tsc -b && vite build`) | 1,071 모듈 | **성공 (에러 0건)** | 190ms |
 | **총 계** | - | **39건** | **전체 통과 (100%)** | - |
 
@@ -37,7 +37,7 @@
 | **S-02** | `test_s02_chunk_preservation_and_deduplication` | 동일 문서 3개 청크 검색 시 원본 청크 100% 보존 및 출처 정돈 | PASSED | **PASSED** | PASS |
 | **S-04** | `test_s04_unverified_article_citation_audit` | 검색 결과에 없는 가짜 조문 인용 시 rejected_citations 수록 | PASSED | **PASSED** | PASS |
 | **H-02** | `test_h02_h04_re_analyze_prompt_neutral_for_loan_dispute` | 대여금 사건(SC-003) 재분석 시 임차권등기명령/임대인 하드코딩 제거 | FAILED | **PASSED** | PASS |
-| **H-03** | `test_h03_labor_dispute_hilt` | 노동 분쟁 사건 재분석 시 근로기준법 반영 및 도메인 혼입 방지 | PASSED | **PASSED** | PASS |
+| **H-03** | `test_h03_labor_dispute_hitl` | 노동 분쟁 사건 재분석 시 근로기준법 반영 및 도메인 혼입 방지 | PASSED | **PASSED** | PASS |
 
 ---
 
