@@ -4,7 +4,7 @@
 
 ## 검증 전제
 - PostgreSQL 전용 평가 DB, Chroma 평가 컬렉션, 가짜 공식 XML 및 mock LLM 사용
-- 공식 법령 API 호출은 HILT 승인 경로만 허용. 단위/통합 테스트는 네트워크 차단
+- 공식 법령 API 호출은 HITL 승인 경로만 허용. 단위/통합 테스트는 네트워크 차단
 - 법령ID, MST, 사건일, 조문ID, 부칙 근거, 출처 vector ID를 각 Trace에 기록
 - 모든 미확정 상황은 법률 적용 확정이 아닌 `SOURCE_TEMPORAL_UNCONFIRMED` 또는 더 엄격한 상태로 귀결
 
