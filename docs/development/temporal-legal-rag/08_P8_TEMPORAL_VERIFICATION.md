@@ -36,7 +36,7 @@
 ## 회귀 결과
 
 GitHub Actions `Temporal RAG P8 verification`:
-- P8 게이트·P7 Evidence·P6 HILT·P5 적용례 회귀 **52건 PASS**
+- P8 게이트·P7 Evidence·P6 HITL·P5 적용례 회귀 **52건 PASS**
 - 실 OpenLaw API·실 회사 LLM·운영 Langfuse의 E2E는 미수행
 - 기존 8개 Agent, 사용자 승인/거절, Graph 구조 전반 보존
 
