@@ -1,7 +1,7 @@
-# P4.1 Verifier-Guided HILT 법령 검색 — 06. T-01 ~ T-08 시나리오별 실행 결과
+# P4.1 Verifier-Guided HITL 법령 검색 — 06. T-01 ~ T-08 시나리오별 실행 결과
 
 ## 1. 개요
-본 문서는 `backend/tests/unit/test_hilt_statute_search.py` 및 전체 통합 테스트 스위트를 통해 실행 검증된 **T-01 ~ T-08 시나리오별 검증 결과**를 상세히 기록한다.
+본 문서는 `backend/tests/unit/test_hitl_statute_search.py` 및 전체 통합 테스트 스위트를 통해 실행 검증된 **T-01 ~ T-08 시나리오별 검증 결과**를 상세히 기록한다.
 
 ---
 
@@ -9,8 +9,8 @@
 
 | 테스트 ID | 시나리오 명칭 | 핵심 검증 항목 | 실행 결과 |
 | :---: | :--- | :--- | :---: |
-| **T-01** | 내부 RAG 충분 사건 | Verifier PASS 시 HILT 승인 노드 진입 없이 `finalize` 직행 | **PASS** |
-| **T-02** | 특별법 누락 사건 | `LEGAL_SOURCE_MISSING` 감지 시 HILT 인터럽트 노드 진입 | **PASS** |
+| **T-01** | 내부 RAG 충분 사건 | Verifier PASS 시 HITL 승인 노드 진입 없이 `finalize` 직행 | **PASS** |
+| **T-02** | 특별법 누락 사건 | `LEGAL_SOURCE_MISSING` 감지 시 HITL 인터럽트 노드 진입 | **PASS** |
 | **T-03** | 사용자 승인 시나리오 | 외부 검색 실행, 공식 조문 병합, 재분석 후 최종 답변 생성 | **PASS** |
 | **T-04** | 사용자 거절 시나리오 | 외부 검색 차단, 판단 유보 안내 후 `insufficient` 안전 종료 | **PASS** |
 | **T-05** | 외부 검색 결과 부재 | 공인 API 조회 실패 시 허위 답변 없이 `insufficient` 안전 종료 | **PASS** |
@@ -25,7 +25,7 @@
 ### 3.1 T-01: 내부 RAG 충분 사건
 - **조건**: 민법상 임대인 수선의무 질문, 내부 ChromaDB에 민법 조문 존재.
 - **실행 경로**: `START` → `supervisor_initialize` → `route` → `plan` → `run_agents` → `synthesize` → `verification` → `finalize` → `END`
-- **검증**: `verification_condition`이 `finalize`를 반환하며 HILT 노드(`statute_search_approval`)로 우회하지 않음.
+- **검증**: `verification_condition`이 `finalize`를 반환하며 HITL 노드(`statute_search_approval`)로 우회하지 않음.
 
 ### 3.2 T-02: 특별법(주택임대차보호법) 누락 사건
 - **조건**: 묵시적 갱신 후 계약 해지 효력 시점 질문, 내부 RAG에 주택임대차보호법 부재.
@@ -94,7 +94,7 @@ collected 63 items
 backend\tests\unit\test_agentic_adaptive_rag.py .....                    [  7%]
 backend\tests\unit\test_aop.py .......                                   [ 19%]
 backend\tests\unit\test_deadline_engine.py ....                          [ 25%]
-backend\tests\unit\test_hilt_statute_search.py ........                  [ 38%]
+backend\tests\unit\test_hitl_statute_search.py ........                  [ 38%]
 backend\tests\unit\test_langfuse.py ...                                  [ 42%]
 backend\tests\unit\test_llm_tracking.py ....                             [ 49%]
 backend\tests\unit\test_observability_enhanced.py .........              [ 63%]
@@ -104,5 +104,5 @@ backend\tests\unit\test_top10_audit_fixes.py ...........                 [100%]
 
 ======================= 63 passed, 7 warnings in 71.08s =======================
 ```
-기존 52개 테스트에 HILT 및 법령 검색·인용 정제 단위 테스트 11개를 포함하여 총 63개 테스트가 **100% PASS**를 기록하였다.
+기존 52개 테스트에 HITL 및 법령 검색·인용 정제 단위 테스트 11개를 포함하여 총 63개 테스트가 **100% PASS**를 기록하였다.
 
