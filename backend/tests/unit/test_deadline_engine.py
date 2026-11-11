@@ -62,3 +62,35 @@ def test_unmet_legal_condition_blocks_deadline():
     ])
     assert result["deadline_type"] == "UNKNOWN"
     assert "선행 요건" in result["calculation_basis"]
+
+
+def test_verified_rule_calculates_lease_notice_date():
+    engine = DeadlineEngine([MockEvent("계약 만기", "2026-09-30")])
+    rule = {
+        "rule_type": "LEASE_RENEWAL_REFUSAL_NOTICE",
+        "basis_date": "2026-09-30",
+        "basis_date_confirmed": True,
+        "applicability_confirmed": True,
+        "verification_status": "VERIFIED",
+        "legal_source": "주택임대차보호법 제6조 제1항",
+    }
+    result = engine.calculate_deadline("갱신 거절 통지", verified_rule=rule)
+    assert result["deadline_type"] == "LEGAL_DEADLINE"
+    assert result["deadline_date"] == datetime(2026, 7, 30)
+    assert result["verification_status"] == "VERIFIED"
+
+
+def test_unverified_or_mismatched_rule_cannot_calculate_deadline():
+    engine = DeadlineEngine([MockEvent("계약 만기", "2026-09-30")])
+    rule = {
+        "rule_type": "LEASE_RENEWAL_REFUSAL_NOTICE",
+        "basis_date": "2026-09-30",
+        "basis_date_confirmed": True,
+        "applicability_confirmed": True,
+        "verification_status": "UNVERIFIED",
+        "legal_source": "주택임대차보호법 제6조 제1항",
+    }
+    assert engine.calculate_deadline("갱신 거절", verified_rule=rule)["deadline_date"] is None
+    rule["verification_status"] = "VERIFIED"
+    rule["basis_date"] = "2024-09-30"
+    assert engine.calculate_deadline("갱신 거절", verified_rule=rule)["deadline_date"] is None
