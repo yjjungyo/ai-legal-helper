@@ -69,7 +69,7 @@ npm.cmd run build
 
 | 기존 실패 테스트 | 확인 범위 |
 |---|---|
-| `test_hilt_statute_search.py::test_t07_checkpointer_state_persistence_and_resume` | 실제 라우터 LLM 연결에 의존하며 현재 네트워크 제약에서 ERROR 반환 |
+| `test_hitl_statute_search.py::test_t07_checkpointer_state_persistence_and_resume` | 실제 라우터 LLM 연결에 의존하며 현재 네트워크 제약에서 ERROR 반환 |
 | `test_official_statute_search.py::test_search_official_statutes_real_api_housing_lease` | 실제 외부 법령 API 의존. HEAD에서도 실패 |
 | `test_official_statute_search.py::test_search_official_statutes_civil_act_exact_match` | 실제 외부 법령 API 의존. HEAD에서도 실패 |
 | `test_official_statute_search.py::test_search_official_statutes_dynamic_missing_issues_boost` | 실제 외부 법령 API 의존. HEAD에서도 실패 |
