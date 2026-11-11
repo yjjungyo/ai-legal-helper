@@ -764,7 +764,7 @@ def build_consultation_trace_summary(
     retrieval_info: Optional[Dict[str, Any]] = None,
     verification_info: Optional[Dict[str, Any]] = None,
     usage_info: Optional[Dict[str, Any]] = None,
-    hilt_info: Optional[Dict[str, Any]] = None,
+    hitl_info: Optional[Dict[str, Any]] = None,
     conversation_id: Optional[str] = None,
     turn_index: int = 1,
     intent: Optional[str] = None,
@@ -786,7 +786,7 @@ def build_consultation_trace_summary(
         retrieval_info: 검색 인덱스 및 수집 출처 요약 정보.
         verification_info: Citation Validator 및 근거 지지율 요약.
         usage_info: LLM 호출 횟수, 토큰량, 지연시간 요약.
-        hilt_info: HILT 공식 법령 검색 승인/거절 내역.
+        hitl_info: HITL 공식 법령 검색 승인/거절 내역.
 
     Returns:
         Dict[str, Any]: Langfuse Trace metadata에 부착될 완성된 요약 딕셔너리.
@@ -806,5 +806,5 @@ def build_consultation_trace_summary(
         "retrieval": retrieval_info or {},
         "verification": verification_info or {},
         "usage": usage_info or {},
-        "hilt": hilt_info or {},
+        "hitl": hitl_info or {},
     }
