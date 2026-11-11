@@ -41,7 +41,7 @@
 ### [P1-04] Adaptive Retrieval 의사결정 미흡
 - **위치:** [`backend/src/ai_legal_helper/workflows/legal_workflow.py`](file:///c:/myprjs/ai-legal-helper/backend/src/ai_legal_helper/workflows/legal_workflow.py)
 - **현상:**
-  - `verification_condition()`에서 부족 원인(법령 부재 vs 인프라 오류 vs 사실관계 증거 부족 vs 단순 초안 수정)을 세분화하지 않고 획일적으로 HILT 또는 revise를 시도할 수 있음.
+  - `verification_condition()`에서 부족 원인(법령 부재 vs 인프라 오류 vs 사실관계 증거 부족 vs 단순 초안 수정)을 세분화하지 않고 획일적으로 HITL 또는 revise를 시도할 수 있음.
   - 검색 인프라가 다운된 상황에서 반복 재검색을 시도하는 비효율 발생.
 - **수정 방향:** `reason_code`에 따른 5단계 정밀 분기 정책 적용 (인프라 장애 시 복구 시도/안전 안내, 사실관계 부족 시 사용자 증거 요청, 단순 문구 수정 시 1회 revise).
 
