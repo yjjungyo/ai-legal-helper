@@ -61,7 +61,7 @@ def cmd_run(args):
         dataset_name=args.dataset,
         scenario_ids=scenario_ids,
         run_id=args.run_id,
-        auto_approve_hilt=not args.no_auto_approve,
+        auto_approve_hitl=not args.no_auto_approve,
     )
 
     print("\n" + "=" * 60)
@@ -135,7 +135,7 @@ def main():
     p_run.add_argument("--profile", default="isolated", choices=["isolated", "e2e"], help="실행 프로파일")
     p_run.add_argument("--scenarios", default=None, help="실행할 시나리오 ID 콤마 구분 (예: SC01-T01,SC01-T02)")
     p_run.add_argument("--run-id", default=None, help="평가 실행 ID")
-    p_run.add_argument("--no-auto-approve", action="store_true", help="HILT 승인 요청 시 자동 승인 비활성화")
+    p_run.add_argument("--no-auto-approve", action="store_true", help="HITL 승인 요청 시 자동 승인 비활성화")
     p_run.set_defaults(func=cmd_run)
 
     # compare
