@@ -11,7 +11,7 @@
    (verification_status가 REVISE라는 이유로 CAUTIONARY가 되어서는 안 됨)
 2. insufficient_node는 내부 감수용 디버그 문구('표현상 긴장', '다소 넓다', '증거 미연결 10건')를
    고객 답변(final_answer)에 일체 노출하지 않는다.
-3. HILT 공식 법령 검색 완료 후 4단계 법률 답변이 재분석되었고 Verifier가 REVISE(주의사항 필요)를
+3. HITL 공식 법령 검색 완료 후 4단계 법률 답변이 재분석되었고 Verifier가 REVISE(주의사항 필요)를
    부여한 경우, 답변을 폐기(insufficient)하지 않고 finalize로 전달하여 CAUTIONARY로 고객에게 정상 제공한다.
 """
 import pytest
@@ -75,8 +75,8 @@ def test_p0_2_insufficient_node_does_not_leak_internal_debug_expressions():
     assert "10건" not in final_ans
 
 
-def test_p0_3_hilt_reanalyze_revise_routes_to_finalize_cautionary():
-    """P0-3: HILT 공식 법령 검색 후 re_analyze 답변이 REVISE 판정을 받은 경우 insufficient로 버리지 않고 finalize로 라우팅되어야 함."""
+def test_p0_3_hitl_reanalyze_revise_routes_to_finalize_cautionary():
+    """P0-3: HITL 공식 법령 검색 후 re_analyze 답변이 REVISE 판정을 받은 경우 insufficient로 버리지 않고 finalize로 라우팅되어야 함."""
     state: LegalState = {
         "question": "전세보증금 3억원 반환 및 추가 손해배상 검토",
         "draft_answer": "[1. 핵심 결론]\n보증금 반환 청구 가능\n[2. 지금 해야 할 일]\n내용증명 발송\n[3. 쟁점별 상세 법률 분석]\n주임법 제6조의2\n[4. 추가 확인사항 및 유의사항]\n입증 주의",
@@ -92,13 +92,13 @@ def test_p0_3_hilt_reanalyze_revise_routes_to_finalize_cautionary():
             "candidate_laws": [],
             "warnings": ["배우자 전화 통지는 입증이 필요합니다."],
         },
-        "hilt_executed": True,  # HILT 공식 법령 검색이 이미 수행됨
+        "hitl_executed": True,  # HITL 공식 법령 검색이 이미 수행됨
         "revision_count": 1,
     }
 
     next_node = verification_condition(state)
 
-    # HILT 법령이 반영된 4단계 답변이 REVISE인 경우 insufficient로 버리지 않고 finalize로 라우팅되어야 함
+    # HITL 법령이 반영된 4단계 답변이 REVISE인 경우 insufficient로 버리지 않고 finalize로 라우팅되어야 함
     assert next_node == "finalize", f"REVISE 판정의 재분석 답변이 {next_node}로 잘못 라우팅되었습니다 (finalize 기대)."
 
 
@@ -160,7 +160,7 @@ def test_p0_5_api_consultation_honors_final_disposition_withheld():
 
 
 def test_p0_6_api_consultation_honors_final_disposition_cautionary():
-    """P0-6: HILT 재분석 완료 후 REVISE인 경우 final_disposition='CAUTIONARY'가 resp.answer_status에 정확히 매핑되는지 검증."""
+    """P0-6: HITL 재분석 완료 후 REVISE인 경우 final_disposition='CAUTIONARY'가 resp.answer_status에 정확히 매핑되는지 검증."""
     from ai_legal_helper.api.routes.consultation import ConsultationResponse
 
     resp = ConsultationResponse(
@@ -233,7 +233,7 @@ def test_p0_8_revise_with_unsupported_legal_claim_routes_to_insufficient():
         "question": "특별손해 청구 가능한지",
         "draft_answer": "특별손해 배상 청구가 인정됩니다.",
         "retrieved_sources": [],
-        "hilt_executed": True,
+        "hitl_executed": True,
         "revision_count": 1,
         "verification_result": {
             "status": "REVISE",
@@ -260,7 +260,7 @@ def test_p0_9_revise_with_severe_reason_code_routes_to_insufficient():
         "question": "특별손해 청구",
         "draft_answer": "특별손해 청구 가능",
         "retrieved_sources": [],
-        "hilt_executed": True,
+        "hitl_executed": True,
         "revision_count": 1,
         "verification_result": {
             "status": "REVISE",
