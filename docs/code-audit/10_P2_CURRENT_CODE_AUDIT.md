@@ -24,7 +24,7 @@
 
 ### 2.1 현재 구현 상태 (`observability/langfuse_client.py`, `api/routes/consultation.py`)
 1. **메타데이터 파편화 및 단편적 기록**:
-   - 현재 `update_span`을 통해 `elapsed_ms`, `total_tokens`, `citation_audit` 일부 지표가 기록되고 있으나, 상담 워크플로우의 전체 의사결정 흐름(Supervisor 선택 에이전트, HILT 승인 여부, 공식 법령 원문 검색 결과 건수, 최종 3계층 상태)이 루트 Trace 수준에서 일목요연하게 태깅되지 않는다.
+   - 현재 `update_span`을 통해 `elapsed_ms`, `total_tokens`, `citation_audit` 일부 지표가 기록되고 있으나, 상담 워크플로우의 전체 의사결정 흐름(Supervisor 선택 에이전트, HITL 승인 여부, 공식 법령 원문 검색 결과 건수, 최종 3계층 상태)이 루트 Trace 수준에서 일목요연하게 태깅되지 않는다.
 2. **민감정보(PII) 마스킹 미흡**:
    - 사용자 질문이나 사건 맥락에 포함될 수 있는 주민등록번호, 전화번호, 이메일 주소, 외부 API Key 등이 Span metadata나 입력값에 원문 그대로 전송될 수 있는 보안 취약점이 존재한다.
 3. **검색 실패 원인 및 인덱스 정보 추적 부재**:
