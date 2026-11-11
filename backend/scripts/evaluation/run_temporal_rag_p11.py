@@ -4,7 +4,7 @@
 본 명령은 벤치마크 질문을 순차 실행하고 실행/소요시간/법령 출처/Trace를
 JSONL로 출력한다. LLMCHAT/LLMRAG는 별도 결과를 같은 표준 형식으로 import.
 법령 공식 검색에 대한 사용자 동의는 --approve-official 옵션을 명시한
-해당 실험 실행에서만 발생한다. 기본값은 승인하지 않으며 HILT 대기 사례를
+해당 실험 실행에서만 발생한다. 기본값은 승인하지 않으며 HITL 대기 사례를
 완료된 정확도 표본으로 취급하지 않는다.
 
 주의:
@@ -119,7 +119,7 @@ def main():
     parser.add_argument("--out", required=True)
     parser.add_argument("--incomplete-out", required=True)
     parser.add_argument("--approve-official", action="store_true",
-                        help="실험의 외부 공식 법령 검색 HILT를 명시적으로 승인")
+                        help="실험의 외부 공식 법령 검색 HITL를 명시적으로 승인")
     args = parser.parse_args()
     cases = read_jsonl(args.gold)
     validate_gold(cases)
