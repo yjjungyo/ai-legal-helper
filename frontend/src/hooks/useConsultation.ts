@@ -9,7 +9,7 @@
  * 3. 브라우저 새로고침(F5) 시 영속성 복원:
  *    - 페이지 재진입 시 DB에서 사건의 전체 상담 이력을 시간순 복원하고,
  *      마지막 메시지가 IN_PROGRESS인 경우 자동으로 상태 폴링을 재개.
- * 4. HILT 승인/거절 인플레이스 제어:
+ * 4. HITL 승인/거절 인플레이스 제어:
  *    - 승인 시 실시간 공식 법령 검색 및 재분석 폴링 재개, 거절 시 현재 근거 기반 종결.
  */
 
@@ -34,7 +34,7 @@ export function useConsultation(caseId?: string) {
   const [messages, setMessages] = useState<ConsultationResponse[]>([]);
   /** 상담 요청 전송 및 폴링 진행 중 여부 */
   const [loading, setLoading] = useState(false);
-  /** HILT 승인/거절 액션 처리 중 여부 */
+  /** HITL 승인/거절 액션 처리 중 여부 */
   const [actionLoading, setActionLoading] = useState(false);
   /** 오류 메시지 */
   const [error, setError] = useState<string | null>(null);
@@ -83,7 +83,7 @@ export function useConsultation(caseId?: string) {
             setConversationId(current.conversation_id);
           }
 
-          // 1. HILT 승인 대기 상태 도달 시: 폴링 멈추고 사용자 승인 대기
+          // 1. HITL 승인 대기 상태 도달 시: 폴링 멈추고 사용자 승인 대기
           if (current.status === 'APPROVAL_REQUIRED') {
             clearPollInterval();
             setLoading(false);
@@ -180,7 +180,7 @@ export function useConsultation(caseId?: string) {
   );
 
   /**
-   * HILT 외부 법령 검색 승인 또는 거절 처리
+   * HITL 외부 법령 검색 승인 또는 거절 처리
    */
   const handleApproval = useCallback(
     async (requestId: string, approved: boolean) => {
