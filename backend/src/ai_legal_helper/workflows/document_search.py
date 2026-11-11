@@ -310,7 +310,7 @@ def _retrieve_from_local_index(
 def can_satisfy_requests_locally(requests: list[dict[str, Any]]) -> bool:
     """법령 검색 요청들이 로컬 인덱스(law_docs_global)에서 모두 충족 가능한지 사전 검사한다.
 
-    HILT 승인 팝업 이전에 로컬 영구 인덱스 적재 여부를 확인하여, 이미 확보된
+    HITL 승인 팝업 이전에 로컬 영구 인덱스 적재 여부를 확인하여, 이미 확보된
     법령 조문에 대한 불필요한 사용자 인터럽트를 방지한다.
 
     Args:
