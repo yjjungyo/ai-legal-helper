@@ -166,7 +166,7 @@ def generate_answer(
         has_searched = bool(
             state.get("statute_search_status")
             or (state.get("statute_search_count") or 0) > 0
-            or state.get("hilt_executed")
+            or state.get("hitl_executed")
         )
         effective_allow_need_more_law = (not has_searched and not repair) if allow_need_more_law is None else allow_need_more_law
 
@@ -334,9 +334,9 @@ def next_verification_step(state: Dict[str, Any]) -> str:
                 route_reason = f"승인된 신규 법령 요청({len(requests)}건) 즉시 검색"
                 branched_statute = True
             else:
-                # 과거 HILT 실행 여부가 아니라 이번 신규 검색 범위의 승인 여부로 판단한다.
+                # 과거 HITL 실행 여부가 아니라 이번 신규 검색 범위의 승인 여부로 판단한다.
                 target_node = "statute_search_approval"
-                route_reason = f"신규 법령({len(requests)}건) 사용자 승인(HILT) 요청"
+                route_reason = f"신규 법령({len(requests)}건) 사용자 승인(HITL) 요청"
                 branched_statute = True
 
         if not branched_statute:
