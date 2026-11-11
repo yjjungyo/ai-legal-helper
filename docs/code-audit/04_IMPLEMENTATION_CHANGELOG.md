@@ -30,17 +30,17 @@
   4. LangChain / Mock 호환성 개선:
      - `prompt | llm` 체인 대신 `llm.invoke(formatted_prompt)` 직접 호출 구조로 표준화하여 `Runnable` 및 단위 테스트 모의 객체(`mock_llm.invoke`) 간의 시그니처 불일치 방지.
 
-### [P0-02] HILT 이후 검증 우회 취약점 제거 및 안전한 전이 보장
+### [P0-02] HITL 이후 검증 우회 취약점 제거 및 안전한 전이 보장
 
 - **수정 파일:** [`backend/src/ai_legal_helper/workflows/legal_workflow.py`](file:///c:/myprjs/ai-legal-helper/backend/src/ai_legal_helper/workflows/legal_workflow.py)
 - **주요 변경 사항:**
-  1. HILT 조건 분기 엄격화:
-     - HILT 승인 요청(`statute_search_approval`)은 오직 `reason_code in ("LEGAL_SOURCE_MISSING", "LEGAL_SOURCE_INSUFFICIENT")`이고 `candidate_laws`가 존재할 때만 진입.
-     - 사실관계 부족(`CASE_EVIDENCE_MISSING`)이나 단순 초안 수정 필요 시에는 HILT로 잘못 분기하지 않고 정상 분기하도록 차단.
-  2. HILT 수행 후 검증 우회 차단:
-     - `if hilt_executed: return "finalize"` 코드를 완전 제거.
+  1. HITL 조건 분기 엄격화:
+     - HITL 승인 요청(`statute_search_approval`)은 오직 `reason_code in ("LEGAL_SOURCE_MISSING", "LEGAL_SOURCE_INSUFFICIENT")`이고 `candidate_laws`가 존재할 때만 진입.
+     - 사실관계 부족(`CASE_EVIDENCE_MISSING`)이나 단순 초안 수정 필요 시에는 HITL로 잘못 분기하지 않고 정상 분기하도록 차단.
+  2. HITL 수행 후 검증 우회 차단:
+     - `if hitl_executed: return "finalize"` 코드를 완전 제거.
      - 오직 `status == "PASS"`인 경우에만 `finalize`로 전이 허용.
-     - HILT 이후 재분석 결과가 여전히 `INSUFFICIENT` 또는 `ERROR`인 경우 안전하게 `insufficient` 노드로 라우팅되어 불완전한 초안의 사용자 노출을 원천 방지.
+     - HITL 이후 재분석 결과가 여전히 `INSUFFICIENT` 또는 `ERROR`인 경우 안전하게 `insufficient` 노드로 라우팅되어 불완전한 초안의 사용자 노출을 원천 방지.
 
 ### [P0-03] LangGraph Checkpointer의 PostgreSQL 영속 저장소 전환
 
