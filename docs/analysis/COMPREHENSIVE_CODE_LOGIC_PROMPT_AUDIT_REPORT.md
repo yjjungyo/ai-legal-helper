@@ -24,13 +24,13 @@
 
 ## 1. 총괄 요약 (Executive Summary)
 
-`ai-legal-helper`는 임대차 분쟁 등 복합 법률 상담에 특화된 고도화된 멀티 에이전트 시스템으로, LangGraph 상태 머신, 사실 기반 Grounding 검증(Verification), 시간성 법령 효력 검증(Temporal Verification), Human-in-the-Loop(HILT) 외부 법령 검색, GraphRAG와 결합된 문서 기반 상담 모드(`DOCUMENT_MODE`) 등 대한민국 리걸테크 분야에서 가장 진보된 엔지니어링 패턴들을 다수 포함하고 있습니다.
+`ai-legal-helper`는 임대차 분쟁 등 복합 법률 상담에 특화된 고도화된 멀티 에이전트 시스템으로, LangGraph 상태 머신, 사실 기반 Grounding 검증(Verification), 시간성 법령 효력 검증(Temporal Verification), Human-in-the-Loop(HITL) 외부 법령 검색, GraphRAG와 결합된 문서 기반 상담 모드(`DOCUMENT_MODE`) 등 대한민국 리걸테크 분야에서 가장 진보된 엔지니어링 패턴들을 다수 포함하고 있습니다.
 
 그러나 장기간에 걸친 점진적 기능 추가와 패치 과정에서 다음과 같은 **중대한 구조적 상충(Architectural Conflicts)과 비효율**이 누적되어 있음이 본 전수 감사를 통해 확인되었습니다:
 
 1. **답변 생성 및 가공 파이프라인의 3중화와 포맷 상충**:
    동일한 질문에 대해 `document_consultation.py`(문서 모드), `synthesizer.py`(일반 종합 모드), `final_disposition.py`(템플릿 조립 모드)라는 상이한 3개 파이프라인이 병존하며, 프론트엔드가 요구하는 리치 마크다운(볼드, 헤더)을 백엔드의 일부 포맷터(`clean_markdown_formatting`)가 강제로 박탈(strip)하는 모순이 존재합니다.
-2. **LangGraph 제어 흐름(HILT Interrupt)과 관측성 데코레이터 간의 충돌**:
+2. **LangGraph 제어 흐름(HITL Interrupt)과 관측성 데코레이터 간의 충돌**:
    정상적인 사용자 승인 대기 인터럽트(`interrupt()`)가 데코레이터에서 예외로 처리되어 대량의 `ERROR` 로그를 유발하고 있습니다.
 3. **체크포인터 설정 무력화 및 Windows 환경 비동기 드라이버 충돌**:
    PostgreSQL 비동기 체크포인터가 설정되어 있어도 Windows의 `ProactorEventLoop`와 `psycopg async` 충돌로 초기화에 실패하고 항상 인메모리 `MemorySaver`로 강제 fallback되는 상태입니다.
@@ -51,7 +51,7 @@
 | **DEBUG** | 192,695건 | 71.5% | 전문 에이전트 중간 사고과정, RAG 청크 스팬 대조, 토큰 카운트 |
 | **INFO** | 75,054건 | 27.8% | 상태 전이, HTTP 요청/응답, 검증 결과(PASS/REVISE), 처분 결정 |
 | **WARN / WARNING** | 1,470건 | 0.5% | Langfuse 지연 콜백 드롭, 상위 스팬 미해결, LangGraph 타입 역직렬화 경고 |
-| **ERROR** | 104건 | 0.04% | HILT 인터럽트 예외 오인, DB 체크포인터 초기화 실패, SQL 예외 |
+| **ERROR** | 104건 | 0.04% | HITL 인터럽트 예외 오인, DB 체크포인터 초기화 실패, SQL 예외 |
 
 ### 2.2 Top 5 핵심 에러 패턴 상세 분석
 ```
@@ -120,24 +120,24 @@ flowchart TD
     route -->|plan| plan["4. plan (도구/계획 수립)"]
     plan --> statute_plan["statute_search_plan (시점 사전 점검)"]
 
-    statute_plan -->|사전 법령 필요| hilt_approval["statute_search_approval (HILT 승인)"]
+    statute_plan -->|사전 법령 필요| hitl_approval["statute_search_approval (HITL 승인)"]
     statute_plan -->|기본 진행| run_agents["run_agents (전문 에이전트 병렬 실행)"]
 
     run_agents --> evidence_bundle["legal_evidence_bundle (법령 원문 결합)"]
     evidence_bundle --> synthesize["synthesize / document_answer (초안 작성)"]
 
     synthesize -->|READY| verification
-    synthesize -->|NEED_MORE_LAW| hilt_approval
+    synthesize -->|NEED_MORE_LAW| hitl_approval
     synthesize -->|FAIL| insufficient["insufficient (판단 유보)"] --> END
 
     verification -->|PASS| finalize["finalize (최종 답변 확정)"] --> END
-    verification -->|LEGAL_SOURCE_MISSING| hilt_approval
+    verification -->|LEGAL_SOURCE_MISSING| hitl_approval
     verification -->|AUTO_SEARCH| execute_search["execute_statute_search (법령 검색)"]
     verification -->|REVISE| revise["revise (부분 수정/재작성)"] --> verification
     verification -->|INSUFFICIENT| insufficient
 
-    hilt_approval -->|APPROVED| execute_search
-    hilt_approval -->|REJECTED| insufficient
+    hitl_approval -->|APPROVED| execute_search
+    hitl_approval -->|REJECTED| insufficient
 
     execute_search -->|문서 모드| re_analyze["re_analyze (원문 재검토)"] --> verification
     execute_search -->|일반 모드| run_agents
@@ -179,7 +179,7 @@ flowchart TD
 ### [상충 2] LangGraph `interrupt()` 제어 예외 vs 데코레이터(`decorators.py`) 치명적 ERROR 로깅
 - **위치**: `backend/src/ai_legal_helper/workflows/legal_workflow.py` (라인 3740) vs `backend/src/ai_legal_helper/observability/decorators.py`
 - **현상**:
-  - `statute_search_approval_node`는 사용자의 HILT 승인을 받기 위해 `interrupt(approval_payload)`를 호출함. LangGraph 프레임워크는 내부적으로 `GraphInterrupt` 예외를 던져 그래프 실행을 일시 중단함.
+  - `statute_search_approval_node`는 사용자의 HITL 승인을 받기 위해 `interrupt(approval_payload)`를 호출함. LangGraph 프레임워크는 내부적으로 `GraphInterrupt` 예외를 던져 그래프 실행을 일시 중단함.
   - 하지만 노드를 감싸고 있는 `@trace` 데코레이터(`decorators.py`)의 `log_error`는 `GraphInterrupt`를 예외(Exception)로만 인지하여 스택 트레이스와 함께 `[ERROR] Error in statute_search_approval_node`를 기록함 (로그 집계 8회).
 - **결과**: 사용자가 법령 검색 승인 화면을 정상적으로 보고 있는 상황인데도 백엔드 로그에는 시스템 장애가 일어난 것처럼 치명적 에러가 누적됨.
 
@@ -200,7 +200,7 @@ flowchart TD
   - 한편 `init_checkpointer()`에서는 `AsyncPostgresSaver.setup()`을 호출하는데, Windows Python 3.8+의 기본 `ProactorEventLoop`와 `psycopg async`의 충돌로 인해:
     `psycopg.OperationalError: Psycopg cannot use the 'ProactorEventLoop' with psycopg async`
     예외가 발생하며 초기화가 실패함.
-- **결과**: 프로덕션 서버가 재시작되거나 Uvicorn 워커가 멀티 프로세스로 구동될 때 대화 세션 및 HILT 대기 상태가 메모리에서 증발하여 사용자의 승인 요청이 복구되지 못함.
+- **결과**: 프로덕션 서버가 재시작되거나 Uvicorn 워커가 멀티 프로세스로 구동될 때 대화 세션 및 HITL 대기 상태가 메모리에서 증발하여 사용자의 승인 요청이 복구되지 못함.
 
 ---
 
@@ -303,8 +303,8 @@ flowchart TD
 *(주의: 사용자의 요청에 따라 코드는 직접 수정하지 않았으며, 향후 개발 시 우선 적용해야 할 항목들을 우선순위별로 정리합니다.)*
 
 ### 7.1 P0 (즉시 개선 권고 - 안정성 및 로깅 정상화)
-1. **HILT 인터럽트 에러 로깅 제외 (`decorators.py`)**:
-   - `log_error` 함수에서 `type(e).__name__ in ('GraphInterrupt', 'Interrupt')`인 경우 `logger.info("[HILT] 사용자 승인 대기 인터럽트 발생")`로 처리하고 `logger.error` 기록을 생략하도록 수정.
+1. **HITL 인터럽트 에러 로깅 제외 (`decorators.py`)**:
+   - `log_error` 함수에서 `type(e).__name__ in ('GraphInterrupt', 'Interrupt')`인 경우 `logger.info("[HITL] 사용자 승인 대기 인터럽트 발생")`로 처리하고 `logger.error` 기록을 생략하도록 수정.
 2. **마크다운 서식 제거 로직 개선 (`text_formatter.py`)**:
    - 프론트엔드가 마크다운을 지원하므로, `clean_markdown_formatting`에서 무조건적인 볼드(`**`) 제거를 중단하거나 프론트엔드 렌더러와 일치하도록 서식 보존 옵션(`preserve_rich_formatting=True`) 추가.
 3. **체크포인터 반환 버그 수정 (`legal_workflow.py`)**:
@@ -320,6 +320,6 @@ flowchart TD
 
 ### 7.3 P2 (중장기 아키텍처 과제 - 모듈화 및 유지보수성)
 1. **`legal_workflow.py` 모듈화 (5,730줄 분할)**:
-   - 라우팅 노드군(`workflow_routing.py`), 법령 검색/HILT 노드군(`workflow_statute.py`), 검증/재작성 노드군(`workflow_verification.py`), 최종화 노드군(`workflow_finalize.py`)으로 분리하여 가독성과 테스트 용이성 확보.
+   - 라우팅 노드군(`workflow_routing.py`), 법령 검색/HITL 노드군(`workflow_statute.py`), 검증/재작성 노드군(`workflow_verification.py`), 최종화 노드군(`workflow_finalize.py`)으로 분리하여 가독성과 테스트 용이성 확보.
 2. **답변 생성 파이프라인 단일화**:
    - `synthesizer.py`, `document_consultation.py`, `final_disposition.py`에 파편화된 답변 렌더링 로직을 단일 `AnswerSynthesisEngine`으로 통합.
