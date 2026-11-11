@@ -12,7 +12,7 @@
 - Source Registry에 저장된 실제 법령 원문은 축약/삭제하지 않음
 - 프롬프트에 들어가는 법령 내용만 길이 제한해 추가 토큰 폭증 방지
 - 없는 PDF나 페이지를 생성하지 않고 공식 law_id/MST와 source_url을 유지
-- 기존 8개 Agent·HILT·Vector DB·Verification 노드 구성 유지
+- 기존 8개 Agent·HITL·Vector DB·Verification 노드 구성 유지
 
 ## 출력 계약
 
@@ -31,7 +31,7 @@ LegalState.legal_evidence_bundle:
 - Source Registry의 원문과 법령ID가 유지되는지
 - 신규 Agent 브리프 및 Synthesizer 입력에 실제 Source 정보가 전달되는지
 - 기존 일반 질문에서 추가 LLM 호출이 발생하지 않는지
-- HILT, P5·P6 회귀 및 LangGraph 전체 노드 정의 유지
+- HITL, P5·P6 회귀 및 LangGraph 전체 노드 정의 유지
 
 ## 후속
 
