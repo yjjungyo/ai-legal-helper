@@ -1,27 +1,27 @@
-# P4.1 Verifier-Guided HILT 법령 검색 — 03. LangGraph HILT 노드 및 승인/거절 분기
+# P4.1 Verifier-Guided HITL 법령 검색 — 03. LangGraph HITL 노드 및 승인/거절 분기
 
 ## 1. 개요
-본 문서는 `backend/src/ai_legal_helper/workflows/legal_workflow.py`에 구현된 **LangGraph 0.6+ 기반 Human-in-the-Loop(HILT) 노드와 조건부 라우팅** 메커니즘을 상술한다.
+본 문서는 `backend/src/ai_legal_helper/workflows/legal_workflow.py`에 구현된 **LangGraph 0.6+ 기반 Human-in-the-Loop(HITL) 노드와 조건부 라우팅** 메커니즘을 상술한다.
 
 ---
 
 ## 2. 상태 스키마 확장 (`LegalState`)
 
-HILT 승인 생명주기를 관리하기 위해 `LegalState`(`backend/src/ai_legal_helper/workflows/state.py`)에 다음 필드가 추가되었다:
+HITL 승인 생명주기를 관리하기 위해 `LegalState`(`backend/src/ai_legal_helper/workflows/state.py`)에 다음 필드가 추가되었다:
 
 ```python
 class LegalState(MessagesState):
     ...
-    # P4.1 HILT 관련 상태
+    # P4.1 HITL 관련 상태
     approval_request: Optional[Dict[str, Any]]  # 승인 요청 페이로드
     approval_status: Optional[str]              # NONE, PENDING, APPROVED, REJECTED, EXPIRED
     statute_search_results: Optional[List[Dict[str, Any]]]  # 공식 법령 API 검색 결과
-    hilt_executed: Optional[bool]               # HILT 1회 실행 여부 (무한루프 방지)
+    hitl_executed: Optional[bool]               # HITL 1회 실행 여부 (무한루프 방지)
 ```
 
 ---
 
-## 3. HILT 노드 구현 상세
+## 3. HITL 노드 구현 상세
 
 ### 3.1 `statute_search_approval_node`
 Verifier가 법률 근거 부족을 감지했을 때 진입하여 사용자에게 승인 요청 데이터를 전달하고 그래프 실행을 일시 중단(interrupt)한다.
@@ -68,7 +68,7 @@ def statute_search_approval_node(state: LegalState) -> Dict:
     return {
         "approval_request": approval_payload,
         "approval_status": "APPROVED" if approved else "REJECTED",
-        "hilt_executed": True,
+        "hitl_executed": True,
     }
 ```
 
@@ -76,9 +76,9 @@ def statute_search_approval_node(state: LegalState) -> Dict:
 
 1. **`verification_condition`**:
    - `PASS` → `finalize`
-   - `not hilt_executed and candidate_laws and reason_code in ("LEGAL_SOURCE_MISSING", "LEGAL_SOURCE_INSUFFICIENT")` → `statute_search_approval`
+   - `not hitl_executed and candidate_laws and reason_code in ("LEGAL_SOURCE_MISSING", "LEGAL_SOURCE_INSUFFICIENT")` → `statute_search_approval`
    - `revision_count < 1 and status == "REVISE"` → `revise`
-   - **`hilt_executed == True`**: 공식 법령 검색 및 재분석을 거친 상태이므로, 잔여 미검증 인용을 `finalize_node`의 정화(Sanitization) 로직을 거쳐 안전하게 정제한 후 `finalize`로 확정 종결하여 불필요한 폐기를 방지.
+   - **`hitl_executed == True`**: 공식 법령 검색 및 재분석을 거친 상태이므로, 잔여 미검증 인용을 `finalize_node`의 정화(Sanitization) 로직을 거쳐 안전하게 정제한 후 `finalize`로 확정 종결하여 불필요한 폐기를 방지.
    - 그 외(출처 위조, 거절 등) → `insufficient`
 
 2. **`statute_search_approval_condition`**:
@@ -108,5 +108,5 @@ def statute_search_approval_node(state: LegalState) -> Dict:
 
 ### 4.2 중복 실행 및 재개(Resume) 안전장치
 1. **상태 전이 락**: 사용자가 승인/거절 버튼을 누르는 즉시 서버 API는 상태를 `IN_PROGRESS`로 변경하여 동일 요청에 대한 중복 `POST /consultations/{request_id}/approve` 호출을 `400 Bad Request`로 차단.
-2. **`hilt_executed: True` 플래그**: 워크플로우 상태에 HILT 실행 여부를 영구 기록하여, 재분석 후 다시 근거가 부족하더라도 2차 HILT가 반복 발생하는 무한 루프를 원천 차단.
+2. **`hitl_executed: True` 플래그**: 워크플로우 상태에 HITL 실행 여부를 영구 기록하여, 재분석 후 다시 근거가 부족하더라도 2차 HITL가 반복 발생하는 무한 루프를 원천 차단.
 
