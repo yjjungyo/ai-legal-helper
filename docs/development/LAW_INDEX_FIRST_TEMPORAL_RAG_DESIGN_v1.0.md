@@ -7,7 +7,7 @@
 - 모든 상담의 법령 근거는 쟁점별 법률효과 발생일(event_date)과 사건 유형(event_type)에 맞게 확인한다. 사건일 미확정이면 APPLICABLE 판정 금지.
 - 공포일, 법령 전체 시행일, 조문 시행일, 적용례·경과규정, 실제 사건 적용성을 구분한다.
 - PostgreSQL에 버전이 있다는 사실 또는 vector 검색 점수가 높다는 사실만으로 적용 확정 금지.
-- 공식 연혁 조회는 기존 HILT 승인 정책을 준수한다. 승인 전 외부 호출 없음.
+- 공식 연혁 조회는 기존 HITL 승인 정책을 준수한다. 승인 전 외부 호출 없음.
 - 공식 조회 성공 시 원문을 상담에 바로 제공하고, 별도 Worker가 나중에 전체 버전을 임베딩한다.
 - 공식 조회 실패, 불완전 연혁, 버전 충돌은 UNCONFIRMED로 종료. 무근거 구버전 자동 대체 금지.
 - 8개 분야 Agent, 공통 Law Retrieval Service, 기존 컬렉션 및 평가 데이터 격리 유지.
@@ -19,7 +19,7 @@
 - legal_knowledge/temporal_resolver.py 및 rag/temporal_applicability.py: 사건일·조문 시행일·적용례 검증.
 - legal_knowledge/retrieval_service.py: ChromaDB 공통/분야 검색; **외부 공식 API 호출 금지 유지**.
 - legal_knowledge/index_jobs.py / index_worker.py: PostgreSQL 중복 작업 및 별도 Worker, law_docs_global 전체 버전 인덱싱.
-- workflows/document_search.py: HILT 승인 후 공식 검색 진입점.
+- workflows/document_search.py: HITL 승인 후 공식 검색 진입점.
 
 ## 3. 신규 책임: LawIndexResolver
 입력: [{law_id 또는 공식명, article_ids, event_date, event_type, issue_id}], history_policy.
@@ -30,7 +30,7 @@
 2) PostgreSQL 카탈로그에서 공식 law_id 확정(동명이법·별칭 충돌은 보류).
 3) PostgreSQL 연혁 확인 상태와 버전·조문 커버리지 조회. 사건일 이전 최신 시행일만으로 유효성을 확정하지 않는다.
 4) 공식 연혁의 신뢰 가능한 스냅샷과 이벤트 기준일이 일치하고 해당 조문 인덱스가 READY이면 law_id+mst+article_id 필터로 Chroma 검색.
-5) 인덱스 부재, 커버리지 부족, 연혁 불확실/만료, 조문 변경, 예외적 소급/경과규정 의심이면 HILT 승인된 공식 연혁 검색 경로로 전달.
+5) 인덱스 부재, 커버리지 부족, 연혁 불확실/만료, 조문 변경, 예외적 소급/경과규정 의심이면 HITL 승인된 공식 연혁 검색 경로로 전달.
 6) 공식 조회 원문과 부칙을 Temporal Resolver에 전달. 확정된 조문만 적용 근거로, 미확정은 명시적 조건부 근거로 구분.
 7) 검증된 출처만 분야 Agent에 전달; 응답에는 조문별 적용 사건일, 공식 버전, 부칙 근거, 검증 상태 포함.
 8) 새 공식 버전은 DB 작업 큐에 enqueue. 사용자 응답은 Worker 완료를 기다리지 않는다.
