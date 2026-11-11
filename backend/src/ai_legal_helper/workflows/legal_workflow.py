@@ -517,7 +517,7 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
 
         "synthesis_law_gate": None,
 
-        "hilt_executed": False,
+        "hitl_executed": False,
 
         "preserved_points": [],
 
@@ -1023,13 +1023,13 @@ def statute_search_plan_node(state: LegalState) -> Dict:
 
 def statute_search_plan_condition(state: LegalState) -> str:
 
-    """계획된 기준일 검색만 HILT 승인 요청. 일반 질의는 Agent로 바로 진행."""
+    """계획된 기준일 검색만 HITL 승인 요청. 일반 질의는 Agent로 바로 진행."""
 
     plan = state.get("law_search_plan") or {}
 
     if (plan.get("status") == "READY" and plan.get("candidate_laws")
 
-            and not state.get("hilt_executed")):
+            and not state.get("hitl_executed")):
 
         # A complete, recently checked local history plus requested article
 
@@ -1091,7 +1091,7 @@ async def run_agents_node(state: LegalState) -> Dict:
 
 
 
-        # 선행 HILT 공식 검색 결과를 문서 상담 Vector 검색으로 덮어쓰지 않는다.
+        # 선행 HITL 공식 검색 결과를 문서 상담 Vector 검색으로 덮어쓰지 않는다.
 
         sources = list(state.get("retrieved_sources", []) or [])
 
@@ -1184,7 +1184,7 @@ async def run_agents_node(state: LegalState) -> Dict:
 
         brief = f"{case_ctx}\n\n[이전 대화 요약]\n{brief}"
 
-    # P7: 사전 HILT 공식 검색 결과를 전문 Agent가 재사용하도록
+    # P7: 사전 HITL 공식 검색 결과를 전문 Agent가 재사용하도록
 
     # 근거ID/버전/부칙/판정이 붙은 제한된 Context를 제공한다.
 
@@ -1396,7 +1396,7 @@ def synthesize_node(state: LegalState) -> Dict:
 
                 or (state.get("statute_search_count") or 0) > 0
 
-                or state.get("hilt_executed")
+                or state.get("hitl_executed")
 
             )
 
@@ -1480,7 +1480,7 @@ def synthesis_law_gate_condition(state: LegalState) -> str:
 
     if gate.get("status") == "NEED_MORE_LAW":
 
-        if (state.get("statute_search_count") or 0) >= 2 or state.get("hilt_executed"):
+        if (state.get("statute_search_count") or 0) >= 2 or state.get("hitl_executed"):
 
             return "insufficient"
 
@@ -2062,11 +2062,11 @@ def supervisor_verification_decision(state: LegalState) -> str:
 
     2. 법령 근거 부족(LEGAL_SOURCE_MISSING / LEGAL_SOURCE_INSUFFICIENT) 및 후보 법령 존재 시:
 
-       사용자 승인을 구하는 HILT 노드(`statute_search_approval`)로 라우팅한다.
+       사용자 승인을 구하는 HITL 노드(`statute_search_approval`)로 라우팅한다.
 
     3. 최초 검증 실패 시(REVISE 또는 일반 INSUFFICIENT): 1회에 한해 적응형 보강 검색(`revise`).
 
-    4. HILT 공식 법령 검색이 이미 수행된 경우:
+    4. HITL 공식 법령 검색이 이미 수행된 경우:
 
        허위 인용(가짜 출처)이 없다면 미검증 폐기하지 않고 실무 권고사항을 보존하여 `finalize`한다.
 
@@ -2102,7 +2102,7 @@ def supervisor_verification_decision(state: LegalState) -> str:
 
             count = state.get("revision_count", 0)
 
-            max_revisions = 2 if state.get("hilt_executed") else 1
+            max_revisions = 2 if state.get("hitl_executed") else 1
 
             if count < max_revisions:
 
@@ -2122,7 +2122,7 @@ def supervisor_verification_decision(state: LegalState) -> str:
 
         candidate_laws = checked.get("candidate_laws") or []
 
-        if candidate_laws and not state.get("hilt_executed", False):
+        if candidate_laws and not state.get("hitl_executed", False):
 
             logger.warning("[SUPERVISOR_DECISION] 적용시점 근거 부족 -> 공식 법령 검색 승인 요청")
 
@@ -2144,7 +2144,7 @@ def supervisor_verification_decision(state: LegalState) -> str:
 
     candidate_laws = ver_res.get("candidate_laws", [])
 
-    hilt_executed = state.get("hilt_executed", False)
+    hitl_executed = state.get("hitl_executed", False)
 
     revision_count = state.get("revision_count", 0)
 
@@ -2188,9 +2188,9 @@ def supervisor_verification_decision(state: LegalState) -> str:
 
 
 
-        # 후보 법령이 존재하고 아직 HILT를 실행하지 않은 경우:
+        # 후보 법령이 존재하고 아직 HITL를 실행하지 않은 경우:
 
-        # 쟁점 중 법령 누락이 있거나 법령 근거 부족 시 사용자 승인을 구하는 HILT 노드로 우선 라우팅
+        # 쟁점 중 법령 누락이 있거나 법령 근거 부족 시 사용자 승인을 구하는 HITL 노드로 우선 라우팅
 
         any_statute_missing = any(
 
@@ -2232,7 +2232,7 @@ def supervisor_verification_decision(state: LegalState) -> str:
 
         )
 
-        if not hilt_executed and candidate_laws and is_issue_statute_need:
+        if not hitl_executed and candidate_laws and is_issue_statute_need:
 
             # [P0-VER-01] 이미 검색된 출처(retrieved_sources)에 후보 법령이 확보되어 있는지 검증하여 불필요한 외부 검색 차단
 
@@ -2256,7 +2256,7 @@ def supervisor_verification_decision(state: LegalState) -> str:
 
             if truly_missing_laws:
 
-                logger.info(f"[VERIFY_ROUTING] 미확보 후보 법령({truly_missing_laws}) 검증을 위해 HILT 법령 검색 승인 요청 노드로 분기합니다.")
+                logger.info(f"[VERIFY_ROUTING] 미확보 후보 법령({truly_missing_laws}) 검증을 위해 HITL 법령 검색 승인 요청 노드로 분기합니다.")
 
                 return "statute_search_approval"
 
@@ -2320,9 +2320,9 @@ def supervisor_verification_decision(state: LegalState) -> str:
 
                 return "finalize"
 
-            # 1회 재검토 가능하면 revise 시도 (HILT 검색 완료 후에도 1회 재검토 기회 보장)
+            # 1회 재검토 가능하면 revise 시도 (HITL 검색 완료 후에도 1회 재검토 기회 보장)
 
-            max_revisions = 2 if hilt_executed else 1
+            max_revisions = 2 if hitl_executed else 1
 
             if revision_count < max_revisions:
 
@@ -2336,7 +2336,7 @@ def supervisor_verification_decision(state: LegalState) -> str:
 
 
 
-    # 1. 모든 필수 검증을 통과했다면 최종 확정 (HILT 여부와 무관하게 PASS일 때만 확정)
+    # 1. 모든 필수 검증을 통과했다면 최종 확정 (HITL 여부와 무관하게 PASS일 때만 확정)
 
     if status == "PASS":
 
@@ -2352,7 +2352,7 @@ def supervisor_verification_decision(state: LegalState) -> str:
 
     #    로컬 RAG에는 해당 법령이 없으므로 불필요한 로컬 revise로 턴을 낭비하지 않고
 
-    #    1회에 한해 HILT 공식 법령 검색 승인 요청 노드로 우선 분기한다 (P0-VER-01).
+    #    1회에 한해 HITL 공식 법령 검색 승인 요청 노드로 우선 분기한다 (P0-VER-01).
 
     #    주의: 순수 사건 사실관계 증거 문제(CASE_EVIDENCE_MISSING, EVIDENCE_CONFLICT)는 법령 검색으로 오분기하지 않는다.
 
@@ -2394,7 +2394,7 @@ def supervisor_verification_decision(state: LegalState) -> str:
 
     )
 
-    if not hilt_executed and candidate_laws and is_legal_source_issue:
+    if not hitl_executed and candidate_laws and is_legal_source_issue:
 
         retrieved_statute_names = {
 
@@ -2438,9 +2438,9 @@ def supervisor_verification_decision(state: LegalState) -> str:
 
     # 3. 최초 검증 실패 시(REVISE 또는 일반 작성오류) 1회에 한해 적응형 보강 검색(revise) 시도
 
-    #    HILT 외부 법령 검색(re_analyze) 완료 후에도 신규 초안에 대해 1회의 수정 기회(max_revisions=2)를 동등하게 부여한다.
+    #    HITL 외부 법령 검색(re_analyze) 완료 후에도 신규 초안에 대해 1회의 수정 기회(max_revisions=2)를 동등하게 부여한다.
 
-    max_revisions = 2 if hilt_executed else 1
+    max_revisions = 2 if hitl_executed else 1
 
     if revision_count < max_revisions:
 
@@ -2452,7 +2452,7 @@ def supervisor_verification_decision(state: LegalState) -> str:
 
 
 
-    # 4. HILT 실행 후 또는 재검토 한도(1회) 도달 후:
+    # 4. HITL 실행 후 또는 재검토 한도(1회) 도달 후:
 
     #    - REVISE 상태이더라도 중대 결함(법률 근거 부재, 허위/미검증 인용, 증거 모순, 시스템 오류)이 존재하거나
 
@@ -3669,7 +3669,7 @@ def _format_client_approval_explanation(
 
 def statute_search_approval_node(state: LegalState) -> Dict:
 
-    """법령 원문 검색 승인을 위한 HILT(Human-in-the-Loop) 노드.
+    """법령 원문 검색 승인을 위한 HITL(Human-in-the-Loop) 노드.
 
 
 
@@ -3687,7 +3687,7 @@ def statute_search_approval_node(state: LegalState) -> Dict:
 
     Returns:
 
-        Dict: 승인 요청 정보(`approval_request`), 승인 상태(`approval_status`), HILT 실행 여부(`hilt_executed`).
+        Dict: 승인 요청 정보(`approval_request`), 승인 상태(`approval_status`), HITL 실행 여부(`hitl_executed`).
 
     """
 
@@ -3761,7 +3761,7 @@ def statute_search_approval_node(state: LegalState) -> Dict:
 
         "candidate_laws": candidate_laws,
 
-        # HILT 화면에 실제 조회할 기준일/법령/단계를 명시한다.
+        # HITL 화면에 실제 조회할 기준일/법령/단계를 명시한다.
 
         "as_of_date": plan.get("as_of_date") if preflight else None,
 
@@ -3849,7 +3849,7 @@ def statute_search_approval_node(state: LegalState) -> Dict:
 
         "approved_statute_laws": approved_laws,
 
-        "hilt_executed": True,
+        "hitl_executed": True,
 
     }
 
@@ -3937,7 +3937,7 @@ def execute_statute_search_node(state: LegalState) -> Dict:
 
     )
 
-    # HILT 거절·미승인 시 공식 OpenLaw 호출은 엄격히 차단한다.
+    # HITL 거절·미승인 시 공식 OpenLaw 호출은 엄격히 차단한다.
 
     if state.get("approval_status") != "APPROVED":
 
@@ -4165,7 +4165,7 @@ def statute_search_result_condition(state: LegalState) -> str:
 
 
 
-    선행 HILT 검색 결과가 없거나 API 장애인 경우 insufficient로 분기하며,
+    선행 HITL 검색 결과가 없거나 API 장애인 경우 insufficient로 분기하며,
 
     최초 초안 작성 전(synthesis_law_gate=NEED_MORE_LAW) 검색 완료 시에는 초안 작성을 위해 run_agents로,
 
@@ -5098,7 +5098,7 @@ def build_legal_graph(checkpointer: Optional[Any] = None):
 
 
 
-    HILT 법령 원문 검색 및 Checkpointer가 포함된다.
+    HITL 법령 원문 검색 및 Checkpointer가 포함된다.
 
 
 
@@ -5468,7 +5468,7 @@ async def _execute_consultation(
 
 
 
-    # HILT 인터럽트 발생 여부 감지
+    # HITL 인터럽트 발생 여부 감지
 
     if "__interrupt__" in final_state and final_state["__interrupt__"]:
 
@@ -5660,7 +5660,7 @@ async def run_legal_consultation(
 
         thread_id: 대화 스레드 또는 요청 식별자
 
-        resume_data: HILT 승인/거절 시 재개를 위한 사용자 결정 데이터 (예: {"approved": True})
+        resume_data: HITL 승인/거절 시 재개를 위한 사용자 결정 데이터 (예: {"approved": True})
 
         checkpointer: 명시적으로 주입할 체크포인터 (미지정 시 환경설정에 따라 자동 선택)
 
@@ -5674,7 +5674,7 @@ async def run_legal_consultation(
 
         Dict[str, Any]: 상담 처리 결과 딕셔너리.
 
-            - HILT 인터럽트 발생 시: `status: "APPROVAL_REQUIRED"`, `approval_request: {...}`
+            - HITL 인터럽트 발생 시: `status: "APPROVAL_REQUIRED"`, `approval_request: {...}`
 
             - 정상 완료 시: `status: "SUCCESS"`, `answer: "..."`, `sources: [...]`
 
