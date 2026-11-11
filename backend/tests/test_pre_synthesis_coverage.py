@@ -19,7 +19,7 @@ def test_missing_law_routes_to_approval():
             "reason_code": "LEGAL_SOURCE_MISSING",
             "candidate_laws": ["임의의법률"],
         },
-        "hilt_executed": False,
+        "hitl_executed": False,
     }
     assert coverage_next(state) == "statute_search_approval"
 
@@ -31,7 +31,7 @@ def test_approved_or_completed_search_does_not_repeat():
             "reason_code": "LEGAL_SOURCE_MISSING",
             "candidate_laws": ["임의의법률"],
         },
-        "hilt_executed": True,
+        "hitl_executed": True,
     }
     assert coverage_next(state) == "legal_evidence_bundle"
 
