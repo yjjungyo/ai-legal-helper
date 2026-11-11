@@ -7,7 +7,7 @@ P0-VER-01 RAG 법령 검색 결과 Verification 오판정 및 구조적 결함 �
 
 [검증 항목]
 1. 재현 질문 입력 시 민법 제6조 기반 답변 생성
-2. OpenLaw 추가 검색 0회 (HILT 미발생)
+2. OpenLaw 추가 검색 0회 (HITL 미발생)
 3. Verification status == PASS
 4. final_disposition == DELIVERED
 5. retrieved_sources에 민법 제6조 유지
@@ -57,7 +57,7 @@ async def test_p0_ver_01_statute_query_verification_pass():
     assert "민법" in final_answer and ("제6조" in final_answer or "6조" in final_answer), "민법 제6조가 답변에 포함되어야 함"
     assert "처분" in final_answer, "처분 관련 내용이 답변에 포함되어야 함"
     
-    # 2. OpenLaw 추가 검색 0회 (HILT 미발생)
+    # 2. OpenLaw 추가 검색 0회 (HITL 미발생)
     assert "statute_search_approval" not in executed_nodes, "OpenLaw 승인 노드가 실행되지 않아야 함"
     assert "execute_statute_search" not in executed_nodes, "OpenLaw 실행 노드가 실행되지 않아야 함"
     
