@@ -1,5 +1,5 @@
 /**
- * @fileoverview LangGraph 6단계 법률 상담 진행 상태 추적 및 HILT 승인 인터랙션 컴포넌트
+ * @fileoverview LangGraph 6단계 법률 상담 진행 상태 추적 및 HITL 승인 인터랙션 컴포넌트
  * 사건 분석 의도 파악부터 증거 매핑, 법령 분석, 쟁점 교차 검증, 미보유 법령 승인, 최종 답변 종합까지
  * 실시간 상태(RUNNING, COMPLETED, WAITING_APPROVAL, SKIPPED, FAILED)를 단계별 체크리스트로 시각화합니다.
  */
@@ -12,7 +12,7 @@ export interface ConsultationProgressProps {
   progress?: IConsultationProgress | null;
   /** 현재 상담 요청의 전체 상태 (IN_PROGRESS, APPROVAL_REQUIRED 등) */
   status: string;
-  /** HILT 외부 법령 검색 승인 요청 세부 정보 */
+  /** HITL 외부 법령 검색 승인 요청 세부 정보 */
   approvalRequest?: ApprovalRequest | null;
   /** 승인 버튼 클릭 콜백 */
   onApprove: (requestId: string) => void;
@@ -69,7 +69,7 @@ function renderStepIcon(status: string) {
 
 /**
  * 진행 상태 카드 컴포넌트
- * @param props 진행 상태 및 HILT 콜백
+ * @param props 진행 상태 및 HITL 콜백
  * @returns 대화 스트림 내 진행 상태 추적 카드 JSX
  */
 export const ConsultationProgress: React.FC<ConsultationProgressProps> = ({
@@ -90,7 +90,7 @@ export const ConsultationProgress: React.FC<ConsultationProgressProps> = ({
   let steps = progress?.steps && progress.steps.length > 0 ? progress.steps : DEFAULT_STEPS;
 
   if (!completedMode && status === 'APPROVAL_REQUIRED') {
-    // HILT 승인 대기 상태인 경우 5번째 단계를 WAITING_APPROVAL로 보정
+    // HITL 승인 대기 상태인 경우 5번째 단계를 WAITING_APPROVAL로 보정
     steps = steps.map((s) => {
       if (s.step_id === 'STATUTE_APPROVAL') {
         return { ...s, status: 'WAITING_APPROVAL' };
@@ -199,7 +199,7 @@ export const ConsultationProgress: React.FC<ConsultationProgressProps> = ({
         </div>
       )}
 
-      {/* 상황 A: HILT 승인 대기 인라인 액션 박스 */}
+      {/* 상황 A: HITL 승인 대기 인라인 액션 박스 */}
       {isApprovalWaiting && (
         <div className="chat-approval-box">
           <div className="chat-approval-desc">
