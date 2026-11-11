@@ -1182,7 +1182,9 @@ async def run_agents_node(state: LegalState) -> Dict:
 
     if case_ctx:
 
-        brief = f"{case_ctx}\n\n[이전 대화 요약]\n{brief}"
+        # case_context may already include the conversation summary from initialization.
+        # Avoid injecting the same history again in this single Agent prompt.
+        brief = case_ctx if brief and brief in case_ctx else f"{case_ctx}\n\n[이전 대화 요약]\n{brief}"
 
     # P7: 사전 HITL 공식 검색 결과를 전문 Agent가 재사용하도록
 
@@ -5027,6 +5029,11 @@ def followup_action_node(state: LegalState) -> Dict:
             pass
 
 
+
+    # Initialization prefixes case_context with the same formatted conversation history.
+    # Keep the history in conversation_context only; retain the separate case facts.
+    if conv_summary and case_ctx.startswith(conv_summary):
+        case_ctx = case_ctx[len(conv_summary):].lstrip()
 
     prompt_str = FOLLOWUP_ACTION_PROMPT.format(
 
