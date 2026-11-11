@@ -40,7 +40,7 @@
         "source_ids": List[str],
         "error_detail": Optional[str]
     },
-    "hilt": {
+    "hitl": {
         "is_required": bool,
         "approved": Optional[bool],
         "official_statutes_count": int
