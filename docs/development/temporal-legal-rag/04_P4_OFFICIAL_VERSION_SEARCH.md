@@ -29,9 +29,9 @@ P4에서는 **공식 시행일/연혁 목록에 기초한 버전 식별과 부�
 | backend/src/ai_legal_helper/tools/official_statute_search.py | 기존 API에 as_of_date 지원, 명시 날짜 시 eflaw 분기, 공식 XML 가상 PDF/페이지 생성 제거 |
 | backend/src/ai_legal_helper/rag/source_schema.py | requested_as_of_date, version_relation, version_lookup_status, history_code 보존 |
 | backend/tests/unit/test_official_statute_versions_p4.py | 버전 선택·공포/시행 구분·불완전 목록·부칙·원문위변조 회귀 테스트 |
-| .github/workflows/temporal-legal-rag-p4.yml | P4/P1 및 HILT·기존 검색 경로를 각각 CI에서 검증 |
+| .github/workflows/temporal-legal-rag-p4.yml | P4/P1 및 HITL·기존 검색 경로를 각각 CI에서 검증 |
 
-기존 8개 Agent, Router, LangGraph 노드/HILT 정책, PostgreSQL, Neo4j,
+기존 8개 Agent, Router, LangGraph 노드/HITL 정책, PostgreSQL, Neo4j,
 ChromaDB의 저장소 구조 및 운영 데이터는 변경하지 않았다.
 
 ## 3. 시행일 기준 조회 프로세스
@@ -101,7 +101,7 @@ ChromaDB의 저장소 구조 및 운영 데이터는 변경하지 않았다.
 Workflow: Temporal Legal RAG P4 official version regression
 
 - Official history / MST / addenda Mock API + P1 시점 회귀: **52 PASS**
-- 기존 HILT 승인/거절 및 공식 검색 회귀: **34 PASS**
+- 기존 HITL 승인/거절 및 공식 검색 회귀: **34 PASS**
 - 합계: **86 PASS, 실패 0건**
 - 종전 P3 회귀 워크플로도 성공
 - 테스트 환경: Python 3.11, Mock XML, 실제 OpenLaw/LLM/운영 DB 미사용
@@ -114,7 +114,7 @@ Workflow: Temporal Legal RAG P4 official version regression
 - 공포 후 유예 개정·부칙의 적용례 텍스트 보존
 - 잘못된 기준일 및 상충한 날짜 인자 입력 시 네트워크 차단
 - 기존 공포일 검색의 가짜 PDF/페이지 생성 방지
-- 기존 사용자 HILT 거절/재검색 호환 경로 보호
+- 기존 사용자 HITL 거절/재검색 호환 경로 보호
 
 ## 7. 로컬 검증 명령
 
@@ -122,7 +122,7 @@ PowerShell에서 backend 디렉터리 기준:
 
     python -m pytest -q tests/unit/test_official_statute_versions_p4.py tests/unit/test_official_statute_temporal_metadata_p1.py tests/unit/test_statute_temporal_p0_law_02.py tests/unit/test_temporal_legal_rag_p0_contract.py tests/unit/test_temporal_legal_rag_p1.py
 
-기존 HILT 테스트는 다음 중 DB 연결이 없는 항목과 별도 수행한다.
+기존 HITL 테스트는 다음 중 DB 연결이 없는 항목과 별도 수행한다.
 
     python -m pytest -q tests/unit/test_step3_statute_search.py tests/unit/test_statute_search_reference_normalization.py
 
@@ -136,7 +136,7 @@ P4에서 **시점별 공식 법령 원문 확보와 버전·부칙 구분**을 �
 호출하므로 모든 사용자 질문에서 자동으로 새 버전 검색이 수행되지는 않는다.
 
 - P5: 사건 기준일의 법률적 의미, 부칙 적용례·경과규정, 3상 적용 판정
-- P6: 공식 검색 선행 계획 및 기존 HILT 체크포인트·승인과 시점 연결
+- P6: 공식 검색 선행 계획 및 기존 HITL 체크포인트·승인과 시점 연결
 - P7/P8: 버전별 Evidence Bundle과 Claim-to-Source Verification 연결
 - P9: 동일 법령별 버전 독립 임베딩 Worker 및 증분 처리
 - P10: 기존 벡터의 시행일/버전 메타데이터 마이그레이션
