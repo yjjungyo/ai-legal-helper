@@ -2,7 +2,7 @@
 """P6: 기존 8개 Agent 앞에 넣는 공식 법령 시점 검색 계획(외부 호출 없음).
 
 정식 법령명/약칭이 질문에 직접 등장하고 계약 등 사건 기준일이 단일하게
-확인된 경우에만 HILT 선행 검색을 계획한다. 카탈로그 미적재/DB 장애/모호한
+확인된 경우에만 HITL 선행 검색을 계획한다. 카탈로그 미적재/DB 장애/모호한
 법령/날짜는 기존 RAG 경로에 안전하게 위임한다.
 """
 from __future__ import annotations
@@ -113,7 +113,7 @@ def _local_law_resolve(question: str) -> Any:
 
 def _index_preflight(law_ids: list[str], event_date: str, event_type: str,
                      question: str, index_fn: Optional[Callable[..., Any]] = None) -> dict[str, Any]:
-    """DB-only diagnostics for HILT planning; does not waive official-search approval.
+    """DB-only diagnostics for HITL planning; does not waive official-search approval.
 
     A local hit remains a *candidate* until downstream event-specific verification.
     """
@@ -162,7 +162,7 @@ def build_temporal_search_plan(
     """사건일/공식 법령ID가 명시된 질의를 '검색 후보'로만 정규화한다.
 
     Returns:
-        READY: HILT 승인 대상으로 제시할 법령명·사건일 확정
+        READY: HITL 승인 대상으로 제시할 법령명·사건일 확정
         SKIP: 기존 Agent 흐름으로 진행, 새 외부 호출 없음
     """
     empty: dict[str, Any] = {
