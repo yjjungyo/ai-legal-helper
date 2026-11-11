@@ -14,14 +14,14 @@
 2.1 Self-Correction 현황: 초기 수준 (Level 2) 구축 완료
 기구현 내용:
 Synthesizer → Verification Agent의 검증 피드백 → Revise 노드의 적응형 보강 검색(1회).
-법률 근거 누락 감지 시 HILT (statute_search_approval) → 법제처 API 연동 → re_analyze 재분석.
+법률 근거 누락 감지 시 HITL (statute_search_approval) → 법제처 API 연동 → re_analyze 재분석.
 결정론적 출처 감사(audit_citations_and_claims)를 통한 허위 인용 정제(sanitize_unverified_citations).
 한계점:
 전면 재생성(Full Regeneration) 비용: 경미한 모순이나 조문 오기가 발생해도 답변 전체를 다시 생성하여 LLM 비용과 지연시간(Latency)이 증가함.
 단일 관점 검증의 맹점: 한 명의 Verifier LLM이 법리, 사실관계, 인용을 한 번에 검토하다 보니 서두 안내문과 본문 설명의 사소한 차이를 모순으로 오탐하는 현상 발생.
 2.2 Self-Evolving 현황: 미도입 상태 (Level 0, 정적 파이프라인)
 한계점:
-경험 휘발성 (Static Agent): HILT를 통해 어렵게 법제처에서 주택임대차보호법 제6조의2를 확보하고 완벽한 답변을 작성했더라도, 세션이 종료되면 그 경험이 휘발됨. 다음 사용자가 동일한 묵시적 갱신을 질문하면 또다시 RAG 부재 → HILT 승인 요청 절차를 반복해야 함.
+경험 휘발성 (Static Agent): HITL를 통해 어렵게 법제처에서 주택임대차보호법 제6조의2를 확보하고 완벽한 답변을 작성했더라도, 세션이 종료되면 그 경험이 휘발됨. 다음 사용자가 동일한 묵시적 갱신을 질문하면 또다시 RAG 부재 → HITL 승인 요청 절차를 반복해야 함.
 반복 오류 학습 부재: Verifier가 자주 지적하는 실무상 주의사항 누락이나 질문 분석 실패 패턴이 프롬프트 개선에 자동으로 피드백되지 않음.
 3. Self-Correction 고도화 방안 (세션 내 즉각 교정)
 
@@ -38,9 +38,9 @@ Synthesizer → Verification Agent의 검증 피드백 → Revise 노드의 적�
 
 4.1 동적 지식베이스 자동 진화 (Knowledge Self-Ingestion)
 작동 방식:
-HILT를 통해 법제처 API에서 성공적으로 조회된 법령 조문(주택임대차보호법 제6조의2 등)을 세션 종료 후 백그라운드 Worker가 로컬 ChromaDB(law_docs_civil) 및 Neo4j 그래프에 자동 색인.
+HITL를 통해 법제처 API에서 성공적으로 조회된 법령 조문(주택임대차보호법 제6조의2 등)을 세션 종료 후 백그라운드 Worker가 로컬 ChromaDB(law_docs_civil) 및 Neo4j 그래프에 자동 색인.
 기대 효과:
-첫 번째 사용자는 HILT를 거치지만, 두 번째 사용자부터는 내부 RAG에서 0.3초 만에 즉각 검색 성공! (시스템의 법률 커버리지가 사용할수록 자연 확장됨)
+첫 번째 사용자는 HITL를 거치지만, 두 번째 사용자부터는 내부 RAG에서 0.3초 만에 즉각 검색 성공! (시스템의 법률 커버리지가 사용할수록 자연 확장됨)
 4.2 에피소딕 사례 메모리 및 Dynamic Few-Shot (Case-Based Reasoning)
 작동 방식:
 Verifier 종합 점수 1.0(PASS, 출처 일치도 100%)을 기록하고 의뢰인이 유용하게 활용한 고품질 상담 케이스를 개인정보(PII) 탈색 후 LegalCaseMemory 벡터스토어에 저장.
@@ -64,8 +64,8 @@ Langfuse에 기록된 REVISE, INSUFFICIENT, 검증 모순 지적 트레이스를
 6. 단계별 도입 로드맵 제안
 단계	추진 과제	난이도	기대 효과
 Phase 1
-(즉시 추진)	HILT 조회 법령 로컬 RAG 자동 캐싱
-- 법제처에서 조회한 법령을 로컬 ChromaDB에 영구 적재	낮음	동일 특별법 질문 시 반복적인 HILT 승인 대기 제거
+(즉시 추진)	HITL 조회 법령 로컬 RAG 자동 캐싱
+- 법제처에서 조회한 법령을 로컬 ChromaDB에 영구 적재	낮음	동일 특별법 질문 시 반복적인 HITL 승인 대기 제거
 Phase 2
 (단기)	Surgical Self-Correction & CRAG 도입
 - Verifier 오류 단락 부분 수정
