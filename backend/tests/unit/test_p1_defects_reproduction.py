@@ -111,11 +111,11 @@ def test_p1_04_adaptive_retrieval_differentiates_causes():
     """P1-04: Adaptive Retrieval 분기 시 인프라 장애, 법령 부재, 사실관계 증거 부족, 단순 초안 수정이 각각 다르게 분기하는지 검증."""
     from ai_legal_helper.workflows.legal_workflow import verification_condition
 
-    # Case A: 법령 부재(LEGAL_SOURCE_MISSING) -> HILT 법령 검색 승인
+    # Case A: 법령 부재(LEGAL_SOURCE_MISSING) -> HITL 법령 검색 승인
     state_statute: LegalState = {
         "messages": [HumanMessage(content="해지통보 효력")],
         "revision_count": 0,
-        "hilt_executed": False,
+        "hitl_executed": False,
         "verification_result": {
             "status": "INSUFFICIENT",
             "reason_code": "LEGAL_SOURCE_MISSING",
@@ -124,11 +124,11 @@ def test_p1_04_adaptive_retrieval_differentiates_causes():
     }
     assert verification_condition(state_statute) == "statute_search_approval"
 
-    # Case B: 검색 인프라 장애(RETRIEVER_UNAVAILABLE) -> insufficient로 안전 종료 (무의미한 HILT 또는 무한 루프 금지)
+    # Case B: 검색 인프라 장애(RETRIEVER_UNAVAILABLE) -> insufficient로 안전 종료 (무의미한 HITL 또는 무한 루프 금지)
     state_infra: LegalState = {
         "messages": [HumanMessage(content="해지통보 효력")],
         "revision_count": 0,
-        "hilt_executed": False,
+        "hitl_executed": False,
         "verification_result": {
             "status": "INSUFFICIENT",
             "reason_code": "RETRIEVER_UNAVAILABLE",
@@ -141,7 +141,7 @@ def test_p1_04_adaptive_retrieval_differentiates_causes():
     state_evidence: LegalState = {
         "messages": [HumanMessage(content="해지통보 효력")],
         "revision_count": 0,
-        "hilt_executed": False,
+        "hitl_executed": False,
         "verification_result": {
             "status": "INSUFFICIENT",
             "reason_code": "CASE_EVIDENCE_MISSING",
@@ -154,7 +154,7 @@ def test_p1_04_adaptive_retrieval_differentiates_causes():
     state_revise: LegalState = {
         "messages": [HumanMessage(content="해지통보 효력")],
         "revision_count": 0,
-        "hilt_executed": False,
+        "hitl_executed": False,
         "verification_result": {
             "status": "REVISE",
             "reason_code": "ANSWER_REVISION_REQUIRED",
