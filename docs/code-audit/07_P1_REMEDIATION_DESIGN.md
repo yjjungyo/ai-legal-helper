@@ -82,7 +82,7 @@ flowchart TD
 ### 2.4 P1-04: Adaptive Retrieval 의사결정 차별화
 - `verification_condition()` 정밀 분기:
   1. `reason_code in ("RETRIEVER_UNAVAILABLE", "COLLECTION_MISSING")` -> `insufficient` (인프라 장애 안내 및 안전 종료)
-  2. `reason_code in ("LEGAL_SOURCE_MISSING", "LEGAL_SOURCE_INSUFFICIENT")` and `candidate_laws` -> `statute_search_approval` (HILT)
+  2. `reason_code in ("LEGAL_SOURCE_MISSING", "LEGAL_SOURCE_INSUFFICIENT")` and `candidate_laws` -> `statute_search_approval` (HITL)
   3. `reason_code == "CASE_EVIDENCE_MISSING"` -> `insufficient` (사용자에게 증거 보강 안내)
   4. `status == "REVISE"` or `reason_code == "ANSWER_REVISION_REQUIRED"` -> 1회 한정 `revise`
 
