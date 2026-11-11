@@ -10,7 +10,7 @@ P3 공통 Law Retrieval Service — 8개 전문 Agent와 법령 저장소의 결
 
 [범위]
 - Vector 검색과 출처 정규화, 법령 후보 및 검색 근거 완전성 상태 판단만 담당한다.
-- OpenLaw 네트워크 호출, HILT 우회, 법률적 효력 판단, 자동 임베딩은 수행하지 않는다.
+- OpenLaw 네트워크 호출, HITL 우회, 법률적 효력 판단, 자동 임베딩은 수행하지 않는다.
 - P2 Law Catalog가 아직 적재되지 않아도 기존 Agent 검색을 중단하지 않는다.
 - 전체 법률 판단의 충분성은 Verification에서 재확인해야 한다.
 """
