@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""P12-6: Persist complete HILT-authorized eflaw history without network calls.
+"""P12-6: Persist complete HITL-authorized eflaw history without network calls.
 
 A history snapshot proves only what the official version list returned. It
 never proves article applicability or that a version is embedded in Chroma.
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 def store_complete_history(session, lookup: VersionLookup, *, law_id: str) -> dict:
-    """Atomic local persistence; caller must have completed HILT-approved lookup.
+    """Atomic local persistence; caller must have completed HITL-approved lookup.
 
     Same MST with multiple official effective dates cannot fit the current
     law_version_index unique(law_id,mst) schema. Record an INCOMPLETE
