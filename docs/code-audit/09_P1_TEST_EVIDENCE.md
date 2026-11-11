@@ -49,8 +49,8 @@ backend\tests\unit\test_p1_defects_reproduction.py::test_p1_06_concurrent_approv
    - 인용이 없는 답변에 대해 제로 분모 `N/A` 표기 및 `citation_coverage_rate` 0.0 산출 검증: **PASS**
 
 4. **`test_p1_04_adaptive_retrieval_differentiates_causes` (P1-04)**
-   - 법령 부재(`LEGAL_SOURCE_MISSING`) 시 `statute_search_approval` 노드로 HILT 전이 검증: **PASS**
-   - 검색 인프라 장애(`RETRIEVER_UNAVAILABLE`) 시 무의미한 HILT/재검색을 차단하고 `insufficient` 노드로 안전 종료 검증: **PASS**
+   - 법령 부재(`LEGAL_SOURCE_MISSING`) 시 `statute_search_approval` 노드로 HITL 전이 검증: **PASS**
+   - 검색 인프라 장애(`RETRIEVER_UNAVAILABLE`) 시 무의미한 HITL/재검색을 차단하고 `insufficient` 노드로 안전 종료 검증: **PASS**
    - 사건 증거 부족(`CASE_EVIDENCE_MISSING`) 시 `insufficient` 노드로 전이 검증: **PASS**
    - 초안 표현 결함(`ANSWER_REVISION_REQUIRED`) 시 `revise` 노드로 재작성 루프 진행 검증: **PASS**
 
@@ -79,8 +79,8 @@ asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, a
 collecting ... collected 8 items
 
 backend\tests\unit\test_p0_defects_reproduction.py::test_p0_01_reproduce_verification_fail_open PASSED [ 12%]
-backend\tests\unit\test_p0_defects_reproduction.py::test_p0_02_reproduce_hilt_bypass_verification_failure PASSED [ 25%]
-backend\tests\unit\test_p0_defects_reproduction.py::test_p0_02_reproduce_non_statute_issue_does_not_trigger_hilt PASSED [ 37%]
+backend\tests\unit\test_p0_defects_reproduction.py::test_p0_02_reproduce_hitl_bypass_verification_failure PASSED [ 25%]
+backend\tests\unit\test_p0_defects_reproduction.py::test_p0_02_reproduce_non_statute_issue_does_not_trigger_hitl PASSED [ 37%]
 backend\tests\unit\test_p0_defects_reproduction.py::test_p0_04_reproduce_statute_search_no_arbitrary_law_fallback PASSED [ 50%]
 backend\tests\unit\test_p0_defects_reproduction.py::test_p0_04_https_enforcement_and_masking PASSED [ 62%]
 backend\tests\unit\test_p0_defects_reproduction.py::test_p0_04_retry_on_network_timeout PASSED [ 75%]
