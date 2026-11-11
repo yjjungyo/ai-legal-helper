@@ -126,7 +126,7 @@ def generate_action_plan(db: Session, case_id: str) -> List[LegalAction]:
             db.add(action_req)
             
         # Deadline 계산
-        dl_info = deadline_engine.calculate_deadline(planned.title, requirements=planned.requirements)
+        dl_info = deadline_engine.calculate_deadline(planned.title)
         
         action_dl = ActionDeadline(
             action_id=action.id,
