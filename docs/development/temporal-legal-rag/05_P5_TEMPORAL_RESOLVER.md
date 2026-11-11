@@ -30,11 +30,11 @@ GitHub Actions `Temporal RAG P5 applicability`:
 - 외부 OpenLaw/LLM/운영 PostgreSQL을 사용하지 않은 순수 Python/pytest 테스트
 - 공포일/계약일 분리, 복수 사건일 보류, 날짜·법령 버전·부칙 정합성 확인
 - 단일 적용례의 시행 전·후 판정, 다중 적용례·경과규정 안전 보류
-- 기존 8개 Agent 및 HILT 구성 변경 없음
+- 기존 8개 Agent 및 HITL 구성 변경 없음
 
 ## 후속
 
-- P6: 승인 전 검색계획 생성, 기준일 확정 후 HILT Resume에서 P4/P5를 호출
+- P6: 승인 전 검색계획 생성, 기준일 확정 후 HITL Resume에서 P4/P5를 호출
 - P7: 공식 근거를 답변 생성에 포함하고 사건별 근거 꾸러미 제공
 - P8: 판정 결과 기반 Verification의 단정 차단 및 안전 응답
 - P9/P10: 공식 법령 버전별 인덱스, 데이터 마이그레이션
