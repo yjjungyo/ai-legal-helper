@@ -12,9 +12,9 @@
 |---|---|---|
 | `backend/src/ai_legal_helper/agents/verification.py` | 강제 PASS 제거, claim_type 도입, 결정론적 사후 판정 강화, cited_sources 분리 | P0-01, P0-03 |
 | `backend/src/ai_legal_helper/workflows/legal_workflow.py` | insufficient_node 미검증 초안 차단, finalize_node 출처 동기화, re_analyze_node 도메인 중립화 | P0-02, P0-03, P0-04 |
-| `backend/src/ai_legal_helper/api/routes/consultation.py` | answer_status 3단계 상태 및 레거시 호환 보정, HILT 재개 시 임시 문구 클리어 | P0-02 |
+| `backend/src/ai_legal_helper/api/routes/consultation.py` | answer_status 3단계 상태 및 레거시 호환 보정, HITL 재개 시 임시 문구 클리어 | P0-02 |
 | `frontend/src/components/ChatSection.tsx` | DELIVERED/CAUTIONARY/WITHHELD 상태 기반 명시적 렌더링 및 진행 상태 시각화 | P0-02 |
-| `frontend/src/hooks/useConsultation.ts` | HILT 승인 시 낙관적 상태 전이(IN_PROGRESS) 및 폴링 동기화 | P0-02 |
+| `frontend/src/hooks/useConsultation.ts` | HITL 승인 시 낙관적 상태 전이(IN_PROGRESS) 및 폴링 동기화 | P0-02 |
 | `backend/tests/unit/test_p0_followup_defects.py` | P0 핵심 결함 4건에 대한 재현 및 방어 단위 테스트 14종 신규 구현 | 전 체 |
 
 ---
