@@ -37,27 +37,27 @@
 
 ---
 
-### P0-02. HILT 이후 검증 우회 및 비법령 사유 오분기
+### P0-02. HITL 이후 검증 우회 및 비법령 사유 오분기
 - **위치**: `backend/src/ai_legal_helper/workflows/legal_workflow.py` (`verification_condition`)
 - **현재 코드 현황**:
   ```python
-  # 2. HILT 진입 조건
-  if not hilt_executed and candidate_laws and (
+  # 2. HITL 진입 조건
+  if not hitl_executed and candidate_laws and (
       reason_code in ("LEGAL_SOURCE_MISSING", "LEGAL_SOURCE_INSUFFICIENT")
       or (status in ("INSUFFICIENT", "REVISE") and reason_code != "NONE")
   ):
       return "statute_search_approval"
 
-  # 4. HILT 이후 분기
-  if hilt_executed:
+  # 4. HITL 이후 분기
+  if hitl_executed:
       return "finalize"
   ```
 - **실제 원인**:
-  1. `hilt_executed == True`이면 2차 Verifier 검증 결과(status)가 `INSUFFICIENT`나 `ERROR`라 하더라도 무조건 `finalize`로 반환하여 검증 실패 답변을 확정함.
-  2. `CASE_EVIDENCE_MISSING`(사건 사실/증거 부족)이나 `EVIDENCE_CONFLICT`(증거 간 모순)인 경우에도 `reason_code != "NONE"` 조건을 만족하여 법령 검색 HILT 노드로 오분기됨.
+  1. `hitl_executed == True`이면 2차 Verifier 검증 결과(status)가 `INSUFFICIENT`나 `ERROR`라 하더라도 무조건 `finalize`로 반환하여 검증 실패 답변을 확정함.
+  2. `CASE_EVIDENCE_MISSING`(사건 사실/증거 부족)이나 `EVIDENCE_CONFLICT`(증거 간 모순)인 경우에도 `reason_code != "NONE"` 조건을 만족하여 법령 검색 HITL 노드로 오분기됨.
 - **재현 테스트**:
-  - `test_p0_defects_reproduction.py::test_p0_02_reproduce_hilt_bypass_verification_failure`
-  - `test_p0_defects_reproduction.py::test_p0_02_reproduce_non_statute_issue_does_not_trigger_hilt`
+  - `test_p0_defects_reproduction.py::test_p0_02_reproduce_hitl_bypass_verification_failure`
+  - `test_p0_defects_reproduction.py::test_p0_02_reproduce_non_statute_issue_does_not_trigger_hitl`
 - **재현 결과**: **FAIL (2건 모두 결함 확인)** — 2차 검증 실패 시 `finalize` 반환, 사건 증거 부족 시 `statute_search_approval` 반환.
 
 ---
@@ -73,7 +73,7 @@
           _checkpointer_instance = MemorySaver()
       return _checkpointer_instance
   ```
-- **실제 원인**: 인메모리 `MemorySaver`를 사용하므로 FastAPI 프로세스 또는 서버 재시작 시 메모리가 소멸되어 HILT 인터럽트 대기 상태(`__interrupt__`)가 증발함.
+- **실제 원인**: 인메모리 `MemorySaver`를 사용하므로 FastAPI 프로세스 또는 서버 재시작 시 메모리가 소멸되어 HITL 인터럽트 대기 상태(`__interrupt__`)가 증발함.
 - **기술 조사 결과**:
   - 이미 `psycopg` 및 `langgraph.checkpoint.postgres.aio`(`AsyncPostgresSaver`) 라이브러리가 환경에 설치되어 있음.
   - PostgreSQL 내에 `checkpoints`, `checkpoint_blobs`, `checkpoint_writes` 테이블 생성 및 프로세스 간 재개(Cross-Process Resume) 동작 가능 확인.
@@ -101,7 +101,7 @@
 | 테스트 ID | 결함 구분 | 재현 조건 | 현재 실행 결과 | 판정 |
 |---|---|---|---|:---:|
 | `test_p0_01` | P0-01 | Verifier LLM 타임아웃 예외 발생 | `status: PASS` 반환 | **재현 완료 (결함)** |
-| `test_p0_02_1` | P0-02 | HILT 완료 후 2차 검증 INSUFFICIENT | `finalize`로 강제 전이 | **재현 완료 (결함)** |
+| `test_p0_02_1` | P0-02 | HITL 완료 후 2차 검증 INSUFFICIENT | `finalize`로 강제 전이 | **재현 완료 (결함)** |
 | `test_p0_02_2` | P0-02 | `CASE_EVIDENCE_MISSING` (증거 부족) | `statute_search_approval` 오분기 | **재현 완료 (결함)** |
 | `test_p0_03` | P0-03 | 프로세스 종료 후 체크포인트 상태 복원 | MemorySaver 휘발로 상태 소실 | **재현 완료 (결함)** |
 | `test_p0_04` | P0-04 | 비보안 HTTP 호출 및 임의 법령 Fallback | http:// 호출 및 첫번째 법령 매칭 | **재현 완료 (결함)** |
