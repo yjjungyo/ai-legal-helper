@@ -1,7 +1,7 @@
-# P4.1 Verifier-Guided HILT 법령 검색 — 07. Langfuse Trace 검증 보고서
+# P4.1 Verifier-Guided HITL 법령 검색 — 07. Langfuse Trace 검증 보고서
 
 ## 1. 개요
-본 문서는 `AI Legal Helper`의 P4.1 Verifier-Guided HILT 법령 검색 구현 전후에 수집되는 **Langfuse Trace, Observation, Span, Scores** 구조를 검증하고, 시나리오별 관측성(Observability) 데이터 흐름을 보고한다.
+본 문서는 `AI Legal Helper`의 P4.1 Verifier-Guided HITL 법령 검색 구현 전후에 수집되는 **Langfuse Trace, Observation, Span, Scores** 구조를 검증하고, 시나리오별 관측성(Observability) 데이터 흐름을 보고한다.
 
 ---
 
@@ -19,7 +19,7 @@ Trace: LegalAgent (session_id=case_id, metadata={"question": ..., "request_id": 
   ├── Generation: synthesize
   ├── Span: verification (법률검증 Agent)
   │     └── Generation: verification_agent_eval
-  ├── Span: statute_search_approval (HILT 인터럽트 대기)
+  ├── Span: statute_search_approval (HITL 인터럽트 대기)
   ├── Span: execute_statute_search (법제처 open.law.go.kr API 호출)
   ├── Generation: re_analyze (공식 법령 기반 초안 재작성)
   ├── Span: verification (2차 재검증)
@@ -37,7 +37,7 @@ Verifier 및 최종 응답 완료 시 Langfuse에 기록되는 정량 지표는 
    - 답변에 인용된 출처 중 실제 Source Registry에 존재하는 비율 (0.0 ~ 1.0)
 3. **`citation_support_rate`**:
    - 출처 문서의 본문 내용이 해당 주장을 실제로 뒷받침하는 비율 (0.0 ~ 1.0)
-4. **HILT 추적 메타데이터**:
+4. **HITL 추적 메타데이터**:
    - `reason_code`: `LEGAL_SOURCE_MISSING`, `LEGAL_SOURCE_INSUFFICIENT` 등
    - `candidate_laws`: `["주택임대차보호법"]`
    - `approval_status`: `APPROVED` / `REJECTED`
@@ -51,10 +51,10 @@ Verifier 및 최종 응답 완료 시 Langfuse에 기록되는 정량 지표는 
 - **Trace ID**: `trace-t-ar-01-xxxx`
 - **실행 노드**: `initialize` → `route` → `plan` → `run_agents` → `synthesize` → `verification` → `finalize`
 - **검증 평가**: `verification_status`: 1.0, `reason_code`: `"NONE"`
-- **HILT 진입 여부**: 미진입 (정상 직행)
+- **HITL 진입 여부**: 미진입 (정상 직행)
 
 ### 3.2 Trace T-02 & T-03: 특별법 누락 및 승인 재분석
-- **Trace ID**: `trace-t-ar-hilt-pass-xxxx`
+- **Trace ID**: `trace-t-ar-hitl-pass-xxxx`
 - **1차 실행 노드**: `initialize` → `route` → `plan` → `run_agents` → `synthesize` → `verification` → `statute_search_approval(INTERRUPT)`
 - **1차 검증 평가**: `verification_status`: 0.0, `reason_code`: `"LEGAL_SOURCE_MISSING"`, `candidate_laws`: `["주택임대차보호법"]`
 - **Resume 재개 노드**: `statute_search_approval(RESUMED)` → `execute_statute_search` → `re_analyze` → `verification` → `finalize`
@@ -66,7 +66,7 @@ Verifier 및 최종 응답 완료 시 Langfuse에 기록되는 정량 지표는 
   - `citation_support_rate`: 1.0
 
 ### 3.3 Trace T-04: 사용자 거절 시나리오
-- **Trace ID**: `trace-t-ar-hilt-reject-xxxx`
+- **Trace ID**: `trace-t-ar-hitl-reject-xxxx`
 - **실행 노드**: `...` → `statute_search_approval(INTERRUPT)` → `statute_search_approval(RESUMED)` → `insufficient` → `END`
 - **결과**: 외부 검색 도구 Span이 일체 생성되지 않음 확인.
 
