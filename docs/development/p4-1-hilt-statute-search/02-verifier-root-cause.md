@@ -1,4 +1,4 @@
-# P4.1 Verifier-Guided HILT 법령 검색 — 02. Verifier 근거 부족 원인 분류 구현
+# P4.1 Verifier-Guided HITL 법령 검색 — 02. Verifier 근거 부족 원인 분류 구현
 
 ## 1. 개요
 기존 Verifier는 답변 검증 결과로 단순히 `PASS`, `REVISE`, `INSUFFICIENT`라는 3단계 상태값만 반환하여, 시스템이 후속 조치를 지능적으로 분기할 수 없었다.
@@ -12,8 +12,8 @@ Verifier 프롬프트와 Pydantic 모델에 정의된 표준 `reason_code`는 �
 
 | 사유 코드 (`reason_code`) | 정의 및 발생 상황 | 권장 후속 조치 (`recommended_action`) |
 | :--- | :--- | :--- |
-| `LEGAL_SOURCE_MISSING` | 특별법 등 필요한 필수 법령이 검색 결과에 완전히 누락됨 (예: 주택임대차보호법 부재) | `REQUEST_STATUTE_SEARCH_APPROVAL` (HILT 승인 요청) |
-| `LEGAL_SOURCE_INSUFFICIENT`| 일반 법률(민법 등)은 검색되었으나 질문의 핵심 특별법 쟁점을 해결하기에 불충분함 | `REQUEST_STATUTE_SEARCH_APPROVAL` (HILT 승인 요청) |
+| `LEGAL_SOURCE_MISSING` | 특별법 등 필요한 필수 법령이 검색 결과에 완전히 누락됨 (예: 주택임대차보호법 부재) | `REQUEST_STATUTE_SEARCH_APPROVAL` (HITL 승인 요청) |
+| `LEGAL_SOURCE_INSUFFICIENT`| 일반 법률(민법 등)은 검색되었으나 질문의 핵심 특별법 쟁점을 해결하기에 불충분함 | `REQUEST_STATUTE_SEARCH_APPROVAL` (HITL 승인 요청) |
 | `CASE_EVIDENCE_MISSING` | 법령은 충분하나 의뢰인의 사건 사실관계 또는 증거(계약서, 영수증 등)가 부족함 | `REQUEST_EVIDENCE` (증거 추가 요청) |
 | `EVIDENCE_CONFLICT` | 제출된 증거 간 또는 사실관계 간 명백한 상충/모순이 감지됨 | `REQUEST_EVIDENCE` (사실관계 소명 요청) |
 | `ANSWER_REVISION_REQUIRED` | 근거 문서는 충분하나 답변 문장의 논리 비약, 조문 번호 오기, 허위 인용 등 작성 오류 | `REVISE_DRAFT` (초안 답변 재작성) |
@@ -92,7 +92,7 @@ update_span(get_current_span_id(), {
 })
 ```
 
-이로써 운영자는 Langfuse 대시보드에서 어떤 법률이 자주 누락되는지, 어떤 쟁점에서 HILT가 승인 요청되는지 정량적으로 모니터링할 수 있다.
+이로써 운영자는 Langfuse 대시보드에서 어떤 법률이 자주 누락되는지, 어떤 쟁점에서 HITL가 승인 요청되는지 정량적으로 모니터링할 수 있다.
 
 ---
 
@@ -127,7 +127,7 @@ update_span(get_current_span_id(), {
    - 특정 도메인(임대차, 손해배상 등) 키워드를 프롬프트 템플릿에서 전면 배제.
    - 실제 수집된 조문 번호 목록(`retrieved_articles_summary`)을 동적으로 포맷팅하여 "확보된 공식 법령 조문 원문({retrieved_articles_summary})을 바탕으로 질문의 핵심 법률 쟁점 및 당사자의 법적 권리·의무 관계를 재분석"하도록 일반화.
 
-### 6.5 HILT 완료 후 finalize 전이 보장 정책
+### 6.5 HITL 완료 후 finalize 전이 보장 정책
 - 사용자 승인 및 법제처 공식 원문 검색, 재분석이 성공적으로 수행된 경우 경미한 서술 차이로 `insufficient_node`에 진입하지 않고 `finalize`로 라우팅하여 검증된 법률 조언과 정제된 출처를 사용자에게 안전하게 확정 전달한다.
 
 ---
