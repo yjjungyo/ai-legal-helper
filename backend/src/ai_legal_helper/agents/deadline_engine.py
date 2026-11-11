@@ -16,7 +16,7 @@
 - 명확한 날짜(YYYY-MM-DD)가 없거나 조건이 불충분할 경우 UNKNOWN으로 처리.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List, Dict, Optional, Any
 from dateutil.relativedelta import relativedelta
 from ai_legal_helper.observability.logging_config import get_logger
@@ -62,7 +62,8 @@ class DeadlineEngine:
         # Event order or the latest date alone cannot establish the legally effective term.
         return candidates[0] if len(set(candidates)) == 1 else None
 
-    def calculate_deadline(self, action_title: str, *, requirements: Optional[List[Any]] = None) -> Dict[str, Any]:
+    def calculate_deadline(self, action_title: str, *, requirements: Optional[List[Any]] = None,
+                           verified_rule: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         행동 제목(action_title)에 따라 기한을 계산하여 반환한다.
         
@@ -93,6 +94,29 @@ class DeadlineEngine:
         if any((getattr(r, "satisfaction_status", None) if not isinstance(r, dict)
                 else r.get("satisfaction_status")) != "SATISFIED" for r in legal_conditions):
             result["calculation_basis"] = "법률상 선행 요건이 확인되지 않아 기한을 확정하지 않았습니다."
+            return result
+
+        # An explicit, independently verified rule may authorize deterministic date math.
+        # Planner titles and SATISFIED flags alone never establish legal applicability.
+        if verified_rule is not None:
+            rule_type = verified_rule.get("rule_type")
+            basis_date = self._parse_date(verified_rule.get("basis_date"))
+            source = str(verified_rule.get("legal_source") or "").strip()
+            if (verified_rule.get("verification_status") == "VERIFIED"
+                    and rule_type == "LEASE_RENEWAL_REFUSAL_NOTICE"
+                    and verified_rule.get("applicability_confirmed") is True
+                    and verified_rule.get("basis_date_confirmed") is True
+                    and basis_date is not None
+                    and basis_date == self.lease_end_date
+                    and source):
+                result.update(
+                    deadline_type="LEGAL_DEADLINE",
+                    deadline_date=basis_date - relativedelta(months=2),
+                    calculation_basis=f"{source}: 확인된 계약 종료일 기준 2개월 전 (통지 도달 기한)",
+                    verification_status="VERIFIED",
+                )
+                return result
+            result["calculation_basis"] = "법률 적용·기준일 검증 정보가 불완전하여 기한을 계산하지 않았습니다."
             return result
 
         if "갱신 거절" in action_title or "계약 종료 의사표시" in action_title:
