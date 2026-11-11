@@ -14,7 +14,7 @@
   시나리오 완료율, 안전 위반 건수, 응답 지연 P50/P95,
   입력/출력 LLM 토큰 총합 및 샘플 수
 - 실제 입력값이 없으면 0으로 위조하지 않고 null/- 표시
-- 미완료/HILT 승인대기/Error를 완료된 정답 평가 결과로 취급하지 않음
+- 미완료/HITL 승인대기/Error를 완료된 정답 평가 결과로 취급하지 않음
 - 동일 시스템/시나리오가 두 번 들어오면 에러(한 사건 1회 원칙)
 - P5 temporal_resolution, P7 legal_evidence_bundle, P6 law_search_plan은
   상담 API 결과에서도 Trace/평가할 수 있도록 반환 필드를 추가
@@ -40,7 +40,7 @@ PostgreSQL/Neo4j/Chroma/Langfuse 및 회사 LLM 실행 확인.
 
 A. 별도 평가 환경의 Gold 검토/Freeze.
 
-B. LEGALAGENT 실제 실행 (미승인 외부 검색은 HILT 대기 처리):
+B. LEGALAGENT 실제 실행 (미승인 외부 검색은 HITL 대기 처리):
 
     cd backend
     python scripts/evaluation/run_temporal_rag_p11.py --gold tests/fixtures/temporal_rag_p11_fixture_gold.jsonl --out p11_legalagent_runs.jsonl --incomplete-out p11_incomplete.jsonl
@@ -85,7 +85,7 @@ P9 자동 인덱싱을 OFF로 유지한다.
 - P2/P9 Alembic 마이그레이션 실행과 PostgreSQL 실확인
 - P9 Worker의 비정상 종료 작업 복구 및 배치 일부 실패 무결성 강화
 - P10 전체 레거시 Vector 감사·건수/해시 대조
-- LangGraph 실제 HILT 승인·거절·Resume + 기존 사건 상담 E2E
+- LangGraph 실제 HITL 승인·거절·Resume + 기존 사건 상담 E2E
 - SC-001 동결 Gold 및 2026 개정법 시점 반례 전문가 검증
 - LLMCHAT/LLMRAG/LEGALAGENT 동일 환경 A/B/C 1회 전체 실행과
   Trace/토큰 집계·법률전문가 정답 검수
