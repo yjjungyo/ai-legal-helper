@@ -259,7 +259,7 @@ class ConsultationResponse(BaseModel):
     case_id: Optional[str] = None
     created_at: Optional[str] = None
 
-    # P4.1 HILT Statute Search Approval fields
+    # P4.1 HITL Statute Search Approval fields
     approval_request: Optional[Dict[str, Any]] = None
 
     # Issue-Level Verification & Evidence Grounding fields (Section 15.2 & P0-2)
