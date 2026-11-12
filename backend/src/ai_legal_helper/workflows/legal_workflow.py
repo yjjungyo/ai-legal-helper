@@ -3755,7 +3755,19 @@ def statute_search_approval_node(state: LegalState) -> Dict:
 
     # LangGraph 표준 interrupt 호출: 그래프 일시 중단 및 외부 승인 대기
 
-    decision = interrupt(approval_payload)
+    auto_approve = (
+        state.get("auto_approve_statute_search", False)
+        or os.getenv("AUTO_APPROVE_STATUTE_SEARCH", "").lower() in ("true", "1", "yes")
+    )
+    if auto_approve:
+        logger.info(
+            f"[HITL_AUTO_APPROVE] AUTO_APPROVE_STATUTE_SEARCH 활성화: 법령 검색 자동 승인 진행 "
+            f"| candidate={candidate_laws} | req_id={approval_req_id}"
+        )
+        decision = {"approved": True, "reason": "AUTOMATIC_APPROVAL_EVAL"}
+    else:
+        # LangGraph 표준 interrupt 호출: 그래프 일시 중단 및 외부 승인 대기
+        decision = interrupt(approval_payload)
 
 
 
