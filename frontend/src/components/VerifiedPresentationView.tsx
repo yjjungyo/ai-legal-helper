@@ -69,7 +69,7 @@ export const VerifiedPresentationView = ({
       )}
 
       {/* 상단 핵심 요약 카드에 이미 노출된 결론 블록은 하단에서 제외하여 중복 노출을 방지한다 */}
-      {(digest.lead && digest.detailedAnswer.trim() ? digest.detailedAnswer.trim() : digest.fullAnswer.trim()) && (
+      {Boolean(digest.lead ? digest.detailedAnswer.trim() : digest.fullAnswer.trim()) && (
         <details className="chat-digest-full-answer" open>
           <summary>
             <span className="chat-digest-expand-icon" aria-hidden="true">▸</span>
@@ -78,7 +78,7 @@ export const VerifiedPresentationView = ({
           </summary>
           <div className="chat-digest-full-content">
             <LegalAnswerView
-              content={digest.lead && digest.detailedAnswer.trim() ? digest.detailedAnswer : digest.fullAnswer}
+              content={digest.lead ? digest.detailedAnswer : digest.fullAnswer}
               claimCitations={claimCitations}
               onEvidenceClick={onEvidenceClick}
             />

@@ -25,9 +25,19 @@ _EVIDENCE_LABEL = re.compile(r"^E\d{1,3}(?:$|[_.\s-])", re.IGNORECASE)
 _EVIDENCE_EXT = re.compile(r"\.(?:pdf|docx|txt|png|jpg|jpeg)$", re.IGNORECASE)
 
 
+# 번호형 섹션 소제목 정규식 (예: '1. 핵심 결론 및 직접 답변', '2. 지금 해야 할 일')
+# 일반 번호 목록(1. 임대인에게 통지, 2. 이사 준비 등)과 구분하여 명시적 법률 섹션 키워드가 포함된 헤딩만 인식한다.
+_NUMBERED_SECTION_HEADING = re.compile(
+    r"^(?:\d+\.|\([0-9가-힣]\)|[①-⑩])[ \t]+(?:\*{0,2})(?:핵심\s*결론|지금\s*해야\s*할\s*일|쟁점별\s*상세|상세\s*법률\s*분석|추가\s*확인|주의사항|실무상\s*유의사항|실행\s*순서|권리보전|세부\s*법적\s*요건|대응\s*방안|상담\s*요지|직접\s*답변|결론|조치|검토\s*결과)[^\r\n]*",
+    re.IGNORECASE,
+)
+
+
 def _is_heading(line: str) -> bool:
     text = line.rstrip("\r\n").strip()
     if _MARKDOWN_HEADING.match(text):
+        return True
+    if _NUMBERED_SECTION_HEADING.match(text):
         return True
     match = _BRACKET_HEADING.fullmatch(text)
     if not match:
@@ -59,7 +69,14 @@ def _split_original(answer: str) -> list[PresentationBlock]:
         title = None
         if is_section:
             stripped = first_line.strip()
-            title = re.sub(r"^#{1,4}[ \t]+", "", stripped).strip() if stripped.startswith("#") else stripped[1:-1].strip()
+            if stripped.startswith("#"):
+                title = re.sub(r"^#{1,4}[ \t]+", "", stripped).strip()
+            elif stripped.startswith("[") and stripped.endswith("]"):
+                title = stripped[1:-1].strip()
+            else:
+                title = stripped
+            # 마크다운 bold(**)가 제목에 둘러싸여 있으면 제거
+            title = re.sub(r"^\*{1,2}|\*{1,2}$", "", title).strip()
         blocks.append(PresentationBlock(
             block_id=f"B{i:03d}", kind=kind, start=start, end=end,
             markdown=markdown, title=title,

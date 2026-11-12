@@ -75,3 +75,25 @@ def test_without_explicit_verification_pass_no_structured_result():
         answer="문장", verification_result={}, verification_status="PASS",
         answer_status="DELIVERED", sources=[],
     ) is None
+
+
+def test_numbered_section_heading_splits_blocks_and_preserves_numbering():
+    """번호형 섹션 소제목(1. 핵심 결론, 2. 지금 해야 할 일)이 정상 분할되고 일반 번호 목록과 구분되는지 검증."""
+    answer = (
+        "1. 핵심 결론 및 직접 답변\n"
+        "지금 상황에서 가장 안전한 실행 순서는 아래와 같습니다.\n"
+        "1. 보증금을 실제로 돌려받기 전에는 임의로 전출하지 마세요.\n"
+        "2. 임차권등기명령을 먼저 신청하세요.\n\n"
+        "2. 지금 해야 할 일\n"
+        "내용증명을 발송하고 등기부등본을 확인하세요.\n\n"
+        "3. 쟁점별 상세 법률 분석\n"
+        "주택임대차보호법 제3조의3에 근거합니다."
+    )
+    result = render(answer, hash_override=hashlib.sha256(answer.encode()).hexdigest())
+    assert result is not None
+    assert "".join(b.markdown for b in result.blocks) == answer
+    assert len(result.blocks) == 3
+    assert [b.kind for b in result.blocks] == ["SECTION", "SECTION", "SECTION"]
+    assert result.blocks[0].title == "1. 핵심 결론 및 직접 답변"
+    assert result.blocks[1].title == "2. 지금 해야 할 일"
+    assert result.blocks[2].title == "3. 쟁점별 상세 법률 분석"

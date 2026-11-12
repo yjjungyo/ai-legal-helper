@@ -969,7 +969,9 @@ def statute_search_plan_node(state: LegalState) -> Dict:
     ev_date = state.get("event_date")
     ev_type = state.get("event_type")
     if ev_date and not ev_type:
-        # 날짜가 있어도 행위 종류가 없으면 계약일로 추정하지 않는다.\n        # temporal_search_plan의 보완/미확정 경로가 의미를 판단하도록 둔다.\n        ev_type = None
+        # 날짜가 존재하더라도 행위 종류(event_type)가 없으면 임의로 계약 체결일로 단정하지 않는다.
+        # temporal_search_plan의 LLM 보완 및 미확정 경로가 법률적 의미를 엄격히 판단하도록 None을 유지한다.
+        ev_type = None
 
     plan = build_temporal_search_plan(
         q_target,
