@@ -471,7 +471,7 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
         "answer_mode": ans_mode,
         "evidence_unavailable": evidence_unavailable,
         "event_date": extracted_date,
-        "event_type": "CONTRACT_SIGNED" if extracted_date else None,
+        "event_type": None,  # 날짜 발견만으로 계약 체결일로 단정하지 않음 (2026-11-12)
         "statute_mention_date": None,
         "answer_generation_error": None,
         "answer_source_manifest": None,
@@ -969,7 +969,7 @@ def statute_search_plan_node(state: LegalState) -> Dict:
     ev_date = state.get("event_date")
     ev_type = state.get("event_type")
     if ev_date and not ev_type:
-        ev_type = "CONTRACT_SIGNED"
+        # 날짜가 있어도 행위 종류가 없으면 계약일로 추정하지 않는다.\n        # temporal_search_plan의 보완/미확정 경로가 의미를 판단하도록 둔다.\n        ev_type = None
 
     plan = build_temporal_search_plan(
         q_target,
