@@ -127,14 +127,28 @@ def normalize_statute_key(src: Dict[str, Any]) -> Optional[str]:
     article = src.get("article") or ""
     title = src.get("title") or src.get("filename") or ""
 
+    # [2026-11-12] 시행본·부칙을 법령명/조문만으로 합치면 다른 시점의 법을 잃는다.
+    # 원본 source_id는 인용 안정성을 위해 변경하지 않고 내부 중복키만 강화한다.
+    # 메타데이터의 버전 키가 비어 있으면 내용 해시로 구분해 무근거 병합을 방지한다.
+    import hashlib
+    version = next((str(src.get(k)).strip() for k in (
+        "version_id", "law_version_id", "effective_date", "enforcement_date",
+        "시행일자", "시행일", "law_effective_date",
+    ) if src.get(k)), "")
+    supplement = str(src.get("supplement_section") or src.get("addendum") or src.get("부칙") or "").strip()
+    content = str(src.get("content") or src.get("text") or "")
+    content_digest = hashlib.sha256(content.encode("utf-8")).hexdigest()[:16] if content else ""
+    # 내용이 서로 다르면 시행본 정보가 같아도 안전하게 구분한다.
+    version_suffix = f":version={version or 'unknown'}:supplement={supplement}:hash={content_digest or 'unknown'}"
+
     # 1. statute_name과 article 필드가 명시된 경우
     if statute_name and article:
-        return f"{statute_name.strip()}:{article.strip()}"
+        return f"{statute_name.strip()}:{article.strip()}{version_suffix}"
 
     # 2. title / filename 정규식 파싱
     m = re.search(r"([가-힣\s]+법(?:률)?)\s*(제\d+조(?:의\d+)?)", title)
     if m:
-        return f"{m.group(1).strip()}:{m.group(2).strip()}"
+        return f"{m.group(1).strip()}:{m.group(2).strip()}{version_suffix}"
 
     # 3. source_id 접두사 및 파트 파싱 (OFFICIAL:001248:... / STATUTE:001248:...)
     sid = str(src.get("source_id") or "")
@@ -148,7 +162,7 @@ def normalize_statute_key(src: Dict[str, Any]) -> Optional[str]:
                 else "민사집행법" if law_id == "009290"
                 else law_id
             )
-            return f"{law_name}:{parts[3]}"
+            return f"{law_name}:{parts[3]}{version_suffix}"
 
     return None
 
