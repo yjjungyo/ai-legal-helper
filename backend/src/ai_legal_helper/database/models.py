@@ -407,6 +407,11 @@ class ActionRequirement(Base):
 
     action = relationship("LegalAction", back_populates="requirements")
 
+    @property
+    def title(self) -> str:
+        """하위 호환성 및 요건 식별을 위해 요건 설명 또는 유형을 반환한다."""
+        return self.description or self.requirement_type or "요건"
+
 
 class ActionDependency(Base):
     """

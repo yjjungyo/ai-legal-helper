@@ -496,7 +496,9 @@ def trace(func: Callable) -> Callable:
                 except Exception as e:
                     exc_name = type(e).__name__
                     if exc_name in ("GraphInterrupt", "Interrupt"):
-                        span.set_status(Status(StatusCode.OK, "Interrupted for HITL"))
+                        span.set_status(Status(StatusCode.OK))
+                        span.set_attribute("hitl.interrupted", True)
+                        span.set_attribute("hitl.reason", "Interrupted for HITL")
                         log_interrupt(start_time, current_span_id, e, parent_agent, parent_node)
                         raise e
                     import re
@@ -557,7 +559,9 @@ def trace(func: Callable) -> Callable:
                 except Exception as e:
                     exc_name = type(e).__name__
                     if exc_name in ("GraphInterrupt", "Interrupt"):
-                        span.set_status(Status(StatusCode.OK, "Interrupted for HITL"))
+                        span.set_status(Status(StatusCode.OK))
+                        span.set_attribute("hitl.interrupted", True)
+                        span.set_attribute("hitl.reason", "Interrupted for HITL")
                         log_interrupt(start_time, current_span_id, e, parent_agent, parent_node)
                         raise e
                     import re
