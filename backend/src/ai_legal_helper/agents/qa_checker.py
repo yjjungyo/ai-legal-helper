@@ -218,33 +218,20 @@ def check_deterministic_qa(
                 )
 
     # 2. 날짜·금액 일치 검사
+    # [2026-11-12 / AI Legal Helper 안전성 수정]
+    # 이전 구현은 case_context에서 첫 번째 금액(deposit_matches[0])을 '전체 보증금'으로
+    # 단정하고, 초안의 다른 금액을 그 값으로 교체하도록 RepairTarget을 생성했습니다.
+    # 그러나 첫 금액은 계약금·일부 반환액·미반환 잔액·가압류액일 수 있습니다.
+    # 금액의 법적 역할과 시점이 확인되지 않은 정규식 비교는 올바른 답변을 훼손하므로
+    # 여기서는 자동 금액 정정 대상을 만들지 않습니다.
+    # 금액 검증은 승인된 사실의 amount_role / event_date / source_id를 기준으로
+    # 별도 의미 검증 단계에서 수행해야 하며, 이 조치는 법률 검증 자체를 생략하지 않습니다.
+    # Gemini/후속 개발자: 역할 기반 검증 도입 전까지 이 블록에 첫 매치 자동수정을
+    # 다시 넣지 마세요. 검증 결과의 date_amount_passed 계약은 유지합니다.
     date_amount_passed = True
-    # 사건 맥락에서 보증금 금액 추출 (예: 3억 원, 2억 2천만 원)
-    deposit_matches = re.findall(r"(\d+(?:억|\s*억)?(?:\s*\d+천)?만?\s*원)", case_context)
-    if deposit_matches:
-        known_deposit = deposit_matches[0].replace(" ", "")
-        # 초안에서 언급된 보증금 표현 확인
-        draft_deposits = re.findall(r"보증금\s*(?:은|이|으로)?\s*(\d+(?:억|\s*억)?(?:\s*\d+천)?만?\s*원)", draft_answer)
-        for dd in draft_deposits:
-            dd_clean = dd.replace(" ", "")
-            if dd_clean != known_deposit and ("억" in known_deposit and "억" in dd_clean):
-                date_amount_passed = False
-                logger.warning(f"[ANSWER_QA] 금액 모순 감지: 사건금액({known_deposit}) != 답변금액({dd_clean})")
-                for idx, sent in enumerate(sentences):
-                    if dd in sent:
-                        repair_targets.append(
-                            RepairTarget(
-                                sentence_index=idx,
-                                original_sentence=sent,
-                                repair_reason=f"사건의 실제 보증금({known_deposit})과 불일치하는 금액({dd_clean}) 기재",
-                                recommended_fix=f"금액을 실제 사건 정보인 {known_deposit}으로 정정하세요.",
-                            )
-                        )
-
-    if date_amount_passed:
-        logger.info("[ANSWER_QA] 날짜·금액 검사: PASS")
-    else:
-        logger.warning("[ANSWER_QA] 날짜·금액 검사: FAILED")
+    logger.info(
+        "[ANSWER_QA] 금액 단순 정규식 자동교정 비활성화: 역할 미확정 금액은 기존 검증 단계에서 판단"
+    )
 
     # 3. 질문 요청 항목 충족 검사
     demands = extract_question_demands(question)
