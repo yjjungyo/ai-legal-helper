@@ -183,3 +183,185 @@
 Gemini는 **카드 00부터 시작**하여 기존 KPI 자동평가 엑셀과 Langfuse 원본 trace를 연결한 baseline을 먼저 제출한다. 그다음 **GitHub 로그에서 이미 확인된 `SOURCE_VERSION_ID_UNCONFIRMED`, `TEMPORAL_APPLICABILITY_UNCONFIRMED`, `DIGEST_TRUNCATED`를 우선 재현**하고 02→03→04 순으로 국소 수정한다. **기존에 올바른 부칙 해석을 가능하게 한 검색/검증을 제거하지 않는다.** 개선 효과는 **올바른 답변을 유지한 동일 조건**에서만 인정한다. 사용자 승인 없이 출시 준비가 끝났다고 선언하지 않는다.
 
 **최종 목적:** AI Legal Helper가 사건을 잊지 않고, 승인된 증거와 실제 시행 법령을 올바르게 연결하며, 일반인이 이해할 수 있는 대응 방향을 **정확하고 빠르고 경제적으로** 제공하는 E2E 제품.
+
+---
+
+# 7. 상세 개발 설계 — 구현 방식·호출 정책·데이터 계약·실패 처리
+
+> 이 장은 **개발자가 그대로 구현을 시작할 수 있는 설계 지시**다. 위 00~10 순서는 유지한다. 아래의 함수·타입은 **제안 인터페이스**이며 기존 코드에 동일 이름이 이미 존재한다는 뜻이 아니다. 실제 수정 전에 해당 파일의 최신 함수 시그니처·테스트·DB 스키마를 확인하여 **기존 기능을 재사용**한다. 단일 거대 PR 금지.
+
+## 7.1 룰 기반 / LLM / DB / 검색의 책임 구분
+
+| 작업 | 우선 방식 | LLM 사용 조건 | 금지 사항 |
+|---|---|---|---|
+| 날짜 문자열 추출·ISO 정규화 | Python 정규식+datetime/dateutil | **없음**: 추출 자체는 결정적 | 날짜 발견만으로 계약일로 확정 |
+| 날짜가 무엇을 뜻하는지(계약/갱신/통지/시행) | 구조화 승인 사실·문서 필드 우선, 애매하면 **기존 의도/사실 추출 LLM 호출에 포함** | 역할 모호하고 결론에 중요한 경우에만 **1회 구조화 판정** | 문장에 '계약' 단어만 있다고 무조건 계약일로 지정 |
+| 날짜의 선후/기한/산술 | Python date arithmetic | 없음 | LLM에게 날짜 계산 위임 |
+| 부칙의 적용대상·경과조치 해석 | 공식 법령 원문+LLM 의미 해석 | 법령 적용 판정의 기존 LLM 호출에 **통합**, 원문과 조건·사건사실 함께 제공 | '경우부터 적용' 같은 특정 regex로 PASS/FAIL |
+| 법령 조문/시행본 식별 | 공식 API ID/metadata + 버전별 DB key | 공식 API 후보 다수·법령명 불명확할 때 기존 planner LLM에 통합 | 법령명만으로 다른 시행본 dedup |
+| 승인·거절 상태·권한·증거 snapshot | DB 트랜잭션/해시/상태머신 | 없음 | LLM이 승인 상태 변경 |
+| 원문 evidence span offset/해시 | Python+DB | 없음 | LLM이 만든 텍스트를 검증 없이 원문 span으로 저장 |
+| 사실 후보 추출/금액 의미 역할/실질 상충 | 기존 사실추출 LLM의 구조화 출력 + 근거 | **문서당 기존 추출 호출에 포함**; 모호한 결정적 사실만 후속 호출 | regex 첫 금액으로 전체 보증금 확정 |
+| 금액 산술·중복 확인 | Decimal/정규화·구조화 role | 없음 | 산술을 위해 별도 LLM 호출 |
+| 법적 결론·증거 해석·검증 | 기존 answer/verification LLM | 기존 호출 유지; 실패 항목만 추가 호출 | 법적 적용을 Python 키워드로 최종 판정 |
+| UI 섹션 분할/중복 표시 | 구조화 presentation schema·Python/TS parser | 없음 | UI를 위해 법률 결론 LLM 재작성 |
+| 검색 cache/dedup/토큰 집계 | Python/DB/observability | 없음 | 다른 사건/시행본의 cache 공유 |
+
+**원칙:** 룰은 **형식·산술·상태·무결성**을 담당하고, LLM은 **문맥 의미·법적 해석·실질 충돌**을 담당한다. LLM 호출을 추가하기 전에 기존 호출의 구조화 출력에 필드를 추가할 수 있는지 먼저 검토한다. 모든 새 호출은 `reason`, `input_tokens`, `latency`, `cost`, `source_ids` 계측.
+
+## 7.2 카드 00 — 재현 가능한 기준선: 구체 구현
+
+- `EvaluationRunManifest`: `git_sha, scenario_id, question_id, case_snapshot_hash, approved_fact_ids, evidence_hashes, law_index_version, model/deployment, temperature, prompt_version, trace_id, started_at`. 인증키·민감 원문은 로그에 넣지 않는다.
+- Langfuse generation별 `input_tokens/output_tokens/cache_read_tokens/model/cost`와 서버 request_id를 연결한다. 로그·Trace·KPI가 다른 날짜/버전이면 `COMPARABLE=false`로 표기.
+- `latency_total = finished-started`, `latency_active = total - HITL_wait`; 중첩 노드 시간을 단순 합산해 총 시간으로 오인하지 않는다. P50/P95는 **동일 시나리오 여러 반복 측정**에서만 계산하며 표본 수 표시.
+- 변경 전 답변을 `gold_claims`(핵심 결론/법령 적용/증거 사실/조치/미확인 조건)로 분해하되, LLM 평가점수만으로 PASS를 확정하지 말고 법률 Gold와 인용 근거를 함께 확인.
+- **테스트:** 동일 케이스 2회 baseline 실행, 실행 식별자/토큰 합계/법령 시행본 기록. 환경 차이 있으면 원인 기록.
+
+## 7.3 카드 01 — 관측성·체크포인터: 구체 구현
+
+- 먼저 최신 main에서 `run_legal_consultation()`이 그래프 `compile(checkpointer=...)`에 무엇을 전달하는지 호출 체인을 추적. `get_checkpointer()` 단독 반환만 보고 버그 판정 금지.
+- `GraphInterrupt`는 정상 HITL 제어 흐름이면 INFO + `WAITING_APPROVAL` 상태로 기록; 일반 예외만 ERROR. 인터럽트 시 DB checkpoint를 commit/flush한 뒤 요청 종료. resume 시 `thread_id`, `case_id`, `approval_request_id`, `evidence_snapshot_hash`를 검증한다.
+- 지연 callback: 비동기 context propagation을 확인하고, 완료된 span에 나중에 도착한 callback은 idempotent 처리. 유실된 generation이 있으면 `telemetry_incomplete=true`로 KPI 제외.
+- UI가 재시도해도 중복 상담 생성/중복 승인되지 않도록 request idempotency key 확인. DB schema migration은 실제 존재 여부 확인 후 추가.
+- **테스트:** 승인 대기→API 재시작→resume, 이중 클릭, 다른 사건 thread_id로 재개 거부, 증거 변경 중 재개 시 안전 중단, Langfuse와 LLM gateway 호출수 일치.
+
+## 7.4 카드 02 — 날짜·법령 적용: 상세 알고리즘
+
+### A. 날짜 추출은 **룰 기반**, 의미 역할은 **구조화 사실 우선 + 조건부 LLM**
+
+**Step A1. 후보 날짜 추출 (LLM 0회)**  
+Python에서 `YYYY-MM-DD`, `YYYY.MM.DD`, `YYYY년 M월 D일`, 문서의 표준 날짜 필드를 파싱한다. 연도 생략 `9월 30일`은 **사건 타임라인과 문맥으로 연도 확정 가능한 경우만** 정규화; 아니면 `year_unknown`. `2026-02-30` 같은 불가능한 날짜는 오류. `다음 달 말` 같은 상대일은 명확한 기준일과 시점이 있을 때만 계산. 모든 후보에 `text_span, source_id, source_field, date_iso, parse_confidence`를 부여한다. **날짜만 추출해서 법률 사건 날짜로 확정하지 않는다.**
+
+**Step A2. 날짜의 의미 역할 지정**  
+우선순위: ① 승인된 DB 사실의 `event_type`과 근거 span ② 계약서 구조화 필드(체결일/시작일/종료일) ③ 동일 문장의 명시적 동사·주어·목적어 ④ 여전히 모호한 경우 **기존 fact extraction / intent analysis LLM의 구조화 결과** ⑤ 결정적 모호성만 단일 LLM 호출 또는 사용자 확인. 규칙이 추출한 `2026-09-30`을 `CONTRACT_SIGNED`로 무조건 지정하는 코드를 제거한다. 날짜 역할 후보: `CONTRACT_SIGNED, CONTRACT_START, CONTRACT_END, RENEWED, CONTRACT_CHANGED, NOTICE_SENT, NOTICE_RECEIVED, MOVE_OUT, PAYMENT, LAW_PROMULGATED, LAW_EFFECTIVE, UNKNOWN`. '통지'는 발송/도달을 구별한다.
+
+**Step A3. 제안 타입**  
+```python
+class TemporalEvent(BaseModel):
+    event_id: str
+    date_iso: date | None
+    event_type: Literal["CONTRACT_SIGNED","CONTRACT_START","CONTRACT_END",
+                        "RENEWED","CONTRACT_CHANGED","NOTICE_SENT",
+                        "NOTICE_RECEIVED","MOVE_OUT","PAYMENT",
+                        "LAW_PROMULGATED","LAW_EFFECTIVE","UNKNOWN"]
+    actor: str | None = None
+    source_id: str
+    evidence_span_id: str | None = None
+    approval_status: str
+    confidence: float
+    unresolved_reason: str | None = None
+```
+**호환성:** 새 모델 강제 DB migration보다 기존 fact/event DTO에 선택 필드 추가 우선. `UNKNOWN`은 임의 계약일로 대체하지 않는다.
+
+**Step A4. 법령 적용 (기존 LLM verification에 통합)**  
+공식 API에서 `law_id, article, promulgation_date, effective_date, version_id, full_article, supplementary_provisions, source_url` 확보. **사건의 어떤 날짜가 법령의 적용 기준인지** 부칙을 읽고 LLM이 구조화 판단한다. 제안 출력:
+```json
+{
+  "statute_id": "...",
+  "article": "...",
+  "version_id": "...",
+  "trigger_event_type": "CONTRACT_SIGNED",
+  "trigger_event_ids": ["..."],
+  "transitional_rule": "시행 후 체결/갱신/변경 계약부터 적용",
+  "applicable": false,
+  "reasoning_summary": "사건 계약일이 시행일 이전이며 부칙의 적용 범위 밖",
+  "supporting_source_ids": ["..."],
+  "missing_conditions": []
+}
+```
+**법적 의미 해석은 LLM**, 정해진 trigger event와 effective date의 날짜 비교는 **Python**. 부칙의 예외·소급/경과조치가 복잡하면 단순 `date >= effective_date`로 결론 내리지 않고 LLM이 공식 원문으로 재검증. `applicable=false`도 원문 출처와 이유를 저장. 공식 조문/부칙 부족 시 `UNCONFIRMED`로 표기하고 공식 검색 재시도/보류.
+
+**Step A5. 실제 회귀**  
+2026-10-27 개정, 2027-04-28 시행 민간임대주택 시행령 제36조: 2026-11-01 체결 계약 비적용, 시행 후 체결 계약 적용 여부, 시행 후 갱신/변경 계약, 2026년 통지와 2027년 갱신이 함께 있는 질문, '개정' 단어 없는 과거 계약. **정확한 조문과 부칙 원문을 테스트 fixture로 보존**하고 실제 API 결과와 버전 비교. 허위 regex 거절 0.
+
+### B. 법령 버전·중복 제거
+
+- `StatuteSourceKey = (official_law_id, article_no, version_id/effective_date, supplement_section, content_hash)`. 조문별 동일 내용 chunk는 중복 압축하되 **서로 다른 시행본/부칙은 독립**.
+- `SOURCE_VERSION_ID_UNCONFIRMED`이면 공식 API 메타데이터 재조회. 그래도 불명확하면 `UNVERIFIED_VERSION` 상태로 답변 검증에 전달; 최신본이라고 단정 금지.
+- `DIGEST_TRUNCATED`이면 `dropped_source_ids`, `dropped_chars`, `has_supplement`, `has_counterevidence`를 manifest로 기록. 부칙·결정적 반증 잘림이면 해당 부분만 다시 조회/첨부.
+- 기존 8개 계승 법령은 `law_id+version+event_date+snapshot` 검증 후 재사용. 과거 답변에 인용되었다는 이유만으로 신뢰하지 않는다.
+
+## 7.5 카드 03 — EvidenceSpan·승인·반대 증거: DB 트랜잭션 설계
+
+**Step 1 (추출):** LLM은 문서에서 `claim_text, normalized_fact, evidence_quote, page/paragraph_hint, amount_role, event_role` 후보를 생성. 이때 **LLM의 quote/offset은 검증 전 후보**. Python이 정규화 원문에서 quote를 정확히 찾아 `start_offset/end_offset/content_hash`를 산출. 중복 매치/원문 부재 시 `SPAN_UNRESOLVED`을 기록하고 **가짜 span 저장 금지**.
+
+**Step 2 (승인):** 사용자의 일괄 승인 요청에서 **각 claim_id별 상태 변경**을 수행하고, EvidenceSpan의 `document_id/version_hash/claim_id` 연결 및 DB FK/commit 확인. 일부 실패 시 전부 롤백할지 부분 성공할지 **기존 API 계약을 먼저 확인**하고 명시적인 결과 목록 반환. 승인하지 않은 claim을 `APPROVED`로 추정하지 않는다.
+
+**Step 3 (상담 입력):** `EvidenceRecord`를 `source_file_name, document_hash, claim_id, claim_approval_status, span_id, span_text, source_kind, temporal_scope`로 직렬화. 원본 문서 존재와 사실 승인 상태를 별개로 표시. 승인 사실은 확정 근거 후보, 미승인 사실은 사용자 주장/확인 필요로 분리; 기존 제품의 원문 사용 정책을 임의 변경하지 않는다.
+
+**Step 4 (반대 증거):** 검증 근거 선택은 draft의 인용 목록만 따르지 말고 `issue_id`별 관련 승인 사실·불일치 후보·반대 근거를 함께 선택. 전체 원문 무제한 전송 대신 결정적 span 및 원문 reference를 유지. 실제 상충 판정은 주체·시간·금액 역할·모달리티·범위를 고려하는 기존 의미 판단에 포함. '분할 반환 제안'과 '전액 즉시 반환 곤란'은 자동 모순 판정 금지.
+
+**테스트:** 다중 문서 같은 문구, OCR/공백 차이, claim 10건 일괄 승인 중 1건 실패, 승인 후 파일 수정, span이 없는 기존 데이터, 반려 claim만 있는 사건, 인용되지 않은 결정적 반증. 모든 답변 인용은 `source_file_name+span_id 또는 문서 원문 ref`로 역추적 가능해야 한다.
+
+## 7.6 카드 04 — 금액·검증·Repair: 호출 정책
+
+**금액 추출:** `1억 7천만 원`, `170,000,000원` 등을 Python `Decimal` 원화 정수로 정규화(LLM 0회). **역할 부여**는 기존 문서 사실 추출 LLM의 구조화 필드 또는 승인 사실을 우선. 제안 `MonetaryFact(amount_krw, role, party, event_date, source_id, approval_status)`; role = `TOTAL_DEPOSIT/EARNEST/BALANCE_DUE/REFUNDED/OUTSTANDING/PROMISED/ATTACHMENT_CLAIM/UNKNOWN`. `UNKNOWN`을 `TOTAL_DEPOSIT`으로 강제하지 않는다.
+
+**금액 검증:** 동일 role+시점+사건 scope 내에서만 비교. `OUTSTANDING = TOTAL_DEPOSIT - SUM(실제 지급 확인된 REFUNDED)`를 **근거가 충분할 때만** Python으로 계산. 분할 반환 **제안**은 실제 반환액에 더하지 않는다. `deposit_matches[0]` 기반 자동 REPAIR 제거. 정확한 잔액을 계약 총액과 다르다는 이유로 수정하지 않음.
+
+**Verification:** 기존 LLM이 `GROUNDING, STATUTE_ACCURACY, TEMPORAL_APPLICABILITY, QUESTION_COVERAGE`를 판정하고 `claim_id/source_ids/contradiction_ids`를 구조화 출력. Python은 **스키마·원문 존재·인용 해시·금액 산술**만 결정적으로 확인; 법률 의미의 PASS/FAIL을 regex로 덮어쓰지 않는다. 실제 source conflict가 확인되면 PASS도 차단 가능하되 이유/근거 기록.
+
+**Repair state machine:** `DRAFT → VERIFY → (PASS → FINAL | FAIL → PATCH)`. `PATCH`는 `old_text` 유일 매치·근거 출처 유효·변경 hash 확인 후 적용. `patch_applied=false`면 동일 hash로 재검증하지 않는다. 1회 안전한 재생성 또는 `WITHHELD/NEEDS_REVIEW`로 종료. 반복 횟수는 품질과 trace 기준으로 정하며 무조건 1회로 고정 금지. 전체 재생성 시 원래 검증된 사실·법령 출처와 diff를 검사한다.
+
+**테스트:** 3억 보증금/계약금/일부 반환/잔액/가압류액 혼재, patch target 중복/공백 변경, 유효한 LLM PASS가 부칙 regex로 거절되는 경우, 검증 JSON 파싱 실패. 파싱 실패는 PASS가 아니다.
+
+## 7.7 카드 05 — 답변 데이터 계약과 UI 표시
+
+- 기존 최종 답변을 **한 번만** 구조화해 `FinalAnswerPresentation{lead, actions[], analysis_sections[], evidence_citations[], statute_citations[], open_questions[], raw_verified_answer, verification_status}`로 전달. 이 작업은 **결정적 parser**로 수행하고 별도 LLM 호출하지 않는다. 파싱 불확실하면 검증된 원문을 **한 번만** 렌더.
+- `synthesizer/document_consultation/final_disposition`의 모든 분기에서 `raw_verified_answer` 원본 hash와 source IDs 보존. Markdown의 강조를 UI에서 지원하되 일반 번호 목록을 제목으로 오인하지 않도록 **알려진 섹션명+헤딩 구조**만 분리.
+- `lead`만 추출되고 상세가 비어 있으면 `raw_verified_answer`를 중복으로 붙이지 말고 **하나의 원문 모드**로 표시. 출처는 E01 같은 내부 별칭만 보여주지 말고 전체 파일명.
+- **테스트:** `# 핵심 결론`, `1. 핵심 결론`, 일반 `1. 계약금을 지급했다`, 긴 인용/테이블, 결론 없는 답변, `WITHHELD` 상태, Markdown 볼드.
+
+## 7.8 카드 06 — 검색·LLM 호출 최적화: 실제 의사결정
+
+- 검색 이전 `SourceCoverage` 계산: `required_issues, required_law_ids, articles, event_date, version_verified, supplement_present, contradictions_checked, missing_items`.
+- `missing_items=[]`이며 버전·부칙 검증 완료일 때만 동일 법령 재검색 생략(**Python 결정적 검사**). 충분성 자체가 의미 판단을 요구하면 **기존 planner/verification LLM의 구조화 결과** 사용; 새 LLM 호출은 원칙적으로 추가하지 않음.
+- `NEED_MORE_LAW` 루프 진입 시 `why_missing`과 새로 요청할 조문·시행본만 전달. 이전과 동일 `source_hash+question_issue+version`이면 재검색 대신 검증 결과를 재사용하거나 근거 부족을 명시. 단, 기존 검색이 실패/잘림/버전 미확인인 경우에는 동일 해시만 보고 중단하지 않는다.
+- cache key: `law_id/article/version/effective_date/supplement_hash`; API 오류 fallback 시 `source_origin=VECTOR_FALLBACK`, `official_verified=false` 유지. 임의로 official PASS로 승격 금지.
+- 먼저 trace에서 **비용 상위 2개 generation**을 선정하여 입력 payload 중복만 제거. 검색 노드의 1초 수준 지연보다 수십 초 LLM generation이 병목이라면 후자를 우선. 재검증 생략은 법률 Gold 유지 증명 후 적용.
+- **성능 결과:** 각 PR별 `before/after node latency, total active latency, LLM calls, input/output tokens, USD cost, answer_quality_delta`; 같은 시나리오·동일 법령/증거 snapshot이 아니면 개선율 계산 금지.
+
+## 7.9 카드 07 — 대화 컨텍스트: 세부 선택 규칙
+
+- 기존 `format_context_for_prompt(max_turns=2)`, `to_chat_history_messages(max_turns=3)`, `document_consultation.user_history`에서 **실제로 어떤 노드에 동일 내용이 두 번 들어가는지** trace payload hash로 측정.
+- **일반 새 질문:** 사건 승인 사실·현재 질문·필수 쟁점/법령만 포함; 이전 AI 답변 전문 제외. **후속 지시어 질문:** 최근 사용자 발언 중 지시 대상과 필요한 이전 상담 결론의 **식별자/요약**만 추가; 이전 AI 출력 전체를 무조건 3턴 첨부하지 않는다.
+- **새 증거 등록:** evidence snapshot fingerprint 변경 시 이전 법률 결론을 캐시 답변으로 재사용 금지. 이전 턴의 법령도 시행본·사건일이 맞는지 재확인.
+- `ContextBudget`에 `question_tokens, case_fact_tokens, evidence_tokens, statute_tokens, prior_turn_tokens, verification_tokens`를 기록. 한도가 초과하면 **과거 답변 서술·중복 메타데이터부터** 줄이고, 승인된 핵심 사실·반대 증거·부칙을 먼저 자르지 않는다.
+- **테스트:** '그럼 이사해도 되나요?' 같은 후속 질문, 증거 변경 후 동일 질문, 과거 법령의 다른 시행본, 사건 A/B 분리, 원문 18건 이상.
+
+## 7.10 카드 08 — 진행 상태 및 HITL 이벤트 계약
+
+- 제안 서버 이벤트 `{consultation_id, phase, node, state, step_index, message, requires_approval, approval_request_id, timestamp}`; `state=QUEUED|RUNNING|WAITING_APPROVAL|RESUMED|COMPLETED|FAILED`.
+- `phase`는 `CASE_CONTEXT, ISSUE_ANALYSIS, LAW_SEARCH, EVIDENCE_REVIEW, ANSWER_DRAFT, VERIFICATION, FINALIZATION`처럼 **사용자 이해 중심**. 내부 노드명은 UI 계약으로 직접 노출하지 않는다.
+- 프론트의 `DEFAULT_STEPS`·`STATUTE_APPROVAL` 비교와 서버 `step_1..step_6` 불일치는 단일 mapping 함수에서 해결. approval 여부는 `requires_approval` 필드로 판단하며 특정 `step_3`에 묶지 않는다.
+- 진행률 숫자는 실제 완료된 phase가 있을 때만 증가. HITL 승인 대기는 멈춤/사용자 조치로 표시하고, resume 후 동일 consultation_id 유지.
+- **테스트:** 정상/실패/승인 대기/거절/재시작, 중복 이벤트, SSE 재연결, 완료 후 답변 렌더.
+
+## 7.11 카드 09~10 — 자동화 회귀·출시 차단
+
+- 테스트 피라미드: **unit**(날짜 파서·금액 정규화·span offset·cache key·section parser), **integration**(Postgres 승인 트랜잭션·공식 API 응답 fixture·checkpoint resume·Langfuse span), **E2E**(SC001/002/003 + 반증/HITL/UI).
+- 법률 Gold는 `scenario_id, fact_snapshot, applicable_law_version, correct_legal_conclusion, required_citations, forbidden_claims, uncertainty_requirements` 구조로 고정. **특정 시나리오 문구에 맞춘 분기 구현 금지**.
+- 테스트 실행 시 모든 사례에 `code SHA, trace ID, question, evidence hash, statute version, pass/fail, human reviewer, reason` 기록. 실패한 법률 결론을 단순 프롬프트 표현 점수로 덮지 않는다.
+- **Go 조건:** 차단급 법률 오류 0, 승인/원문 무결성 0건 위반, HITL resume PASS, UI 답변 중복 0, 재현 가능한 trace/KPI. 목표 60초·30% 절감은 **품질이 유지될 때만** 성능 목표로 평가.
+- **No-Go:** 시행일·부칙 적용 오판, 결정적 반증 소실, 미승인 사실 확정, 금액 role 오판에 의한 자동 수정, 핵심 인용 누락, 사건 간 데이터 누출, checkpoint 소실.
+
+## 7.12 구현 PR 순서와 작업자별 완료 조건
+
+| PR | 변경 단위 | 구현/테스트 완료 조건 |
+|---|---|---|
+| PR-00 | baseline manifest/측정 스크립트 | 동일 실행 추적 가능, 원본 보존 |
+| PR-01 | observability/HITL (잔존 결함만) | 최신 로그로 재현, 재시작 resume PASS |
+| PR-02A | 날짜 후보 파서+event role DTO | Python 단위 테스트, 모호한 날짜 UNKNOWN |
+| PR-02B | 법령 version/supplement source manifest | 다른 시행본 dedup 금지, 공식 API fixture PASS |
+| PR-02C | temporal applicability LLM schema + 검증 | 실제 부칙·경과조치 Gold PASS |
+| PR-03A | EvidenceSpan·일괄 승인 | DB FK/offset/transaction PASS |
+| PR-03B | 검증용 반대 증거 source selection | 미인용 반증도 검증기에서 확인 |
+| PR-04A | monetary role QA | 원금/반환/잔액/가압류액 혼동 0 |
+| PR-04B | repair no-op 방지 | 동일 draft hash 무의미 재검증 0 |
+| PR-05 | final answer presentation contract | 의미/출처/Markdown 보존, 중복 0 |
+| PR-06 | trace 기반 검색/검증 중복 제거 | 법률 Gold 동등, 실측 성능 개선 |
+| PR-07 | history/context budget | 후속 질문 PASS, 토큰 감소 |
+| PR-08 | progress/HITL frontend contract | 대기/재개/완료 표시 PASS |
+| PR-09 | SC 통합 회귀·KPI·릴리스 게이트 | 차단 오류 0, 사용자 Go 승인 |
+
+**작업 통제:** 각 PR마다 최신 main에서 재확인 → 원인/로그/기존 동작 확인 → 최소 구현 → 단위/통합 테스트 → 동일 Gold 회귀 → trace 비용 비교 → PR/커밋 → 사용자 검토. 출시 전 시간이 부족하면 **정확도 PR을 우선**하고 PR-06/07은 미완료 상태로 남겨도 된다. 변경 코드가 검증되지 않았다면 **속도 개선보다 이전의 검증된 동작 유지**가 우선이다.
