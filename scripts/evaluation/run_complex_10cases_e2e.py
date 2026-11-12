@@ -319,7 +319,7 @@ async def run_case_evaluation(case_meta: Dict[str, Any], results: Dict[str, Any]
         for a in actions:
             if not first_action_id:
                 first_action_id = a.id
-            req_titles = [r.title for r in a.requirements] if hasattr(a, 'requirements') else []
+            req_titles = [getattr(r, "description", getattr(r, "requirement_type", "요건")) for r in a.requirements] if hasattr(a, "requirements") else []
             action_list.append({
                 "id": a.id,
                 "action_type": a.action_type,
