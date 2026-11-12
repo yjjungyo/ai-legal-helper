@@ -217,6 +217,18 @@
   max-height: calc(100vh - 56px) !important;
 }
 
+/* Graph 탭 전용 풀스크린/반응형 와이드 레이아웃 (남는 여백 없이 대형 캔버스 활용) */
+.workspace-canvas.workspace-canvas-graph {
+  padding: 16px 20px !important;
+  max-width: none !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  height: calc(100vh - 56px) !important;
+  max-height: calc(100vh - 56px) !important;
+}
+
+
 /* Cards */
 .card {
   background-color: var(--surface);

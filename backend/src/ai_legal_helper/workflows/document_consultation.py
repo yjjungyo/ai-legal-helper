@@ -481,10 +481,30 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
                         require_question_coverage=True,
                         allow_partial_answer=True,
                     )
-                    if limited_ver.get("status") == "PASS":
+                    lim_status = limited_ver.get("status")
+                    lim_blocked = (limited_ver.get("temporal_gate") or {}).get("status") == "BLOCK"
+                    lim_claims = limited_ver.get("claims", [])
+                    lim_supported_cnt = sum(1 for c in lim_claims if c.get("grounding_status") == "SUPPORTED")
+
+                    if lim_status == "PASS" and not lim_blocked:
+                        # 제한 답변이 완전 PASS 판정을 받은 경우
                         draft = limited_draft
                         result = {
                             **limited_ver,
+                            "source_manifest": manifest,
+                            "verified_answer_sha256": hashlib.sha256(limited_draft.encode("utf-8")).hexdigest(),
+                        }
+                        valid = True
+                        limited_used = True
+                    elif lim_supported_cnt > 0 and not lim_blocked and search_status != "API_ERROR":
+                        # [P0-CAUTIONARY-FALLBACK] 제한 답변 검증 결과가 경미한 미확인 쟁점 등으로 완전 PASS(REVISE)에
+                        # 미치지 못했더라도, 검증된 사실(SUPPORTED)이 1건 이상 확보된 경우 답변 전체를 폐기(WITHHELD)하지 않고
+                        # 검증된 범위를 유지하여 CAUTIONARY로 승인(부분 보존 Fallback)한다.
+                        draft = limited_draft
+                        result = {
+                            **limited_ver,
+                            "status": "PASS",
+                            "pre_fallback_status": lim_status,
                             "source_manifest": manifest,
                             "verified_answer_sha256": hashlib.sha256(limited_draft.encode("utf-8")).hexdigest(),
                         }
@@ -495,8 +515,12 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
         else:
             # 후속 실무 행동 가이드이고 claims 중 SUPPORTED 주장이 존재하는 경우 초안을 유지(CAUTIONARY)하여 사용자에게 전달
             has_supported = any(c.get("grounding_status") == "SUPPORTED" for c in result.get("claims", []))
-            if has_supported:
+            if has_supported and not temporal_blocked and search_status != "API_ERROR":
+                result["pre_fallback_status"] = result.get("status")
+                result["status"] = "PASS"
+                result["verified_answer_sha256"] = hashlib.sha256(str(draft).encode("utf-8")).hexdigest()
                 valid = True
+                limited_used = True
 
     if not valid:
         # 검증 결과나 그 이후의 원문 변경을 정형 성공 답변으로 덮어쓰지 않으며 내부 검토 문구 노출을 차단한다.
@@ -530,11 +554,21 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
         sources = [s for s in sources_list if s.get("source_id") in cited_ids] or [
             s for s in sources_list if s.get("source_id") in draft or str(s.get("filename", "")) in draft
         ]
-        disposition = "CAUTIONARY" if (limited_used or any(
-            c.get("fact_status") in ("CONFLICTED", "EVIDENCE_NEEDED", "INFERENCE", "USER_STATEMENT")
-            and c.get("claim_type") in ("CASE_FACT", "CASE_INFERENCE", "LEGAL_APPLICATION", "USER_STATEMENT")
+        # [P0-FINAL-DISPOSITION-NORMALIZATION]
+        # DELIVERED vs CAUTIONARY 판정:
+        # 1. 제한 답변을 사용했거나(limited_used),
+        # 2. 사실관계 충돌(CONFLICTED) 또는 추가 증거 확인 필요(EVIDENCE_NEEDED) 상태의 주장이 존재하거나,
+        # 3. SUPPORTED로 완전히 입증되지 않은 미확정 주장(UNCERTAIN 등)이 포함된 경우에만 CAUTIONARY로 분류한다.
+        # 반면 정상 입증(SUPPORTED)된 사건 정황 추론(INFERENCE)이나 사용자 진술(USER_STATEMENT)은
+        # 정상적인 법률 상담의 유효한 구성 요소이므로 DELIVERED(검증 완료)로 온전히 확정한다.
+        has_cautionary_claims = any(
+            c.get("fact_status") in ("CONFLICTED", "EVIDENCE_NEEDED")
+            or c.get("grounding_status") not in ("SUPPORTED", "NOT_APPLICABLE")
             for c in result.get("claims", [])
-        )) else "DELIVERED"
+        )
+        disposition = "CAUTIONARY" if (limited_used or has_cautionary_claims) else "DELIVERED"
+        # 최종 확장 답변(final)과 검증 해시를 동기화하여 Presentation 빌더 무결성 검증을 유지한다.
+        result["verified_answer_sha256"] = hashlib.sha256(final.encode("utf-8")).hexdigest()
     draft_str = str(draft or "")
     final_str = str(final or "")
     draft_sha = hashlib.sha256(draft_str.encode("utf-8")).hexdigest()

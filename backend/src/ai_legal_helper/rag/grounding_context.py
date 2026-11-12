@@ -130,16 +130,14 @@ def normalize_statute_key(src: Dict[str, Any]) -> Optional[str]:
     # [2026-11-12] 시행본·부칙을 법령명/조문만으로 합치면 다른 시점의 법을 잃는다.
     # 원본 source_id는 인용 안정성을 위해 변경하지 않고 내부 중복키만 강화한다.
     # 메타데이터의 버전 키가 비어 있으면 내용 해시로 구분해 무근거 병합을 방지한다.
-    import hashlib
+    # 시행일자나 부칙이 명시적으로 다른 경우에만 버전을 구분하여 고유 키로 유지하고,
+    # 그렇지 않은 일반 조문은 동일 키로 묶어 중복(공식/로컬/벡터)을 하나로 통합한다.
     version = next((str(src.get(k)).strip() for k in (
         "version_id", "law_version_id", "effective_date", "enforcement_date",
         "시행일자", "시행일", "law_effective_date",
     ) if src.get(k)), "")
     supplement = str(src.get("supplement_section") or src.get("addendum") or src.get("부칙") or "").strip()
-    content = str(src.get("content") or src.get("text") or "")
-    content_digest = hashlib.sha256(content.encode("utf-8")).hexdigest()[:16] if content else ""
-    # 내용이 서로 다르면 시행본 정보가 같아도 안전하게 구분한다.
-    version_suffix = f":version={version or 'unknown'}:supplement={supplement}:hash={content_digest or 'unknown'}"
+    version_suffix = f":version={version}:supplement={supplement}" if (version or supplement) else ""
 
     # 1. statute_name과 article 필드가 명시된 경우
     if statute_name and article:
@@ -235,6 +233,107 @@ def prune_sources_for_verification(
                 is_cited = True
 
         # 초안에 실제 인용된 증거는 원문 전문 100% 보존
+        if is_cited:
+            pruned_evidence_sources.append(src)
+            continue
+
+        # 미인용 증거는 메타데이터 유지 + 본문 스니펫 축약
+        raw_content = str(src.get("content") or "").strip()
+        if len(raw_content) > max_unreferenced_snippet:
+            condensed = dict(src)
+            condensed["content"] = f"{raw_content[:max_unreferenced_snippet]}... (초안 미인용 증거: 상세 본문 생략)"
+            pruned_evidence_sources.append(condensed)
+        else:
+            pruned_evidence_sources.append(src)
+
+    return deduped_statutes + pruned_evidence_sources
+
+
+def prune_sources_for_consultation(
+    sources: List[Dict[str, Any]],
+    draft_answer: str = "",
+    verification: Optional[Dict[str, Any]] = None,
+    max_unreferenced_snippet: int = 150,
+) -> List[Dict[str, Any]]:
+    """답변 초안 작성 및 재작성 시 프롬프트 컨텍스트 다이어트를 수행한다.
+
+    1. 동일 법령 조문 중복 제거 (공식 검색 결과 우선) -> 최초/재작성 공통 적용.
+    2. 재작성(draft_answer 존재 시):
+       - 기존 초안에서 인용된 증거 + 검증 지적(verification)에 포함된 출처 ID는 원문 전문 100% 보존.
+       - 지적이나 초안에 없는 미인용 증거는 앞 150자 스니펫으로 압축.
+    3. 최초 작성(draft_answer 없음):
+       - 증거 문서는 원문 보존하되, 중복 법령만 제거하여 입력 토큰 절감.
+
+    Args:
+        sources: 전체 출처 메타데이터 및 본문 목록.
+        draft_answer: 이전 초안 문자열 (재작성 시).
+        verification: 검증 결과 딕셔너리 (재작성 시).
+        max_unreferenced_snippet: 비인용 증거에 남겨둘 최대 앞부분 글자 수.
+
+    Returns:
+        List[Dict[str, Any]]: 컨텍스트 다이어트가 적용된 출처 목록.
+    """
+    if not sources:
+        return []
+
+    # 1단계: 법령 조문 중복 제거 (공통)
+    seen_statutes: Dict[str, Dict[str, Any]] = {}
+    non_statute_sources: List[Dict[str, Any]] = []
+
+    for src in sources:
+        if not isinstance(src, dict):
+            continue
+        st_key = normalize_statute_key(src)
+        if st_key:
+            if st_key in seen_statutes:
+                existing = seen_statutes[st_key]
+                if src.get("retrieval_method") == "OFFICIAL_STATUTE_SEARCH" and existing.get("retrieval_method") != "OFFICIAL_STATUTE_SEARCH":
+                    seen_statutes[st_key] = src
+                elif len(str(src.get("content") or "")) > len(str(existing.get("content") or "")) and existing.get("retrieval_method") != "OFFICIAL_STATUTE_SEARCH":
+                    seen_statutes[st_key] = src
+                continue
+            seen_statutes[st_key] = src
+        else:
+            non_statute_sources.append(src)
+
+    deduped_statutes = list(seen_statutes.values())
+
+    # 초안이 없는 최초 작성이면 증거 원문은 그대로 보존하고 중복 제거된 법령과 병합 반환
+    if not draft_answer.strip():
+        return deduped_statutes + non_statute_sources
+
+    # 2단계: 재작성 시 비인용 증거 문서 본문 다이어트
+    draft_lower = draft_answer.lower()
+    # 검증 지적에 포함된 출처 ID 수집
+    targeted_source_ids = set()
+    if isinstance(verification, dict):
+        for c in verification.get("claims", []):
+            if isinstance(c, dict) and c.get("grounding_status") in ("UNSUPPORTED", "UNCERTAIN"):
+                for sid in c.get("source_ids", []):
+                    if isinstance(sid, str):
+                        targeted_source_ids.add(sid.lower())
+
+    pruned_evidence_sources = []
+    for src in non_statute_sources:
+        is_cited = False
+        sid = str(src.get("source_id") or "").strip().lower()
+        if sid and sid in targeted_source_ids:
+            is_cited = True
+
+        if not is_cited:
+            check_keys = ["filename", "file_name", "evidence_label", "source_id", "evidence_id", "document_name"]
+            for key in check_keys:
+                val = str(src.get(key) or "").strip().lower()
+                if val and len(val) >= 2 and val in draft_lower:
+                    is_cited = True
+                    break
+
+        if not is_cited and src.get("filename"):
+            base_name = str(src.get("filename")).split(".")[0].lower()
+            if len(base_name) >= 3 and base_name in draft_lower:
+                is_cited = True
+
+        # 초안에 인용되었거나 검증 지적에 연결된 핵심 증거는 원문 전문 100% 보존
         if is_cited:
             pruned_evidence_sources.append(src)
             continue

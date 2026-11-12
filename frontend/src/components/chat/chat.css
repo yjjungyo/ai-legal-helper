@@ -943,6 +943,7 @@
 .chat-digest-full-content { border-top: 1px solid #e9edf3; padding: 23px 20px 25px; min-width: 0; }
 .chat-digest-full-content .chat-legal-answer { line-height: 1.75; }
 .chat-digest-full-content .chat-legal-section.has-heading { margin-top: 25px; }
+.chat-digest-full-content .chat-legal-section:first-child.has-heading { margin-top: 0; padding-top: 0; border-top: none; }
 .chat-digest-full-content .chat-legal-heading { font-size: 1.06rem; }
 .chat-consultation-digest .chat-evidence-tag { max-width: 160px; display: inline-block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; vertical-align: middle; font-size: .74em; }
 .chat-digest-full-content .chat-evidence-tag { max-width: none; display: inline; white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
@@ -965,7 +966,9 @@
 .chat-legal-section.has-heading { padding-top: 8px; border-top: 1px solid #e5eaf1; }
 .chat-legal-section.summary-section { padding: 16px 18px; background: #f8fbff; border: 1px solid #dbeafe; border-left: 4px solid #2563eb; border-radius: 10px; }
 .chat-legal-section.action-section { padding: 14px 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; }
-.chat-legal-heading { margin: 0 0 10px; font-size: 1.04em; line-height: 1.5; font-weight: 750; color: #17253e; }
+.chat-legal-heading { margin: 0 0 10px; font-size: 1.04em; line-height: 1.5; font-weight: 750; color: #17253e; display: flex; align-items: center; }
+.chat-legal-heading-icon { display: inline-flex; align-items: center; font-size: 1.05em; margin-right: 6px; }
+.chat-statute-pill { display: inline-block; white-space: nowrap; }
 .chat-legal-content { line-height: 1.75; overflow-wrap: anywhere; }
 .chat-legal-section.source-section { border-top: 1px solid #e5eaf1; padding-top: 12px; }
 .chat-legal-answer button:focus-visible { outline: 2px solid #2563eb; outline-offset: 3px; }

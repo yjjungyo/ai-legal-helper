@@ -1,3 +1,11 @@
+/**
+ * @fileoverview 증거 지식 그래프(Evidence Knowledge Graph) 시각화 컴포넌트
+ *
+ * Neo4j 파생 그래프(Case, Fact, Event, LegalIssue, Claim, Document)의 노드 및 엣지를 시각화합니다.
+ * 화면 크기에 맞춰 대형 캔버스를 동적으로 채우고(ResizeObserver), 노드 간 반발력(charge) 및
+ * 링크 거리(link distance)를 최적화하여 노드 밀집 및 텍스트 겹침을 방지합니다.
+ */
+
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 import { getCaseGraph, getGraphAnalysis } from '../api/graphClient';
@@ -6,16 +14,6 @@ interface Props {
   caseId: string;
 }
 
-/**
- * 증거 지식 그래프(Evidence Knowledge Graph) 시각화 컴포넌트.
- *
- * 주요 기능:
- * 1. Neo4j 파생 그래프(Case, Fact, Event, LegalIssue, Claim, Document) 노드 및 엣지 시각화.
- * 2. 캔버스 컨테이너 크기 자동 측정(ResizeObserver)으로 우하단 쏠림 현상 및 오버플로우 방지.
- * 3. 시뮬레이션 완료 시 화면 자동 맞춤(zoomToFit) 및 노드 텍스트 라벨 렌더링.
- * 4. 증거 공백(Evidence Gaps) 및 상충 증거(Contradictions) 분석 패널 제공.
- * 5. 노드 클릭 시 상세 속성 팝업/조회 지원.
- */
 export const EvidenceGraph: React.FC<Props> = ({ caseId }) => {
   const [graphData, setGraphData] = useState<{ nodes: any[]; links: any[] }>({ nodes: [], links: [] });
   const [analysis, setAnalysis] = useState<any>(null);
@@ -25,7 +23,7 @@ export const EvidenceGraph: React.FC<Props> = ({ caseId }) => {
   
   const containerRef = useRef<HTMLDivElement>(null);
   const fgRef = useRef<any>(null);
-  const [dimensions, setDimensions] = useState<{ width: number; height: number }>({ width: 600, height: 520 });
+  const [dimensions, setDimensions] = useState<{ width: number; height: number }>({ width: 900, height: 700 });
 
   // 컨테이너 크기 측정 및 반응형 리사이징
   useEffect(() => {
@@ -34,10 +32,10 @@ export const EvidenceGraph: React.FC<Props> = ({ caseId }) => {
     const updateSize = () => {
       if (containerRef.current) {
         const { clientWidth, clientHeight } = containerRef.current;
-        if (clientWidth > 0) {
+        if (clientWidth > 0 && clientHeight > 0) {
           setDimensions({
             width: clientWidth,
-            height: clientHeight > 0 ? clientHeight : 520,
+            height: clientHeight,
           });
         }
       }
@@ -62,11 +60,10 @@ export const EvidenceGraph: React.FC<Props> = ({ caseId }) => {
       if (graphRes.available === false) {
         setError('그래프 데이터베이스(Neo4j)를 사용할 수 없습니다.');
       } else {
-        // react-force-graph expects 'links' instead of 'edges'
         const nodes = graphRes.nodes || [];
         const links = (graphRes.edges || []).map((e: any) => ({
           ...e,
-          name: e.type // edge label
+          name: e.type,
         }));
         setGraphData({ nodes, links });
       }
@@ -86,9 +83,41 @@ export const EvidenceGraph: React.FC<Props> = ({ caseId }) => {
     loadGraph();
   }, [loadGraph]);
 
+  // 노드 반발력 및 링크 거리 최적화 (뭉침 현상 방지)
+  useEffect(() => {
+    if (fgRef.current && graphData.nodes.length > 0) {
+      try {
+        const charge = fgRef.current.d3Force('charge');
+        if (charge) {
+          const strength = graphData.nodes.length > 60 ? -350 : -240;
+          charge.strength(strength);
+        }
+        const link = fgRef.current.d3Force('link');
+        if (link) {
+          link.distance(65);
+        }
+        fgRef.current.d3ReheatSimulation();
+      } catch {
+        // safe fallback
+      }
+    }
+  }, [graphData]);
+
+  const handleZoomIn = () => {
+    if (fgRef.current) {
+      fgRef.current.zoom(fgRef.current.zoom() * 1.35, 300);
+    }
+  };
+
+  const handleZoomOut = () => {
+    if (fgRef.current) {
+      fgRef.current.zoom(fgRef.current.zoom() / 1.35, 300);
+    }
+  };
+
   const handleZoomToFit = () => {
     if (fgRef.current) {
-      fgRef.current.zoomToFit(400, 40);
+      fgRef.current.zoomToFit(500, 60);
     }
   };
 
@@ -112,38 +141,86 @@ export const EvidenceGraph: React.FC<Props> = ({ caseId }) => {
   };
 
   return (
-    <div style={{ marginTop: '20px', border: '1px solid #ddd', borderRadius: '8px', padding: '16px', backgroundColor: '#fff' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-        <h3 style={{ margin: 0 }}>🕸️ 증거 지식 그래프 (Evidence Knowledge Graph)</h3>
-        <div>
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100%',
+      minHeight: '650px',
+      backgroundColor: '#fff',
+      border: '1px solid var(--border, #e2e8f0)',
+      borderRadius: '8px',
+      padding: '16px 20px',
+      boxSizing: 'border-box',
+    }}>
+      {/* 상단 툴바 및 컨트롤 */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <h3 style={{ margin: 0, fontSize: '1.15em', fontWeight: 750, color: 'var(--text-main, #0f172a)' }}>
+            🕸️ 증거 지식 그래프 (Evidence Knowledge Graph)
+          </h3>
+          {graphData.nodes.length > 0 && (
+            <span style={{
+              fontSize: '0.82em',
+              padding: '3px 9px',
+              backgroundColor: '#eff6ff',
+              color: '#1d4ed8',
+              borderRadius: '999px',
+              border: '1px solid #bfdbfe',
+              fontWeight: 600
+            }}>
+              노드 {graphData.nodes.length}개 · 관계 {graphData.links.length}개
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <button 
+            type="button"
+            onClick={handleZoomIn} 
+            title="그래프 확대"
+            style={{ padding: '6px 11px', cursor: 'pointer', borderRadius: '5px', border: '1px solid #cbd5e1', backgroundColor: '#fff', fontSize: '0.88em', fontWeight: 500 }}
+          >
+            🔍＋ 확대
+          </button>
+          <button 
+            type="button"
+            onClick={handleZoomOut} 
+            title="그래프 축소"
+            style={{ padding: '6px 11px', cursor: 'pointer', borderRadius: '5px', border: '1px solid #cbd5e1', backgroundColor: '#fff', fontSize: '0.88em', fontWeight: 500 }}
+          >
+            🔍－ 축소
+          </button>
+          <button 
+            type="button"
             onClick={handleZoomToFit} 
-            style={{ padding: '6px 12px', marginRight: '8px', cursor: 'pointer', borderRadius: '4px', border: '1px solid #ccc' }}
+            title="화면 크기에 맞춤"
+            style={{ padding: '6px 13px', cursor: 'pointer', borderRadius: '5px', border: '1px solid #cbd5e1', backgroundColor: '#fff', fontSize: '0.88em', fontWeight: 500 }}
           >
             🎯 화면 맞춤
           </button>
           <button 
+            type="button"
             onClick={loadGraph} 
-            style={{ padding: '6px 12px', cursor: 'pointer', borderRadius: '4px', border: '1px solid #ccc' }}
+            title="그래프 데이터 새로고침"
+            style={{ padding: '6px 13px', cursor: 'pointer', borderRadius: '5px', border: '1px solid #cbd5e1', backgroundColor: '#fff', fontSize: '0.88em', fontWeight: 500 }}
           >
             🔄 새로고침
           </button>
         </div>
       </div>
 
-      {loading && <p style={{ color: '#666' }}>그래프 데이터를 불러오는 중입니다...</p>}
-      {error && <p style={{ color: '#e03131' }}>⚠️ {error}</p>}
+      {loading && <p style={{ color: '#64748b', padding: '20px' }}>그래프 데이터를 불러오는 중입니다...</p>}
+      {error && <p style={{ color: '#e03131', padding: '20px' }}>⚠️ {error}</p>}
       
       {!loading && !error && (
-        <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
-          {/* 그래프 캔버스 컨테이너 (정확한 width/height 전달 및 오버플로우 방지) */}
+        <div style={{ display: 'flex', gap: '16px', flex: 1, minHeight: 0, height: '100%' }}>
+          {/* 그래프 캔버스 컨테이너 (남는 여백 없이 최대 크기 활용) */}
           <div 
             ref={containerRef}
             style={{ 
-              flex: '2 1 500px', 
-              minWidth: '320px', 
-              height: '520px', 
-              border: '1px solid #e0e0e0', 
+              flex: 1, 
+              minWidth: 0, 
+              height: '100%', 
+              border: '1px solid #e2e8f0', 
               borderRadius: '8px',
               position: 'relative', 
               overflow: 'hidden',
@@ -157,12 +234,14 @@ export const EvidenceGraph: React.FC<Props> = ({ caseId }) => {
               graphData={graphData}
               nodeLabel={(node: any) => `${node.type}: ${node.label || node.id}`}
               nodeColor={(node: any) => getNodeColor(node.type)}
-              nodeRelSize={6}
+              nodeRelSize={7}
               linkColor={(link: any) => getLinkColor(link.type)}
               linkWidth={(link: any) => link.type === 'CONTRADICTS' ? 2.5 : 1.2}
-              linkDirectionalArrowLength={4}
+              linkDirectionalArrowLength={4.5}
               linkDirectionalArrowRelPos={1}
-              cooldownTicks={120}
+              d3VelocityDecay={0.3}
+              cooldownTicks={140}
+              warmupTicks={40}
               onEngineStop={handleZoomToFit}
               onNodeClick={(node: any) => {
                 setSelectedNode(node);
@@ -173,38 +252,45 @@ export const EvidenceGraph: React.FC<Props> = ({ caseId }) => {
               }}
               nodeCanvasObject={(node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
                 const label = node.label || node.id || '';
-                const fontSize = 11 / Math.max(globalScale, 0.8);
-                ctx.font = `${fontSize}px sans-serif`;
+                const fontSize = Math.max(9, Math.min(13, 11 / Math.max(globalScale, 0.6)));
+                ctx.font = `500 ${fontSize}px sans-serif`;
 
                 // Node circle
                 ctx.beginPath();
-                ctx.arc(node.x, node.y, 6, 0, 2 * Math.PI, false);
+                ctx.arc(node.x, node.y, 7, 0, 2 * Math.PI, false);
                 ctx.fillStyle = getNodeColor(node.type);
                 ctx.fill();
                 ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 1.5;
+                ctx.lineWidth = 1.8;
                 ctx.stroke();
 
-                // Node text label
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'top';
-                ctx.fillStyle = '#333333';
-                const truncated = label.length > 16 ? label.slice(0, 16) + '...' : label;
-                ctx.fillText(truncated, node.x, node.y + 8);
+                // Node text label with halo for high contrast and readability
+                if (globalScale > 0.45) {
+                  ctx.textAlign = 'center';
+                  ctx.textBaseline = 'top';
+                  const truncated = label.length > 20 ? label.slice(0, 18) + '...' : label;
+                  ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+                  ctx.lineWidth = 3;
+                  ctx.strokeText(truncated, node.x, node.y + 9);
+                  ctx.fillStyle = '#1e293b';
+                  ctx.fillText(truncated, node.x, node.y + 9);
+                }
               }}
             />
           </div>
 
-          {/* 우측 분석 및 선택 노드 정보 패널 */}
+          {/* 우측 분석 및 선택 노드 정보 패널 (슬림 고정 사이드바) */}
           <div style={{ 
-            flex: '1 1 280px', 
-            minWidth: '260px', 
+            width: '360px', 
+            minWidth: '320px', 
+            maxWidth: '400px', 
+            height: '100%', 
             overflowY: 'auto', 
-            maxHeight: '520px', 
-            padding: '15px', 
-            backgroundColor: '#f8f9fa', 
-            border: '1px solid #e0e0e0', 
-            borderRadius: '8px' 
+            padding: '16px', 
+            backgroundColor: '#f8fafc', 
+            border: '1px solid #e2e8f0', 
+            borderRadius: '8px',
+            boxSizing: 'border-box'
           }}>
             {selectedNode ? (
               <div style={{ marginBottom: '20px', padding: '12px', backgroundColor: '#fff', borderRadius: '6px', border: '1px solid #d0ebff' }}>
@@ -226,7 +312,7 @@ export const EvidenceGraph: React.FC<Props> = ({ caseId }) => {
               </div>
             ) : null}
 
-            <h4 style={{ margin: '0 0 12px 0', borderBottom: '1px solid #eee', paddingBottom: '6px' }}>📊 지식 그래프 분석</h4>
+            <h4 style={{ margin: '0 0 12px 0', borderBottom: '1px solid #eee', paddingBottom: '6px', color: '#0f172a' }}>📊 지식 그래프 분석</h4>
             
             {analysis && (
               <div style={{ fontSize: '13px' }}>
@@ -287,14 +373,24 @@ export const EvidenceGraph: React.FC<Props> = ({ caseId }) => {
       )}
 
       {/* 하단 범례 */}
-      <div style={{ marginTop: '15px', paddingTop: '10px', borderTop: '1px solid #eee', fontSize: '13px', display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
-        <strong>범례: </strong>
-        <span style={{ color: '#1976d2' }}>● Fact (사실)</span>
-        <span style={{ color: '#f59f00' }}>● Event (타임라인)</span>
-        <span style={{ color: '#e03131' }}>● LegalIssue (법률 쟁점)</span>
-        <span style={{ color: '#2f9e44' }}>● Claim (추출 주장)</span>
-        <span style={{ color: '#7950f2' }}>● Document (증거 문서)</span>
-        <span style={{ color: '#868e96' }}>● Case (사건)</span>
+      <div style={{ 
+        marginTop: '12px', 
+        paddingTop: '10px', 
+        borderTop: '1px solid #e2e8f0', 
+        fontSize: '12.5px', 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: '14px', 
+        flexWrap: 'wrap',
+        color: '#475569'
+      }}>
+        <strong style={{ color: '#0f172a' }}>범례: </strong>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><span style={{ color: '#1976d2', fontSize: '1.2em' }}>●</span> Fact (사실)</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><span style={{ color: '#f59f00', fontSize: '1.2em' }}>●</span> Event (타임라인)</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><span style={{ color: '#e03131', fontSize: '1.2em' }}>●</span> LegalIssue (법률 쟁점)</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><span style={{ color: '#2f9e44', fontSize: '1.2em' }}>●</span> Claim (추출 주장)</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><span style={{ color: '#7950f2', fontSize: '1.2em' }}>●</span> Document (증거 문서)</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><span style={{ color: '#868e96', fontSize: '1.2em' }}>●</span> EvidenceSpan (증거원문)</span>
       </div>
     </div>
   );

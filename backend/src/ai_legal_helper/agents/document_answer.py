@@ -36,6 +36,7 @@ DOCUMENT_ANSWER_SYSTEM = """당신은 등록 자료를 읽고 사용자의 현�
     - 핵심 법적 상태/판단: 예: `**묵시적 갱신**`, `**대항력 유지**`, `**우선변제권**`, `**분할반환 거절**`, `**임차권등기명령**`
     - 불릿 항목의 핵심 라벨: 예: `- **임대차계약 성립 및 보증금 지급**: ...`
   * 문장 전체를 무분별하게 길게 볼드 처리하지 말고, 핵심 단어와 수치에만 절제하여 강조함으로써 시각적 대비(Contrast)를 극대화하세요.
+- [간결하고 명확한 최적 분량]: 질문에 필요한 핵심 답변과 필수 법적 근거, 대응 방안을 명쾌하게 설명하되, 동일한 내용을 다른 문단에서 불필요하게 반복하여 분량을 과도하게 늘리지 마세요. 1,500~2,500자(A4 1~2장) 내외의 잘 정돈된 핵심 답변으로 작성하세요.
 - [유연한 소제목 구분]: 질문에 맞춘 자연스러운 마크다운 소제목(`### 현재 계약 상태`, `### 보증금 반환 순위와 법적 안전성`, `### 실무적 회수 위험 및 대응`, `### 확인할 사항` 등)으로 단락을 명확히 구분하세요.
 - [중복 배제 및 간결성]: 단순한 질문에 긴 분석 보고서 형식을 억지로 강요하지 마시고, 질문과 무관한 소송 절차 안내를 강제하지 마세요. 이미 설명한 결론이나 면책 문구를 남발하지 마세요.
 
@@ -234,7 +235,17 @@ def write_document_answer(
         limited,
         bool(previous_draft),
     )
-    context, manifest = format_grounding_sources(sources)
+    # [컨텍스트 다이어트: 토큰 비용 및 지연시간 대폭 압축]
+    # LLM 프롬프트에 주입할 본문은 동일 조문 중복 제거 및 재작성 시 비인용 증거 축약을 거쳐 압축한다.
+    from ai_legal_helper.rag.grounding_context import prune_sources_for_consultation
+    diet_sources = prune_sources_for_consultation(
+        sources,
+        draft_answer=previous_draft,
+        verification=verification,
+    )
+    context, _ = format_grounding_sources(diet_sources)
+    # 최종 매니페스트는 검증 및 영속성 무결성 유지를 위해 전체 sources 기준으로 산출한다.
+    _, manifest = format_grounding_sources(sources)
     # 감사 레지스트리의 본문을 수정 지적으로 다시 넣으면 원문이 중복되고 예산이 무의미해진다.
     # 작성자는 오류·누락 지적만 읽고 사실 판단은 항상 아래 공통 원문에서 다시 수행한다.
     review = verification or {}

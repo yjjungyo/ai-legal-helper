@@ -5,7 +5,7 @@
  * 불확실/추가확인 사항, 다음 행동, 검증된 출처)를 가독성 높은 카드/섹션 양식으로 렌더링합니다.
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import type { ClaimCitation } from '../types/consultation';
 
 export interface CitationMeta {
@@ -53,19 +53,19 @@ function classifySectionTitle(title: string): SectionCategoryConfig {
   }
 
   // 1. 핵심 결론 (P0-03)
-  if (t.includes('핵심 결론') || t.includes('결론 요약') || t.includes('핵심 요약') || t.includes('사건 요약') || t.includes('상담 요약') || t.includes('개요')) {
+  if (t.includes('핵심 결론') || t.includes('결론 요약') || t.includes('핵심 요약') || t.includes('사건 요약') || t.includes('상담 요약') || t.includes('개요') || t.includes('한 줄 정리') || t.includes('한줄 정리')) {
     return { icon: '📋', theme: 'summary' };
   }
   // 2. 사건 사실관계 및 판단 근거 (P0-03)
-  if (t.includes('판단 근거') || t.includes('사실관계') || t.includes('확인된 사실') || t.includes('확인되는 계약') || t.includes('계약 사실') || t.includes('보증금 지급') || t.includes('사건 사실') || t.includes('증거 자료') || t.includes('기초 사실')) {
+  if (t.includes('판단 근거') || t.includes('사실관계') || t.includes('확인된 사실') || t.includes('확인되는 계약') || t.includes('계약 사실') || t.includes('보증금 지급') || t.includes('사건 사실') || t.includes('증거 자료') || t.includes('기초 사실') || t.includes('계약 상태')) {
     return { icon: '🔍', theme: 'facts' };
   }
   // 3. 쟁점별 법률 분석 / 상세 법률 분석 (P0-03)
-  if (t.includes('상세 법률 분석') || t.includes('쟁점별 법률 분석') || t.includes('법률 분석') || t.includes('법적 근거 및 심층 분석') || t.includes('법률 쟁점') || t.includes('주요 쟁점') || t.includes('쟁점') || t.includes('임차인의 권리') || t.includes('계약 상태') || t.includes('법적 상태')) {
+  if (t.includes('상세 법률 분석') || t.includes('쟁점별 법률 분석') || t.includes('법률 분석') || t.includes('법적 근거 및 심층 분석') || t.includes('법률 쟁점') || t.includes('주요 쟁점') || t.includes('쟁점') || t.includes('권리') || t.includes('해지') || t.includes('반환') || t.includes('의무') || t.includes('법적 상태')) {
     return { icon: '⚖️', theme: 'issues' };
   }
   // 4. 우선순위별 다음 행동 / 우선 행동 가이드 (P0-04)
-  if (t.includes('행동 가이드') || t.includes('지금 해야 할 일') || t.includes('우선 행동') || t.includes('우선순위') || t.includes('다음 행동') || t.includes('action plan') || t.includes('조치 사항') || t.includes('대응 방안')) {
+  if (t.includes('행동 가이드') || t.includes('지금 해야 할 일') || t.includes('우선 행동') || t.includes('우선순위') || t.includes('다음 행동') || t.includes('action plan') || t.includes('조치 사항') || t.includes('대응 방안') || t.includes('대응')) {
     return { icon: '🚀', theme: 'action' };
   }
   // 5. 미확인 사항 및 주의사항
@@ -103,11 +103,14 @@ export function renderInlineMarkdown(
 ): React.ReactNode[] {
   if (!text) return [];
 
+  // 인용 태그나 괄호 뒤에 불필요하게 삽입된 마침표/쉼표 앞 공백을 정돈하여 줄바꿈 시 문장 부호만 홀로 분리되는 현상 방지
+  const sanitizedText = text.replace(/\s+([.,;:!?])/g, '$1');
+
   // 법률 답변 원문을 표시 과정에서 수정하지 않는다.
   const tokenRegex = (
     /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*|\[(?:E\d{1,3}[^\]]*|[^\]\n]+\.(?:pdf|docx|txt|png|jpg|jpeg)|[^\]\n]+)\]|\([가-힣A-Za-z0-9·\s]+(?:법률|법|시행령|시행규칙)\s+제\s*\d+\s*조(?:[^()\n]|\([^()\n]*\))*\))/gi
   );
-  const parts = text.split(tokenRegex);
+  const parts = sanitizedText.split(tokenRegex);
 
   return parts.map((part, index) => {
     if (!part) return null;
@@ -137,7 +140,7 @@ export function renderInlineMarkdown(
           // 검증 인용 데이터가 있으나 연결에 실패했다면 다른 증거로 임의 연결하지 않는다.
           return <span key={index}>{part}</span>;
         }
-        const ctx = (lineContext || text).trim();
+        const ctx = (lineContext || sanitizedText).trim();
         const contextual = matchingRefs.filter(({ citation }) =>
           Boolean(citation.claim_text) &&
           (ctx.includes(citation.claim_text) || citation.claim_text.includes(ctx))
@@ -152,13 +155,13 @@ export function renderInlineMarkdown(
             claimId: selected.ref.claim_id || undefined,
             spanId: selected.ref.span_id || undefined,
           };
-          resolvedDocName = rawLabel;
+          resolvedDocName = selected.ref.document_name || rawLabel;
         } else {
           // 동일 파일이 여러 주장에 연결될 때 임의 Claim/Span을 고르지 않는다.
           const evidenceIds = [...new Set(matchingRefs.map(({ ref }) => ref.evidence_id).filter(Boolean))];
           if (evidenceIds.length !== 1) return <span key={index}>{part}</span>;
           meta = { evidenceId: evidenceIds[0] };
-          resolvedDocName = rawLabel;
+          resolvedDocName = matchingRefs.find(({ ref }) => ref.document_name)?.ref.document_name || rawLabel;
         }
       }
 
@@ -234,6 +237,7 @@ export function renderInlineMarkdown(
             fontSize: '0.88em',
             fontWeight: 600,
             margin: '0 2px',
+            whiteSpace: 'nowrap',
           }}
         >
           {part}
@@ -393,16 +397,7 @@ function renderFormattedLine(line: string, index: number, onEvidenceClick?: (lab
   );
 }
 export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvidenceClick, claimCitations }) => {
-  const [collapsedSections, setCollapsedSections] = useState<Record<number, boolean>>({});
-
   if (!content) return null;
-
-  const toggleSection = (index: number) => {
-    setCollapsedSections((prev) => ({
-      ...prev,
-      [index]: !prev[index],
-    }));
-  };
 
   // 줄바꿈 단위로 분할하여 파싱
   const rawLines = content.split('\n');
@@ -572,50 +567,10 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
             </div>
           );
         }
-
-        // 3-1. 쟁점별 심층 법률 분석 (접기/펼치기 아코디언 지원 - P0-03/Gate 2 기본 접힘 제공)
-        if (sec.type === 'issues') {
-          const isCollapsed = collapsedSections[idx] !== undefined ? collapsedSections[idx] : false;
-          return (
-            <div
-              key={idx}
-              style={{
-                backgroundColor: 'var(--surface, #ffffff)',
-                border: '1px solid var(--border, #e2e8f0)',
-                borderLeft: '4px solid #2563eb',
-                borderRadius: 'var(--radius-md, 6px)',
-                padding: '12px 14px',
-                color: 'var(--text-main, #1e293b)',
-              }}
-            >
-              <button
-                type="button"
-                aria-expanded={!isCollapsed}
-                onClick={() => toggleSection(idx)}
-                className="chat-legal-issues-toggle"
-              >
-                <span className="chat-legal-issues-label">
-                  <span aria-hidden="true">{sec.icon || '⚖️'}</span>
-                  <span>{sec.title}</span>
-                </span>
-                <span className="chat-legal-issues-hint">
-                  {isCollapsed ? '▶ 심층 분석 펼치기' : '▼ 심층 분석 접기'}
-                </span>
-              </button>
-              {isCollapsed ? (
-                <div style={{ fontSize: '0.86em', color: '#64748b', padding: '8px 0 2px 0' }}>
-                  상세 법률 분석이 접혀 있습니다. 위 버튼으로 펼칠 수 있습니다.
-                </div>
-              ) : (
-                <div style={{ fontSize: '0.91em', color: 'var(--text-main)', marginTop: '8px' }}>
-                  {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx, onEvidenceClick, claimCitations))}
-                </div>
-              )}
-            </div>
-          );
-        }
-
-        // 4. 일반 본문 및 유연한 소제목 섹션 (STEP 6 지시서 6.4 C: 과도한 카드 스타일 제거 및 문단 중심 레이아웃)
+        // 4. 일반 법률 본문 및 소제목 섹션
+        // 상위 '전체 법률 분석' 아코디언 내부에서 특정 항목만 별도 중첩 아코디언으로 감싸져
+        // 서식이 단절되는 현상을 방지하고, 모든 법률 분석 섹션이 균일하고 가독성 높은
+        // 일관된 문서 레이아웃으로 자연스럽게 이어지도록 렌더링합니다.
         const hasTitle = Boolean(sec.title);
         const isAction = sec.type === 'action';
 
@@ -626,6 +581,11 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
           >
             {hasTitle && (
               <h3 className="chat-legal-heading">
+                {sec.icon && sec.icon !== '▪' && (
+                  <span className="chat-legal-heading-icon" aria-hidden="true" style={{ marginRight: '6px' }}>
+                    {sec.icon}
+                  </span>
+                )}
                 <span>{sec.title}</span>
               </h3>
             )}

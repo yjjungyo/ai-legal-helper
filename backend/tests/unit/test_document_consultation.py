@@ -541,6 +541,116 @@ def test_finish_answer_generates_verified_limited_answer_or_sanitizes_internal_c
     assert "등기사항증명서 원본 확인 필요" in withheld_out["final_answer"]
 
 
+def test_finish_answer_cautionary_fallback_when_limited_ver_is_revise_with_supported_claims(document_state):
+    """[P0-CAUTIONARY-FALLBACK] 제한 답변 검증이 경미한 사유로 REVISE를 받았더라도 SUPPORTED 주장이 확보되어 있으면 WITHHELD로 폐기하지 않고 CAUTIONARY로 승인한다."""
+    draft = "초안 답변입니다. [E01_계약서.txt]"
+    _, manifest = format_grounding_sources(consultation.document_sources(document_state))
+    failed_ver = {
+        **verification_reply(
+            status="REVISE",
+            reason_code="ANSWER_REVISION_REQUIRED",
+            missing_issues=["추가 확인 사항"],
+        ),
+        "verified_answer_sha256": hashlib.sha256(draft.encode()).hexdigest(),
+        "source_manifest": manifest,
+    }
+    state = {**document_state, "draft_answer": draft, "verification_result": failed_ver}
+
+    limited_draft = "임대차 계약 체결 사실이 확인되었습니다. [E01_계약서.txt] 추가 합의일은 자료 보완이 필요합니다."
+    # status는 REVISE이지만, 1건의 주장이 SUPPORTED로 검증된 상황 (트레이스 86e18c0e 재현)
+    limited_ver = {
+        "status": "REVISE",
+        "reason_code": "UNCERTAIN_FACT_CLAIMED",
+        "claims": [
+            {
+                "claim": "임대차 계약 체결 사실이 확인되었습니다.",
+                "claim_type": "CASE_FACT",
+                "fact_status": "VERIFIED_FACT",
+                "source_ids": ["E01_계약서.txt"],
+                "grounding_status": "SUPPORTED",
+            },
+            {
+                "claim": "추가 합의일은 2026년 9월 30일입니다.",
+                "claim_type": "CASE_FACT",
+                "fact_status": "EVIDENCE_NEEDED",
+                "source_ids": [],
+                "grounding_status": "UNCERTAIN",
+            },
+        ],
+        "question_coverage": [
+            {"question": "계약 사실", "answered": True, "reason": "계약서 확인"}
+        ],
+        "temporal_gate": {"status": "PASS"},
+    }
+    with patch.object(consultation, "validate_document_snapshot"), \
+            patch.object(consultation, "write_document_answer", return_value={"draft_answer": limited_draft}), \
+            patch("ai_legal_helper.agents.verification.run_verification", return_value=limited_ver):
+        out = consultation.finish_answer(state)
+
+    # 전체 폐기(WITHHELD)되지 않고 CAUTIONARY로 보존 승인되어야 함
+    assert out["final_disposition"] == "CAUTIONARY"
+    assert "임대차 계약 체결 사실이 확인되었습니다." in out["final_answer"]
+    assert out["verification_result"]["status"] == "PASS"
+    assert out["verification_result"]["pre_fallback_status"] == "REVISE"
+    assert len(out["sources"]) == 1
+
+
+def test_document_verification_prompt_generalized_temporal_principles():
+    """문서 검증 프롬프트가 특정 시나리오 전용 지침 주입 없이, 일반적 기준일 및 법정 유예/당사자 지정일 원칙을 준수하는지 검증한다."""
+    from ai_legal_helper.agents.document_verification_prompt import DOCUMENT_VERIFICATION_PROMPT
+
+    # 1. 특정 날짜 하드코딩 금지 검증 (시나리오 종속 강제 주입 배제)
+    assert "2026.4.1" not in DOCUMENT_VERIFICATION_PROMPT
+    assert "2026.9.30" not in DOCUMENT_VERIFICATION_PROMPT
+    assert "2026.7.1" not in DOCUMENT_VERIFICATION_PROMPT
+    assert "2026-11-06" not in DOCUMENT_VERIFICATION_PROMPT
+
+    # 2. 보편적인 기준일 및 법정 유예기간 / 당사자 지정일 일반 원칙 확보 검증
+    assert "시점 및 효력 판단의 일반 원칙" in DOCUMENT_VERIFICATION_PROMPT
+    assert "사건 검토 기준일 시점에 두 날짜가 이미 모두 경과하였다면" in DOCUMENT_VERIFICATION_PROMPT
+    assert "REVISE는 잘못된 법률 결론, 질문 미응답, 핵심 근거 누락 등 실제 중대한 결함에 한하여 엄격히 사용" in DOCUMENT_VERIFICATION_PROMPT
+    assert "표현 방식의 사소한 차이나 부수적 설명의 보완 여부는 warnings에만 권고하고 PASS로 판정" in DOCUMENT_VERIFICATION_PROMPT
+
+
+def test_finish_answer_delivered_when_all_claims_supported_including_inference(document_state):
+    """[P0-FINAL-DISPOSITION-NORMALIZATION] 입증된 정황 추론(INFERENCE)이나 사용자 진술이 포함되어 있더라도 모든 클레임이 SUPPORTED로 검증된 완전 답변은 CAUTIONARY로 강등되지 않고 DELIVERED로 확정된다."""
+    draft = "임대차가 종료되어 보증금 반환 의무가 있습니다. 실무상 회수 위험은 추가 확인이 필요합니다. [E01_계약서.txt]"
+    _, manifest = format_grounding_sources(consultation.document_sources(document_state))
+    ver_result = {
+        "status": "PASS",
+        "reason_code": "NONE",
+        "claims": [
+            {
+                "claim": "임대차가 종료되어 보증금 반환 의무가 있습니다.",
+                "claim_type": "LEGAL_APPLICATION",
+                "fact_status": "VERIFIED_FACT",
+                "source_ids": ["E01_계약서.txt"],
+                "grounding_status": "SUPPORTED",
+            },
+            {
+                "claim": "실무상 회수 위험은 추가 확인이 필요합니다.",
+                "claim_type": "CASE_INFERENCE",
+                "fact_status": "INFERENCE",
+                "source_ids": ["E01_계약서.txt"],
+                "grounding_status": "SUPPORTED",
+            },
+        ],
+        "question_coverage": [
+            {"question": "계약 상태", "answered": True, "reason": "정상 답변"}
+        ],
+        "source_manifest": manifest,
+        "verified_answer_sha256": hashlib.sha256(draft.encode()).hexdigest(),
+    }
+    state = {**document_state, "draft_answer": draft, "verification_result": ver_result}
+    with patch.object(consultation, "validate_document_snapshot"):
+        out = consultation.finish_answer(state)
+
+    # 과잉 강등(CAUTIONARY) 없이 DELIVERED(검증 완료)로 정상 판정되어야 함
+    assert out["final_disposition"] == "DELIVERED"
+    assert out["verification_result"]["status"] == "PASS"
+    assert len(out["sources"]) == 1
+
+
 def test_trace_3bc30893_list_inference_basis_does_not_cause_verification_error(document_state):
     """검증 LLM이 inference_basis를 배열로 반환해도 VERIFICATION_ERROR가 발생하지 않고 후속 조문 검색으로 이어진다."""
     draft = (
