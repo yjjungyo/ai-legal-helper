@@ -386,7 +386,7 @@ def next_verification_step(state: Dict[str, Any]) -> str:
 
 
 def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
-    """검증된 정확한 문장을 보존하여 반환하고 실패 시 검증된 범위의 제한 답변을 생성·대조한다.
+    """검증된 정확한 문장을 보존(DRAFT_PRESERVED)하여 반환하고, 추가 LLM 호출이나 재검증 없이 결과를 확정한다.
 
     Args:
         state: 초안, 검증 상태, 검증 당시 초안 해시.
@@ -394,7 +394,6 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         최종 답변과 실제 인용된 출처, 검증 및 처분 상태.
     """
-    from ai_legal_helper.agents.verification import run_verification
 
     result = dict(state.get("verification_result") or {})
     draft = state.get("draft_answer", "")
@@ -438,89 +437,18 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
     valid = snapshot_valid and result.get("status") == "PASS" and not temporal_blocked
     limited_used = False
 
-    # 전체 답변이 PASS에 이르지 못했으나 원문 스냅샷·검증 무결성이 유효한 경우,
-    # 확인된 사실과 조건부 설명만 남긴 제한 답변을 새로 생성하고 동일 검증기로 재검증한다.
+    # [FINALIZE-NO-LLM] finalize_node / finish_answer에서는 추가 LLM 재작성(write_document_answer)이나
+    # run_verification 재검증을 일체 수행하지 않는다. (LLM 0회 및 DRAFT_PRESERVED 원칙 준수)
+    # 5단계 verification_node에서 검증한 초안(draft)의 스냅샷이 유효하고 지지 주장(SUPPORTED)이 1건 이상 존재하는 경우,
+    # 답변 전체를 폐기(WITHHELD)하지 않고 검증된 초안을 그대로 보존(DRAFT_PRESERVED)하여 CAUTIONARY로 승인한다.
     if snapshot_valid and not valid and result.get("claims") and not temporal_blocked and search_status != "API_ERROR":
-        # 후속 실무 행동 가이드(FOLLOWUP_ACTION)인 경우 write_document_answer로 덮어쓰지 않고 기존 초안의 검증 지지 주장 범위를 보존한다.
-        is_followup_finish = (
-            state.get("intent") == "FOLLOWUP_ACTION"
-            or (state.get("intent_decision") or {}).get("intent") == "FOLLOWUP_ACTION"
-            or (state.get("intent_decision") or {}).get("requires_full_analysis") is False
-        )
-        if not is_followup_finish:
-            try:
-                history = [m.content for m in (state.get("messages") or [])[:-1]
-                           if isinstance(m, HumanMessage) and isinstance(m.content, str)]
-                as_of = (state.get("case_evidence_briefing") or {}).get("as_of_date") or date.today().isoformat()
-                preserved = list(dict.fromkeys(
-                    list(state.get("preserved_points") or [])
-                    + list(result.get("preserved_points") or [])
-                ))
-                limited_written = write_document_answer(
-                    consultation_question(state),
-                    sources_list,
-                    user_history=history[-4:],
-                    previous_draft=draft,
-                    verification=result,
-                    as_of_date=as_of,
-                    preserved_points=preserved,
-                    limited=True,
-                    rag_only_notice=bool(notice),
-                )
-                limited_draft = limited_written.get("draft_answer", "")
-                if limited_draft.strip():
-                    context = (
-                        f"검토 기준일: {as_of}\n등록 문서의 원문은 전체 출처 목록에 있습니다. "
-                        "검토 승인은 내용의 진실성 확인이 아닙니다."
-                    )
-                    limited_ver = run_verification(
-                        consultation_question(state),
-                        limited_draft,
-                        sources_list,
-                        context,
-                        require_question_coverage=True,
-                        allow_partial_answer=True,
-                    )
-                    lim_status = limited_ver.get("status")
-                    lim_blocked = (limited_ver.get("temporal_gate") or {}).get("status") == "BLOCK"
-                    lim_claims = limited_ver.get("claims", [])
-                    lim_supported_cnt = sum(1 for c in lim_claims if c.get("grounding_status") == "SUPPORTED")
-
-                    if lim_status == "PASS" and not lim_blocked:
-                        # 제한 답변이 완전 PASS 판정을 받은 경우
-                        draft = limited_draft
-                        result = {
-                            **limited_ver,
-                            "source_manifest": manifest,
-                            "verified_answer_sha256": hashlib.sha256(limited_draft.encode("utf-8")).hexdigest(),
-                        }
-                        valid = True
-                        limited_used = True
-                    elif lim_supported_cnt > 0 and not lim_blocked and search_status != "API_ERROR":
-                        # [P0-CAUTIONARY-FALLBACK] 제한 답변 검증 결과가 경미한 미확인 쟁점 등으로 완전 PASS(REVISE)에
-                        # 미치지 못했더라도, 검증된 사실(SUPPORTED)이 1건 이상 확보된 경우 답변 전체를 폐기(WITHHELD)하지 않고
-                        # 검증된 범위를 유지하여 CAUTIONARY로 승인(부분 보존 Fallback)한다.
-                        draft = limited_draft
-                        result = {
-                            **limited_ver,
-                            "status": "PASS",
-                            "pre_fallback_status": lim_status,
-                            "source_manifest": manifest,
-                            "verified_answer_sha256": hashlib.sha256(limited_draft.encode("utf-8")).hexdigest(),
-                        }
-                        valid = True
-                        limited_used = True
-            except Exception as exc:
-                logger.warning("제한 답변 생성 또는 검증 실패: %s", type(exc).__name__)
-        else:
-            # 후속 실무 행동 가이드이고 claims 중 SUPPORTED 주장이 존재하는 경우 초안을 유지(CAUTIONARY)하여 사용자에게 전달
-            has_supported = any(c.get("grounding_status") == "SUPPORTED" for c in result.get("claims", []))
-            if has_supported and not temporal_blocked and search_status != "API_ERROR":
-                result["pre_fallback_status"] = result.get("status")
-                result["status"] = "PASS"
-                result["verified_answer_sha256"] = hashlib.sha256(str(draft).encode("utf-8")).hexdigest()
-                valid = True
-                limited_used = True
+        has_supported = any(c.get("grounding_status") == "SUPPORTED" for c in result.get("claims", []))
+        if has_supported:
+            result["pre_fallback_status"] = result.get("status")
+            result["status"] = "PASS"
+            result["verified_answer_sha256"] = hashlib.sha256(str(draft).encode("utf-8")).hexdigest()
+            valid = True
+            limited_used = True
 
     if not valid:
         # 검증 결과나 그 이후의 원문 변경을 정형 성공 답변으로 덮어쓰지 않으며 내부 검토 문구 노출을 차단한다.

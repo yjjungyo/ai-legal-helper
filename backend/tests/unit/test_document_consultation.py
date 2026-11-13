@@ -486,8 +486,8 @@ def test_re_analyze_preserves_points_without_consuming_revision_count_and_approv
 
 
 def test_finish_answer_generates_verified_limited_answer_or_sanitizes_internal_critique(document_state):
-    """재작성 후 미통과 시 제한 답변을 생성·재검증하여 CAUTIONARY로 제공하고, 실패 시 내부 검토 문구를 숨긴다."""
-    draft = "초안 답변입니다. [E01_계약서.txt]"
+    """재작성 후 미통과 시 추가 LLM/재검증 없이 검증된 초안을 CAUTIONARY로 보존하고, 실패 시 내부 검토 문구를 숨긴다."""
+    draft = "임대인 갑과 임차인 을이 계약했다. [E01_계약서.txt]"
     _, manifest = format_grounding_sources(consultation.document_sources(document_state))
     failed_ver = {
         **verification_reply(
@@ -501,40 +501,14 @@ def test_finish_answer_generates_verified_limited_answer_or_sanitizes_internal_c
     }
     state = {**document_state, "draft_answer": draft, "verification_result": failed_ver}
 
-    limited_draft = "임대인 갑과 임차인 을이 계약했다. [E01_계약서.txt] 종료 여부는 추가 자료가 필요합니다."
-    limited_ver = verification_reply(
-        claims=[
-            {
-                "claim": "임대인 갑과 임차인 을이 계약했다.",
-                "claim_type": "CASE_FACT",
-                "fact_status": "VERIFIED_FACT",
-                "source_ids": ["E01_계약서.txt"],
-                "grounding_status": "SUPPORTED",
-            }
-        ],
-        question_coverage=[
-            {
-                "question": "당사자와 지급 여부",
-                "answered": False,
-                "answerable": False,
-                "limitation_disclosed": True,
-                "limitation_statement": "종료 여부는 추가 자료가 필요합니다.",
-                "reason": "한계 명시",
-            }
-        ],
-    )
-    with patch.object(consultation, "validate_document_snapshot"), \
-            patch.object(consultation, "write_document_answer", return_value={"draft_answer": limited_draft}), \
-            patch("ai_legal_helper.agents.verification.run_verification", return_value=limited_ver):
+    with patch.object(consultation, "validate_document_snapshot"):
         cautionary_out = consultation.finish_answer(state)
     assert cautionary_out["final_disposition"] == "CAUTIONARY"
-    assert cautionary_out["final_answer"] == limited_draft
+    assert cautionary_out["final_answer"] == draft
     assert len(cautionary_out["sources"]) == 1
 
-    # 제한 답변도 통과하지 못한 경우 내부 검토자 문구('밝혔어야 한다' 등)는 노출하지 않고 정제된 항목만 안내한다.
-    with patch.object(consultation, "validate_document_snapshot"), \
-            patch.object(consultation, "write_document_answer", return_value={"draft_answer": limited_draft}), \
-            patch("ai_legal_helper.agents.verification.run_verification", return_value={"status": "REVISE", "claims": []}):
+    # 지지 주장(SUPPORTED)이 전혀 없는 경우 내부 검토자 문구('밝혔어야 한다' 등)는 노출하지 않고 정제된 항목만 안내한다.
+    with patch.object(consultation, "validate_document_snapshot"):
         withheld_state = {**state, "verification_result": {**failed_ver, "claims": []}}
         withheld_out = consultation.finish_answer(withheld_state)
     assert withheld_out["final_disposition"] == "WITHHELD"
@@ -543,23 +517,10 @@ def test_finish_answer_generates_verified_limited_answer_or_sanitizes_internal_c
 
 
 def test_finish_answer_cautionary_fallback_when_limited_ver_is_revise_with_supported_claims(document_state):
-    """[P0-CAUTIONARY-FALLBACK] 제한 답변 검증이 경미한 사유로 REVISE를 받았더라도 SUPPORTED 주장이 확보되어 있으면 WITHHELD로 폐기하지 않고 CAUTIONARY로 승인한다."""
-    draft = "초안 답변입니다. [E01_계약서.txt]"
+    """[P0-CAUTIONARY-FALLBACK] 검증 결과가 REVISE라도 SUPPORTED 주장이 확보되어 있으면 WITHHELD로 폐기하지 않고 초안을 CAUTIONARY로 승인한다."""
+    draft = "임대차 계약 체결 사실이 확인되었습니다. [E01_계약서.txt]"
     _, manifest = format_grounding_sources(consultation.document_sources(document_state))
     failed_ver = {
-        **verification_reply(
-            status="REVISE",
-            reason_code="ANSWER_REVISION_REQUIRED",
-            missing_issues=["추가 확인 사항"],
-        ),
-        "verified_answer_sha256": hashlib.sha256(draft.encode()).hexdigest(),
-        "source_manifest": manifest,
-    }
-    state = {**document_state, "draft_answer": draft, "verification_result": failed_ver}
-
-    limited_draft = "임대차 계약 체결 사실이 확인되었습니다. [E01_계약서.txt] 추가 합의일은 자료 보완이 필요합니다."
-    # status는 REVISE이지만, 1건의 주장이 SUPPORTED로 검증된 상황 (트레이스 86e18c0e 재현)
-    limited_ver = {
         "status": "REVISE",
         "reason_code": "UNCERTAIN_FACT_CLAIMED",
         "claims": [
@@ -582,10 +543,13 @@ def test_finish_answer_cautionary_fallback_when_limited_ver_is_revise_with_suppo
             {"question": "계약 사실", "answered": True, "reason": "계약서 확인"}
         ],
         "temporal_gate": {"status": "PASS"},
+        "verified_answer_sha256": hashlib.sha256(draft.encode()).hexdigest(),
+        "source_manifest": manifest,
+        "missing_issues": ["추가 확인 사항"],
     }
-    with patch.object(consultation, "validate_document_snapshot"), \
-            patch.object(consultation, "write_document_answer", return_value={"draft_answer": limited_draft}), \
-            patch("ai_legal_helper.agents.verification.run_verification", return_value=limited_ver):
+    state = {**document_state, "draft_answer": draft, "verification_result": failed_ver}
+
+    with patch.object(consultation, "validate_document_snapshot"):
         out = consultation.finish_answer(state)
 
     # 전체 폐기(WITHHELD)되지 않고 CAUTIONARY로 보존 승인되어야 함
