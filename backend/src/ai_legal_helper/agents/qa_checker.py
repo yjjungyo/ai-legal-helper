@@ -291,6 +291,48 @@ def check_deterministic_qa(
                     )
                     break
 
+    # 4-2. [SC-013 3단계] 선순위 담보권과 경매 매각 시 대항력 소멸주의(민사집행법 제91조 제3항) 결정론적 검사
+    # 질문 또는 사건 맥락에 선순위 담보권/근저당권이 명시된 사안에서, 후순위 임차인이 경매 낙찰자(매수인)에게
+    # 대항할 수 있다거나 보증금 반환/인수를 요구할 수 있다고 잘못 결론 내린 단정문 탐지
+    has_prior_encumbrance = (
+        any(
+            kw in question or kw in case_context
+            for kw in ("선순위 근저당", "선순위근저당", "선순위 담보", "1순위 근저당", "근저당권(20", "근저당권이 설정된 후", "근저당권 설정 후")
+        )
+        and not any(
+            no_kw in question or no_kw in case_context
+            for no_kw in ("선순위 담보권이 전혀 없", "선순위 담보권이 없", "선순위 근저당이 없", "선순위 권리 없음", "선순위 담보 없음", "선순위근저당 없음")
+        )
+    )
+    if has_prior_encumbrance:
+        buyer_assumption_positive_pats = [
+            re.compile(r"낙찰자(?:에게|를\s*상대로)?\s*(?:(?:미회수\s*)?보증금(?:\s*(?:의\s*)?반환)?|반환)을?\s*청구할\s*수\s*있"),
+            re.compile(r"낙찰자(?:에게|를\s*상대로)?\s*대항할\s*수\s*있"),
+            re.compile(r"낙찰자(?:가|는)\s*(?:미회수\s*)?보증금을?\s*인수해야\s*(?:합|한)"),
+            re.compile(r"매수인(?:에게|을\s*상대로)?\s*(?:(?:미회수\s*)?보증금(?:\s*(?:의\s*)?반환)?|반환)을?\s*청구할\s*수\s*있"),
+            re.compile(r"매수인(?:에게|을\s*상대로)?\s*대항할\s*수\s*있"),
+            re.compile(r"매수인(?:이|은)\s*(?:미회수\s*)?보증금을?\s*인수해야\s*(?:합|한)"),
+            re.compile(r"소멸하지\s*않고\s*낙찰자에게\s*인수"),
+        ]
+        negative_context_pats = ("대항할 수 없", "청구할 수 없", "인수하지 않", "소멸하므로", "소멸하며", "소멸하게 되", "대항하지 못", "청구하지 못")
+
+        for idx, sent in enumerate(sentences):
+            if any(p.search(sent) for p in buyer_assumption_positive_pats):
+                if not any(neg in sent for neg in negative_context_pats):
+                    logger.warning("[ANSWER_QA] 경매 소멸주의 위반 감지: %s", sent)
+                    legal_risk_passed = False
+                    repair_targets.append(
+                        RepairTarget(
+                            sentence_index=idx,
+                            original_sentence=sent,
+                            repair_reason="선순위 담보권 존재 시 경매 매각으로 임차권이 소멸(민사집행법 제91조 제3항)하므로 낙찰자에게 대항하거나 보증금 인수를 청구할 수 없음에도 대항/인수를 단정함",
+                            recommended_fix="경매 매각으로 임차권이 소멸하여 낙찰자에게 대항할 수 없으며, 배당요구 종기까지 배당요구하여 매각대금에서 우선변제받아야 함을 명시",
+                        )
+                    )
+                    llm_eval_reasons.append(
+                        "선순위 근저당권 존재 시 경매 소멸주의(민사집행법 제91조 제3항) 위반 문장 교정 필요: " + sent
+                    )
+
     if llm_eval_reasons:
         logger.info("[ANSWER_QA] 법률 효과 표현은 최종 판단 없이 심층 검증으로 전달")
     if legal_risk_passed:

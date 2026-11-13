@@ -145,7 +145,7 @@ from ai_legal_helper.observability.logging_config import get_logger
 
 from ai_legal_helper.observability.pii_masker import mask_pii, sanitize_diagnostic_text
 
-from ai_legal_helper.observability.context import set_node_name
+from ai_legal_helper.observability.context import set_node_name, get_request_id, get_trace_id, get_case_id
 
 
 
@@ -1149,10 +1149,23 @@ async def run_agents_node(state: LegalState) -> Dict:
             # 분야 분류가 지정되지 않은 경우 전체 컬렉션(category=None)을 1회 검색
             categories_to_query = [None]
 
+        # [SC-013 2단계 검색 쿼리 정밀화]
+        # 사용자 질문에만 의존하지 않고, 쟁점 계획의 핵심 법률 질문을 간결하게 결합하여 법률적 요건사실 기반 검색 수행.
+        # (특정 법령명/조문을 강제로 하드코딩하지 않고, 도출된 쟁점 질문의 법률적 핵심 취지를 반영)
+        user_raw_q = state.get("resolved_query") or state.get("question", "")
+        query_parts = [user_raw_q] if user_raw_q else []
+        issue_tasks = state.get("issue_tasks") or []
+        for task in issue_tasks[:3]:
+            if isinstance(task, dict):
+                lqs = task.get("legal_questions") or []
+                if lqs:
+                    query_parts.append(lqs[0])
+        retrieval_query = " \n".join(query_parts) if query_parts else user_raw_q
+
         for category in categories_to_query:
             try:
                 retrieved = await asyncio.to_thread(
-                    retrieve_with_status, query=state.get("resolved_query") or state.get("question", ""), category=category, k=6,
+                    retrieve_with_status, query=retrieval_query, category=category, k=6,
                 )
                 sources.extend(build_source_from_chroma_doc(
                     doc, category=category or "전체", retrieval_method="CHROMA_VECTOR",

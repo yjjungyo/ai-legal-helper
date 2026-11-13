@@ -16,6 +16,7 @@
 """
 
 from typing import List, Dict, Any, Optional
+import os
 import re
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
