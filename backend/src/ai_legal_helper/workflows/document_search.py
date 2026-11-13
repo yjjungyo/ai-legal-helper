@@ -6,6 +6,7 @@
 
 import hashlib
 import json
+import os
 from typing import Any
 
 from ai_legal_helper.tools.official_statute_search import _prepare_search_targets, _article_references
@@ -378,6 +379,11 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
         grouped.setdefault(request["law_name"], []).append(request)
     found = []
     diagnostics = []
+    channels_used = set()
+    local_matched_count = 0
+    openlaw_matched_count = 0
+    statute_search_items = []
+
     for name, items in grouped.items():
         articles = list(dict.fromkeys(a for r in items for a in r["articles"]))
         has_unnumbered = any(not r.get("articles") for r in items)
@@ -398,6 +404,19 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
                 "[DOCUMENT_SEARCH] 로컬 공식 법령 인덱스(law_docs_global)에서 '%s' 조문 %d건 즉시 재사용 (Local-First Hit)",
                 name, len(local_matched),
             )
+            channels_used.add("VECTOR_DB")
+            local_matched_count += len(local_matched)
+            for doc in local_matched:
+                s_name = doc.get("statute_name") or name
+                s_art = doc.get("article") or ""
+                s_title = doc.get("article_title") or ""
+                disp = f"{s_name} {s_art}" + (f" ({s_title})" if s_title and s_title != "?" else "")
+                statute_search_items.append({
+                    "statute_name": s_name,
+                    "article": s_art,
+                    "title": s_title,
+                    "display": disp.strip(),
+                })
             found.extend(local_matched)
             continue
 
@@ -409,12 +428,27 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
         # 3. 승인된 경우에 한해 OpenLaw 실시간 공식 API 호출
         diagnostic = {}
         try:
-            found.extend(search_official_statutes(
+            api_found = search_official_statutes(
                 query=" ".join(r["issue"] for r in items), candidate_laws=references,
                 missing_issues=[r["issue"] for r in items], max_articles_per_law=max(len(articles), 4),
                 as_of_date=(state.get("case_evidence_briefing") or {}).get("as_of_date"),
                 diagnostic=diagnostic,
-            ))
+            )
+            if api_found:
+                channels_used.add("OPENLAW_API")
+                openlaw_matched_count += len(api_found)
+                for doc in api_found:
+                    s_name = doc.get("statute_name") or name
+                    s_art = doc.get("article") or ""
+                    s_title = doc.get("article_title") or ""
+                    disp = f"{s_name} {s_art}" + (f" ({s_title})" if s_title and s_title != "?" else "")
+                    statute_search_items.append({
+                        "statute_name": s_name,
+                        "article": s_art,
+                        "title": s_title,
+                        "display": disp.strip(),
+                    })
+                found.extend(api_found)
         except Exception as exc:
             # 공식 API 장애를 그래프 전체 실패로 전파하지 않는다. 법령을 임의로 생성하지 않는다.
             diagnostic["api_error"] = True
@@ -467,11 +501,47 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
         except Exception as exc:
             logger.warning("[OFFICIAL_INDEX] document_search 백그라운드 인덱스 등록 예외: %s", exc)
 
-    return {"statute_search_results": found or fallback, "retrieved_sources": merged,
-            "statute_search_status": ("API_ERROR" if api_error else
-                "PARTIAL_SUCCESS" if partial else
-                "OFFICIAL_SUCCESS" if found else
-                "VERIFIED_LOCAL_FALLBACK" if fallback else "NOT_FOUND"),
-            "statute_search_count": (state.get("statute_search_count") or 0) + 1,
-            "statute_search_history": list(dict.fromkeys(
-                (state.get("statute_search_history") or []) + [r["key"] for r in requests]))}
+    if "VECTOR_DB" in channels_used and "OPENLAW_API" in channels_used:
+        channel_mode = "HYBRID"
+    elif "VECTOR_DB" in channels_used:
+        channel_mode = "VECTOR_DB"
+    elif "OPENLAW_API" in channels_used:
+        channel_mode = "OPENLAW_API"
+    else:
+        channel_mode = "NONE"
+
+    is_auto = bool(state.get("auto_approve_statute_search") or os.getenv("AUTO_APPROVE_STATUTE_SEARCH", "").lower() in ("true", "1", "yes"))
+    prefix = "[자동승인] " if is_auto else ""
+    items_str = " · ".join(item["display"] for item in statute_search_items)
+    if channel_mode == "HYBRID":
+        completion_desc = f"{prefix}로컬 벡터DB 및 OpenLaw API 병행 확보 | {items_str}"
+    elif channel_mode == "VECTOR_DB":
+        completion_desc = f"{prefix}로컬 벡터DB에서 {len(found)}건 확보 | {items_str}"
+    elif channel_mode == "OPENLAW_API":
+        completion_desc = f"{prefix}OpenLaw 공식 API에서 {len(found)}건 확보 | {items_str}"
+    else:
+        completion_desc = f"{prefix}법령을 찾지 못했습니다."
+
+    return {
+        "statute_search_results": found or fallback,
+        "retrieved_sources": merged,
+        "statute_search_status": (
+            "API_ERROR" if api_error else
+            "PARTIAL_SUCCESS" if partial else
+            "OFFICIAL_SUCCESS" if found else
+            "VERIFIED_LOCAL_FALLBACK" if fallback else "NOT_FOUND"
+        ),
+        "statute_search_count": (state.get("statute_search_count") or 0) + 1,
+        "statute_search_history": list(dict.fromkeys(
+            (state.get("statute_search_history") or []) + [r["key"] for r in requests]
+        )),
+        "statute_search_channels": sorted(list(channels_used)),
+        "statute_search_channel_mode": channel_mode,
+        "statute_search_channel_desc": completion_desc,
+        "statute_search_stats": {
+            "local_count": local_matched_count,
+            "openlaw_count": openlaw_matched_count,
+            "total_count": len(found),
+        },
+        "statute_search_items": statute_search_items,
+    }

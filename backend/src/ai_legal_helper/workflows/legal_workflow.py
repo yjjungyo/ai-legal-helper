@@ -85,6 +85,7 @@ from typing import Dict, List, Any, Optional
 from ai_legal_helper.agents.intent_analyzer import analyze_consultation_intent, ConsultationIntent, ConsultationMode
 
 import os
+import json
 
 import uuid
 
@@ -1042,6 +1043,41 @@ def statute_search_plan_condition(state: LegalState) -> str:
 
 @trace
 
+
+def format_statute_display(s: dict) -> Optional[str]:
+    """출처 딕셔너리에서 정제된 법령명 및 조문제목('법령명 제O조 (제목)')을 추출한다."""
+    if not isinstance(s, dict):
+        return None
+    law = s.get("statute_name") or s.get("law_name")
+    article = s.get("article") or s.get("article_number") or ""
+    title = s.get("article_title") or ""
+
+    candidates = [str(s.get(k) or "") for k in ("title", "source_id", "file_name", "filename")]
+    for c in candidates:
+        if not c:
+            continue
+        if not law:
+            m_law = re.search(r"([가-힣]+(?:법|령|규칙))", c)
+            if m_law:
+                law = m_law.group(1)
+        if not article:
+            m_art = re.search(r"(?:제\s*)?(\d+조(?:의\d+)?)", c)
+            if m_art:
+                article = m_art.group(1)
+        if not title:
+            m_title = re.search(r"\(([^)]+)\)", c)
+            if m_title and not re.search(r"\d{8}", m_title.group(1)):
+                title = m_title.group(1)
+
+    if not law:
+        return None
+    if article and not str(article).startswith("제"):
+        article = f"제{article}"
+    disp = f"{law} {article}".strip()
+    if title and title != "?":
+        disp += f" ({title})"
+    return disp
+
 async def run_agents_node(state: LegalState) -> Dict:
 
     """문서 사건은 법률 자료만 검색하고, 일반 상담은 기존 전문 에이전트를 실행한다.
@@ -1061,6 +1097,35 @@ async def run_agents_node(state: LegalState) -> Dict:
     """
 
     set_node_name("run_agents")
+    req_id = state.get("request_id") or get_request_id()
+    # 쟁점 계획이나 분야에서 검색 대상 추출
+    vector_target_candidates = []
+    issue_tasks = state.get("issue_tasks") or []
+    for task in issue_tasks:
+        if isinstance(task, dict):
+            for st in (task.get("required_statutes") or []) + (task.get("candidate_statutes") or []):
+                law_name = st.split()[0] if isinstance(st, str) else ""
+                if law_name and law_name not in vector_target_candidates:
+                    vector_target_candidates.append(law_name)
+    if not vector_target_candidates and state.get("categories"):
+        vector_target_candidates = [str(c) for c in state.get("categories") if c]
+    vector_target_str = ", ".join(vector_target_candidates[:3]) if vector_target_candidates else ""
+
+    if req_id:
+        try:
+            from ai_legal_helper.api.routes.consultation import update_progress_step, make_statute_search_message
+            from ai_legal_helper.api.schemas.consultation import ConsultationStepStatus
+            init_msg = make_statute_search_message(
+                vector_status="RUNNING",
+                vector_target=vector_target_str,
+                vector_statutes=[],
+                openlaw_status="PENDING",
+                openlaw_target="",
+                openlaw_statutes=[],
+            )
+            update_progress_step(req_id, "step_3", ConsultationStepStatus.RUNNING, init_msg)
+        except Exception as ex:
+            logger.warning("[RUN_AGENTS] 3단계 시작 진행 알림 예외: %s", ex)
 
     if state.get("answer_mode") == DOCUMENT_MODE:
 
@@ -1144,6 +1209,28 @@ async def run_agents_node(state: LegalState) -> Dict:
             f"수집된문서수={len(sources)} | 경고수={len(retrieval_warnings)}"
 
         )
+
+        found_displays = []
+        for s in sources:
+            disp = format_statute_display(s)
+            if disp and disp not in found_displays:
+                found_displays.append(disp)
+
+        if req_id:
+            try:
+                from ai_legal_helper.api.routes.consultation import update_progress_step, make_statute_search_message
+                from ai_legal_helper.api.schemas.consultation import ConsultationStepStatus
+                step3_msg = make_statute_search_message(
+                    vector_status="COMPLETED",
+                    vector_target=vector_target_str,
+                    vector_statutes=found_displays[:6],
+                    openlaw_status="SKIPPED",
+                    openlaw_target="",
+                    openlaw_statutes=[],
+                )
+                update_progress_step(req_id, "step_3", ConsultationStepStatus.COMPLETED, step3_msg)
+            except Exception as ex:
+                logger.warning("[RUN_AGENTS] 3단계 완료 진행 알림 예외: %s", ex)
 
         return {"results": {}, "agent_results": {}, "retrieved_sources": sources,
 
@@ -1353,6 +1440,14 @@ def synthesize_node(state: LegalState) -> Dict:
     """
 
     set_node_name("synthesize")
+    req_id = state.get("request_id") or get_request_id()
+    if req_id:
+        try:
+            from ai_legal_helper.api.routes.consultation import update_progress_step
+            from ai_legal_helper.api.schemas.consultation import ConsultationStepStatus
+            update_progress_step(req_id, "step_4", ConsultationStepStatus.RUNNING, "법률 쟁점별 분석 중")
+        except Exception as ex:
+            logger.warning("[SYNTHESIZE] 4단계 진행 알림 예외: %s", ex)
 
     if state.get("answer_mode") == DOCUMENT_MODE:
 
@@ -1492,6 +1587,14 @@ def verification_node(state: LegalState) -> Dict:
     """
 
     set_node_name("verification")
+    req_id = state.get("request_id") or get_request_id()
+    if req_id:
+        try:
+            from ai_legal_helper.api.routes.consultation import update_progress_step
+            from ai_legal_helper.api.schemas.consultation import ConsultationStepStatus
+            update_progress_step(req_id, "step_5", ConsultationStepStatus.RUNNING, "증거 및 법률 근거 검증 중")
+        except Exception as ex:
+            logger.warning("[VERIFICATION] 5단계 진행 알림 예외: %s", ex)
 
     if state.get("answer_mode") == DOCUMENT_MODE:
 
@@ -2612,6 +2715,14 @@ def revise_node(state: LegalState) -> Dict:
     """
 
     set_node_name("revise")
+    req_id = state.get("request_id") or get_request_id()
+    if req_id:
+        try:
+            from ai_legal_helper.api.routes.consultation import update_progress_step
+            from ai_legal_helper.api.schemas.consultation import ConsultationStepStatus
+            update_progress_step(req_id, "step_5", ConsultationStepStatus.RUNNING, "검증 피드백 기반 보강 중")
+        except Exception as ex:
+            logger.warning("[REVISE] 5단계 재작성 진행 알림 예외: %s", ex)
 
     ver_res = state.get("verification_result", {}) or {}
 
@@ -3211,6 +3322,14 @@ def finalize_node(state: LegalState) -> Dict:
     """문서 사건은 검증한 초안을 그대로 반환하고 일반 상담은 기존 출력 처리를 적용한다."""
 
     set_node_name("finalize")
+    req_id = state.get("request_id") or get_request_id()
+    if req_id:
+        try:
+            from ai_legal_helper.api.routes.consultation import update_progress_step
+            from ai_legal_helper.api.schemas.consultation import ConsultationStepStatus
+            update_progress_step(req_id, "step_6", ConsultationStepStatus.RUNNING, "최종 상담 답변 작성 중")
+        except Exception as ex:
+            logger.warning("[FINALIZE] 6단계 최종화 진행 알림 예외: %s", ex)
 
     if state.get("answer_mode") == DOCUMENT_MODE:
 
@@ -3963,7 +4082,52 @@ def execute_statute_search_node(state: LegalState) -> Dict:
 
             search_state["approved_statute_laws"] = law_names(raw_refs)
 
+        req_id = state.get("request_id") or get_request_id()
+        prior_statutes = []
+        for s in (state.get("retrieved_sources") or []):
+            disp = format_statute_display(s)
+            if disp and disp not in prior_statutes:
+                prior_statutes.append(disp)
+        openlaw_target_str = ", ".join(str(c) for c in (candidate_laws or search_state.get("approved_statute_laws") or [])[:3])
+        if req_id:
+            try:
+                from ai_legal_helper.api.routes.consultation import update_progress_step, make_statute_search_message
+                from ai_legal_helper.api.schemas.consultation import ConsultationStepStatus
+                run_msg = make_statute_search_message(
+                    vector_status="COMPLETED",
+                    vector_target="",
+                    vector_statutes=prior_statutes[:4],
+                    openlaw_status="RUNNING",
+                    openlaw_target=openlaw_target_str,
+                    openlaw_statutes=[],
+                )
+                update_progress_step(req_id, "step_3", ConsultationStepStatus.RUNNING, run_msg)
+            except Exception as ex:
+                logger.warning("[EXECUTE_STATUTE_SEARCH] 3단계 OpenLaw 시작 알림 예외: %s", ex)
+
         doc_search_out = execute_document_search(search_state)
+
+        openlaw_found = []
+        for s in (doc_search_out.get("statute_search_results") or []):
+            disp = format_statute_display(s)
+            if disp and disp not in openlaw_found:
+                openlaw_found.append(disp)
+
+        if req_id:
+            try:
+                from ai_legal_helper.api.routes.consultation import update_progress_step, make_statute_search_message
+                from ai_legal_helper.api.schemas.consultation import ConsultationStepStatus
+                done_msg = make_statute_search_message(
+                    vector_status="COMPLETED",
+                    vector_target="",
+                    vector_statutes=prior_statutes[:4],
+                    openlaw_status="COMPLETED",
+                    openlaw_target=openlaw_target_str,
+                    openlaw_statutes=openlaw_found[:6],
+                )
+                update_progress_step(req_id, "step_3", ConsultationStepStatus.COMPLETED, done_msg)
+            except Exception as ex:
+                logger.warning("[EXECUTE_STATUTE_SEARCH] 3단계 OpenLaw 완료 알림 예외: %s", ex)
 
         warnings = list(state.get("warnings", []) or [])
 

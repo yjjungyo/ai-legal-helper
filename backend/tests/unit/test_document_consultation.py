@@ -535,7 +535,8 @@ def test_finish_answer_generates_verified_limited_answer_or_sanitizes_internal_c
     with patch.object(consultation, "validate_document_snapshot"), \
             patch.object(consultation, "write_document_answer", return_value={"draft_answer": limited_draft}), \
             patch("ai_legal_helper.agents.verification.run_verification", return_value={"status": "REVISE", "claims": []}):
-        withheld_out = consultation.finish_answer(state)
+        withheld_state = {**state, "verification_result": {**failed_ver, "claims": []}}
+        withheld_out = consultation.finish_answer(withheld_state)
     assert withheld_out["final_disposition"] == "WITHHELD"
     assert "밝혔어야" not in withheld_out["final_answer"]
     assert "등기사항증명서 원본 확인 필요" in withheld_out["final_answer"]
@@ -915,3 +916,158 @@ def test_consultation_question_empty_state():
     """상태가 비어있거나 None인 경우 안전하게 빈 문자열을 반환한다."""
     assert consultation.consultation_question({}) == ""
     assert consultation.consultation_question({"question": None, "resolved_query": None}) == ""
+
+
+def test_execute_document_search_channel_vector_db():
+    """로컬 Chroma 벡터DB 인덱스에서 법령을 충족할 때 채널이 VECTOR_DB로 기록되고 법령명·제목이 전달되는지 검증한다."""
+    from ai_legal_helper.workflows.document_search import execute_document_search
+
+    mock_doc = {
+        "source_id": "law-test-1",
+        "statute_name": "주택임대차보호법",
+        "article": "제3조",
+        "article_title": "대항력 등",
+        "content": "대항력 요건 규정",
+        "source_type": "STATUTE",
+    }
+    state = {
+        "question": "대항력 요건을 알고 싶습니다.",
+        "auto_approve_statute_search": True,
+        "verification_result": {
+            "status": "REVISE",
+            "reason_code": "LEGAL_SOURCE_INSUFFICIENT",
+            "legal_search_requests": [
+                {
+                    "law_name": "주택임대차보호법",
+                    "articles": ["제3조"],
+                    "issue": "대항력 요건",
+                    "question_part": "대항력 요건",
+                }
+            ],
+        },
+        "retrieved_sources": [],
+        "statute_search_count": 0,
+    }
+
+    with patch("ai_legal_helper.workflows.document_search._retrieve_from_local_index", return_value=[mock_doc]):
+        result = execute_document_search(state)
+
+    assert result["statute_search_channel_mode"] == "VECTOR_DB"
+    assert "VECTOR_DB" in result["statute_search_channels"]
+    assert result["statute_search_stats"]["local_count"] == 1
+    assert result["statute_search_stats"]["openlaw_count"] == 0
+    assert "[자동승인]" in result["statute_search_channel_desc"]
+    assert "로컬 벡터DB" in result["statute_search_channel_desc"]
+    assert "주택임대차보호법 제3조 (대항력 등)" in result["statute_search_channel_desc"]
+    assert len(result["statute_search_items"]) == 1
+    assert result["statute_search_items"][0]["display"] == "주택임대차보호법 제3조 (대항력 등)"
+
+
+def test_execute_document_search_channel_openlaw_api():
+    """로컬 인덱스에 없어 OpenLaw 공식 API를 호출할 때 채널과 법령명·조문제목이 기록되는지 검증한다."""
+    from ai_legal_helper.workflows.document_search import execute_document_search
+
+    mock_api_source = {
+        "source_id": "openlaw-test-1",
+        "statute_name": "상가건물 임대차보호법",
+        "article": "제10조",
+        "article_title": "계약갱신 요구 등",
+        "content": "계약갱신 요구권",
+        "source_type": "STATUTE",
+    }
+    state = {
+        "question": "상가 계약갱신 요구권을 알고 싶습니다.",
+        "auto_approve_statute_search": True,
+        "verification_result": {
+            "status": "REVISE",
+            "reason_code": "LEGAL_SOURCE_INSUFFICIENT",
+            "legal_search_requests": [
+                {
+                    "law_name": "상가건물 임대차보호법",
+                    "articles": ["제10조"],
+                    "issue": "계약갱신 요구권",
+                    "question_part": "상가 계약갱신",
+                }
+            ],
+        },
+        "retrieved_sources": [],
+        "statute_search_count": 0,
+    }
+
+    with patch("ai_legal_helper.workflows.document_search._retrieve_from_local_index", return_value=[]),          patch("ai_legal_helper.tools.official_statute_search.search_official_statutes", return_value=[mock_api_source]):
+        result = execute_document_search(state)
+
+    assert result["statute_search_channel_mode"] == "OPENLAW_API"
+    assert "OPENLAW_API" in result["statute_search_channels"]
+    assert result["statute_search_stats"]["openlaw_count"] == 1
+    assert result["statute_search_stats"]["local_count"] == 0
+    assert "[자동승인]" in result["statute_search_channel_desc"]
+    assert "OpenLaw 공식 API" in result["statute_search_channel_desc"]
+    assert "상가건물 임대차보호법 제10조 (계약갱신 요구 등)" in result["statute_search_channel_desc"]
+    assert len(result["statute_search_items"]) == 1
+    assert result["statute_search_items"][0]["display"] == "상가건물 임대차보호법 제10조 (계약갱신 요구 등)"
+
+
+def test_execute_document_search_channel_hybrid():
+    """일부 법령은 로컬 벡터DB, 일부 법령은 OpenLaw API를 병행 호출할 때 HYBRID와 각 법령명·제목이 기록되는지 검증한다."""
+    from ai_legal_helper.workflows.document_search import execute_document_search
+
+    local_doc = {
+        "source_id": "law-local-1",
+        "statute_name": "주택임대차보호법",
+        "article": "제3조",
+        "article_title": "대항력 등",
+        "content": "대항력 요건",
+        "source_type": "STATUTE",
+    }
+    api_doc = {
+        "source_id": "law-api-1",
+        "statute_name": "민법",
+        "article": "제623조",
+        "article_title": "임대인의 의무",
+        "content": "임대인의 의무",
+        "source_type": "STATUTE",
+    }
+    state = {
+        "question": "대항력과 수선의무를 알고 싶습니다.",
+        "auto_approve_statute_search": True,
+        "verification_result": {
+            "status": "REVISE",
+            "reason_code": "LEGAL_SOURCE_INSUFFICIENT",
+            "legal_search_requests": [
+                {
+                    "law_name": "주택임대차보호법",
+                    "articles": ["제3조"],
+                    "issue": "대항력",
+                    "question_part": "대항력",
+                },
+                {
+                    "law_name": "민법",
+                    "articles": ["제623조"],
+                    "issue": "수선의무",
+                    "question_part": "수선의무",
+                },
+            ],
+        },
+        "retrieved_sources": [],
+        "statute_search_count": 0,
+    }
+
+    def fake_retrieve(law_name, **kwargs):
+        if "주택임대차" in law_name:
+            return [local_doc]
+        return []
+
+    with patch("ai_legal_helper.workflows.document_search._retrieve_from_local_index", side_effect=fake_retrieve),          patch("ai_legal_helper.tools.official_statute_search.search_official_statutes", return_value=[api_doc]):
+        result = execute_document_search(state)
+
+    assert result["statute_search_channel_mode"] == "HYBRID"
+    assert "VECTOR_DB" in result["statute_search_channels"]
+    assert "OPENLAW_API" in result["statute_search_channels"]
+    assert result["statute_search_stats"]["local_count"] == 1
+    assert result["statute_search_stats"]["openlaw_count"] == 1
+    assert "[자동승인]" in result["statute_search_channel_desc"]
+    assert "병행 확보" in result["statute_search_channel_desc"]
+    assert "주택임대차보호법 제3조 (대항력 등)" in result["statute_search_channel_desc"]
+    assert "민법 제623조 (임대인의 의무)" in result["statute_search_channel_desc"]
+    assert len(result["statute_search_items"]) == 2

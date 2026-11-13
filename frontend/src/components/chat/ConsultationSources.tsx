@@ -32,9 +32,23 @@ function presentSource(s: Source): DisplaySource | null {
   if (kind === 'evidence') {
     label = fileName || '파일명 확인 필요';
   } else if (kind === 'law') {
-    const law = (s.statute_name || s.title || fileName || '').split('[')[0].trim();
+    const rawLaw = (s.statute_name || s.title || fileName || '').split('[')[0].trim();
     const article = (s.article || '').trim();
-    label = [law, article && !law.includes(article) ? article : ''].filter(Boolean).join(' ') || '법령명 확인 필요';
+    const articleTitle = (s.article_title || '').trim();
+
+    let law = rawLaw;
+    if (article && law.includes(article)) {
+      law = law.split(article)[0].trim();
+    }
+
+    let artWithTitle = article;
+    if (article && articleTitle && !article.includes(articleTitle) && !law.includes(articleTitle)) {
+      artWithTitle = `${article} (${articleTitle})`;
+    } else if (!article && articleTitle && !law.includes(articleTitle)) {
+      artWithTitle = `(${articleTitle})`;
+    }
+
+    label = [law, artWithTitle].filter(Boolean).join(' ') || '법령명 확인 필요';
   } else if (kind === 'precedent') {
     label = [s.court, s.case_number].filter(Boolean).join(' ') || s.title || fileName || '판례명 확인 필요';
   } else {
@@ -45,12 +59,26 @@ function presentSource(s: Source): DisplaySource | null {
   const version = (s.effective_date || s.version_date || s.version_id || '').trim();
   const key = kind === 'evidence' ? `evidence:${s.evidence_id || fileName || id}` :
     `${kind}:${label}:${version}`;
+
+  // 법령 출처에 source_url이 없을 경우 국가법령정보센터 표준 링크 자동 생성 (법령 링크 이동 복원)
+  let url = s.source_url || undefined;
+  if (!url && kind === 'law') {
+    const rawLaw = (s.statute_name || s.title || fileName || '').split('[')[0].trim();
+    const article = (s.article || '').trim();
+    const cleanLaw = rawLaw.replace(/\(법률\)|\(대통령령\)|\(시행령\)|\(시행규칙\)/g, '').trim();
+    if (cleanLaw) {
+      const encLaw = encodeURIComponent(cleanLaw);
+      const encArt = article ? `/${encodeURIComponent(article)}` : '';
+      url = `https://www.law.go.kr/법령/${encLaw}${encArt}`;
+    }
+  }
+
   return {
     key, label, kind,
     evidenceId: s.evidence_id || undefined,
     claimId: s.claim_id || undefined,
     spanId: s.span_id || undefined,
-    url: s.source_url || undefined,
+    url,
   };
 }
 

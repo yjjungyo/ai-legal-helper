@@ -1,0 +1,90 @@
+[
+  {
+    "case_id": "SC-011",
+    "title": "묵시적갱신_중도해지_분할반환_이자상계분쟁",
+    "tag": "turn1",
+    "trace_id": "2e9cd9f5-31a5-4d87-bb58-211f6ebe4138",
+    "latency_sec": 43.1,
+    "total_tokens": 26638,
+    "llm_calls": 3,
+    "verification_status": "PASS",
+    "filename": "SC-011_turn1_2e9cd9f5-31a5-4d87-bb58-211f6ebe4138.json"
+  },
+  {
+    "case_id": "SC-011",
+    "title": "묵시적갱신_중도해지_분할반환_이자상계분쟁",
+    "tag": "turn2",
+    "trace_id": "bf98b713-b03e-428e-87ea-8d7b4b24ff30",
+    "latency_sec": 63.7,
+    "total_tokens": 25197,
+    "llm_calls": 2,
+    "verification_status": "PASS",
+    "filename": "SC-011_turn2_bf98b713-b03e-428e-87ea-8d7b4b24ff30.json"
+  },
+  {
+    "case_id": "SC-011",
+    "title": "묵시적갱신_중도해지_분할반환_이자상계분쟁",
+    "tag": "turn3",
+    "trace_id": "c287edb2-4781-463a-98ef-578c614647b4",
+    "latency_sec": 67.27,
+    "total_tokens": 29798,
+    "llm_calls": 2,
+    "verification_status": "PASS",
+    "filename": "SC-011_turn3_c287edb2-4781-463a-98ef-578c614647b4.json"
+  },
+  {
+    "case_id": "SC-011",
+    "title": "묵시적갱신_중도해지_분할반환_이자상계분쟁",
+    "tag": "draft",
+    "trace_id": "132d335d-d628-490b-b5f3-0640e23bc01e",
+    "latency_sec": 3.5,
+    "total_tokens": 3728,
+    "llm_calls": 2,
+    "verification_status": "PASS",
+    "filename": "SC-011_draft_132d335d-d628-490b-b5f3-0640e23bc01e.json"
+  },
+  {
+    "case_id": "SC-012",
+    "title": "임대인사망_공동상속인_불가분채무_보증금청구",
+    "tag": "turn1",
+    "trace_id": "9de9cd8d-f1c2-4dd7-90d0-842646e9898f",
+    "latency_sec": 121.67,
+    "total_tokens": 79275,
+    "llm_calls": 6,
+    "verification_status": "PASS",
+    "filename": "SC-012_turn1_9de9cd8d-f1c2-4dd7-90d0-842646e9898f.json"
+  },
+  {
+    "case_id": "SC-012",
+    "title": "임대인사망_공동상속인_불가분채무_보증금청구",
+    "tag": "turn2",
+    "trace_id": "626dacc8-27a5-4b10-817d-514454a23ef7",
+    "latency_sec": 327.08,
+    "total_tokens": 92625,
+    "llm_calls": 7,
+    "verification_status": "PASS",
+    "filename": "SC-012_turn2_626dacc8-27a5-4b10-817d-514454a23ef7.json"
+  },
+  {
+    "case_id": "SC-012",
+    "title": "임대인사망_공동상속인_불가분채무_보증금청구",
+    "tag": "turn3",
+    "trace_id": "8c2b34b4-931d-4425-a539-4d319c8f900a",
+    "latency_sec": 163.55,
+    "total_tokens": 100566,
+    "llm_calls": 7,
+    "verification_status": "PASS",
+    "filename": "SC-012_turn3_8c2b34b4-931d-4425-a539-4d319c8f900a.json"
+  },
+  {
+    "case_id": "SC-012",
+    "title": "임대인사망_공동상속인_불가분채무_보증금청구",
+    "tag": "draft",
+    "trace_id": "873acc5d-fcf2-4e3d-8743-51c7c0cec03f",
+    "latency_sec": 3.5,
+    "total_tokens": 1838,
+    "llm_calls": 2,
+    "verification_status": "PASS",
+    "filename": "SC-012_draft_873acc5d-fcf2-4e3d-8743-51c7c0cec03f.json"
+  }
+]

@@ -295,6 +295,13 @@ def build_source_from_chroma_doc(
             source_id = detailed_statute_name
         else:
             source_id = raw_sid
+
+        # 법령(STATUTE)인 경우 공식 법령 URL(law.go.kr)이 누락되었다면 법령명과 조문 번호로 기본 생성한다.
+        if not source_url and statute_name:
+            import urllib.parse
+            clean_stat = re.sub(r"\(법률\)|\(대통령령\)|\(시행령\)|\(시행규칙\)", "", str(statute_name)).strip()
+            art_enc = f"/{urllib.parse.quote(str(article).strip())}" if article else ""
+            source_url = f"https://www.law.go.kr/법령/{urllib.parse.quote(clean_stat)}{art_enc}"
     else:
         title = (
             meta.get("title")
@@ -594,6 +601,13 @@ def normalize_source_dict(raw: Any) -> Dict[str, Any]:
         elif head:
             raw_title = head
 
+    norm_source_url = raw.get("source_url")
+    if source_type == "STATUTE" and not norm_source_url and statute_name:
+        import urllib.parse
+        clean_stat = re.sub(r"\(법률\)|\(대통령령\)|\(시행령\)|\(시행규칙\)", "", str(statute_name)).strip()
+        art_enc = f"/{urllib.parse.quote(str(article).strip())}" if article else ""
+        norm_source_url = f"https://www.law.go.kr/법령/{urllib.parse.quote(clean_stat)}{art_enc}"
+
     std = StandardSource(
         source_id=source_id,
         source_type=source_type,
@@ -608,7 +622,7 @@ def normalize_source_dict(raw: Any) -> Dict[str, Any]:
         ),
         chunk_id=raw.get("chunk_id") or (f"{source_id}#chunk" if source_id != "UNKNOWN" else None),
         retrieval_collection=raw.get("retrieval_collection"),
-        source_url=raw.get("source_url"),
+        source_url=norm_source_url,
         version_date=version_date,
         retrieved_at=raw.get("retrieved_at") or _utc_now_iso(),
         law_id=str(raw.get("law_id")).strip() if raw.get("law_id") else None,

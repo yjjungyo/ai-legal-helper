@@ -98,3 +98,20 @@ test('동일한 증거의 여러 claim이 모호하면 Claim/Span을 임의 지�
   assert.equal(clicked.meta.claimId, undefined);
   assert.equal(clicked.meta.spanId, undefined);
 });
+
+test('claimCitations가 없어도 파일명·라벨 증거 태그는 열람 버튼으로 렌더링된다', () => {
+  let clickedName;
+  const nodes = renderInlineMarkdown('[E01_계약서.txt]', (name) => { clickedName = name; });
+  const button = nodes.find((node) => node && node.type === 'button');
+  assert.ok(button, '버튼 노드가 생성되어야 함');
+  button.props.onClick({ stopPropagation() {} });
+  assert.equal(clickedName, 'E01_계약서.txt');
+});
+
+test('인라인 법령 조문 배지는 국가법령정보센터(law.go.kr) 링크로 렌더링된다', () => {
+  const nodes = renderInlineMarkdown('(주택임대차보호법 제3조)');
+  const link = nodes.find((node) => node && node.type === 'a');
+  assert.ok(link, '링크 <a> 노드가 생성되어야 함');
+  assert.equal(decodeURIComponent(link.props.href), 'https://www.law.go.kr/법령/주택임대차보호법/제3조');
+  assert.equal(link.props.target, '_blank');
+});

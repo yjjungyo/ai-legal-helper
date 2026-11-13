@@ -31,7 +31,8 @@ from ai_legal_helper.api.schemas.consultation import (
     ConsultationProgress, create_initial_progress
 )
 from ai_legal_helper.observability.context import (
-    set_trace_id, reset_trace_id, set_case_id, reset_case_id
+    set_trace_id, reset_trace_id, set_case_id, reset_case_id,
+    set_request_id, reset_request_id, get_request_id
 )
 from ai_legal_helper.llm.usage import global_token_tracker
 from ai_legal_helper.workflows.legal_workflow import run_legal_consultation
@@ -69,12 +70,60 @@ def _get_conversation_lock(conversation_id: str) -> threading.Lock:
             _conversation_locks[conversation_id] = threading.Lock()
         return _conversation_locks[conversation_id]
 
+def make_statute_search_message(
+    vector_status: str = "PENDING",
+    vector_target: Optional[str] = None,
+    vector_statutes: Optional[List[str]] = None,
+    openlaw_status: str = "PENDING",
+    openlaw_target: Optional[str] = None,
+    openlaw_statutes: Optional[List[str]] = None,
+) -> str:
+    """법령 검색 2대 채널(벡터DB, 국가법령정보센터)의 검색 대상, 진행 상태 및 결과를 구조화된 JSON으로 생성한다."""
+    vec_stats = vector_statutes or []
+    open_stats = openlaw_statutes or []
+    
+    vec_target_str = vector_target or ""
+    open_target_str = openlaw_target or ""
+
+    vec_msg = (
+        (f"벡터DB에서 '{vec_target_str}' 찾는 중..." if vec_target_str else "벡터DB에서 법령 찾는 중...")
+        if vector_status == "RUNNING"
+        else f"{', '.join(vec_stats)}을 찾았습니다." if vec_stats
+        else "법령을 찾지 못했습니다." if vector_status == "COMPLETED"
+        else "벡터DB에서 법령 대기 중..."
+    )
+    open_msg = (
+        (f"국가법령정보센터에서 '{open_target_str}' 찾는 중..." if open_target_str else "국가법령정보센터에서 법령 찾는 중...")
+        if openlaw_status == "RUNNING"
+        else f"{', '.join(open_stats)}을 찾았습니다." if open_stats
+        else "추가 조회가 필요하지 않아 생략되었습니다." if openlaw_status in ("SKIPPED", "NOT_NEEDED", "PENDING")
+        else "법령을 찾지 못했습니다." if openlaw_status == "COMPLETED" and open_target_str
+        else "추가 조회가 필요하지 않아 생략되었습니다."
+    )
+    payload = {
+        "vector_db": {
+            "status": vector_status,
+            "target": vec_target_str,
+            "statutes": vec_stats,
+            "message": vec_msg,
+        },
+        "openlaw": {
+            "status": openlaw_status,
+            "target": open_target_str,
+            "statutes": open_stats,
+            "message": open_msg,
+        },
+    }
+    return json.dumps(payload, ensure_ascii=False)
+
+
 NODE_TO_PROGRESS_STEP: Dict[str, tuple[str, str]] = {
     "supervisor_initialize": ("step_1", "사건 기본정보 및 대화 맥락 확인 완료"),
     "intent_analysis": ("step_1", "의뢰인 질의 의도 분석 완료"),
     "general_conversation": ("step_6", "일반 안내 답변 생성 완료"),
     "followup_action": ("step_4", "후속 실행 조치 분석 완료"),
     "route": ("step_2", "사실관계 및 타임라인 조회 중"),
+    "plan": ("step_2", "사실관계 및 타임라인 검토 완료"),
     "statute_search_plan": ("step_2", "법령 적용 시점 및 사실관계 검토 완료"),
     "run_agents": ("step_3", "법령 및 판례 검색 중"),
     "synthesize": ("step_4", "법률 쟁점별 분석 중"),
@@ -116,7 +165,11 @@ def update_progress_step(
                 elif status in (ConsultationStepStatus.COMPLETED, ConsultationStepStatus.WAITING_APPROVAL, ConsultationStepStatus.FAILED):
                     s.completed_at = now_str
                 if message:
-                    s.message = message
+                    # 3단계 등 이미 구조화된 법령 검색 결과(JSON)가 보존되어 있는 경우 단순 텍스트로 덮어쓰지 않는다.
+                    if s.message and s.message.strip().startswith("{") and not message.strip().startswith("{"):
+                        pass
+                    else:
+                        s.message = message
             else:
                 s.status = ConsultationStepStatus.PENDING
 
@@ -421,6 +474,7 @@ async def start_consultation(
 async def process_consultation(request_id: str, trace_id: str, req: ConsultationRequest, conv_context: Optional[Any] = None):
     """실제 LangGraph 워크플로우를 실행하고 결과를 업데이트하는 백그라운드 태스크."""
     t_token = set_trace_id(trace_id)
+    r_token = set_request_id(request_id)
     c_token = None
     if req.case_id:
         c_token = set_case_id(req.case_id)
@@ -707,6 +761,7 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
         end_trace(trace_id)
         flush_langfuse()
         reset_trace_id(t_token)
+        reset_request_id(r_token)
         if c_token:
             reset_case_id(c_token)
 
@@ -944,6 +999,7 @@ async def process_consultation_resume(
 ):
     """승인/거절 결정을 바탕으로 중단된 LangGraph 워크플로우를 재개(Resume)하는 백그라운드 태스크."""
     t_token = set_trace_id(trace_id)
+    r_token = set_request_id(request_id)
     c_token = set_case_id(case_id) if case_id else None
     sys_name = get_system_name()
     git_sha = get_git_commit()
@@ -1150,6 +1206,7 @@ async def process_consultation_resume(
         end_trace(trace_id)
         flush_langfuse()
         reset_trace_id(t_token)
+        reset_request_id(r_token)
         if c_token:
             reset_case_id(c_token)
 

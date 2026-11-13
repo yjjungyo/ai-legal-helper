@@ -28,6 +28,10 @@ export interface LegalAnswerViewProps {
 /**
  * 8대 권장 구성요소 분류 정보
  */
+// 이모티콘 감지 정규식 (유니코드 확장 픽토그래프 블록 지원)
+const LEADING_EMOJI_REGEX = /^([\p{Extended_Pictographic}\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]+)\s*/u;
+const ONLY_EMOJI_REGEX = /^[\p{Extended_Pictographic}\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}\s]+$/u;
+
 interface SectionCategoryConfig {
   icon: string;
   theme: 'summary' | 'facts' | 'issues' | 'statutes' | 'analysis' | 'uncertain' | 'action' | 'sources' | 'banner' | 'warning' | 'normal';
@@ -108,12 +112,28 @@ export function renderInlineMarkdown(
 
   // 법률 답변 원문을 표시 과정에서 수정하지 않는다.
   const tokenRegex = (
-    /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*|\[(?:E\d{1,3}[^\]]*|[^\]\n]+\.(?:pdf|docx|txt|png|jpg|jpeg)|[^\]\n]+)\]|\([가-힣A-Za-z0-9·\s]+(?:법률|법|시행령|시행규칙)\s+제\s*\d+\s*조(?:[^()\n]|\([^()\n]*\))*\))/gi
+    /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*|\[[^\]\n]+\]\(https?:\/\/[^\s)]+\)|\[(?:E\d{1,3}[^\]]*|[^\]\n]+\.(?:pdf|docx|txt|png|jpg|jpeg)|[^\]\n]+)\]|\([가-힣A-Za-z0-9·\s]+(?:법률|법|시행령|시행규칙)\s+제\s*\d+\s*조(?:[^()\n]|\([^()\n]*\))*\))/gi
   );
   const parts = sanitizedText.split(tokenRegex);
 
   return parts.map((part, index) => {
     if (!part) return null;
+
+    // 마크다운 일반 링크 ([제목](url)) 지원
+    const linkMatch = part.match(/^\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)$/);
+    if (linkMatch) {
+      return (
+        <a
+          key={index}
+          href={linkMatch[2]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="chat-source-link"
+        >
+          {linkMatch[1]}
+        </a>
+      );
+    }
 
     // 대괄호 일반 텍스트와 실제 증거 인용을 명확히 분리한다.
     // [잠정], [1. 핵심 결론] 같은 제목/표시는 클릭 가능한 증거가 아니다.
@@ -130,10 +150,17 @@ export function renderInlineMarkdown(
         // 정확히 같은 증거 라벨 또는 파일명으로만 연결한다. 부분 문자열/E01 vs E010 유사 매칭 금지.
         const matchingRefs = claimCitations.flatMap((citation) =>
           citation.evidence_refs
-            .filter((ref) =>
-              (Boolean(ref.evidence_label) && ref.evidence_label!.trim().toUpperCase() === cleanUpper) ||
-              (Boolean(ref.document_name) && ref.document_name!.trim().toUpperCase() === cleanUpper)
-            )
+            .filter((ref) => {
+              const rLabel = (ref.evidence_label || '').trim().toUpperCase();
+              const rDoc = (ref.document_name || '').trim().toUpperCase();
+              if (rLabel && rLabel === cleanUpper) return true;
+              if (rDoc && rDoc === cleanUpper) return true;
+              // 접두사 매칭: E01_ 또는 E01. (E010 오인 방지)
+              if (rLabel && (cleanUpper.startsWith(rLabel + '_') || cleanUpper.startsWith(rLabel + '.'))) return true;
+              // 파일명 일치
+              if (rDoc && cleanUpper.endsWith(rDoc)) return true;
+              return false;
+            })
             .map((ref) => ({ citation, ref }))
         );
         if (matchingRefs.length === 0) {
@@ -165,7 +192,9 @@ export function renderInlineMarkdown(
         }
       }
 
-      if (!onEvidenceClick || !meta?.evidenceId) return <span key={index}>{part}</span>;
+      // claimCitations가 주어졌는데 evidenceId가 매핑되지 않았거나, 콜백이 없으면 텍스트로 유지
+      if (!onEvidenceClick) return <span key={index}>{part}</span>;
+      if (claimCitations && claimCitations.length > 0 && !meta?.evidenceId) return <span key={index}>{part}</span>;
 
       return (
         <button
@@ -222,8 +251,44 @@ export function renderInlineMarkdown(
       );
     }
 
-    // 인라인 법령 조문 인용 배지: (주택임대차보호법 제2조, 제3조 제1항) 등
+    // 인라인 법령 조문 인용 배지 및 공식 법령 링크: (주택임대차보호법 제2조, 제3조 등)
     if (part.startsWith('(') && part.endsWith(')') && /제\s*\d+\s*조/.test(part)) {
+      const inner = part.slice(1, -1).trim();
+      const mLaw = inner.match(/([가-힣]+(?:법률|법|시행령|시행규칙))/);
+      const mArt = inner.match(/제\s*(\d+(?:조(?:의\d+)?))/);
+      if (mLaw) {
+        const rawStat = mLaw[1];
+        const cleanStat = rawStat.replace(/\(법률\)|\(대통령령\)|\(시행령\)|\(시행규칙\)/g, '').trim();
+        const artStr = mArt ? `제${mArt[1].replace(/\s+/g, '')}` : '';
+        const lawUrl = `https://www.law.go.kr/법령/${encodeURIComponent(cleanStat)}${artStr ? `/${encodeURIComponent(artStr)}` : ''}`;
+        return (
+          <a
+            key={index}
+            href={lawUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="chat-statute-badge-link"
+            title={`국가법령정보센터에서 [${cleanStat} ${artStr}] 조문 열기`}
+            style={{
+              display: 'inline-block',
+              backgroundColor: '#eff6ff',
+              color: '#1d4ed8',
+              border: '1px solid #bfdbfe',
+              borderRadius: '4px',
+              padding: '0px 6px',
+              fontSize: '0.88em',
+              fontWeight: 600,
+              margin: '0 2px',
+              textDecoration: 'none',
+              whiteSpace: 'nowrap',
+              cursor: 'pointer',
+            }}
+          >
+            <span style={{ marginRight: '3px' }}>📜</span>
+            {part}
+          </a>
+        );
+      }
       return (
         <span
           key={index}
@@ -396,6 +461,144 @@ function renderFormattedLine(line: string, index: number, onEvidenceClick?: (lab
     </div>
   );
 }
+/**
+ * 마크다운 테이블 구분선 행(delimiter) 여부 판정 (예: |:---:|:---|:---:|)
+ */
+function isTableDelimiter(line: string): boolean {
+  const trimmed = line.trim();
+  return /^\|(?:\s*:?-+:?\s*\|)+$/.test(trimmed);
+}
+
+/**
+ * 마크다운 테이블 데이터 행 여부 판정
+ */
+function isTableRow(line: string): boolean {
+  const trimmed = line.trim();
+  return trimmed.startsWith('|') && trimmed.endsWith('|') && trimmed.length > 2;
+}
+
+/**
+ * 마크다운 테이블 행을 셀 배열로 분할
+ */
+function parseTableRow(line: string): string[] {
+  const trimmed = line.trim();
+  const inner = trimmed.replace(/^\|/, '').replace(/\|$/, '');
+  return inner.split('|').map((c) => c.trim());
+}
+
+/**
+ * 마크다운 테이블 구분선으로부터 정렬 방식(left, center, right) 파싱
+ */
+function parseTableAlignments(delimiterLine: string): ('left' | 'center' | 'right')[] {
+  const cells = parseTableRow(delimiterLine);
+  return cells.map((cell) => {
+    const left = cell.startsWith(':');
+    const right = cell.endsWith(':');
+    if (left && right) return 'center';
+    if (right) return 'right';
+    return 'left';
+  });
+}
+
+interface ParsedTable {
+  headers: string[];
+  alignments: ('left' | 'center' | 'right')[];
+  rows: string[][];
+}
+
+/**
+ * 파싱된 마크다운 테이블 구조를 접근성과 반응형 스크롤이 고려된 HTML table 엘리먼트로 렌더링
+ */
+function renderTableBlock(
+  table: ParsedTable,
+  key: React.Key,
+  onEvidenceClick?: (label: string, meta?: CitationMeta) => void,
+  claimCitations?: ClaimCitation[]
+): React.ReactNode {
+  return (
+    <div key={key} className="chat-table-wrapper" role="region" tabIndex={0} aria-label="법률 분석 표">
+      <table className="chat-legal-table">
+        <thead>
+          <tr>
+            {table.headers.map((header, hIdx) => (
+              <th
+                key={hIdx}
+                style={{ textAlign: table.alignments[hIdx] || 'left' }}
+              >
+                {renderInlineMarkdown(header, onEvidenceClick, claimCitations, header)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {table.rows.map((row, rIdx) => (
+            <tr key={rIdx}>
+              {row.map((cell, cIdx) => (
+                <td
+                  key={cIdx}
+                  style={{ textAlign: table.alignments[cIdx] || 'left' }}
+                >
+                  {renderInlineMarkdown(cell, onEvidenceClick, claimCitations, cell)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/**
+ * 섹션 내 줄 목록을 순회하며 마크다운 테이블 블록과 일반 줄을 분기 렌더링한다.
+ */
+function renderSectionLines(
+  lines: string[],
+  onEvidenceClick?: (label: string, meta?: CitationMeta) => void,
+  claimCitations?: ClaimCitation[]
+): React.ReactNode[] {
+  const result: React.ReactNode[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // 마크다운 테이블 시작 감지: 현재 줄이 테이블 행이고 다음 줄이 구분선인 경우
+    if (
+      isTableRow(trimmed) &&
+      i + 1 < lines.length &&
+      isTableDelimiter(lines[i + 1])
+    ) {
+      const headers = parseTableRow(trimmed);
+      const alignments = parseTableAlignments(lines[i + 1]);
+      const rows: string[][] = [];
+      i += 2;
+
+      while (i < lines.length && isTableRow(lines[i])) {
+        rows.push(parseTableRow(lines[i]));
+        i += 1;
+      }
+
+      result.push(
+        renderTableBlock(
+          { headers, alignments, rows },
+          `table-${i}`,
+          onEvidenceClick,
+          claimCitations
+        )
+      );
+      continue;
+    }
+
+    // 일반 문단/불릿 렌더링
+    result.push(renderFormattedLine(line, i, onEvidenceClick, claimCitations));
+    i += 1;
+  }
+
+  return result;
+}
+
 export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvidenceClick, claimCitations }) => {
   if (!content) return null;
 
@@ -430,10 +633,12 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
       continue;
     }
 
-    // 섹션 헤더 감지: [제목...] 형태 또는 ### 제목 또는 ## 제목
+    // 섹션 헤더 감지: [제목...] 형태, ### 헤더, **제목**, 또는 이모지로 시작하는 단독 제목줄
     let detectedTitle: string | null = null;
     const bracketMatch = trimmed.match(/^\[(.+)\]$/);
     const mdHeaderMatch = trimmed.match(/^#{1,4}\s*(.+)$/);
+    const boldHeaderMatch = trimmed.match(/^\*\*(?:[0-9]+[.\s]+)?([^*]+)\*\*$/);
+    const emojiHeaderMatch = trimmed.match(/^([\p{Extended_Pictographic}\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]+)\s+([^\r\n.!?]{2,40})$/u);
 
     if (bracketMatch
         && !/^E\d{1,3}(?:$|[_.\s-])/i.test(bracketMatch[1])
@@ -441,19 +646,39 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
       detectedTitle = bracketMatch[1];
     } else if (mdHeaderMatch) {
       detectedTitle = mdHeaderMatch[1].replace(/^\*\*|\*\*$/g, ''); // 볼드 감싸진 헤더 정제
+    } else if (boldHeaderMatch && boldHeaderMatch[1].trim().length <= 40) {
+      detectedTitle = boldHeaderMatch[1].trim();
+    } else if (emojiHeaderMatch && !trimmed.startsWith('-') && !trimmed.startsWith('*') && !trimmed.startsWith('|')) {
+      detectedTitle = trimmed;
     }
 
     if (detectedTitle) {
       if (currentSection.lines.length > 0 || currentSection.title) {
         sections.push(currentSection);
       }
-      const cat = classifySectionTitle(detectedTitle);
+
+      // 제목 앞에 이미 이모지가 포함된 경우(예: '📊 권리관계 및 예상 배당 순위'),
+      // 해당 이모지를 추출하여 단일 아이콘으로 지정하고 제목에서는 제거하여 이중 이모지 노출을 방지한다.
+      let customIcon: string | null = null;
+      let cleanTitle = detectedTitle.trim();
+      const emojiMatch = cleanTitle.match(LEADING_EMOJI_REGEX);
+      if (emojiMatch) {
+        customIcon = emojiMatch[1].trim();
+        cleanTitle = cleanTitle.substring(emojiMatch[0].length).trim();
+      }
+
+      const cat = classifySectionTitle(cleanTitle || detectedTitle);
       currentSection = {
         type: cat.theme,
-        title: detectedTitle,
-        icon: cat.icon,
+        title: cleanTitle || detectedTitle,
+        icon: customIcon || cat.icon,
         lines: [],
       };
+      continue;
+    }
+
+    // 단독 이모지 줄(예: '⚖️'만 홀로 있는 줄)이 노이즈로 출력된 경우 스킵
+    if (ONLY_EMOJI_REGEX.test(trimmed)) {
       continue;
     }
 
@@ -526,7 +751,7 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
                 <span>{sec.title}</span>
               </div>
               <div style={{ fontSize: '0.9em', color: 'var(--text-main)' }}>
-                {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx, onEvidenceClick, claimCitations))}
+                {renderSectionLines(linesToRender, onEvidenceClick, claimCitations)}
               </div>
             </div>
           );
@@ -562,7 +787,7 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
 
               </div>
               <div style={{ fontSize: '0.89em', color: 'var(--text-secondary, #475569)' }}>
-                {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx, onEvidenceClick, claimCitations))}
+                {renderSectionLines(linesToRender, onEvidenceClick, claimCitations)}
               </div>
             </div>
           );
@@ -581,7 +806,7 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
           >
             {hasTitle && (
               <h3 className="chat-legal-heading">
-                {sec.icon && sec.icon !== '▪' && (
+                {sec.icon && sec.icon !== '▪' && !LEADING_EMOJI_REGEX.test(sec.title || '') && (
                   <span className="chat-legal-heading-icon" aria-hidden="true" style={{ marginRight: '6px' }}>
                     {sec.icon}
                   </span>
@@ -590,7 +815,7 @@ export const LegalAnswerView: React.FC<LegalAnswerViewProps> = ({ content, onEvi
               </h3>
             )}
             <div className="chat-legal-content">
-              {linesToRender.map((l, lIdx) => renderFormattedLine(l, lIdx, onEvidenceClick, claimCitations))}
+              {renderSectionLines(linesToRender, onEvidenceClick, claimCitations)}
             </div>
           </section>
         );
