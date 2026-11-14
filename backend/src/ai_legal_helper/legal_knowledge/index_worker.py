@@ -547,8 +547,22 @@ def process_next_job(
         # 법령별 관할 도메인 컬렉션 결정 (식별 시 law_docs_{category}, 미식별 시 law_docs_global)
         target_col_name = resolve_law_collection(v.law_name)
         actual_collection = chroma_collection
-        if hasattr(chroma_collection, "_client") and getattr(chroma_collection, "name", None) != target_col_name:
-            actual_collection = chroma_collection._client.get_or_create_collection(target_col_name)
+        if getattr(chroma_collection, "name", None) != target_col_name and hasattr(chroma_collection, "name"):
+            # ChromaDB 고수준 클라이언트를 통해 실제 upsert 메서드를 보유한 Collection 모델을 획득한다.
+            # chroma_collection._client는 저수준 FastAPI 클라이언트이므로 pydantic 모델(upsert 부재)을 반환하는 문제를 방지한다.
+            try:
+                from ai_legal_helper.rag.retrieval import _get_client
+                actual_collection = _get_client().get_or_create_collection(target_col_name)
+            except Exception as col_err:
+                logger.warning(
+                    "[INDEX_WORKER] 도메인 컬렉션({}) 획득 실패, 기본 컬렉션 유지: {}".format(
+                        target_col_name, col_err
+                    )
+                )
+                if hasattr(chroma_collection, "_client") and hasattr(chroma_collection._client, "get_or_create_collection"):
+                    cand = chroma_collection._client.get_or_create_collection(target_col_name)
+                    if hasattr(cand, "upsert"):
+                        actual_collection = cand
 
         count = index_one_version(
             v, api_key=api_key, fetch_xml=lambda _url: payload,

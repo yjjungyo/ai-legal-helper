@@ -198,7 +198,8 @@ async def test_t07_checkpointer_state_persistence_and_resume():
         "revision_instructions": [],
     }
 
-    with patch("ai_legal_helper.workflows.legal_workflow.intent_analysis_node", return_value={"intent": "NEW_LEGAL_ANALYSIS"}), \
+    with patch.dict("os.environ", {"AUTO_APPROVE_STATUTE_SEARCH": "false"}), \
+         patch("ai_legal_helper.workflows.legal_workflow.intent_analysis_node", return_value={"intent": "NEW_LEGAL_ANALYSIS"}), \
          patch("ai_legal_helper.workflows.legal_workflow.run_agents_node", return_value={"retrieved_sources": []}), \
          patch("ai_legal_helper.workflows.legal_workflow.synthesize_node", return_value={"draft_answer": "초안"}), \
          patch("ai_legal_helper.workflows.legal_workflow.verification_node") as mock_ver_node:

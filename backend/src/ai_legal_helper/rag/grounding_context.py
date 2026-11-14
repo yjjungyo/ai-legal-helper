@@ -255,43 +255,17 @@ def prune_sources_for_verification(
                 for kw in ("근저당권설정", "근저당권 설정", "채권최고액", "가압류", "경매개시결정", "말소등기", "임차권등기", "확정일자")
             )
         )
-        # 핵심 증거는 1,500자까지 우선 보존하며, 1,500자 뒤에 위치한 핵심 반대 증거(Counter-Evidence: 말소, 가압류, 근저당 등)도
-        # 윈도우 발췌를 통해 검증 컨텍스트에서 유실되지 않도록 정밀 보존
-        snippet_len = max(max_unreferenced_snippet, 1500) if is_core_evidence else max_unreferenced_snippet
-        if len(raw_content) > snippet_len:
+        # 핵심 증거(등기사항증명서, 임대차계약서, 내용증명, 노동/채권 증빙 등) 또는 사건 증거(CASE_EVIDENCE)는
+        # 임의의 고정 길이(1,500자)나 키워드 발췌로 잘라낼 경우 후순위 권리 변동, 단서 특약, 지급 내역 등
+        # 결정적인 반대 증거(Counter-Evidence)가 유실될 위험이 있으므로 원문 전문(Full Text)을 100% 온전히 보존한다.
+        if is_core_evidence or src.get("source_type") == "CASE_EVIDENCE":
+            pruned_evidence_sources.append(src)
+            continue
+
+        # 그 외 핵심이 아닌 일반 부수 증거(형식적 안내문 등)만 토큰 절감을 위해 스니펫으로 축약한다.
+        if len(raw_content) > max_unreferenced_snippet:
             condensed = dict(src)
-            deep_keywords = (
-                "근저당", "저당권", "가압류", "압류", "경매", "말소", "을구", "갑구",
-                "순위번호", "접수일", "채권최고액", "특약", "임차권등기", "배당요구"
-            )
-            deep_windows = []
-            for kw in deep_keywords:
-                pos = raw_content.find(kw, snippet_len)
-                while pos != -1:
-                    w_start = max(snippet_len, pos - 150)
-                    w_end = min(len(raw_content), pos + 250)
-                    deep_windows.append((w_start, w_end))
-                    pos = raw_content.find(kw, pos + len(kw) + 150)
-
-            if deep_windows:
-                deep_windows.sort()
-                merged_windows = []
-                cur_start, cur_end = deep_windows[0]
-                for s, e in deep_windows[1:]:
-                    if s <= cur_end + 50:
-                        cur_end = max(cur_end, e)
-                    else:
-                        merged_windows.append((cur_start, cur_end))
-                        cur_start, cur_end = s, e
-                merged_windows.append((cur_start, cur_end))
-
-                extracted_parts = [raw_content[:snippet_len]]
-                for ws, we in merged_windows[:3]:
-                    extracted_parts.append(f"\n... [핵심 권리/반대 증거 구간 발췌 (위치: {ws}~{we}자)] ...\n{raw_content[ws:we]}")
-                extracted_parts.append("\n... (초안 미인용 증거: 기타 상세 본문 생략)")
-                condensed["content"] = "".join(extracted_parts)
-            else:
-                condensed["content"] = f"{raw_content[:snippet_len]}... (초안 미인용 증거: 상세 본문 생략)"
+            condensed["content"] = f"{raw_content[:max_unreferenced_snippet]}... (초안 미인용 부수 증거: 상세 본문 생략)"
             pruned_evidence_sources.append(condensed)
         else:
             pruned_evidence_sources.append(src)

@@ -1656,3 +1656,1077 @@
 2026-11-14 20:03:59.996 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
 2026-11-14 20:04:00.048 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
 2026-11-14 20:04:00.048 | INFO  | -------- | server.py:113:_serve         - Finished server process [31656]
+2026-11-14 20:04:07.699 | INFO  | -------- | server.py:103:_serve         - Started server process [70956]
+2026-11-14 20:04:07.699 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-11-14 20:04:07.716 | INFO  | -------- | legal_workflow.py:202:init_checkpointer - [체크포인터] PostgreSQL 체크포인트 테이블 초기화 완료
+2026-11-14 20:04:07.716 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - [그래프 동기화 워커] 백그라운드 그래프 동기화 워커가 시작되었습니다.
+2026-11-14 20:04:07.734 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-11-14 20:38:47.440 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-11-14 20:38:47.550 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-11-14 20:38:48.072 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-11-14 20:38:48.092 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-11-14 20:38:48.093 | INFO  | -------- | server.py:113:_serve         - Finished server process [70956]
+2026-11-14 20:38:56.074 | INFO  | -------- | server.py:103:_serve         - Started server process [73460]
+2026-11-14 20:38:56.074 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-11-14 20:38:56.094 | INFO  | -------- | legal_workflow.py:202:init_checkpointer - [체크포인터] PostgreSQL 체크포인트 테이블 초기화 완료
+2026-11-14 20:38:56.094 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - [그래프 동기화 워커] 백그라운드 그래프 동기화 워커가 시작되었습니다.
+2026-11-14 20:38:56.107 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-11-14 20:45:20.507 | INFO  | c5282394 | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/auth/me" 200 (31.9ms) [req:4e114ffd]
+2026-11-14 20:45:20.513 | INFO  | 49f80ab3 | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/auth/me" 200 (4.8ms) [req:0ad840a3]
+2026-11-14 20:45:20.538 | INFO  | 806e1ea6 | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: '[SC-002] 보증금 일부반환 분쟁 사건 [V5-2026-11-14]' [case:v5_20261, req:c16868fd]
+2026-11-14 20:45:20.552 | INFO  | 806e1ea6 | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/v5_20261114_sc002_50834c" 200 (97.1ms) [case:v5_20261, req:c16868fd]
+2026-11-14 20:45:20.566 | INFO  | de7cc4f6 | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: '[SC-002] 보증금 일부반환 분쟁 사건 [V5-2026-11-14]' [case:v5_20261, req:0e4dde7e]
+2026-11-14 20:45:20.572 | INFO  | de7cc4f6 | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/v5_20261114_sc002_50834c" 200 (18.2ms) [case:v5_20261, req:0e4dde7e]
+2026-11-14 20:45:20.686 | INFO  | f2ad1f6d | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/v5_20261114_sc002_50834c/consultations" 200 (112.9ms) [case:v5_20261, req:e44dc6e6]
+2026-11-14 20:45:20.694 | INFO  | cd1206fd | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: '[SC-002] 보증금 일부반환 분쟁 사건 [V5-2026-11-14]' [case:v5_20261, req:d8ff78de]
+2026-11-14 20:45:20.701 | INFO  | cd1206fd | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/v5_20261114_sc002_50834c" 200 (122.0ms) [case:v5_20261, req:d8ff78de]
+2026-11-14 20:45:20.737 | INFO  | d21c17f0 | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/v5_20261114_sc002_50834c/consultations" 200 (47.9ms) [case:v5_20261, req:2480f411]
+2026-11-14 20:45:20.770 | INFO  | 00d9c7ff | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/v5_20261114_sc002_50834c/evidence" 200 (190.6ms) [case:v5_20261, req:d9d9cfdb]
+2026-11-14 20:45:20.785 | INFO  | 8647631c | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: '[SC-002] 보증금 일부반환 분쟁 사건 [V5-2026-11-14]' [case:v5_20261, req:8db2bcfe]
+2026-11-14 20:45:20.791 | INFO  | 8647631c | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/v5_20261114_sc002_50834c" 200 (52.2ms) [case:v5_20261, req:8db2bcfe]
+2026-11-14 20:45:20.824 | INFO  | 9447d381 | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/v5_20261114_sc002_50834c/evidence" 200 (51.4ms) [case:v5_20261, req:917842b6]
+2026-11-14 20:45:28.905 | INFO  | 19c47dd6 | conversation_context.py:495:load_conversation_context - [대화 맥락 로드 완료] 대화ID=conv_v5_20261114_sc002_50834c: DB 누적 3턴 중 최근 3턴 유지 (최대=3턴), 현재 진행 턴=4턴 [case:v5_20261, req:03804291]
+2026-11-14 20:45:28.916 | INFO  | 19c47dd6 | consultation.py:450:start_consultation - [EVIDENCE_BASELINE] request=03804291 case=v5_20261 docs=9 fingerprint=58581c54b9f5 [case:v5_20261, req:03804291]
+2026-11-14 20:45:28.931 | INFO  | 19c47dd6 | main.py:196:trace_context_middleware - 127.0.0.1 - "POST /api/v1/consultations" 200 (64.5ms) [req:03804291]
+2026-11-14 20:45:28.932 | INFO  | 19c47dd6 | consultation.py:563:process_consultation - [상담 분석 시작] 의뢰인 질문 접수 (사건: v5_20261114_sc002_50834c, 요청: 03804291) [case:v5_20261, req:03804291]
+2026-11-14 20:45:28.933 | INFO  | 19c47dd6 | decorators.py:340:log_entry  - [통합 법률 상담 워크플로우] 단계 시작 (run_legal_consultation) [case:v5_20261, req:03804291]
+2026-11-14 20:45:28.986 | INFO  | 19c47dd6 | legal_workflow.py:5574:build_legal_graph - [워크플로우 그래프] 통합 법률 상담 엔진(공식 법령 검색 포함) 그래프 빌드 완료 [case:v5_20261, req:03804291]
+2026-11-14 20:45:29.009 | INFO  | 19c47dd6 | decorators.py:340:log_entry  - [1단계: 사건·맥락 확인] 단계 시작 (supervisor_initialize_node) [case:v5_20261, req:03804291]
+2026-11-14 20:45:29.011 | INFO  | 19c47dd6 | legal_workflow.py:379:supervisor_initialize_node - [1단계: 사건·맥락 확인(init)] [SUPERVISOR_INIT] 연속 대화 이전 턴 검증 법령 출처 7건 계승 완료 [case:v5_20261, req:03804291]
+2026-11-14 20:45:29.051 | INFO  | 19c47dd6 | issue_planner.py:697:plan_legal_issues - [1단계: 사건·맥락 확인(init)] [ISSUE_PLANNER] 질문 분석 결과 5개 단위 쟁점 도출 완료 [case:v5_20261, req:03804291]
+2026-11-14 20:45:29.051 | INFO  | 19c47dd6 | issue_planner.py:702:plan_legal_issues - [1단계: 사건·맥락 확인(init)] [ISSUE_PLANNER] 단위 쟁점 상세:
+1. [ISSUE_FAKE_CITATION] 가공의 증거 라벨 식별 및 존재 부인
+   우선순위: HIGH
+   검토 질문: 의뢰인이 언급한 증거('증거를')가 현재 사건에 공적으로 등록되어 있는지 여부 | 존재하지 않는 가공 증거에 기재됐다고 주장된 사실의 효력 배제 및 등록 증거 대조
+   필요한 사실: 등록증거목록, 가공증거부인
+   관련 법령: 없음
+   관련 증거: E01, E02, E03, E04, E05
+   보완 자료: 현재 사건에 공식 등록된 정식 증거 목록 확인 (증거를 부존재)
+2. [ISSUE_LEASE_TERMINATION] 임대차계약 종료 시점 및 보증금 반환의무 발생
+   우선순위: HIGH
+   검토 질문: 임대차계약의 당초 만료일은 언제인가? | 임차인의 해지 및 반환 통고가 임대인에게 적법하게 도달하여 계약이 종료되었는가? | 계약 종료에 따른 임대인의 보증금 반환 채무가 이행기에 도달하였는가?
+   필요한 사실: 임대차기간, 만료일, 퇴거요청일, 통지도달, 보증금액
+   관련 법령: 주택임대차보호법 제6조, 주택임대차보호법 제6조의2, 민법 제544조, 민법 제623조
+   관련 증거: E01, E03, E06, E07
+   보완 자료: 없음
+3. [ISSUE_ATTACHMENT_RANKING] 가압류·담보권 등재와 임차인의 권리 순위 관계
+   우선순위: HIGH
+   검토 질문: 임차인의 대항요건(주택 인도 및 주민등록)과 우선변제권(확정일자) 취득 시점은 언제인가? | 등기부에 등재된 가압류·담보권의 접수일자와 임차인의 권리 발생 시점의 선후 관계는 어떠한가? | 임차인의 권리 취득 시점과 가압류·담보권의 설정 시점 간 선후 관계에 따른 법률적 대항력 및 우선변제 효력은 어떠한가?
+   필요한 사실: 전입신고일, 주택인도일, 확정일자일, 가압류접수일, 청구금액
+   관련 법령: 주택임대차보호법 제3조, 주택임대차보호법 제3조의2, 민사집행법 제91조, 민사집행법 제148조
+   관련 증거: E02, E07, E08
+   보완 자료: 없음
+4. [ISSUE_RIGHT_PRESERVATION] 이사 전 대항력 유지 및 임차권등기명령 등 권리보전 조치
+   우선순위: HIGH
+   검토 질문: 보증금을 반환받지 못한 상태에서 다른 곳으로 이사하거나 주민등록을 이전할 때 발생하는 위험은 무엇인가? | 주택임대차보호법상 임차권등기명령 신청 요건(계약종료+미반환)이 충족되었는가? | 임차권등기가 등기부에 기재되기 전까지 점유와 전입을 유지해야 하는 법적 이유는 무엇인가?
+   필요한 사실: 계약종료사실, 미반환사실, 전입유지상태, 점유상태
+   관련 법령: 주택임대차보호법 제3조의3, 주택임대차보호법 제3조 제1항
+   관련 증거: E02, E03, E07, E08
+   보완 자료: 없음
+5. [ISSUE_NEXT_ACTIONS] 입증 보완이 필요한 증거 목록 및 안전한 실무적 다음 행동
+   우선순위: HIGH
+   검토 질문: 향후 지급명령, 임차권등기명령, 반환소송을 진행하기 위해 보완해야 할 필수 증빙
+... (총 1671자 중 1500자만 표시됨) [case:v5_20261, req:03804291]
+2026-11-14 20:45:29.054 | INFO  | 19c47dd6 | legal_workflow.py:443:supervisor_initialize_node - [1단계: 사건·맥락 확인(init)] [SUPERVISOR_INIT] 초기화 및 상담 준비 완료 | 의도=NEW_LEGAL_ANALYSIS | 모드=CASE_EVIDENCE | case_id=v5_20261114_sc002_50834c | 등록문서수=9 | 단위쟁점수=5 | 사건증거출처수=27 | 컨텍스트길이=4389 | 증거부족여부=False [case:v5_20261, req:03804291]
+2026-11-14 20:45:29.054 | INFO  | 19c47dd6 | decorators.py:373:log_success - [1단계: 사건·맥락 확인(init)] [1단계: 사건·맥락 확인] 단계 완료 (47.8ms) [case:v5_20261, req:03804291]
+2026-11-14 20:45:29.095 | INFO  | 19c47dd6 | consultation.py:569:on_step  - [1단계 진행 상태] 사건 기본정보 및 대화 맥락 확인 완료 (노드: supervisor_initialize) [case:v5_20261, req:03804291]
+2026-11-14 20:45:29.110 | INFO  | 19c47dd6 | decorators.py:340:log_entry  - [2단계: 분야 판별] 단계 시작 (route_node) [case:v5_20261, req:03804291]
+2026-11-14 20:45:29.110 | INFO  | 19c47dd6 | legal_workflow.py:699:route_node - [2단계: 법률 분야 판별(route)] [ROUTE_FAST_PATH] DOCUMENT_MODE 라우팅 LLM 스킵: 분야=['민법'] [case:v5_20261, req:03804291]
+2026-11-14 20:45:29.111 | INFO  | 19c47dd6 | decorators.py:373:log_success - [2단계: 법률 분야 판별(route)] [2단계: 분야 판별] 단계 완료 (5.3ms) [case:v5_20261, req:03804291]
+2026-11-14 20:45:29.114 | INFO  | 19c47dd6 | consultation.py:569:on_step  - [2단계 진행 상태] 사실관계 및 타임라인 조회 중 (노드: route) [case:v5_20261, req:03804291]
+2026-11-14 20:45:29.125 | INFO  | 19c47dd6 | decorators.py:340:log_entry  - [3단계: 법령·판례 검색] 단계 시작 (run_agents_node) [case:v5_20261, req:03804291]
+2026-11-14 20:45:29.132 | INFO  | 19c47dd6 | decorators.py:340:log_entry  - [3단계: 법령·판례 검색(run_agents)] [법률 지식베이스 검색] 단계 시작 (retrieve_with_status) [case:v5_20261, req:03804291]
+2026-11-14 20:45:29.443 | DEBUG | 19c47dd6 | config.py:355:start          - [3단계: 법령·판례 검색(run_agents)] Starting component System [case:v5_20261, req:03804291]
+2026-11-14 20:45:29.444 | DEBUG | 19c47dd6 | config.py:355:start          - [3단계: 법령·판례 검색(run_agents)] Starting component Posthog [case:v5_20261, req:03804291]
+2026-11-14 20:45:29.444 | DEBUG | 19c47dd6 | config.py:355:start          - [3단계: 법령·판례 검색(run_agents)] Starting component OpenTelemetryClient [case:v5_20261, req:03804291]
+2026-11-14 20:45:29.444 | DEBUG | 19c47dd6 | config.py:355:start          - [3단계: 법령·판례 검색(run_agents)] Starting component FastAPI [case:v5_20261, req:03804291]
+2026-11-14 20:45:29.686 | DEBUG | 19c47dd6 | config.py:355:start          - [3단계: 법령·판례 검색(run_agents)] Starting component System [case:v5_20261, req:03804291]
+2026-11-14 20:45:29.686 | DEBUG | 19c47dd6 | config.py:355:start          - [3단계: 법령·판례 검색(run_agents)] Starting component Posthog [case:v5_20261, req:03804291]
+2026-11-14 20:45:29.686 | DEBUG | 19c47dd6 | config.py:355:start          - [3단계: 법령·판례 검색(run_agents)] Starting component OpenTelemetryClient [case:v5_20261, req:03804291]
+2026-11-14 20:45:29.686 | DEBUG | 19c47dd6 | config.py:355:start          - [3단계: 법령·판례 검색(run_agents)] Starting component FastAPI [case:v5_20261, req:03804291]
+2026-11-14 20:45:29.764 | DEBUG | 19c47dd6 | retrieval.py:212:_get_client - [3단계: 법령·판례 검색(run_agents)] [벡터DB] 원격 ChromaDB 연결 완료: 127.0.0.1:8001 (컬렉션 9개) [case:v5_20261, req:03804291]
+2026-11-14 20:45:29.780 | DEBUG | 19c47dd6 | retrieval.py:243:_list_collections - [3단계: 법령·판례 검색(run_agents)] [벡터DB] 조회된 컬렉션 목록=['law_docs_international', 'law_docs_civil', 'law_docs_tax', 'law_docs_criminal', 'law_docs_administrative', 'law_docs_commercial', 'law_docs_global', 'law_docs_constitution', 'law_docs_labor'] [case:v5_20261, req:03804291]
+2026-11-14 20:45:30.216 | INFO  | 19c47dd6 | _client.py:1085:_send_single_request - [3단계: 법령·판례 검색(run_agents)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/text-embedding-3-large/embeddings?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:03804291]
+2026-11-14 20:45:30.337 | DEBUG | 19c47dd6 | retrieval.py:391:retrieve_with_status - [3단계: 법령·판례 검색(run_agents)] [벡터 검색 완료] 컬렉션=law_docs_civil, 검색된 문서=6건 [case:v5_20261, req:03804291]
+2026-11-14 20:45:30.337 | INFO  | 19c47dd6 | decorators.py:373:log_success - [3단계: 법령·판례 검색(run_agents)] [법률 지식베이스 검색] 단계 완료 (1205.7ms) [case:v5_20261, req:03804291]
+2026-11-14 20:45:30.338 | INFO  | 19c47dd6 | decorators.py:340:log_entry  - [3단계: 법령·판례 검색(run_agents)] [법률 지식베이스 검색] 단계 시작 (retrieve_with_status) [case:v5_20261, req:03804291]
+2026-11-14 20:45:30.345 | DEBUG | 19c47dd6 | retrieval.py:243:_list_collections - [3단계: 법령·판례 검색(run_agents)] [벡터DB] 조회된 컬렉션 목록=['law_docs_international', 'law_docs_civil', 'law_docs_tax', 'law_docs_criminal', 'law_docs_administrative', 'law_docs_commercial', 'law_docs_global', 'law_docs_constitution', 'law_docs_labor'] [case:v5_20261, req:03804291]
+2026-11-14 20:45:30.537 | INFO  | 19c47dd6 | _client.py:1085:_send_single_request - [3단계: 법령·판례 검색(run_agents)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/text-embedding-3-large/embeddings?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:03804291]
+2026-11-14 20:45:30.630 | DEBUG | 19c47dd6 | retrieval.py:391:retrieve_with_status - [3단계: 법령·판례 검색(run_agents)] [벡터 검색 완료] 컬렉션=law_docs_global, 검색된 문서=6건 [case:v5_20261, req:03804291]
+2026-11-14 20:45:30.630 | INFO  | 19c47dd6 | decorators.py:373:log_success - [3단계: 법령·판례 검색(run_agents)] [법률 지식베이스 검색] 단계 완료 (292.1ms) [case:v5_20261, req:03804291]
+2026-11-14 20:45:30.687 | INFO  | 19c47dd6 | legal_workflow.py:1209:run_agents_node - [3단계: 법령·판례 검색(run_agents)] [RUN_AGENTS] 쟁점 계획 필수 법령 '주택임대차보호법' (['제6조', '제6조의2', '제3조', '제3조의2', '제3조의3']) 5건 로컬 사전 적재 완료 (Local-First Pre-fetch) [case:v5_20261, req:03804291]
+2026-11-14 20:45:31.152 | INFO  | 19c47dd6 | legal_workflow.py:1209:run_agents_node - [3단계: 법령·판례 검색(run_agents)] [RUN_AGENTS] 쟁점 계획 필수 법령 '민법' (['제544조', '제623조']) 2건 로컬 사전 적재 완료 (Local-First Pre-fetch) [case:v5_20261, req:03804291]
+2026-11-14 20:45:31.181 | INFO  | 19c47dd6 | legal_workflow.py:1209:run_agents_node - [3단계: 법령·판례 검색(run_agents)] [RUN_AGENTS] 쟁점 계획 필수 법령 '민사집행법' (['제91조', '제148조']) 2건 로컬 사전 적재 완료 (Local-First Pre-fetch) [case:v5_20261, req:03804291]
+2026-11-14 20:45:31.182 | INFO  | 19c47dd6 | legal_workflow.py:1229:run_agents_node - [3단계: 법령·판례 검색(run_agents)] [RUN_AGENTS] 문서상담 Vector RAG 검색 완료 | 분야=['민법'] | 수집된문서수=21 | 경고수=0 [case:v5_20261, req:03804291]
+2026-11-14 20:45:31.188 | INFO  | 19c47dd6 | decorators.py:373:log_success - [3단계: 법령·판례 검색(run_agents)] [3단계: 법령·판례 검색] 단계 완료 (2067.1ms) [case:v5_20261, req:03804291]
+2026-11-14 20:45:31.190 | INFO  | 19c47dd6 | consultation.py:569:on_step  - [3단계 진행 상태] 법령 및 판례 검색 중 (노드: run_agents) [case:v5_20261, req:03804291]
+2026-11-14 20:45:31.200 | INFO  | 19c47dd6 | decorators.py:340:log_entry  - [legal_evidence_bundle_node] 단계 시작 (legal_evidence_bundle_node) [case:v5_20261, req:03804291]
+2026-11-14 20:45:31.201 | INFO  | 19c47dd6 | legal_workflow.py:1447:legal_evidence_bundle_node - [legal_evidence_bundle] [EVIDENCE_BUNDLE] DOCUMENT_MODE 감지 — document_sources 직접 포맷팅 경로 사용으로 번들 생성 생략 [case:v5_20261, req:03804291]
+2026-11-14 20:45:31.201 | INFO  | 19c47dd6 | decorators.py:373:log_success - [legal_evidence_bundle] [legal_evidence_bundle_node] 단계 완료 (4.8ms) [case:v5_20261, req:03804291]
+2026-11-14 20:45:31.203 | INFO  | 19c47dd6 | consultation.py:569:on_step  - [3단계 진행 상태] 법령 및 판례 근거 정리 완료 (노드: legal_evidence_bundle) [case:v5_20261, req:03804291]
+2026-11-14 20:45:31.214 | INFO  | 19c47dd6 | decorators.py:340:log_entry  - [4단계: 쟁점별 분석] 단계 시작 (synthesize_node) [case:v5_20261, req:03804291]
+2026-11-14 20:45:31.222 | INFO  | 19c47dd6 | document_consultation.py:182:generate_answer - [4단계: 쟁점별 분석·초안 작성(synthesize)] [DOC_CONSULTATION] 답변 생성 시작 (모드=최초초안(initial) | 출처=30건 | 이전초안길이=0자) [case:v5_20261, req:03804291]
+2026-11-14 20:45:31.222 | INFO  | 19c47dd6 | document_answer.py:245:write_document_answer - [4단계: 쟁점별 분석·초안 작성(synthesize)] [DOCUMENT_ANSWER] 답변 초안 작성 시작 (출처: 30건 | 제한모드=False | 재작성=False) [case:v5_20261, req:03804291]
+2026-11-14 20:45:31.264 | INFO  | 19c47dd6 | callbacks.py:107:on_chat_model_start - [4단계: 쟁점별 분석·초안 작성(synthesize)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:03804291]
+2026-11-14 20:45:47.337 | INFO  | 19c47dd6 | _client.py:1085:_send_single_request - [4단계: 쟁점별 분석·초안 작성(synthesize)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:03804291]
+2026-11-14 20:45:47.342 | INFO  | 19c47dd6 | callbacks.py:196:on_llm_end  - [4단계: 쟁점별 분석·초안 작성(synthesize)] [LLM_IO_SIZE] agent=None node=synthesize input_chars=24779 output_chars=4016 input_tokens=14288 output_tokens=2476 latency_ms=16077 [case:v5_20261, req:03804291]
+2026-11-14 20:45:47.342 | INFO  | 19c47dd6 | callbacks.py:205:on_llm_end  - [4단계: 쟁점별 분석·초안 작성(synthesize)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 16077ms, 입력: 14,288토큰, 출력: 2,476토큰, 총: 16,764토큰) [case:v5_20261, req:03804291]
+2026-11-14 20:45:47.346 | INFO  | 19c47dd6 | document_answer.py:418:write_document_answer - [4단계: 쟁점별 분석·초안 작성(synthesize)] [DOCUMENT_ANSWER] 답변 초안 작성 완료 (길이: 3918자 | 해시: 216e476ec7fcdcb7 | 제한모드=False) [case:v5_20261, req:03804291]
+2026-11-14 20:45:47.346 | INFO  | 19c47dd6 | document_consultation.py:209:generate_answer - [4단계: 쟁점별 분석·초안 작성(synthesize)] [DOC_CONSULTATION] 답변 생성 완료 (초안길이=3918자 | 해시=216e476ec7fcdcb7) [case:v5_20261, req:03804291]
+2026-11-14 20:45:47.346 | INFO  | 19c47dd6 | decorators.py:373:log_success - [4단계: 쟁점별 분석·초안 작성(synthesize)] [4단계: 쟁점별 분석] 단계 완료 (16135.9ms) [case:v5_20261, req:03804291]
+2026-11-14 20:45:47.350 | INFO  | 19c47dd6 | consultation.py:569:on_step  - [4단계 진행 상태] 법률 쟁점별 분석 중 (노드: synthesize) [case:v5_20261, req:03804291]
+2026-11-14 20:45:47.361 | INFO  | 19c47dd6 | decorators.py:340:log_entry  - [5단계: 근거 검증] 단계 시작 (verification_node) [case:v5_20261, req:03804291]
+2026-11-14 20:45:47.383 | INFO  | 19c47dd6 | document_consultation.py:274:verify_answer - [5단계: 법령·증거 근거 검증(verification)] [DOC_CONSULTATION] 원문 근거 검증 시작 (검증 대상 초안: 3918자 | 참조 출처: 30건) [case:v5_20261, req:03804291]
+2026-11-14 20:45:47.389 | INFO  | 19c47dd6 | decorators.py:340:log_entry  - [5단계: 법령·증거 근거 검증(verification)] [5단계: 조문·증거 일치성 검증] 단계 시작 (run_verification) [case:v5_20261, req:03804291]
+2026-11-14 20:45:47.399 | INFO  | 19c47dd6 | qa_checker.py:174:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 검사 시작 (초안길이: 3918자 | 질문: '임대차가 끝났는데 집주인이 보증금을 일부만 반환하고 나머지 지급을 미루고 있습니다. 집주인이 주장하는 반환액...') [case:v5_20261, req:03804291]
+2026-11-14 20:45:47.406 | INFO  | 19c47dd6 | qa_checker.py:202:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 출처 존재 검사: PASS (인용출처: 30건 정상) [case:v5_20261, req:03804291]
+2026-11-14 20:45:47.406 | INFO  | 19c47dd6 | qa_checker.py:233:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 금액 단순 정규식 자동교정 비활성화: 역할 미확정 금액은 기존 검증 단계에서 판단 [case:v5_20261, req:03804291]
+2026-11-14 20:45:47.407 | INFO  | 19c47dd6 | qa_checker.py:257:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 질문 충족: 3/3 (누락항목: 없음) [case:v5_20261, req:03804291]
+2026-11-14 20:45:47.407 | INFO  | 19c47dd6 | qa_checker.py:340:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 형식 검사 PASS (법률적 의미 판단 아님) [case:v5_20261, req:03804291]
+2026-11-14 20:45:47.408 | INFO  | 19c47dd6 | qa_checker.py:402:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] LLM 추가 검토 사유:
+  - 법적 권리의 발생·소멸·우선순위 복합 법률요건 적용 검토
+  - 사건 사실관계 및 증거 기반 법률요건 검증 [case:v5_20261, req:03804291]
+2026-11-14 20:45:47.412 | INFO  | 19c47dd6 | callbacks.py:107:on_chat_model_start - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 1건) [case:v5_20261, req:03804291]
+2026-11-14 20:46:23.559 | INFO  | 19c47dd6 | _client.py:1085:_send_single_request - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:03804291]
+2026-11-14 20:46:23.560 | INFO  | 19c47dd6 | callbacks.py:196:on_llm_end  - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [LLM_IO_SIZE] agent=verification_agent node=verification input_chars=30002 output_chars=7336 input_tokens=16757 output_tokens=3349 latency_ms=36149 [case:v5_20261, req:03804291]
+2026-11-14 20:46:23.560 | INFO  | 19c47dd6 | callbacks.py:205:on_llm_end  - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 36149ms, 입력: 16,757토큰, 출력: 3,349토큰, 총: 20,106토큰) [case:v5_20261, req:03804291]
+2026-11-14 20:46:23.562 | INFO  | 19c47dd6 | verification.py:1089:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION_SCHEMA] 검증 출력 수신 및 스키마 검증 시작 [case:v5_20261, req:03804291]
+2026-11-14 20:46:23.563 | INFO  | 19c47dd6 | verification.py:1091:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION_SCHEMA] 스키마 검증 및 정규화 결과: SUCCESS (주장수=8, 상태=PASS) [case:v5_20261, req:03804291]
+2026-11-14 20:46:23.563 | INFO  | 19c47dd6 | verification.py:1092:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION] 법률 주장 검증 계속 진행 [case:v5_20261, req:03804291]
+2026-11-14 20:46:23.564 | INFO  | 19c47dd6 | verification.py:1586:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION] status=PASS, claims=8, unverified=0, unsupported=0 [case:v5_20261, req:03804291]
+2026-11-14 20:46:23.565 | INFO  | 19c47dd6 | decorators.py:373:log_success - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [5단계: 조문·증거 일치성 검증] 단계 완료 (36176.5ms) [case:v5_20261, req:03804291]
+2026-11-14 20:46:23.572 | INFO  | 19c47dd6 | document_consultation.py:319:verify_answer - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [DOC_CONSULTATION] 원문 근거 검증 완료 (판정=PASS | 사유=NONE | 주장=8건[지지=7, 미흡=1] | 후보법령=[]) [case:v5_20261, req:03804291]
+2026-11-14 20:46:23.605 | INFO  | 19c47dd6 | decorators.py:373:log_success - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [5단계: 근거 검증] 단계 완료 (36247.2ms) [case:v5_20261, req:03804291]
+2026-11-14 20:46:23.608 | INFO  | 19c47dd6 | document_consultation.py:379:next_verification_step - [DOC_ROUTING] 검증 후 다음 실행 노드 결정: finalize (사유: 검증 통과(PASS) | 재작성=0회 | 법령검색=0회) [case:v5_20261, req:03804291]
+2026-11-14 20:46:23.609 | INFO  | 19c47dd6 | consultation.py:569:on_step  - [5단계 진행 상태] 증거 및 법률 근거 검증 중 (노드: verification) [case:v5_20261, req:03804291]
+2026-11-14 20:46:23.623 | INFO  | 19c47dd6 | decorators.py:340:log_entry  - [6단계: 최종 답변 작성] 단계 시작 (finalize_node) [case:v5_20261, req:03804291]
+2026-11-14 20:46:23.639 | INFO  | 19c47dd6 | document_consultation.py:507:finish_answer - [6단계: 최종 답변 확정(finalize)] [FINALIZE] 최종 답변 작성 시작
+[FINALIZE] 답변 생성 방식: DRAFT_PRESERVED
+[FINALIZE] Verification 결과: PASS
+[FINALIZE] 초안 SHA256: 216e476ec7fcdcb76976ef2878c3211bb78242031b0cd5b39ac07f0c0127bb03
+[FINALIZE] 최종 SHA256: 216e476ec7fcdcb76976ef2878c3211bb78242031b0cd5b39ac07f0c0127bb03
+[FINALIZE] 답변 내용 변경: 없음
+[FINALIZE] 인용 출처: 12건
+[FINALIZE] 완료 [case:v5_20261, req:03804291]
+2026-11-14 20:46:23.639 | INFO  | 19c47dd6 | document_consultation.py:522:finish_answer - [6단계: 최종 답변 확정(finalize)] [DOC_FINALIZE] 문서 상담 답변 확정 (처분=CAUTIONARY | 초안보존=True | 제한답변사용=False | 인용출처=12건 | 최종답변길이=3918자) [case:v5_20261, req:03804291]
+2026-11-14 20:46:23.640 | INFO  | 19c47dd6 | decorators.py:373:log_success - [6단계: 최종 답변 확정(finalize)] [6단계: 최종 답변 작성] 단계 완료 (22.0ms) [case:v5_20261, req:03804291]
+2026-11-14 20:46:23.671 | INFO  | 19c47dd6 | consultation.py:569:on_step  - [6단계 진행 상태] 최종 상담 답변 작성 중 (노드: finalize) [case:v5_20261, req:03804291]
+2026-11-14 20:46:26.195 | INFO  | 19c47dd6 | decorators.py:373:log_success - [통합 법률 상담 워크플로우] 단계 완료 (57262.3ms) [case:v5_20261, req:03804291]
+2026-11-14 20:46:26.196 | INFO  | 19c47dd6 | consultation.py:683:process_consultation - [상담 분석 완료] 6단계 분석 및 검증 완료 (요청: 03804291 | 소요: 57263.8ms | 처분: CAUTIONARY | 검증: PASS | 인용출처: 12건) [case:v5_20261, req:03804291]
+2026-11-14 20:46:26.214 | INFO  | 19c47dd6 | consultation.py:369:_freeze_record_presentation - [PRESENTATION_FREEZE] request=03804291 version=1.0 binding=HASH_MATCHED [case:v5_20261, req:03804291]
+2026-11-14 20:55:04.872 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-11-14 20:55:04.975 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-11-14 20:55:04.985 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-11-14 20:55:05.010 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-11-14 20:55:05.011 | INFO  | -------- | server.py:113:_serve         - Finished server process [73460]
+2026-11-14 20:55:11.825 | INFO  | -------- | server.py:103:_serve         - Started server process [23356]
+2026-11-14 20:55:11.826 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-11-14 20:55:11.843 | INFO  | -------- | legal_workflow.py:202:init_checkpointer - [체크포인터] PostgreSQL 체크포인트 테이블 초기화 완료
+2026-11-14 20:55:11.843 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - [그래프 동기화 워커] 백그라운드 그래프 동기화 워커가 시작되었습니다.
+2026-11-14 20:55:11.850 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-11-14 20:57:06.358 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-11-14 20:57:06.467 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-11-14 20:57:06.942 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-11-14 20:57:06.965 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-11-14 20:57:06.966 | INFO  | -------- | server.py:113:_serve         - Finished server process [23356]
+2026-11-14 20:57:14.347 | INFO  | -------- | server.py:103:_serve         - Started server process [65104]
+2026-11-14 20:57:14.347 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-11-14 20:57:14.388 | INFO  | -------- | legal_workflow.py:202:init_checkpointer - [체크포인터] PostgreSQL 체크포인트 테이블 초기화 완료
+2026-11-14 20:57:14.389 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - [그래프 동기화 워커] 백그라운드 그래프 동기화 워커가 시작되었습니다.
+2026-11-14 20:57:14.404 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-11-14 21:14:43.251 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-11-14 21:14:43.362 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-11-14 21:14:43.905 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-11-14 21:14:43.937 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-11-14 21:14:43.938 | INFO  | -------- | server.py:113:_serve         - Finished server process [65104]
+2026-11-14 21:14:53.717 | INFO  | -------- | server.py:103:_serve         - Started server process [70232]
+2026-11-14 21:14:53.717 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-11-14 21:14:53.754 | INFO  | -------- | legal_workflow.py:202:init_checkpointer - [체크포인터] PostgreSQL 체크포인트 테이블 초기화 완료
+2026-11-14 21:14:53.755 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - [그래프 동기화 워커] 백그라운드 그래프 동기화 워커가 시작되었습니다.
+2026-11-14 21:14:53.773 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-11-14 21:21:25.360 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-11-14 21:21:25.472 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-11-14 21:21:25.963 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-11-14 21:21:25.985 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-11-14 21:21:25.986 | INFO  | -------- | server.py:113:_serve         - Finished server process [70232]
+2026-11-14 21:21:33.750 | INFO  | -------- | server.py:103:_serve         - Started server process [46544]
+2026-11-14 21:21:33.751 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-11-14 21:21:33.769 | INFO  | -------- | legal_workflow.py:202:init_checkpointer - [체크포인터] PostgreSQL 체크포인트 테이블 초기화 완료
+2026-11-14 21:21:33.770 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - [그래프 동기화 워커] 백그라운드 그래프 동기화 워커가 시작되었습니다.
+2026-11-14 21:21:33.782 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-11-14 21:26:15.221 | INFO  | 6b0b6fd5 | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/auth/me" 200 (30.0ms) [req:d40db1f5]
+2026-11-14 21:26:15.227 | INFO  | 02aa2ec3 | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/auth/me" 200 (4.8ms) [req:732109e2]
+2026-11-14 21:26:15.251 | INFO  | 34892a0c | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: '[SC-002] 보증금 일부반환 분쟁 사건 [V5-2026-11-14]' [case:v5_20261, req:0ac697d0]
+2026-11-14 21:26:15.262 | INFO  | 34892a0c | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/v5_20261114_sc002_50834c" 200 (102.0ms) [case:v5_20261, req:0ac697d0]
+2026-11-14 21:26:15.278 | INFO  | 34d65657 | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: '[SC-002] 보증금 일부반환 분쟁 사건 [V5-2026-11-14]' [case:v5_20261, req:7c15ef84]
+2026-11-14 21:26:15.282 | INFO  | 34d65657 | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/v5_20261114_sc002_50834c" 200 (14.7ms) [case:v5_20261, req:7c15ef84]
+2026-11-14 21:26:15.413 | INFO  | 1c592627 | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/v5_20261114_sc002_50834c/consultations" 200 (118.7ms) [case:v5_20261, req:8697e6aa]
+2026-11-14 21:26:15.420 | INFO  | 08bb53ee | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: '[SC-002] 보증금 일부반환 분쟁 사건 [V5-2026-11-14]' [case:v5_20261, req:53654ec9]
+2026-11-14 21:26:15.427 | INFO  | 08bb53ee | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/v5_20261114_sc002_50834c" 200 (132.3ms) [case:v5_20261, req:53654ec9]
+2026-11-14 21:26:15.470 | INFO  | be670dd4 | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/v5_20261114_sc002_50834c/consultations" 200 (51.0ms) [case:v5_20261, req:36db92e3]
+2026-11-14 21:26:15.494 | INFO  | 5641fe13 | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/v5_20261114_sc002_50834c/evidence" 200 (190.3ms) [case:v5_20261, req:330c20cf]
+2026-11-14 21:26:15.511 | INFO  | 359c51ae | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: '[SC-002] 보증금 일부반환 분쟁 사건 [V5-2026-11-14]' [case:v5_20261, req:de12fc0d]
+2026-11-14 21:26:15.516 | INFO  | 359c51ae | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/v5_20261114_sc002_50834c" 200 (45.2ms) [case:v5_20261, req:de12fc0d]
+2026-11-14 21:26:15.540 | INFO  | 6b67c3fb | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/v5_20261114_sc002_50834c/evidence" 200 (44.2ms) [case:v5_20261, req:7c22dafc]
+2026-11-14 21:26:22.889 | INFO  | 40116890 | conversation_context.py:495:load_conversation_context - [대화 맥락 로드 완료] 대화ID=conv_v5_20261114_sc002_50834c: DB 누적 4턴 중 최근 3턴 유지 (최대=3턴), 현재 진행 턴=5턴 [case:v5_20261, req:5c254273]
+2026-11-14 21:26:22.897 | INFO  | 40116890 | consultation.py:450:start_consultation - [EVIDENCE_BASELINE] request=5c254273 case=v5_20261 docs=9 fingerprint=58581c54b9f5 [case:v5_20261, req:5c254273]
+2026-11-14 21:26:22.905 | INFO  | 40116890 | main.py:196:trace_context_middleware - 127.0.0.1 - "POST /api/v1/consultations" 200 (52.7ms) [req:5c254273]
+2026-11-14 21:26:22.906 | INFO  | 40116890 | consultation.py:563:process_consultation - [상담 분석 시작] 의뢰인 질문 접수 (사건: v5_20261114_sc002_50834c, 요청: 5c254273) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:22.908 | INFO  | 40116890 | decorators.py:340:log_entry  - [통합 법률 상담 워크플로우] 단계 시작 (run_legal_consultation) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:22.968 | INFO  | 40116890 | legal_workflow.py:5574:build_legal_graph - [워크플로우 그래프] 통합 법률 상담 엔진(공식 법령 검색 포함) 그래프 빌드 완료 [case:v5_20261, req:5c254273]
+2026-11-14 21:26:22.983 | INFO  | 40116890 | decorators.py:340:log_entry  - [1단계: 사건·맥락 확인] 단계 시작 (supervisor_initialize_node) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:22.985 | INFO  | 40116890 | legal_workflow.py:379:supervisor_initialize_node - [1단계: 사건·맥락 확인(init)] [SUPERVISOR_INIT] 연속 대화 이전 턴 검증 법령 출처 7건 계승 완료 [case:v5_20261, req:5c254273]
+2026-11-14 21:26:23.030 | INFO  | 40116890 | issue_planner.py:697:plan_legal_issues - [1단계: 사건·맥락 확인(init)] [ISSUE_PLANNER] 질문 분석 결과 5개 단위 쟁점 도출 완료 [case:v5_20261, req:5c254273]
+2026-11-14 21:26:23.030 | INFO  | 40116890 | issue_planner.py:702:plan_legal_issues - [1단계: 사건·맥락 확인(init)] [ISSUE_PLANNER] 단위 쟁점 상세:
+1. [ISSUE_FAKE_CITATION] 가공의 증거 라벨 식별 및 존재 부인
+   우선순위: HIGH
+   검토 질문: 의뢰인이 언급한 증거('증거를')가 현재 사건에 공적으로 등록되어 있는지 여부 | 존재하지 않는 가공 증거에 기재됐다고 주장된 사실의 효력 배제 및 등록 증거 대조
+   필요한 사실: 등록증거목록, 가공증거부인
+   관련 법령: 없음
+   관련 증거: E01, E02, E03, E04, E05
+   보완 자료: 현재 사건에 공식 등록된 정식 증거 목록 확인 (증거를 부존재)
+2. [ISSUE_LEASE_TERMINATION] 임대차계약 종료 시점 및 보증금 반환의무 발생
+   우선순위: HIGH
+   검토 질문: 임대차계약의 당초 만료일은 언제인가? | 임차인의 해지 및 반환 통고가 임대인에게 적법하게 도달하여 계약이 종료되었는가? | 계약 종료에 따른 임대인의 보증금 반환 채무가 이행기에 도달하였는가?
+   필요한 사실: 임대차기간, 만료일, 퇴거요청일, 통지도달, 보증금액
+   관련 법령: 주택임대차보호법 제6조, 주택임대차보호법 제6조의2, 민법 제544조, 민법 제623조
+   관련 증거: E01, E03, E06, E07
+   보완 자료: 없음
+3. [ISSUE_ATTACHMENT_RANKING] 가압류·담보권 등재와 임차인의 권리 순위 관계
+   우선순위: HIGH
+   검토 질문: 임차인의 대항요건(주택 인도 및 주민등록)과 우선변제권(확정일자) 취득 시점은 언제인가? | 등기부에 등재된 가압류·담보권의 접수일자와 임차인의 권리 발생 시점의 선후 관계는 어떠한가? | 임차인의 권리 취득 시점과 가압류·담보권의 설정 시점 간 선후 관계에 따른 법률적 대항력 및 우선변제 효력은 어떠한가?
+   필요한 사실: 전입신고일, 주택인도일, 확정일자일, 가압류접수일, 청구금액
+   관련 법령: 주택임대차보호법 제3조, 주택임대차보호법 제3조의2, 민사집행법 제91조, 민사집행법 제148조
+   관련 증거: E02, E07, E08
+   보완 자료: 없음
+4. [ISSUE_RIGHT_PRESERVATION] 이사 전 대항력 유지 및 임차권등기명령 등 권리보전 조치
+   우선순위: HIGH
+   검토 질문: 보증금을 반환받지 못한 상태에서 다른 곳으로 이사하거나 주민등록을 이전할 때 발생하는 위험은 무엇인가? | 주택임대차보호법상 임차권등기명령 신청 요건(계약종료+미반환)이 충족되었는가? | 임차권등기가 등기부에 기재되기 전까지 점유와 전입을 유지해야 하는 법적 이유는 무엇인가?
+   필요한 사실: 계약종료사실, 미반환사실, 전입유지상태, 점유상태
+   관련 법령: 주택임대차보호법 제3조의3, 주택임대차보호법 제3조 제1항
+   관련 증거: E02, E03, E07, E08
+   보완 자료: 없음
+5. [ISSUE_NEXT_ACTIONS] 입증 보완이 필요한 증거 목록 및 안전한 실무적 다음 행동
+   우선순위: HIGH
+   검토 질문: 향후 지급명령, 임차권등기명령, 반환소송을 진행하기 위해 보완해야 할 필수 증빙
+... (총 1671자 중 1500자만 표시됨) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:23.032 | INFO  | 40116890 | legal_workflow.py:443:supervisor_initialize_node - [1단계: 사건·맥락 확인(init)] [SUPERVISOR_INIT] 초기화 및 상담 준비 완료 | 의도=NEW_LEGAL_ANALYSIS | 모드=CASE_EVIDENCE | case_id=v5_20261114_sc002_50834c | 등록문서수=9 | 단위쟁점수=5 | 사건증거출처수=27 | 컨텍스트길이=4648 | 증거부족여부=False [case:v5_20261, req:5c254273]
+2026-11-14 21:26:23.033 | INFO  | 40116890 | decorators.py:373:log_success - [1단계: 사건·맥락 확인(init)] [1단계: 사건·맥락 확인] 단계 완료 (51.5ms) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:23.068 | INFO  | 40116890 | consultation.py:569:on_step  - [1단계 진행 상태] 사건 기본정보 및 대화 맥락 확인 완료 (노드: supervisor_initialize) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:23.084 | INFO  | 40116890 | decorators.py:340:log_entry  - [2단계: 분야 판별] 단계 시작 (route_node) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:23.084 | INFO  | 40116890 | legal_workflow.py:699:route_node - [2단계: 법률 분야 판별(route)] [ROUTE_FAST_PATH] DOCUMENT_MODE 라우팅 LLM 스킵: 분야=['민법'] [case:v5_20261, req:5c254273]
+2026-11-14 21:26:23.085 | INFO  | 40116890 | decorators.py:373:log_success - [2단계: 법률 분야 판별(route)] [2단계: 분야 판별] 단계 완료 (5.7ms) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:23.087 | INFO  | 40116890 | consultation.py:569:on_step  - [2단계 진행 상태] 사실관계 및 타임라인 조회 중 (노드: route) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:23.098 | INFO  | 40116890 | decorators.py:340:log_entry  - [3단계: 법령·판례 검색] 단계 시작 (run_agents_node) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:23.106 | INFO  | 40116890 | decorators.py:340:log_entry  - [3단계: 법령·판례 검색(run_agents)] [법률 지식베이스 검색] 단계 시작 (retrieve_with_status) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:23.391 | DEBUG | 40116890 | config.py:355:start          - [3단계: 법령·판례 검색(run_agents)] Starting component System [case:v5_20261, req:5c254273]
+2026-11-14 21:26:23.391 | DEBUG | 40116890 | config.py:355:start          - [3단계: 법령·판례 검색(run_agents)] Starting component Posthog [case:v5_20261, req:5c254273]
+2026-11-14 21:26:23.391 | DEBUG | 40116890 | config.py:355:start          - [3단계: 법령·판례 검색(run_agents)] Starting component OpenTelemetryClient [case:v5_20261, req:5c254273]
+2026-11-14 21:26:23.391 | DEBUG | 40116890 | config.py:355:start          - [3단계: 법령·판례 검색(run_agents)] Starting component FastAPI [case:v5_20261, req:5c254273]
+2026-11-14 21:26:23.619 | DEBUG | 40116890 | config.py:355:start          - [3단계: 법령·판례 검색(run_agents)] Starting component System [case:v5_20261, req:5c254273]
+2026-11-14 21:26:23.619 | DEBUG | 40116890 | config.py:355:start          - [3단계: 법령·판례 검색(run_agents)] Starting component Posthog [case:v5_20261, req:5c254273]
+2026-11-14 21:26:23.619 | DEBUG | 40116890 | config.py:355:start          - [3단계: 법령·판례 검색(run_agents)] Starting component OpenTelemetryClient [case:v5_20261, req:5c254273]
+2026-11-14 21:26:23.621 | DEBUG | 40116890 | config.py:355:start          - [3단계: 법령·판례 검색(run_agents)] Starting component FastAPI [case:v5_20261, req:5c254273]
+2026-11-14 21:26:23.673 | DEBUG | 40116890 | retrieval.py:212:_get_client - [3단계: 법령·판례 검색(run_agents)] [벡터DB] 원격 ChromaDB 연결 완료: 127.0.0.1:8001 (컬렉션 9개) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:23.686 | DEBUG | 40116890 | retrieval.py:243:_list_collections - [3단계: 법령·판례 검색(run_agents)] [벡터DB] 조회된 컬렉션 목록=['law_docs_international', 'law_docs_civil', 'law_docs_tax', 'law_docs_criminal', 'law_docs_administrative', 'law_docs_commercial', 'law_docs_global', 'law_docs_constitution', 'law_docs_labor'] [case:v5_20261, req:5c254273]
+2026-11-14 21:26:24.091 | INFO  | 40116890 | _client.py:1085:_send_single_request - [3단계: 법령·판례 검색(run_agents)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/text-embedding-3-large/embeddings?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:5c254273]
+2026-11-14 21:26:24.197 | DEBUG | 40116890 | retrieval.py:391:retrieve_with_status - [3단계: 법령·판례 검색(run_agents)] [벡터 검색 완료] 컬렉션=law_docs_civil, 검색된 문서=6건 [case:v5_20261, req:5c254273]
+2026-11-14 21:26:24.198 | INFO  | 40116890 | decorators.py:373:log_success - [3단계: 법령·판례 검색(run_agents)] [법률 지식베이스 검색] 단계 완료 (1092.0ms) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:24.198 | INFO  | 40116890 | decorators.py:340:log_entry  - [3단계: 법령·판례 검색(run_agents)] [법률 지식베이스 검색] 단계 시작 (retrieve_with_status) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:24.209 | DEBUG | 40116890 | retrieval.py:243:_list_collections - [3단계: 법령·판례 검색(run_agents)] [벡터DB] 조회된 컬렉션 목록=['law_docs_international', 'law_docs_civil', 'law_docs_tax', 'law_docs_criminal', 'law_docs_administrative', 'law_docs_commercial', 'law_docs_global', 'law_docs_constitution', 'law_docs_labor'] [case:v5_20261, req:5c254273]
+2026-11-14 21:26:24.379 | INFO  | 40116890 | _client.py:1085:_send_single_request - [3단계: 법령·판례 검색(run_agents)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/text-embedding-3-large/embeddings?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:5c254273]
+2026-11-14 21:26:24.478 | DEBUG | 40116890 | retrieval.py:391:retrieve_with_status - [3단계: 법령·판례 검색(run_agents)] [벡터 검색 완료] 컬렉션=law_docs_global, 검색된 문서=6건 [case:v5_20261, req:5c254273]
+2026-11-14 21:26:24.478 | INFO  | 40116890 | decorators.py:373:log_success - [3단계: 법령·판례 검색(run_agents)] [법률 지식베이스 검색] 단계 완료 (279.8ms) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:24.534 | INFO  | 40116890 | legal_workflow.py:1209:run_agents_node - [3단계: 법령·판례 검색(run_agents)] [RUN_AGENTS] 쟁점 계획 필수 법령 '주택임대차보호법' (['제6조', '제6조의2', '제3조', '제3조의2', '제3조의3']) 5건 로컬 사전 적재 완료 (Local-First Pre-fetch) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:25.095 | INFO  | 40116890 | legal_workflow.py:1209:run_agents_node - [3단계: 법령·판례 검색(run_agents)] [RUN_AGENTS] 쟁점 계획 필수 법령 '민법' (['제544조', '제623조']) 2건 로컬 사전 적재 완료 (Local-First Pre-fetch) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:25.128 | INFO  | 40116890 | legal_workflow.py:1209:run_agents_node - [3단계: 법령·판례 검색(run_agents)] [RUN_AGENTS] 쟁점 계획 필수 법령 '민사집행법' (['제91조', '제148조']) 2건 로컬 사전 적재 완료 (Local-First Pre-fetch) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:25.128 | INFO  | 40116890 | legal_workflow.py:1229:run_agents_node - [3단계: 법령·판례 검색(run_agents)] [RUN_AGENTS] 문서상담 Vector RAG 검색 완료 | 분야=['민법'] | 수집된문서수=21 | 경고수=0 [case:v5_20261, req:5c254273]
+2026-11-14 21:26:25.135 | INFO  | 40116890 | decorators.py:373:log_success - [3단계: 법령·판례 검색(run_agents)] [3단계: 법령·판례 검색] 단계 완료 (2041.1ms) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:25.136 | INFO  | 40116890 | consultation.py:569:on_step  - [3단계 진행 상태] 법령 및 판례 검색 중 (노드: run_agents) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:25.148 | INFO  | 40116890 | decorators.py:340:log_entry  - [legal_evidence_bundle_node] 단계 시작 (legal_evidence_bundle_node) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:25.149 | INFO  | 40116890 | legal_workflow.py:1447:legal_evidence_bundle_node - [legal_evidence_bundle] [EVIDENCE_BUNDLE] DOCUMENT_MODE 감지 — document_sources 직접 포맷팅 경로 사용으로 번들 생성 생략 [case:v5_20261, req:5c254273]
+2026-11-14 21:26:25.149 | INFO  | 40116890 | decorators.py:373:log_success - [legal_evidence_bundle] [legal_evidence_bundle_node] 단계 완료 (5.2ms) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:25.150 | INFO  | 40116890 | consultation.py:569:on_step  - [3단계 진행 상태] 법령 및 판례 근거 정리 완료 (노드: legal_evidence_bundle) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:25.163 | INFO  | 40116890 | decorators.py:340:log_entry  - [4단계: 쟁점별 분석] 단계 시작 (synthesize_node) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:25.171 | INFO  | 40116890 | document_consultation.py:182:generate_answer - [4단계: 쟁점별 분석·초안 작성(synthesize)] [DOC_CONSULTATION] 답변 생성 시작 (모드=최초초안(initial) | 출처=30건 | 이전초안길이=0자) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:25.172 | INFO  | 40116890 | document_answer.py:245:write_document_answer - [4단계: 쟁점별 분석·초안 작성(synthesize)] [DOCUMENT_ANSWER] 답변 초안 작성 시작 (출처: 30건 | 제한모드=False | 재작성=False) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:25.233 | INFO  | 40116890 | callbacks.py:107:on_chat_model_start - [4단계: 쟁점별 분석·초안 작성(synthesize)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:40.683 | INFO  | 40116890 | _client.py:1085:_send_single_request - [4단계: 쟁점별 분석·초안 작성(synthesize)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:5c254273]
+2026-11-14 21:26:40.687 | INFO  | 40116890 | callbacks.py:196:on_llm_end  - [4단계: 쟁점별 분석·초안 작성(synthesize)] [LLM_IO_SIZE] agent=None node=synthesize input_chars=24971 output_chars=3683 input_tokens=14410 output_tokens=2240 latency_ms=15454 [case:v5_20261, req:5c254273]
+2026-11-14 21:26:40.688 | INFO  | 40116890 | callbacks.py:205:on_llm_end  - [4단계: 쟁점별 분석·초안 작성(synthesize)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 15454ms, 입력: 14,410토큰, 출력: 2,240토큰, 총: 16,650토큰) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:40.692 | INFO  | 40116890 | document_answer.py:420:write_document_answer - [4단계: 쟁점별 분석·초안 작성(synthesize)] [DOCUMENT_ANSWER] 답변 초안 작성 완료 (길이: 3572자 | 해시: 414fa82e5fea9442 | 제한모드=False) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:40.692 | INFO  | 40116890 | document_consultation.py:209:generate_answer - [4단계: 쟁점별 분석·초안 작성(synthesize)] [DOC_CONSULTATION] 답변 생성 완료 (초안길이=3572자 | 해시=414fa82e5fea9442) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:40.692 | INFO  | 40116890 | decorators.py:373:log_success - [4단계: 쟁점별 분석·초안 작성(synthesize)] [4단계: 쟁점별 분석] 단계 완료 (15532.7ms) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:40.696 | INFO  | 40116890 | consultation.py:569:on_step  - [4단계 진행 상태] 법률 쟁점별 분석 중 (노드: synthesize) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:40.708 | INFO  | 40116890 | decorators.py:340:log_entry  - [5단계: 근거 검증] 단계 시작 (verification_node) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:40.736 | INFO  | 40116890 | document_consultation.py:274:verify_answer - [5단계: 법령·증거 근거 검증(verification)] [DOC_CONSULTATION] 원문 근거 검증 시작 (검증 대상 초안: 3572자 | 참조 출처: 30건) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:40.742 | INFO  | 40116890 | decorators.py:340:log_entry  - [5단계: 법령·증거 근거 검증(verification)] [5단계: 조문·증거 일치성 검증] 단계 시작 (run_verification) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:40.753 | INFO  | 40116890 | qa_checker.py:174:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 검사 시작 (초안길이: 3572자 | 질문: '임대차가 끝났는데 집주인이 보증금을 일부만 반환하고 나머지 지급을 미루고 있습니다. 집주인이 주장하는 반환액...') [case:v5_20261, req:5c254273]
+2026-11-14 21:26:40.759 | INFO  | 40116890 | qa_checker.py:202:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 출처 존재 검사: PASS (인용출처: 30건 정상) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:40.760 | INFO  | 40116890 | qa_checker.py:233:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 금액 단순 정규식 자동교정 비활성화: 역할 미확정 금액은 기존 검증 단계에서 판단 [case:v5_20261, req:5c254273]
+2026-11-14 21:26:40.760 | INFO  | 40116890 | qa_checker.py:257:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 질문 충족: 3/3 (누락항목: 없음) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:40.760 | INFO  | 40116890 | qa_checker.py:352:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 형식 검사 PASS (법률적 의미 판단 아님) [case:v5_20261, req:5c254273]
+2026-11-14 21:26:40.760 | INFO  | 40116890 | qa_checker.py:414:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] LLM 추가 검토 사유:
+  - 법적 권리의 발생·소멸·우선순위 복합 법률요건 적용 검토
+  - 사건 사실관계 및 증거 기반 법률요건 검증 [case:v5_20261, req:5c254273]
+2026-11-14 21:26:40.765 | INFO  | 40116890 | callbacks.py:107:on_chat_model_start - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 1건) [case:v5_20261, req:5c254273]
+2026-11-14 21:27:16.361 | INFO  | 40116890 | _client.py:1085:_send_single_request - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:5c254273]
+2026-11-14 21:27:16.363 | INFO  | 40116890 | callbacks.py:196:on_llm_end  - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [LLM_IO_SIZE] agent=verification_agent node=verification input_chars=29857 output_chars=8410 input_tokens=16605 output_tokens=3989 latency_ms=35599 [case:v5_20261, req:5c254273]
+2026-11-14 21:27:16.363 | INFO  | 40116890 | callbacks.py:205:on_llm_end  - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 35599ms, 입력: 16,605토큰, 출력: 3,989토큰, 총: 20,594토큰) [case:v5_20261, req:5c254273]
+2026-11-14 21:27:16.365 | INFO  | 40116890 | verification.py:1089:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION_SCHEMA] 검증 출력 수신 및 스키마 검증 시작 [case:v5_20261, req:5c254273]
+2026-11-14 21:27:16.366 | INFO  | 40116890 | verification.py:1091:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION_SCHEMA] 스키마 검증 및 정규화 결과: SUCCESS (주장수=8, 상태=PASS) [case:v5_20261, req:5c254273]
+2026-11-14 21:27:16.366 | INFO  | 40116890 | verification.py:1092:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION] 법률 주장 검증 계속 진행 [case:v5_20261, req:5c254273]
+2026-11-14 21:27:16.368 | INFO  | 40116890 | verification.py:1597:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION] status=PASS, claims=8, unverified=0, unsupported=0 [case:v5_20261, req:5c254273]
+2026-11-14 21:27:16.369 | INFO  | 40116890 | decorators.py:373:log_success - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [5단계: 조문·증거 일치성 검증] 단계 완료 (35627.8ms) [case:v5_20261, req:5c254273]
+2026-11-14 21:27:16.372 | INFO  | 40116890 | document_consultation.py:319:verify_answer - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [DOC_CONSULTATION] 원문 근거 검증 완료 (판정=PASS | 사유=NONE | 주장=8건[지지=8, 미흡=0] | 후보법령=[]) [case:v5_20261, req:5c254273]
+2026-11-14 21:27:16.372 | INFO  | 40116890 | decorators.py:373:log_success - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [5단계: 근거 검증] 단계 완료 (35669.0ms) [case:v5_20261, req:5c254273]
+2026-11-14 21:27:16.373 | INFO  | 40116890 | document_consultation.py:379:next_verification_step - [DOC_ROUTING] 검증 후 다음 실행 노드 결정: finalize (사유: 검증 통과(PASS) | 재작성=0회 | 법령검색=0회) [case:v5_20261, req:5c254273]
+2026-11-14 21:27:16.374 | INFO  | 40116890 | consultation.py:569:on_step  - [5단계 진행 상태] 증거 및 법률 근거 검증 중 (노드: verification) [case:v5_20261, req:5c254273]
+2026-11-14 21:27:16.387 | INFO  | 40116890 | decorators.py:340:log_entry  - [6단계: 최종 답변 작성] 단계 시작 (finalize_node) [case:v5_20261, req:5c254273]
+2026-11-14 21:27:16.403 | INFO  | 40116890 | document_consultation.py:529:finish_answer - [6단계: 최종 답변 확정(finalize)] [FINALIZE] 최종 답변 작성 시작
+[FINALIZE] 답변 생성 방식: DRAFT_PRESERVED
+[FINALIZE] Verification 결과: PASS
+[FINALIZE] 초안 SHA256: 414fa82e5fea94420d16d0bfa3b3f1e51cc03be4d73f4aa143051c4865e9a726
+[FINALIZE] 최종 SHA256: 414fa82e5fea94420d16d0bfa3b3f1e51cc03be4d73f4aa143051c4865e9a726
+[FINALIZE] 답변 내용 변경: 없음
+[FINALIZE] 인용 출처: 12건
+[FINALIZE] 완료 [case:v5_20261, req:5c254273]
+2026-11-14 21:27:16.404 | INFO  | 40116890 | document_consultation.py:544:finish_answer - [6단계: 최종 답변 확정(finalize)] [DOC_FINALIZE] 문서 상담 답변 확정 (처분=DELIVERED | 초안보존=True | 제한답변사용=False | 인용출처=12건 | 최종답변길이=3572자) [case:v5_20261, req:5c254273]
+2026-11-14 21:27:16.404 | INFO  | 40116890 | decorators.py:373:log_success - [6단계: 최종 답변 확정(finalize)] [6단계: 최종 답변 작성] 단계 완료 (21.9ms) [case:v5_20261, req:5c254273]
+2026-11-14 21:27:16.423 | INFO  | 40116890 | consultation.py:569:on_step  - [6단계 진행 상태] 최종 상담 답변 작성 중 (노드: finalize) [case:v5_20261, req:5c254273]
+2026-11-14 21:27:19.385 | INFO  | 40116890 | decorators.py:373:log_success - [통합 법률 상담 워크플로우] 단계 완료 (56477.9ms) [case:v5_20261, req:5c254273]
+2026-11-14 21:27:19.387 | INFO  | 40116890 | consultation.py:683:process_consultation - [상담 분석 완료] 6단계 분석 및 검증 완료 (요청: 5c254273 | 소요: 56480.5ms | 처분: DELIVERED | 검증: PASS | 인용출처: 12건) [case:v5_20261, req:5c254273]
+2026-11-14 21:27:19.405 | INFO  | 40116890 | consultation.py:369:_freeze_record_presentation - [PRESENTATION_FREEZE] request=5c254273 version=1.0 binding=HASH_MATCHED [case:v5_20261, req:5c254273]
+2026-11-14 21:33:33.637 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-11-14 21:33:33.748 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-11-14 21:33:33.761 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-11-14 21:33:33.785 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-11-14 21:33:33.786 | INFO  | -------- | server.py:113:_serve         - Finished server process [46544]
+2026-11-14 21:33:43.002 | INFO  | -------- | server.py:103:_serve         - Started server process [48580]
+2026-11-14 21:33:43.003 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-11-14 21:33:43.041 | INFO  | -------- | legal_workflow.py:202:init_checkpointer - [체크포인터] PostgreSQL 체크포인트 테이블 초기화 완료
+2026-11-14 21:33:43.042 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - [그래프 동기화 워커] 백그라운드 그래프 동기화 워커가 시작되었습니다.
+2026-11-14 21:33:43.059 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-11-14 21:34:00.104 | INFO  | 4a9ea6b2 | cases.py:75:list_cases       - 사건 목록 조회 완료 (총 793건) [req:1427243b]
+2026-11-14 21:34:00.110 | INFO  | 4a9ea6b2 | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases" 200 (41.4ms) [req:1427243b]
+2026-11-14 21:34:00.126 | INFO  | 8d9e49af | cases.py:75:list_cases       - 사건 목록 조회 완료 (총 793건) [req:7e2d5ef2]
+2026-11-14 21:34:00.130 | INFO  | 8d9e49af | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases" 200 (14.3ms) [req:7e2d5ef2]
+2026-11-14 21:34:02.879 | INFO  | 377df5e8 | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: '[SC-003] 민간임대주택 시행령 시행일 자문 [V5-2026-11-14]' [case:v5_20261, req:0625bc95]
+2026-11-14 21:34:02.889 | INFO  | 377df5e8 | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/v5_20261114_sc003_a2c7c7" 200 (28.0ms) [case:v5_20261, req:0625bc95]
+2026-11-14 21:34:02.898 | INFO  | f757d7fc | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: '[SC-003] 민간임대주택 시행령 시행일 자문 [V5-2026-11-14]' [case:v5_20261, req:8d3e20a9]
+2026-11-14 21:34:02.902 | INFO  | f757d7fc | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/v5_20261114_sc003_a2c7c7" 200 (10.7ms) [case:v5_20261, req:8d3e20a9]
+2026-11-14 21:34:02.979 | INFO  | 7355f013 | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/v5_20261114_sc003_a2c7c7/workflow/summary" 200 (73.9ms) [case:v5_20261, req:c5d3dccf]
+2026-11-14 21:34:03.003 | INFO  | 53afb18e | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/v5_20261114_sc003_a2c7c7/workflow/summary" 200 (22.4ms) [case:v5_20261, req:d3ac199c]
+2026-11-14 21:34:05.052 | INFO  | d4fb38b9 | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: '[SC-003] 민간임대주택 시행령 시행일 자문 [V5-2026-11-14]' [case:v5_20261, req:1990d25d]
+2026-11-14 21:34:05.056 | INFO  | d4fb38b9 | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/v5_20261114_sc003_a2c7c7" 200 (18.5ms) [case:v5_20261, req:1990d25d]
+2026-11-14 21:34:05.078 | INFO  | c97d88b0 | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/v5_20261114_sc003_a2c7c7/consultations" 200 (39.4ms) [case:v5_20261, req:2732ac5e]
+2026-11-14 21:34:05.090 | INFO  | ba95ac2a | cases.py:108:get_case_detail - 사건 상세 정보 조회 완료: '[SC-003] 민간임대주택 시행령 시행일 자문 [V5-2026-11-14]' [case:v5_20261, req:2a4414d9]
+2026-11-14 21:34:05.094 | INFO  | da39cb6f | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/v5_20261114_sc003_a2c7c7/evidence" 200 (51.7ms) [case:v5_20261, req:1a895ff2]
+2026-11-14 21:34:05.104 | INFO  | ba95ac2a | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/v5_20261114_sc003_a2c7c7" 200 (45.5ms) [case:v5_20261, req:2a4414d9]
+2026-11-14 21:34:05.105 | INFO  | 4a19d5fc | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/v5_20261114_sc003_a2c7c7/consultations" 200 (14.7ms) [case:v5_20261, req:da8c412d]
+2026-11-14 21:34:05.115 | INFO  | c6f019a0 | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/v5_20261114_sc003_a2c7c7/evidence" 200 (19.6ms) [case:v5_20261, req:924bd813]
+2026-11-14 21:34:11.679 | INFO  | c193fbb6 | conversation_context.py:495:load_conversation_context - [대화 맥락 로드 완료] 대화ID=conv_v5_20261114_sc003_a2c7c7: DB 누적 4턴 중 최근 3턴 유지 (최대=3턴), 현재 진행 턴=5턴 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:11.685 | INFO  | c193fbb6 | consultation.py:450:start_consultation - [EVIDENCE_BASELINE] request=4c400bc2 case=v5_20261 docs=0 fingerprint=4f53cda18c2b [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:11.692 | INFO  | c193fbb6 | main.py:196:trace_context_middleware - 127.0.0.1 - "POST /api/v1/consultations" 200 (35.6ms) [req:4c400bc2]
+2026-11-14 21:34:11.693 | INFO  | c193fbb6 | consultation.py:563:process_consultation - [상담 분석 시작] 의뢰인 질문 접수 (사건: v5_20261114_sc003_a2c7c7, 요청: 4c400bc2) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:11.695 | INFO  | c193fbb6 | decorators.py:340:log_entry  - [통합 법률 상담 워크플로우] 단계 시작 (run_legal_consultation) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:11.742 | INFO  | c193fbb6 | legal_workflow.py:5574:build_legal_graph - [워크플로우 그래프] 통합 법률 상담 엔진(공식 법령 검색 포함) 그래프 빌드 완료 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:11.758 | INFO  | c193fbb6 | decorators.py:340:log_entry  - [1단계: 사건·맥락 확인] 단계 시작 (supervisor_initialize_node) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:11.788 | INFO  | c193fbb6 | issue_planner.py:697:plan_legal_issues - [1단계: 사건·맥락 확인(init)] [ISSUE_PLANNER] 질문 분석 결과 1개 단위 쟁점 도출 완료 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:11.789 | INFO  | c193fbb6 | issue_planner.py:702:plan_legal_issues - [1단계: 사건·맥락 확인(init)] [ISSUE_PLANNER] 단위 쟁점 상세:
+1. [ISSUE_GENERAL_ANALYSIS] 사건 사실관계 및 법률적 검토 쟁점
+   우선순위: HIGH
+   검토 질문: 저는 등록 민간임대주택의 임대사업자입니다. 2026년 11월 1일에 새로운 임대차계약을 체결했습니다. 임대차계약 신고 시 관리비와 전기·수도료 등 임차인 부담 비용의 금액이나 산정방식까지 신고해야 하나요?
+   필요한 사실: 주요사실, 요건사실
+   관련 법령: 없음
+   관련 증거: 없음
+   보완 자료: 없음 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:11.790 | INFO  | c193fbb6 | legal_workflow.py:443:supervisor_initialize_node - [1단계: 사건·맥락 확인(init)] [SUPERVISOR_INIT] 초기화 및 상담 준비 완료 | 의도=NEW_LEGAL_ANALYSIS | 모드=CASE_EVIDENCE | case_id=v5_20261114_sc003_a2c7c7 | 등록문서수=0 | 단위쟁점수=1 | 사건증거출처수=0 | 컨텍스트길이=1032 | 증거부족여부=True [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:11.790 | INFO  | c193fbb6 | decorators.py:373:log_success - [1단계: 사건·맥락 확인(init)] [1단계: 사건·맥락 확인] 단계 완료 (33.5ms) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:11.794 | INFO  | c193fbb6 | consultation.py:569:on_step  - [1단계 진행 상태] 사건 기본정보 및 대화 맥락 확인 완료 (노드: supervisor_initialize) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:11.806 | INFO  | c193fbb6 | decorators.py:340:log_entry  - [2단계: 분야 판별] 단계 시작 (route_node) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:11.807 | INFO  | c193fbb6 | decorators.py:340:log_entry  - [2단계: 법률 분야 판별(route)] [2단계: 법률 분야 상세 분류] 단계 시작 (route_categories_detailed) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:11.883 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [2단계: 법률 분야 판별(route)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 1건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:13.254 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [2단계: 법률 분야 판별(route)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:13.258 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [2단계: 법률 분야 판별(route)] [LLM_IO_SIZE] agent=None node=route input_chars=3078 output_chars=107 input_tokens=1692 output_tokens=61 latency_ms=1376 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:13.258 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [2단계: 법률 분야 판별(route)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1376ms, 입력: 1,692토큰, 출력: 61토큰, 총: 1,753토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:13.260 | INFO  | c193fbb6 | decorators.py:373:log_success - [2단계: 법률 분야 판별(route)] [2단계: 법률 분야 상세 분류] 단계 완료 (1453.2ms) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:13.260 | INFO  | c193fbb6 | legal_workflow.py:737:route_node - [2단계: 법률 분야 판별(route)] [ROUTE] 분야 판별 완료(폴백) | 상태=CLASSIFIED | 분야=['행정'] | 사유=등록 민간임대주택 임대사업자의 임대차계약 신고 의무와 신고사항 범위가 핵심 쟁점으로, 관련 법령상 행정적 신고제도 해석이 필요합니다. | 답변모드=STANDARD [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:13.260 | INFO  | c193fbb6 | decorators.py:373:log_success - [2단계: 법률 분야 판별(route)] [2단계: 분야 판별] 단계 완료 (1455.2ms) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:13.261 | INFO  | c193fbb6 | consultation.py:569:on_step  - [2단계 진행 상태] 사실관계 및 타임라인 조회 중 (노드: route) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:13.272 | INFO  | c193fbb6 | decorators.py:340:log_entry  - [3단계: 법령·판례 검색] 단계 시작 (run_agents_node) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:13.278 | INFO  | c193fbb6 | decorators.py:340:log_entry  - [3단계: 법령·판례 검색(run_agents)] [전문 에이전트 분석] 단계 시작 (run_specialist_agent) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:13.279 | INFO  | c193fbb6 | decorators.py:340:log_entry  - [3단계: 법령·판례 검색(run_agents)] [전문 에이전트 초기화] 단계 시작 (build_react_agent) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:13.282 | DEBUG | c193fbb6 | base_agent.py:211:build_react_agent - [3단계: 법령·판례 검색(run_agents)] [전문 에이전트 준비] 분야=행정, 도구=1개, 주력도구=administrative_retrieval_tool [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:13.282 | INFO  | c193fbb6 | decorators.py:373:log_success - [3단계: 법령·판례 검색(run_agents)] [전문 에이전트 초기화] 단계 완료 (3.3ms) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:13.283 | INFO  | c193fbb6 | decorators.py:340:log_entry  - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [법률 검색 도구 실행] 단계 시작 (_run) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:13.284 | DEBUG | c193fbb6 | retrieval_factory.py:45:_run - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [LAW_TOOL] tool=administrative_retrieval_tool category=administrative question_len=114 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:13.284 | INFO  | c193fbb6 | decorators.py:340:log_entry  - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [검색 질의어 법령 용어 확장] 단계 시작 (rewrite_query) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:13.288 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 1건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:14.709 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:14.711 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [LLM_IO_SIZE] agent=administrative_agent node=run_agents input_chars=1188 output_chars=48 input_tokens=682 output_tokens=29 latency_ms=1423 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:14.711 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1423ms, 입력: 682토큰, 출력: 29토큰, 총: 711토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:14.712 | DEBUG | c193fbb6 | query_rewrite.py:131:rewrite_query - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [질의어 확장] LLM 도출 법률 키워드=['주택 임대차계약 신고', '임차인 부담 비용'] (질의='저는 등록 민간임대주택의 임대사업자입니다. 2026년 11월 1일에 새로...') [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:14.713 | DEBUG | c193fbb6 | query_rewrite.py:143:rewrite_query - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [질의어 확장 완료] 최종 길이=142자, 확장 질의=[저는 등록 민간임대주택의 임대사업자입니다. 2026년 11월 1일에 새로운 임대차계약을 체결했습니다. 임대차계약 신고 시 관리비와 전기·수도료 등 임차인 부담 비용의 금액이나 산정방식까지 신고해야 하나요?
+키워드: 주택 임대차계약 신고, 임차인 부담 비용] [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:14.713 | INFO  | c193fbb6 | decorators.py:373:log_success - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [검색 질의어 법령 용어 확장] 단계 완료 (1428.9ms) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:14.726 | INFO  | c193fbb6 | decorators.py:340:log_entry  - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [법률 지식베이스 검색] 단계 시작 (retrieve_with_status) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:15.022 | DEBUG | c193fbb6 | config.py:355:start          - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] Starting component System [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:15.022 | DEBUG | c193fbb6 | config.py:355:start          - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] Starting component Posthog [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:15.022 | DEBUG | c193fbb6 | config.py:355:start          - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] Starting component OpenTelemetryClient [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:15.022 | DEBUG | c193fbb6 | config.py:355:start          - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] Starting component FastAPI [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:15.252 | DEBUG | c193fbb6 | config.py:355:start          - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] Starting component System [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:15.253 | DEBUG | c193fbb6 | config.py:355:start          - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] Starting component Posthog [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:15.253 | DEBUG | c193fbb6 | config.py:355:start          - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] Starting component OpenTelemetryClient [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:15.253 | DEBUG | c193fbb6 | config.py:355:start          - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] Starting component FastAPI [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:15.277 | DEBUG | c193fbb6 | retrieval.py:212:_get_client - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [벡터DB] 원격 ChromaDB 연결 완료: 127.0.0.1:8001 (컬렉션 9개) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:15.431 | DEBUG | c193fbb6 | retrieval.py:243:_list_collections - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [벡터DB] 조회된 컬렉션 목록=['law_docs_international', 'law_docs_civil', 'law_docs_tax', 'law_docs_criminal', 'law_docs_administrative', 'law_docs_commercial', 'law_docs_global', 'law_docs_constitution', 'law_docs_labor'] [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:15.738 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/text-embedding-3-large/embeddings?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:15.798 | DEBUG | c193fbb6 | retrieval.py:391:retrieve_with_status - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [벡터 검색 완료] 컬렉션=law_docs_global, 검색된 문서=4건 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:15.798 | INFO  | c193fbb6 | decorators.py:373:log_success - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [법률 지식베이스 검색] 단계 완료 (1072.5ms) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:15.799 | INFO  | c193fbb6 | decorators.py:340:log_entry  - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [법률 지식베이스 검색] 단계 시작 (retrieve_with_status) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:15.806 | DEBUG | c193fbb6 | retrieval.py:243:_list_collections - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [벡터DB] 조회된 컬렉션 목록=['law_docs_international', 'law_docs_civil', 'law_docs_tax', 'law_docs_criminal', 'law_docs_administrative', 'law_docs_commercial', 'law_docs_global', 'law_docs_constitution', 'law_docs_labor'] [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:15.967 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/text-embedding-3-large/embeddings?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:16.064 | DEBUG | c193fbb6 | retrieval.py:391:retrieve_with_status - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [벡터 검색 완료] 컬렉션=law_docs_administrative, 검색된 문서=4건 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:16.065 | INFO  | c193fbb6 | decorators.py:373:log_success - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [법률 지식베이스 검색] 단계 완료 (265.4ms) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:16.164 | INFO  | c193fbb6 | retrieval_service.py:772:search - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [LAW_RETRIEVAL] status=SOURCE_TEMPORAL_UNCONFIRMED category=administrative source_count=3 catalog=NOT_REQUESTED collection_statuses={'law_docs_global': 'SUCCESS', 'law_docs_administrative': 'SUCCESS'} reason_codes=['LEGAL_ISSUES_NOT_FULLY_RESOLVED', 'TEMPORAL_LEGAL_REVIEW_REQUIRED'] [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:16.164 | INFO  | c193fbb6 | decorators.py:373:log_success - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [법률 검색 도구 실행] 단계 완료 (2881.1ms) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:16.165 | INFO  | c193fbb6 | decorators.py:373:log_success - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [전문 에이전트 분석] 단계 완료 (2887.1ms) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:16.166 | INFO  | c193fbb6 | legal_workflow.py:1398:run_agents_node - [3단계: 법령·판례 검색(run_agents)] [RUN_AGENTS] 전문 에이전트 분석 완료 | 대상분야=['행정'] | 고속검색(fast_retrieval)=True | 완료분야=['행정'] | 수집출처수=2 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:16.173 | INFO  | c193fbb6 | decorators.py:373:log_success - [3단계: 법령·판례 검색(run_agents)] [3단계: 법령·판례 검색] 단계 완료 (2902.7ms) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:16.175 | INFO  | c193fbb6 | consultation.py:569:on_step  - [3단계 진행 상태] 법령 및 판례 검색 중 (노드: run_agents) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:16.183 | INFO  | c193fbb6 | decorators.py:340:log_entry  - [legal_evidence_bundle_node] 단계 시작 (legal_evidence_bundle_node) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:16.189 | INFO  | c193fbb6 | legal_workflow.py:1460:legal_evidence_bundle_node - [legal_evidence_bundle] [EVIDENCE_BUNDLE] statute_sources=2 warnings=['TEMPORAL_APPLICABILITY_UNCONFIRMED'] truncated=False [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:16.190 | INFO  | c193fbb6 | decorators.py:373:log_success - [legal_evidence_bundle] [legal_evidence_bundle_node] 단계 완료 (8.2ms) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:16.192 | INFO  | c193fbb6 | consultation.py:569:on_step  - [3단계 진행 상태] 법령 및 판례 근거 정리 완료 (노드: legal_evidence_bundle) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:16.201 | INFO  | c193fbb6 | decorators.py:340:log_entry  - [4단계: 쟁점별 분석] 단계 시작 (synthesize_node) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:16.210 | INFO  | c193fbb6 | decorators.py:340:log_entry  - [4단계: 쟁점별 분석·초안 작성(synthesize)] [4단계: 쟁점별 분석] 단계 시작 (synthesize) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:16.218 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [4단계: 쟁점별 분석·초안 작성(synthesize)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 1건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:35.614 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [4단계: 쟁점별 분석·초안 작성(synthesize)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:35.616 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [4단계: 쟁점별 분석·초안 작성(synthesize)] [LLM_IO_SIZE] agent=None node=synthesize input_chars=5731 output_chars=1684 input_tokens=3418 output_tokens=970 latency_ms=19397 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:35.616 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [4단계: 쟁점별 분석·초안 작성(synthesize)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 19397ms, 입력: 3,418토큰, 출력: 970토큰, 총: 4,388토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:35.618 | INFO  | c193fbb6 | decorators.py:373:log_success - [4단계: 쟁점별 분석·초안 작성(synthesize)] [4단계: 쟁점별 분석] 단계 완료 (19409.5ms) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:35.619 | INFO  | c193fbb6 | legal_workflow.py:1577:synthesize_node - [4단계: 쟁점별 분석·초안 작성(synthesize)] [SYNTHESIZE] 초안 작성 완료 | 길이=1570 | 해시=0f299e3a | 전문분석결과수=1 | intent=NEW_LEGAL_ANALYSIS [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:35.620 | INFO  | c193fbb6 | decorators.py:373:log_success - [4단계: 쟁점별 분석·초안 작성(synthesize)] [4단계: 쟁점별 분석] 단계 완료 (19420.4ms) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:35.622 | INFO  | c193fbb6 | consultation.py:569:on_step  - [4단계 진행 상태] 법률 쟁점별 분석 중 (노드: synthesize) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:35.632 | INFO  | c193fbb6 | decorators.py:340:log_entry  - [5단계: 근거 검증] 단계 시작 (verification_node) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:35.673 | INFO  | c193fbb6 | decorators.py:340:log_entry  - [5단계: 법령·증거 근거 검증(verification)] [5단계: 조문·증거 일치성 검증] 단계 시작 (run_verification) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:35.684 | INFO  | c193fbb6 | qa_checker.py:174:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 검사 시작 (초안길이: 1570자 | 질문: '저는 등록 민간임대주택의 임대사업자입니다. 2026년 11월 1일에 새로운 임대차계약을 체결했습니다. 임대차...') [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:35.685 | INFO  | c193fbb6 | qa_checker.py:202:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 출처 존재 검사: PASS (인용출처: 2건 정상) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:35.685 | INFO  | c193fbb6 | qa_checker.py:233:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 금액 단순 정규식 자동교정 비활성화: 역할 미확정 금액은 기존 검증 단계에서 판단 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:35.686 | INFO  | c193fbb6 | qa_checker.py:257:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 질문 충족: 1/1 (누락항목: 없음) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:35.686 | INFO  | c193fbb6 | qa_checker.py:379:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 형식 검사 PASS (법률적 의미 판단 아님) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:35.687 | INFO  | c193fbb6 | qa_checker.py:441:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] LLM 추가 검토 사유:
+  - 사건 사실관계 및 증거 기반 법률요건 검증 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:35.691 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 1건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:59.441 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:59.444 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [LLM_IO_SIZE] agent=verification_agent node=verification input_chars=10751 output_chars=4778 input_tokens=5679 output_tokens=2187 latency_ms=23751 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:59.444 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 23751ms, 입력: 5,679토큰, 출력: 2,187토큰, 총: 7,866토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:59.445 | INFO  | c193fbb6 | verification.py:1089:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION_SCHEMA] 검증 출력 수신 및 스키마 검증 시작 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:59.446 | INFO  | c193fbb6 | verification.py:1091:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION_SCHEMA] 스키마 검증 및 정규화 결과: SUCCESS (주장수=8, 상태=REVISE) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:59.446 | INFO  | c193fbb6 | verification.py:1092:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION] 법률 주장 검증 계속 진행 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:59.446 | INFO  | c193fbb6 | verification.py:1597:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION] status=REVISE, claims=8, unverified=0, unsupported=0 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:59.447 | INFO  | c193fbb6 | decorators.py:373:log_success - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [5단계: 조문·증거 일치성 검증] 단계 완료 (23775.1ms) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:59.448 | INFO  | c193fbb6 | legal_workflow.py:1983:verification_node - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [TEMPORAL_VERIFICATION] gate=NOT_REQUIRED pre=REVISE post=REVISE reasons=[] [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:59.462 | INFO  | c193fbb6 | settlement_calculator.py:232:extract_case_contract_deposit - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [DEPOSIT_UNCONFIRMED] 근거가 확인된 총 보증금 원금 없음 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:59.463 | DEBUG | c193fbb6 | issue_verifier.py:1000:verify_issue - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ISSUE_VERIFIER] 쟁점 검증(ISSUE_GENERAL_ANALYSIS) -> 상태=NEEDS_EVIDENCE (확인사실=0건, 법령근거=0건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:59.463 | INFO  | c193fbb6 | legal_workflow.py:2151:verification_node - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION] 초안 검증 완료 | 판정=REVISE | 사유코드=LEGAL_SOURCE_MISSING | 후보법령=['민간임대주택에 관한 특별법', '민간임대주택에 관한 특별법 시행령'] | 검증출처수=1 | 쟁점결과수=1 | 초안해시=0f299e3a [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:59.463 | INFO  | c193fbb6 | decorators.py:373:log_success - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [5단계: 근거 검증] 단계 완료 (23832.6ms) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:59.468 | INFO  | c193fbb6 | legal_workflow.py:2315:supervisor_verification_decision - [DISPOSITION] 쟁점 기반 처분 결정: WITHHELD (모든 쟁점(1건)의 증거 또는 법률 근거가 불충분하여 법률 판단을 유보합니다.) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:59.469 | INFO  | c193fbb6 | legal_workflow.py:2387:supervisor_verification_decision - [VERIFY_ROUTING] 미확보 후보 법령(['민간임대주택에 관한 특별법', '민간임대주택에 관한 특별법 시행령']) 검증을 위해 HITL 법령 검색 승인 요청 노드로 분기합니다. [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:59.469 | INFO  | c193fbb6 | consultation.py:569:on_step  - [5단계 진행 상태] 증거 및 법률 근거 검증 중 (노드: verification) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:59.478 | INFO  | c193fbb6 | decorators.py:340:log_entry  - [3단계: 공식 검색 승인 대기] 단계 시작 (statute_search_approval_node) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:59.479 | INFO  | c193fbb6 | legal_workflow.py:3967:statute_search_approval_node - [5단계: 외부 법령 조회 승인 대기(hitl)] [HITL_AUTO_APPROVE] AUTO_APPROVE_STATUTE_SEARCH 활성화: 법령 검색 자동 승인 진행 | candidate=['민간임대주택에 관한 특별법', '민간임대주택에 관한 특별법 시행령'] | req_id=APPR-c2dd722b [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:59.480 | INFO  | c193fbb6 | legal_workflow.py:4028:statute_search_approval_node - [5단계: 외부 법령 조회 승인 대기(hitl)] [STATUTE_APPROVAL] 사용자 법령검색 승인 결과 | 승인여부=True | 승인법령=['민간임대주택에 관한 특별법', '민간임대주택에 관한 특별법 시행령'] | 사유=AUTOMATIC_APPROVAL_EVAL | req_id=APPR-c2dd722b [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:59.480 | INFO  | c193fbb6 | decorators.py:373:log_success - [5단계: 외부 법령 조회 승인 대기(hitl)] [3단계: 공식 검색 승인 대기] 단계 완료 (4.6ms) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:59.482 | INFO  | c193fbb6 | consultation.py:569:on_step  - [3단계 진행 상태] 공식 법령 원문 검색 승인 대기 중 (노드: statute_search_approval) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:59.489 | INFO  | c193fbb6 | decorators.py:340:log_entry  - [3단계: 공식 법령 조회] 단계 시작 (execute_statute_search_node) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:34:59.491 | INFO  | c193fbb6 | decorators.py:340:log_entry  - [5단계: 국가법령정보센터 조회(statute_search)] [국가법령정보센터 공식 조문 검색] 단계 시작 (search_official_statutes) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:00.611 | INFO  | c193fbb6 | official_statute_asof.py:331:search_official_statutes_by_date - [5단계: 국가법령정보센터 조회(statute_search)] [OFFICIAL_P4] 승인 법령 시점 검색 완료 | law=민간임대주택에 관한 특별법 versions=['276995', '289169'] sources=22 as_of=2026-11-01 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:01.601 | INFO  | c193fbb6 | official_statute_asof.py:331:search_official_statutes_by_date - [5단계: 국가법령정보센터 조회(statute_search)] [OFFICIAL_P4] 승인 법령 시점 검색 완료 | law=민간임대주택에 관한 특별법 시행령 versions=['291499', '291499'] sources=22 as_of=2026-11-01 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:01.601 | INFO  | c193fbb6 | decorators.py:373:log_success - [5단계: 국가법령정보센터 조회(statute_search)] [국가법령정보센터 공식 조문 검색] 단계 완료 (2109.3ms) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:01.620 | INFO  | c193fbb6 | legal_workflow.py:4347:execute_statute_search_node - [5단계: 국가법령정보센터 조회(statute_search)] [OFFICIAL_INDEX] approved enqueue result={'registered': 0, 'duplicate': 3, 'failed': 0} [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:01.621 | INFO  | c193fbb6 | legal_workflow.py:4383:execute_statute_search_node - [5단계: 국가법령정보센터 조회(statute_search)] [STATUTE_SEARCH] 공식 법령 검색 완료 | 조회조문수=44 | 누적출처수=37 | 후보법령=['민간임대주택에 관한 특별법', '민간임대주택에 관한 특별법 시행령'] [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:01.623 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:03.313 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:03.314 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1578 output_chars=195 input_tokens=810 output_tokens=48 latency_ms=1690 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:03.314 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1690ms, 입력: 810토큰, 출력: 48토큰, 총: 858토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:03.318 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:04.795 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:04.796 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1579 output_chars=195 input_tokens=812 output_tokens=48 latency_ms=1478 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:04.796 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1478ms, 입력: 812토큰, 출력: 48토큰, 총: 860토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:04.800 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:06.540 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:06.542 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1577 output_chars=195 input_tokens=810 output_tokens=48 latency_ms=1742 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:06.542 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1742ms, 입력: 810토큰, 출력: 48토큰, 총: 858토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:06.545 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:08.259 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:08.260 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1577 output_chars=195 input_tokens=810 output_tokens=48 latency_ms=1714 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:08.260 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1714ms, 입력: 810토큰, 출력: 48토큰, 총: 858토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:08.263 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:09.832 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:09.833 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1578 output_chars=195 input_tokens=810 output_tokens=48 latency_ms=1571 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:09.834 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1571ms, 입력: 810토큰, 출력: 48토큰, 총: 858토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:09.836 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:11.379 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:11.379 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1580 output_chars=195 input_tokens=812 output_tokens=48 latency_ms=1543 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:11.379 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1543ms, 입력: 812토큰, 출력: 48토큰, 총: 860토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:11.379 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:12.991 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:12.992 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1578 output_chars=195 input_tokens=810 output_tokens=48 latency_ms=1614 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:12.992 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1614ms, 입력: 810토큰, 출력: 48토큰, 총: 858토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:12.995 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:14.768 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:14.769 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1578 output_chars=195 input_tokens=810 output_tokens=48 latency_ms=1774 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:14.769 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1774ms, 입력: 810토큰, 출력: 48토큰, 총: 858토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:14.773 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:16.072 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:16.073 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1578 output_chars=195 input_tokens=810 output_tokens=48 latency_ms=1300 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:16.074 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1300ms, 입력: 810토큰, 출력: 48토큰, 총: 858토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:16.077 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:17.773 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:17.774 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1578 output_chars=195 input_tokens=810 output_tokens=48 latency_ms=1697 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:17.775 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1697ms, 입력: 810토큰, 출력: 48토큰, 총: 858토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:17.778 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:19.880 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:19.880 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1184 output_chars=300 input_tokens=566 output_tokens=99 latency_ms=2102 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:19.881 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 2102ms, 입력: 566토큰, 출력: 99토큰, 총: 665토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:19.884 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:21.670 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:21.671 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1185 output_chars=195 input_tokens=568 output_tokens=48 latency_ms=1788 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:21.671 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1788ms, 입력: 568토큰, 출력: 48토큰, 총: 616토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:21.676 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:23.315 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:23.316 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1183 output_chars=195 input_tokens=566 output_tokens=48 latency_ms=1641 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:23.317 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1641ms, 입력: 566토큰, 출력: 48토큰, 총: 614토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:23.321 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:25.484 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:25.485 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1183 output_chars=195 input_tokens=566 output_tokens=48 latency_ms=2164 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:25.486 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 2164ms, 입력: 566토큰, 출력: 48토큰, 총: 614토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:25.490 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:27.076 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:27.077 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1184 output_chars=195 input_tokens=566 output_tokens=48 latency_ms=1588 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:27.078 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1588ms, 입력: 566토큰, 출력: 48토큰, 총: 614토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:27.081 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:28.648 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:28.649 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1184 output_chars=195 input_tokens=566 output_tokens=48 latency_ms=1568 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:28.649 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1568ms, 입력: 566토큰, 출력: 48토큰, 총: 614토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:28.653 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:30.117 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:30.118 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1186 output_chars=195 input_tokens=568 output_tokens=48 latency_ms=1466 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:30.119 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1466ms, 입력: 568토큰, 출력: 48토큰, 총: 616토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:30.123 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:31.817 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:31.818 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1184 output_chars=195 input_tokens=566 output_tokens=48 latency_ms=1695 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:31.818 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1695ms, 입력: 566토큰, 출력: 48토큰, 총: 614토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:31.822 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:33.079 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:33.081 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1184 output_chars=195 input_tokens=566 output_tokens=48 latency_ms=1259 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:33.081 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1259ms, 입력: 566토큰, 출력: 48토큰, 총: 614토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:33.084 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:34.243 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:34.245 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1184 output_chars=195 input_tokens=566 output_tokens=48 latency_ms=1160 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:34.245 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1160ms, 입력: 566토큰, 출력: 48토큰, 총: 614토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:34.249 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:35.275 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:35.276 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1167 output_chars=195 input_tokens=576 output_tokens=48 latency_ms=1027 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:35.276 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1027ms, 입력: 576토큰, 출력: 48토큰, 총: 624토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:35.279 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:36.832 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:36.834 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1168 output_chars=375 input_tokens=576 output_tokens=140 latency_ms=1555 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:36.834 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1555ms, 입력: 576토큰, 출력: 140토큰, 총: 716토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:36.838 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:38.140 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:38.141 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=982 output_chars=66 input_tokens=527 output_tokens=19 latency_ms=1303 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:38.142 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1303ms, 입력: 527토큰, 출력: 19토큰, 총: 546토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:38.145 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:39.351 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:39.352 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1170 output_chars=195 input_tokens=578 output_tokens=48 latency_ms=1207 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:39.352 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1207ms, 입력: 578토큰, 출력: 48토큰, 총: 626토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:39.357 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:40.979 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:40.980 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1167 output_chars=195 input_tokens=576 output_tokens=48 latency_ms=1624 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:40.980 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1624ms, 입력: 576토큰, 출력: 48토큰, 총: 624토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:40.983 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:42.569 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:42.570 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1168 output_chars=195 input_tokens=576 output_tokens=48 latency_ms=1587 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:42.570 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1587ms, 입력: 576토큰, 출력: 48토큰, 총: 624토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:42.574 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:44.218 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:44.219 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1168 output_chars=195 input_tokens=576 output_tokens=48 latency_ms=1644 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:44.219 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1644ms, 입력: 576토큰, 출력: 48토큰, 총: 624토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:44.222 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:45.555 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:45.556 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1168 output_chars=195 input_tokens=576 output_tokens=48 latency_ms=1334 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:45.556 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1334ms, 입력: 576토큰, 출력: 48토큰, 총: 624토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:45.560 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:46.736 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:46.737 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1167 output_chars=195 input_tokens=576 output_tokens=48 latency_ms=1177 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:46.737 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1177ms, 입력: 576토큰, 출력: 48토큰, 총: 624토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:46.742 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:48.447 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:48.448 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1168 output_chars=195 input_tokens=576 output_tokens=48 latency_ms=1707 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:48.449 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1707ms, 입력: 576토큰, 출력: 48토큰, 총: 624토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:48.453 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:49.635 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:49.636 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1168 output_chars=195 input_tokens=576 output_tokens=48 latency_ms=1183 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:49.637 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1183ms, 입력: 576토큰, 출력: 48토큰, 총: 624토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:49.638 | INFO  | c193fbb6 | legal_workflow.py:4411:execute_statute_search_node - [5단계: 국가법령정보센터 조회(statute_search)] [TEMPORAL_P5] decisions=40 status=UNCONFIRMED [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:49.639 | INFO  | c193fbb6 | decorators.py:373:log_success - [5단계: 국가법령정보센터 조회(statute_search)] [3단계: 공식 법령 조회] 단계 완료 (50151.0ms) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:49.692 | INFO  | c193fbb6 | consultation.py:569:on_step  - [3단계 진행 상태] 공식 법령 정보 조회 중 (노드: execute_statute_search) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:49.708 | INFO  | c193fbb6 | decorators.py:340:log_entry  - [4단계: 쟁점별 재분석] 단계 시작 (re_analyze_node) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:35:49.720 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [5단계: 확보 법령 기반 재분석(re_analyze)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 1건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:09.561 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [5단계: 확보 법령 기반 재분석(re_analyze)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:09.562 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [5단계: 확보 법령 기반 재분석(re_analyze)] [LLM_IO_SIZE] agent=None node=re_analyze input_chars=62700 output_chars=4192 input_tokens=40181 output_tokens=2493 latency_ms=19843 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:09.562 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [5단계: 확보 법령 기반 재분석(re_analyze)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 19843ms, 입력: 40,181토큰, 출력: 2,493토큰, 총: 42,674토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:09.564 | INFO  | c193fbb6 | legal_workflow.py:4702:re_analyze_node - [5단계: 확보 법령 기반 재분석(re_analyze)] [RE_ANALYZE] 법령 검색 후 재분석 완료 | 길이=4192 | 해시=8cab25b0 | 확보조문수=44 | revision_count=1 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:09.565 | INFO  | c193fbb6 | decorators.py:373:log_success - [5단계: 확보 법령 기반 재분석(re_analyze)] [4단계: 쟁점별 재분석] 단계 완료 (19860.6ms) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:09.566 | INFO  | c193fbb6 | consultation.py:569:on_step  - [4단계 진행 상태] 법령 검색 결과 기반 재분석 중 (노드: re_analyze) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:09.579 | INFO  | c193fbb6 | decorators.py:340:log_entry  - [5단계: 근거 검증] 단계 시작 (verification_node) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:09.588 | INFO  | c193fbb6 | decorators.py:340:log_entry  - [5단계: 법령·증거 근거 검증(verification)] [5단계: 조문·증거 일치성 검증] 단계 시작 (run_verification) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:09.594 | INFO  | c193fbb6 | qa_checker.py:174:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 검사 시작 (초안길이: 4192자 | 질문: '저는 등록 민간임대주택의 임대사업자입니다. 2026년 11월 1일에 새로운 임대차계약을 체결했습니다. 임대차...') [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:09.602 | INFO  | c193fbb6 | qa_checker.py:202:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 출처 존재 검사: PASS (인용출처: 37건 정상) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:09.602 | INFO  | c193fbb6 | qa_checker.py:233:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 금액 단순 정규식 자동교정 비활성화: 역할 미확정 금액은 기존 검증 단계에서 판단 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:09.602 | INFO  | c193fbb6 | qa_checker.py:257:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 질문 충족: 1/1 (누락항목: 없음) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:09.603 | INFO  | c193fbb6 | qa_checker.py:379:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 형식 검사 PASS (법률적 의미 판단 아님) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:09.603 | INFO  | c193fbb6 | qa_checker.py:441:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] LLM 추가 검토 사유:
+  - 법적 권리의 발생·소멸·우선순위 복합 법률요건 적용 검토
+  - 사건 사실관계 및 증거 기반 법률요건 검증 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:09.607 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 1건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:29.856 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:29.857 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [LLM_IO_SIZE] agent=verification_agent node=verification input_chars=61818 output_chars=4118 input_tokens=36410 output_tokens=1825 latency_ms=20251 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:29.857 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 20251ms, 입력: 36,410토큰, 출력: 1,825토큰, 총: 38,235토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:29.859 | INFO  | c193fbb6 | verification.py:1089:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION_SCHEMA] 검증 출력 수신 및 스키마 검증 시작 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:29.861 | INFO  | c193fbb6 | verification.py:1091:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION_SCHEMA] 스키마 검증 및 정규화 결과: SUCCESS (주장수=8, 상태=PASS) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:29.861 | INFO  | c193fbb6 | verification.py:1092:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION] 법률 주장 검증 계속 진행 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:29.861 | INFO  | c193fbb6 | verification.py:1597:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION] status=PASS, claims=8, unverified=0, unsupported=0 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:29.861 | INFO  | c193fbb6 | decorators.py:373:log_success - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [5단계: 조문·증거 일치성 검증] 단계 완료 (20275.1ms) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:29.864 | INFO  | c193fbb6 | legal_workflow.py:1983:verification_node - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [TEMPORAL_VERIFICATION] gate=CAUTION pre=PASS post=PASS reasons=['TEMPORAL_INTERPRETATION_UNCONFIRMED'] [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:29.882 | INFO  | c193fbb6 | settlement_calculator.py:232:extract_case_contract_deposit - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [DEPOSIT_UNCONFIRMED] 근거가 확인된 총 보증금 원금 없음 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:29.882 | DEBUG | c193fbb6 | issue_verifier.py:1000:verify_issue - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ISSUE_VERIFIER] 쟁점 검증(ISSUE_GENERAL_ANALYSIS) -> 상태=NEEDS_EVIDENCE (확인사실=0건, 법령근거=0건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:29.883 | INFO  | c193fbb6 | legal_workflow.py:2151:verification_node - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION] 초안 검증 완료 | 판정=PASS | 사유코드=NONE | 후보법령=[] | 검증출처수=3 | 쟁점결과수=1 | 초안해시=8cab25b0 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:29.883 | INFO  | c193fbb6 | decorators.py:373:log_success - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [5단계: 근거 검증] 단계 완료 (20307.5ms) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:29.884 | INFO  | c193fbb6 | legal_workflow.py:2315:supervisor_verification_decision - [DISPOSITION] 쟁점 기반 처분 결정: WITHHELD (모든 쟁점(1건)의 증거 또는 법률 근거가 불충분하여 법률 판단을 유보합니다.) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:29.884 | INFO  | c193fbb6 | legal_workflow.py:2447:supervisor_verification_decision - [VERIFY_ROUTING] 쟁점 사실관계 증거는 미확보(NEEDS_EVIDENCE)이나 핵심 법리가 출처에 의해 정상 뒷받침되므로 finalize 확정 분기 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:29.885 | INFO  | c193fbb6 | consultation.py:569:on_step  - [5단계 진행 상태] 증거 및 법률 근거 검증 중 (노드: verification) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:29.897 | INFO  | c193fbb6 | decorators.py:340:log_entry  - [6단계: 최종 답변 작성] 단계 시작 (finalize_node) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:29.904 | INFO  | c193fbb6 | settlement_calculator.py:232:extract_case_contract_deposit - [6단계: 최종 답변 확정(finalize)] [DEPOSIT_UNCONFIRMED] 근거가 확인된 총 보증금 원금 없음 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:29.907 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [6단계: 최종 답변 확정(finalize)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:31.619 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [6단계: 최종 답변 확정(finalize)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:31.620 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [6단계: 최종 답변 확정(finalize)] [LLM_IO_SIZE] agent=None node=finalize input_chars=977 output_chars=163 input_tokens=477 output_tokens=72 latency_ms=1713 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:31.620 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [6단계: 최종 답변 확정(finalize)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1713ms, 입력: 477토큰, 출력: 72토큰, 총: 549토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:31.624 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [6단계: 최종 답변 확정(finalize)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:33.705 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [6단계: 최종 답변 확정(finalize)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:33.707 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [6단계: 최종 답변 확정(finalize)] [LLM_IO_SIZE] agent=None node=finalize input_chars=990 output_chars=304 input_tokens=461 output_tokens=137 latency_ms=2083 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:33.707 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [6단계: 최종 답변 확정(finalize)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 2083ms, 입력: 461토큰, 출력: 137토큰, 총: 598토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:34.031 | INFO  | c193fbb6 | callbacks.py:107:on_chat_model_start - [6단계: 최종 답변 확정(finalize)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:35.490 | INFO  | c193fbb6 | _client.py:1085:_send_single_request - [6단계: 최종 답변 확정(finalize)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:35.491 | INFO  | c193fbb6 | callbacks.py:196:on_llm_end  - [6단계: 최종 답변 확정(finalize)] [LLM_IO_SIZE] agent=None node=finalize input_chars=4857 output_chars=196 input_tokens=2868 output_tokens=99 latency_ms=1460 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:35.491 | INFO  | c193fbb6 | callbacks.py:205:on_llm_end  - [6단계: 최종 답변 확정(finalize)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1460ms, 입력: 2,868토큰, 출력: 99토큰, 총: 2,967토큰) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:35.501 | INFO  | c193fbb6 | legal_workflow.py:3704:finalize_node - [6단계: 최종 답변 확정(finalize)] [FINALIZE] 최종 답변 작성 시작
+[FINALIZE] 답변 생성 방식: DRAFT_PRESERVED
+[FINALIZE] Verification 결과: PASS
+[FINALIZE] 초안 SHA256: 8cab25b0dcf9df8083163c85a4aede2a8bad569bb64a3e8ca65ab1cee4efcf7b
+[FINALIZE] 최종 SHA256: 3015fb64e140636eb1a178e83499d2ceba474f98c2bf49be360be297b99bd147
+[FINALIZE] 답변 내용 변경: 있음
+[FINALIZE] 인용 출처: 3건
+[FINALIZE] 완료 [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:35.502 | INFO  | c193fbb6 | decorators.py:373:log_success - [6단계: 최종 답변 확정(finalize)] [6단계: 최종 답변 작성] 단계 완료 (5608.1ms) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:35.526 | INFO  | c193fbb6 | consultation.py:569:on_step  - [6단계 진행 상태] 최종 상담 답변 작성 중 (노드: finalize) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:35.832 | INFO  | c193fbb6 | decorators.py:373:log_success - [통합 법률 상담 워크플로우] 단계 완료 (144137.4ms) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:36:35.832 | INFO  | c193fbb6 | consultation.py:683:process_consultation - [상담 분석 완료] 6단계 분석 및 검증 완료 (요청: 4c400bc2 | 소요: 144139.5ms | 처분: WITHHELD | 검증: PASS | 인용출처: 3건) [case:v5_20261, req:4c400bc2]
+2026-11-14 21:37:17.085 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-11-14 21:37:17.194 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-11-14 21:37:17.206 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-11-14 21:37:17.230 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-11-14 21:37:17.230 | INFO  | -------- | server.py:113:_serve         - Finished server process [48580]
+2026-11-14 21:38:48.639 | INFO  | -------- | server.py:103:_serve         - Started server process [70316]
+2026-11-14 21:38:48.640 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-11-14 21:38:48.658 | INFO  | -------- | legal_workflow.py:202:init_checkpointer - [체크포인터] PostgreSQL 체크포인트 테이블 초기화 완료
+2026-11-14 21:38:48.658 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - [그래프 동기화 워커] 백그라운드 그래프 동기화 워커가 시작되었습니다.
+2026-11-14 21:38:48.677 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-11-14 21:42:46.412 | INFO  | c96c6aca | conversation_context.py:495:load_conversation_context - [대화 맥락 로드 완료] 대화ID=conv_v5_20261114_sc003_a2c7c7: DB 누적 5턴 중 최근 3턴 유지 (최대=3턴), 현재 진행 턴=6턴 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:46.420 | INFO  | c96c6aca | consultation.py:450:start_consultation - [EVIDENCE_BASELINE] request=cb69e3e3 case=v5_20261 docs=0 fingerprint=4f53cda18c2b [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:46.428 | INFO  | c96c6aca | main.py:196:trace_context_middleware - 127.0.0.1 - "POST /api/v1/consultations" 200 (58.8ms) [req:cb69e3e3]
+2026-11-14 21:42:46.428 | INFO  | c96c6aca | consultation.py:563:process_consultation - [상담 분석 시작] 의뢰인 질문 접수 (사건: v5_20261114_sc003_a2c7c7, 요청: cb69e3e3) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:46.430 | INFO  | c96c6aca | decorators.py:340:log_entry  - [통합 법률 상담 워크플로우] 단계 시작 (run_legal_consultation) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:46.479 | INFO  | c96c6aca | legal_workflow.py:5574:build_legal_graph - [워크플로우 그래프] 통합 법률 상담 엔진(공식 법령 검색 포함) 그래프 빌드 완료 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:46.493 | INFO  | c96c6aca | decorators.py:340:log_entry  - [1단계: 사건·맥락 확인] 단계 시작 (supervisor_initialize_node) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:46.495 | INFO  | c96c6aca | legal_workflow.py:379:supervisor_initialize_node - [1단계: 사건·맥락 확인(init)] [SUPERVISOR_INIT] 연속 대화 이전 턴 검증 법령 출처 3건 계승 완료 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:46.531 | INFO  | c96c6aca | issue_planner.py:697:plan_legal_issues - [1단계: 사건·맥락 확인(init)] [ISSUE_PLANNER] 질문 분석 결과 1개 단위 쟁점 도출 완료 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:46.531 | INFO  | c96c6aca | issue_planner.py:702:plan_legal_issues - [1단계: 사건·맥락 확인(init)] [ISSUE_PLANNER] 단위 쟁점 상세:
+1. [ISSUE_GENERAL_ANALYSIS] 사건 사실관계 및 법률적 검토 쟁점
+   우선순위: HIGH
+   검토 질문: 저는 등록 민간임대주택의 임대사업자입니다. 2026년 11월 1일에 새로운 임대차계약을 체결했습니다. 임대차계약 신고 시 관리비와 전기·수도료 등 임차인 부담 비용의 금액이나 산정방식까지 신고해야 하나요?
+   필요한 사실: 주요사실, 요건사실
+   관련 법령: 없음
+   관련 증거: 없음
+   보완 자료: 없음 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:46.532 | INFO  | c96c6aca | legal_workflow.py:443:supervisor_initialize_node - [1단계: 사건·맥락 확인(init)] [SUPERVISOR_INIT] 초기화 및 상담 준비 완료 | 의도=NEW_LEGAL_ANALYSIS | 모드=CASE_EVIDENCE | case_id=v5_20261114_sc003_a2c7c7 | 등록문서수=0 | 단위쟁점수=1 | 사건증거출처수=0 | 컨텍스트길이=1391 | 증거부족여부=True [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:46.532 | INFO  | c96c6aca | decorators.py:373:log_success - [1단계: 사건·맥락 확인(init)] [1단계: 사건·맥락 확인] 단계 완료 (40.7ms) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:46.540 | INFO  | c96c6aca | consultation.py:569:on_step  - [1단계 진행 상태] 사건 기본정보 및 대화 맥락 확인 완료 (노드: supervisor_initialize) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:46.551 | INFO  | c96c6aca | decorators.py:340:log_entry  - [2단계: 분야 판별] 단계 시작 (route_node) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:46.553 | INFO  | c96c6aca | decorators.py:340:log_entry  - [2단계: 법률 분야 판별(route)] [2단계: 법률 분야 상세 분류] 단계 시작 (route_categories_detailed) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:46.654 | INFO  | c96c6aca | callbacks.py:107:on_chat_model_start - [2단계: 법률 분야 판별(route)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 1건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:48.104 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [2단계: 법률 분야 판별(route)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:48.108 | INFO  | c96c6aca | callbacks.py:196:on_llm_end  - [2단계: 법률 분야 판별(route)] [LLM_IO_SIZE] agent=None node=route input_chars=3437 output_chars=113 input_tokens=1914 output_tokens=64 latency_ms=1453 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:48.109 | INFO  | c96c6aca | callbacks.py:205:on_llm_end  - [2단계: 법률 분야 판별(route)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1453ms, 입력: 1,914토큰, 출력: 64토큰, 총: 1,978토큰) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:48.110 | INFO  | c96c6aca | decorators.py:373:log_success - [2단계: 법률 분야 판별(route)] [2단계: 법률 분야 상세 분류] 단계 완료 (1557.7ms) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:48.111 | INFO  | c96c6aca | legal_workflow.py:737:route_node - [2단계: 법률 분야 판별(route)] [ROUTE] 분야 판별 완료(폴백) | 상태=CLASSIFIED | 분야=['행정'] | 사유=등록 민간임대주택 임대사업자의 임대차계약 신고 의무와 신고사항 범위는 관련 법령에 따른 행정상 신고제도 해석이 핵심 쟁점입니다. | 답변모드=STANDARD [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:48.111 | INFO  | c96c6aca | decorators.py:373:log_success - [2단계: 법률 분야 판별(route)] [2단계: 분야 판별] 단계 완료 (1560.8ms) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:48.113 | INFO  | c96c6aca | consultation.py:569:on_step  - [2단계 진행 상태] 사실관계 및 타임라인 조회 중 (노드: route) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:48.121 | INFO  | c96c6aca | decorators.py:340:log_entry  - [3단계: 법령·판례 검색] 단계 시작 (run_agents_node) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:48.132 | INFO  | c96c6aca | decorators.py:340:log_entry  - [3단계: 법령·판례 검색(run_agents)] [전문 에이전트 분석] 단계 시작 (run_specialist_agent) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:48.133 | INFO  | c96c6aca | decorators.py:340:log_entry  - [3단계: 법령·판례 검색(run_agents)] [전문 에이전트 초기화] 단계 시작 (build_react_agent) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:48.135 | DEBUG | c96c6aca | base_agent.py:211:build_react_agent - [3단계: 법령·판례 검색(run_agents)] [전문 에이전트 준비] 분야=행정, 도구=1개, 주력도구=administrative_retrieval_tool [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:48.135 | INFO  | c96c6aca | decorators.py:373:log_success - [3단계: 법령·판례 검색(run_agents)] [전문 에이전트 초기화] 단계 완료 (2.0ms) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:48.136 | INFO  | c96c6aca | decorators.py:340:log_entry  - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [법률 검색 도구 실행] 단계 시작 (_run) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:48.137 | DEBUG | c96c6aca | retrieval_factory.py:45:_run - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [LAW_TOOL] tool=administrative_retrieval_tool category=administrative question_len=114 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:48.138 | INFO  | c96c6aca | decorators.py:340:log_entry  - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [검색 질의어 법령 용어 확장] 단계 시작 (rewrite_query) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:48.141 | INFO  | c96c6aca | callbacks.py:107:on_chat_model_start - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 1건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:49.272 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:49.273 | INFO  | c96c6aca | callbacks.py:196:on_llm_end  - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [LLM_IO_SIZE] agent=administrative_agent node=run_agents input_chars=1188 output_chars=48 input_tokens=682 output_tokens=29 latency_ms=1132 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:49.273 | INFO  | c96c6aca | callbacks.py:205:on_llm_end  - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1132ms, 입력: 682토큰, 출력: 29토큰, 총: 711토큰) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:49.275 | DEBUG | c96c6aca | query_rewrite.py:131:rewrite_query - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [질의어 확장] LLM 도출 법률 키워드=['주택 임대차계약 신고', '임차인 부담 비용'] (질의='저는 등록 민간임대주택의 임대사업자입니다. 2026년 11월 1일에 새로...') [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:49.275 | DEBUG | c96c6aca | query_rewrite.py:143:rewrite_query - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [질의어 확장 완료] 최종 길이=142자, 확장 질의=[저는 등록 민간임대주택의 임대사업자입니다. 2026년 11월 1일에 새로운 임대차계약을 체결했습니다. 임대차계약 신고 시 관리비와 전기·수도료 등 임차인 부담 비용의 금액이나 산정방식까지 신고해야 하나요?
+키워드: 주택 임대차계약 신고, 임차인 부담 비용] [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:49.275 | INFO  | c96c6aca | decorators.py:373:log_success - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [검색 질의어 법령 용어 확장] 단계 완료 (1136.9ms) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:49.280 | INFO  | c96c6aca | decorators.py:340:log_entry  - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [법률 지식베이스 검색] 단계 시작 (retrieve_with_status) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:49.561 | DEBUG | c96c6aca | config.py:355:start          - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] Starting component System [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:49.561 | DEBUG | c96c6aca | config.py:355:start          - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] Starting component Posthog [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:49.561 | DEBUG | c96c6aca | config.py:355:start          - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] Starting component OpenTelemetryClient [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:49.562 | DEBUG | c96c6aca | config.py:355:start          - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] Starting component FastAPI [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:49.791 | DEBUG | c96c6aca | config.py:355:start          - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] Starting component System [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:49.792 | DEBUG | c96c6aca | config.py:355:start          - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] Starting component Posthog [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:49.792 | DEBUG | c96c6aca | config.py:355:start          - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] Starting component OpenTelemetryClient [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:49.792 | DEBUG | c96c6aca | config.py:355:start          - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] Starting component FastAPI [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:49.807 | DEBUG | c96c6aca | retrieval.py:212:_get_client - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [벡터DB] 원격 ChromaDB 연결 완료: 127.0.0.1:8001 (컬렉션 9개) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:49.812 | DEBUG | c96c6aca | retrieval.py:243:_list_collections - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [벡터DB] 조회된 컬렉션 목록=['law_docs_international', 'law_docs_civil', 'law_docs_tax', 'law_docs_criminal', 'law_docs_administrative', 'law_docs_commercial', 'law_docs_global', 'law_docs_constitution', 'law_docs_labor'] [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:50.134 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/text-embedding-3-large/embeddings?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:50.164 | DEBUG | c96c6aca | retrieval.py:391:retrieve_with_status - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [벡터 검색 완료] 컬렉션=law_docs_global, 검색된 문서=4건 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:50.165 | INFO  | c96c6aca | decorators.py:373:log_success - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [법률 지식베이스 검색] 단계 완료 (884.8ms) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:50.166 | INFO  | c96c6aca | decorators.py:340:log_entry  - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [법률 지식베이스 검색] 단계 시작 (retrieve_with_status) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:50.172 | DEBUG | c96c6aca | retrieval.py:243:_list_collections - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [벡터DB] 조회된 컬렉션 목록=['law_docs_international', 'law_docs_civil', 'law_docs_tax', 'law_docs_criminal', 'law_docs_administrative', 'law_docs_commercial', 'law_docs_global', 'law_docs_constitution', 'law_docs_labor'] [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:50.362 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/text-embedding-3-large/embeddings?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:50.403 | DEBUG | c96c6aca | retrieval.py:391:retrieve_with_status - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [벡터 검색 완료] 컬렉션=law_docs_administrative, 검색된 문서=4건 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:50.403 | INFO  | c96c6aca | decorators.py:373:log_success - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [법률 지식베이스 검색] 단계 완료 (237.5ms) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:50.454 | INFO  | c96c6aca | retrieval_service.py:772:search - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [LAW_RETRIEVAL] status=SOURCE_TEMPORAL_UNCONFIRMED category=administrative source_count=3 catalog=NOT_REQUESTED collection_statuses={'law_docs_global': 'SUCCESS', 'law_docs_administrative': 'SUCCESS'} reason_codes=['LEGAL_ISSUES_NOT_FULLY_RESOLVED', 'TEMPORAL_LEGAL_REVIEW_REQUIRED'] [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:50.455 | INFO  | c96c6aca | decorators.py:373:log_success - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [법률 검색 도구 실행] 단계 완료 (2318.5ms) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:50.455 | INFO  | c96c6aca | decorators.py:373:log_success - [administrative_agent >> 3단계: 법령·판례 검색(run_agents)] [전문 에이전트 분석] 단계 완료 (2324.1ms) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:50.457 | INFO  | c96c6aca | legal_workflow.py:1398:run_agents_node - [3단계: 법령·판례 검색(run_agents)] [RUN_AGENTS] 전문 에이전트 분석 완료 | 대상분야=['행정'] | 고속검색(fast_retrieval)=True | 완료분야=['행정'] | 수집출처수=5 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:50.463 | INFO  | c96c6aca | decorators.py:373:log_success - [3단계: 법령·판례 검색(run_agents)] [3단계: 법령·판례 검색] 단계 완료 (2343.1ms) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:50.465 | INFO  | c96c6aca | consultation.py:569:on_step  - [3단계 진행 상태] 법령 및 판례 검색 중 (노드: run_agents) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:50.473 | INFO  | c96c6aca | decorators.py:340:log_entry  - [legal_evidence_bundle_node] 단계 시작 (legal_evidence_bundle_node) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:50.473 | INFO  | c96c6aca | legal_workflow.py:1460:legal_evidence_bundle_node - [legal_evidence_bundle] [EVIDENCE_BUNDLE] statute_sources=5 warnings=['TEMPORAL_APPLICABILITY_UNCONFIRMED'] truncated=False [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:50.474 | INFO  | c96c6aca | decorators.py:373:log_success - [legal_evidence_bundle] [legal_evidence_bundle_node] 단계 완료 (3.1ms) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:50.475 | INFO  | c96c6aca | consultation.py:569:on_step  - [3단계 진행 상태] 법령 및 판례 근거 정리 완료 (노드: legal_evidence_bundle) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:50.486 | INFO  | c96c6aca | decorators.py:340:log_entry  - [4단계: 쟁점별 분석] 단계 시작 (synthesize_node) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:50.497 | INFO  | c96c6aca | decorators.py:340:log_entry  - [4단계: 쟁점별 분석·초안 작성(synthesize)] [4단계: 쟁점별 분석] 단계 시작 (synthesize) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:42:50.505 | INFO  | c96c6aca | callbacks.py:107:on_chat_model_start - [4단계: 쟁점별 분석·초안 작성(synthesize)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 1건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:11.356 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [4단계: 쟁점별 분석·초안 작성(synthesize)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:11.357 | INFO  | c96c6aca | callbacks.py:196:on_llm_end  - [4단계: 쟁점별 분석·초안 작성(synthesize)] [LLM_IO_SIZE] agent=None node=synthesize input_chars=9073 output_chars=1981 input_tokens=5479 output_tokens=1154 latency_ms=20853 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:11.357 | INFO  | c96c6aca | callbacks.py:205:on_llm_end  - [4단계: 쟁점별 분석·초안 작성(synthesize)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 20853ms, 입력: 5,479토큰, 출력: 1,154토큰, 총: 6,633토큰) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:11.359 | INFO  | c96c6aca | decorators.py:373:log_success - [4단계: 쟁점별 분석·초안 작성(synthesize)] [4단계: 쟁점별 분석] 단계 완료 (20863.8ms) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:11.360 | INFO  | c96c6aca | legal_workflow.py:1577:synthesize_node - [4단계: 쟁점별 분석·초안 작성(synthesize)] [SYNTHESIZE] 초안 작성 완료 | 길이=1828 | 해시=fcdafe03 | 전문분석결과수=1 | intent=NEW_LEGAL_ANALYSIS [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:11.361 | INFO  | c96c6aca | decorators.py:373:log_success - [4단계: 쟁점별 분석·초안 작성(synthesize)] [4단계: 쟁점별 분석] 단계 완료 (20876.8ms) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:11.363 | INFO  | c96c6aca | consultation.py:569:on_step  - [4단계 진행 상태] 법률 쟁점별 분석 중 (노드: synthesize) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:11.375 | INFO  | c96c6aca | decorators.py:340:log_entry  - [5단계: 근거 검증] 단계 시작 (verification_node) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:11.397 | INFO  | c96c6aca | decorators.py:340:log_entry  - [5단계: 법령·증거 근거 검증(verification)] [5단계: 조문·증거 일치성 검증] 단계 시작 (run_verification) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:11.404 | INFO  | c96c6aca | qa_checker.py:174:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 검사 시작 (초안길이: 1828자 | 질문: '저는 등록 민간임대주택의 임대사업자입니다. 2026년 11월 1일에 새로운 임대차계약을 체결했습니다. 임대차...') [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:11.406 | INFO  | c96c6aca | qa_checker.py:202:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 출처 존재 검사: PASS (인용출처: 5건 정상) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:11.406 | INFO  | c96c6aca | qa_checker.py:233:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 금액 단순 정규식 자동교정 비활성화: 역할 미확정 금액은 기존 검증 단계에서 판단 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:11.406 | INFO  | c96c6aca | qa_checker.py:257:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 질문 충족: 1/1 (누락항목: 없음) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:11.406 | INFO  | c96c6aca | qa_checker.py:379:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 형식 검사 PASS (법률적 의미 판단 아님) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:11.406 | INFO  | c96c6aca | qa_checker.py:441:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] LLM 추가 검토 사유:
+  - 사건 사실관계 및 증거 기반 법률요건 검증 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:11.410 | INFO  | c96c6aca | callbacks.py:107:on_chat_model_start - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 1건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:36.147 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:36.147 | INFO  | c96c6aca | callbacks.py:196:on_llm_end  - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [LLM_IO_SIZE] agent=verification_agent node=verification input_chars=16103 output_chars=4059 input_tokens=8915 output_tokens=1830 latency_ms=24736 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:36.147 | INFO  | c96c6aca | callbacks.py:205:on_llm_end  - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 24736ms, 입력: 8,915토큰, 출력: 1,830토큰, 총: 10,745토큰) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:36.147 | INFO  | c96c6aca | verification.py:1089:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION_SCHEMA] 검증 출력 수신 및 스키마 검증 시작 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:36.147 | INFO  | c96c6aca | verification.py:1091:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION_SCHEMA] 스키마 검증 및 정규화 결과: SUCCESS (주장수=7, 상태=REVISE) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:36.147 | INFO  | c96c6aca | verification.py:1092:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION] 법률 주장 검증 계속 진행 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:36.147 | INFO  | c96c6aca | verification.py:1565:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION] 모든 핵심 주장이 검색 출처에 의해 온전히 뒷받침(SUPPORTED 100%)되므로 PASS로 확정합니다. [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:36.147 | INFO  | c96c6aca | verification.py:1597:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION] status=PASS, claims=7, unverified=0, unsupported=0 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:36.147 | INFO  | c96c6aca | decorators.py:373:log_success - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [5단계: 조문·증거 일치성 검증] 단계 완료 (24749.3ms) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:36.157 | INFO  | c96c6aca | legal_workflow.py:1983:verification_node - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [TEMPORAL_VERIFICATION] gate=NOT_REQUIRED pre=PASS post=PASS reasons=[] [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:36.170 | INFO  | c96c6aca | settlement_calculator.py:232:extract_case_contract_deposit - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [DEPOSIT_UNCONFIRMED] 근거가 확인된 총 보증금 원금 없음 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:36.171 | DEBUG | c96c6aca | issue_verifier.py:1000:verify_issue - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ISSUE_VERIFIER] 쟁점 검증(ISSUE_GENERAL_ANALYSIS) -> 상태=NEEDS_EVIDENCE (확인사실=0건, 법령근거=0건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:36.171 | INFO  | c96c6aca | legal_workflow.py:2151:verification_node - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION] 초안 검증 완료 | 판정=PASS | 사유코드=NONE | 후보법령=['민간임대주택에 관한 특별법 시행령', '민간임대주택에 관한 특별법 시행규칙'] | 검증출처수=1 | 쟁점결과수=1 | 초안해시=fcdafe03 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:36.171 | INFO  | c96c6aca | decorators.py:373:log_success - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [5단계: 근거 검증] 단계 완료 (24797.4ms) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:36.176 | INFO  | c96c6aca | legal_workflow.py:2315:supervisor_verification_decision - [DISPOSITION] 쟁점 기반 처분 결정: WITHHELD (모든 쟁점(1건)의 증거 또는 법률 근거가 불충분하여 법률 판단을 유보합니다.) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:36.176 | INFO  | c96c6aca | legal_workflow.py:2387:supervisor_verification_decision - [VERIFY_ROUTING] 미확보 후보 법령(['민간임대주택에 관한 특별법 시행규칙']) 검증을 위해 HITL 법령 검색 승인 요청 노드로 분기합니다. [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:36.177 | INFO  | c96c6aca | consultation.py:569:on_step  - [5단계 진행 상태] 증거 및 법률 근거 검증 중 (노드: verification) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:36.191 | INFO  | c96c6aca | decorators.py:340:log_entry  - [3단계: 공식 검색 승인 대기] 단계 시작 (statute_search_approval_node) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:36.192 | INFO  | c96c6aca | legal_workflow.py:3967:statute_search_approval_node - [5단계: 외부 법령 조회 승인 대기(hitl)] [HITL_AUTO_APPROVE] AUTO_APPROVE_STATUTE_SEARCH 활성화: 법령 검색 자동 승인 진행 | candidate=['민간임대주택에 관한 특별법 시행령', '민간임대주택에 관한 특별법 시행규칙'] | req_id=APPR-5038e173 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:36.194 | INFO  | c96c6aca | legal_workflow.py:4028:statute_search_approval_node - [5단계: 외부 법령 조회 승인 대기(hitl)] [STATUTE_APPROVAL] 사용자 법령검색 승인 결과 | 승인여부=True | 승인법령=['민간임대주택에 관한 특별법 시행령', '민간임대주택에 관한 특별법 시행규칙'] | 사유=AUTOMATIC_APPROVAL_EVAL | req_id=APPR-5038e173 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:36.194 | INFO  | c96c6aca | decorators.py:373:log_success - [5단계: 외부 법령 조회 승인 대기(hitl)] [3단계: 공식 검색 승인 대기] 단계 완료 (5.2ms) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:36.198 | INFO  | c96c6aca | consultation.py:569:on_step  - [3단계 진행 상태] 공식 법령 원문 검색 승인 대기 중 (노드: statute_search_approval) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:36.206 | INFO  | c96c6aca | decorators.py:340:log_entry  - [3단계: 공식 법령 조회] 단계 시작 (execute_statute_search_node) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:36.210 | INFO  | c96c6aca | decorators.py:340:log_entry  - [5단계: 국가법령정보센터 조회(statute_search)] [국가법령정보센터 공식 조문 검색] 단계 시작 (search_official_statutes) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:37.240 | INFO  | c96c6aca | official_statute_asof.py:331:search_official_statutes_by_date - [5단계: 국가법령정보센터 조회(statute_search)] [OFFICIAL_P4] 승인 법령 시점 검색 완료 | law=민간임대주택에 관한 특별법 시행령 versions=['291499', '291499'] sources=22 as_of=2026-11-01 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:38.370 | INFO  | c96c6aca | official_statute_asof.py:331:search_official_statutes_by_date - [5단계: 국가법령정보센터 조회(statute_search)] [OFFICIAL_P4] 승인 법령 시점 검색 완료 | law=민간임대주택에 관한 특별법 시행규칙 versions=['291515', '291515'] sources=22 as_of=2026-11-01 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:38.370 | INFO  | c96c6aca | decorators.py:373:log_success - [5단계: 국가법령정보센터 조회(statute_search)] [국가법령정보센터 공식 조문 검색] 단계 완료 (2160.1ms) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:38.382 | INFO  | c96c6aca | legal_workflow.py:4347:execute_statute_search_node - [5단계: 국가법령정보센터 조회(statute_search)] [OFFICIAL_INDEX] approved enqueue result={'registered': 0, 'duplicate': 2, 'failed': 0} [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:38.383 | INFO  | c96c6aca | legal_workflow.py:4383:execute_statute_search_node - [5단계: 국가법령정보센터 조회(statute_search)] [STATUTE_SEARCH] 공식 법령 검색 완료 | 조회조문수=44 | 누적출처수=29 | 후보법령=['민간임대주택에 관한 특별법 시행령', '민간임대주택에 관한 특별법 시행규칙'] [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:38.386 | INFO  | c96c6aca | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:40.249 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:40.250 | INFO  | c96c6aca | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1168 output_chars=375 input_tokens=576 output_tokens=140 latency_ms=1865 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:40.251 | INFO  | c96c6aca | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1865ms, 입력: 576토큰, 출력: 140토큰, 총: 716토큰) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:40.254 | INFO  | c96c6aca | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:41.528 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:41.528 | INFO  | c96c6aca | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=982 output_chars=66 input_tokens=527 output_tokens=19 latency_ms=1273 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:41.528 | INFO  | c96c6aca | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1273ms, 입력: 527토큰, 출력: 19토큰, 총: 546토큰) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:41.529 | INFO  | c96c6aca | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:43.173 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:43.174 | INFO  | c96c6aca | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1167 output_chars=195 input_tokens=576 output_tokens=48 latency_ms=1644 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:43.174 | INFO  | c96c6aca | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1644ms, 입력: 576토큰, 출력: 48토큰, 총: 624토큰) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:43.178 | INFO  | c96c6aca | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:44.917 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:44.917 | INFO  | c96c6aca | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1167 output_chars=195 input_tokens=576 output_tokens=48 latency_ms=1739 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:44.917 | INFO  | c96c6aca | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1739ms, 입력: 576토큰, 출력: 48토큰, 총: 624토큰) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:44.921 | INFO  | c96c6aca | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:46.656 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:46.657 | INFO  | c96c6aca | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1170 output_chars=195 input_tokens=578 output_tokens=48 latency_ms=1736 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:46.657 | INFO  | c96c6aca | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1736ms, 입력: 578토큰, 출력: 48토큰, 총: 626토큰) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:46.661 | INFO  | c96c6aca | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:48.262 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:48.263 | INFO  | c96c6aca | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1170 output_chars=195 input_tokens=578 output_tokens=48 latency_ms=1602 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:48.263 | INFO  | c96c6aca | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1602ms, 입력: 578토큰, 출력: 48토큰, 총: 626토큰) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:48.266 | INFO  | c96c6aca | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:50.567 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:50.568 | INFO  | c96c6aca | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1168 output_chars=195 input_tokens=576 output_tokens=48 latency_ms=2302 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:50.569 | INFO  | c96c6aca | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 2302ms, 입력: 576토큰, 출력: 48토큰, 총: 624토큰) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:50.572 | INFO  | c96c6aca | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:51.871 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:51.872 | INFO  | c96c6aca | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1168 output_chars=195 input_tokens=576 output_tokens=48 latency_ms=1300 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:51.873 | INFO  | c96c6aca | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1300ms, 입력: 576토큰, 출력: 48토큰, 총: 624토큰) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:51.875 | INFO  | c96c6aca | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:53.545 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:53.546 | INFO  | c96c6aca | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1168 output_chars=195 input_tokens=576 output_tokens=48 latency_ms=1672 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:53.546 | INFO  | c96c6aca | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1672ms, 입력: 576토큰, 출력: 48토큰, 총: 624토큰) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:53.549 | INFO  | c96c6aca | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:55.198 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:55.198 | INFO  | c96c6aca | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1168 output_chars=195 input_tokens=576 output_tokens=48 latency_ms=1649 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:55.198 | INFO  | c96c6aca | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1649ms, 입력: 576토큰, 출력: 48토큰, 총: 624토큰) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:55.198 | INFO  | c96c6aca | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:56.573 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:56.574 | INFO  | c96c6aca | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=1168 output_chars=195 input_tokens=576 output_tokens=48 latency_ms=1376 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:56.574 | INFO  | c96c6aca | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1376ms, 입력: 576토큰, 출력: 48토큰, 총: 624토큰) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:56.578 | INFO  | c96c6aca | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:58.240 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:58.241 | INFO  | c96c6aca | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=986 output_chars=195 input_tokens=448 output_tokens=48 latency_ms=1664 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:58.242 | INFO  | c96c6aca | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1664ms, 입력: 448토큰, 출력: 48토큰, 총: 496토큰) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:58.245 | INFO  | c96c6aca | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:59.849 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:59.849 | INFO  | c96c6aca | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=989 output_chars=195 input_tokens=450 output_tokens=48 latency_ms=1604 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:59.849 | INFO  | c96c6aca | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1604ms, 입력: 450토큰, 출력: 48토큰, 총: 498토큰) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:43:59.869 | INFO  | c96c6aca | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:01.712 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:01.713 | INFO  | c96c6aca | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=986 output_chars=195 input_tokens=448 output_tokens=48 latency_ms=1844 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:01.713 | INFO  | c96c6aca | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1844ms, 입력: 448토큰, 출력: 48토큰, 총: 496토큰) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:01.717 | INFO  | c96c6aca | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:03.447 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:03.448 | INFO  | c96c6aca | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=989 output_chars=195 input_tokens=450 output_tokens=48 latency_ms=1731 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:03.449 | INFO  | c96c6aca | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1731ms, 입력: 450토큰, 출력: 48토큰, 총: 498토큰) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:03.452 | INFO  | c96c6aca | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:05.087 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:05.087 | INFO  | c96c6aca | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=988 output_chars=195 input_tokens=450 output_tokens=48 latency_ms=1635 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:05.087 | INFO  | c96c6aca | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1635ms, 입력: 450토큰, 출력: 48토큰, 총: 498토큰) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:05.103 | INFO  | c96c6aca | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:06.361 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:06.362 | INFO  | c96c6aca | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=988 output_chars=195 input_tokens=450 output_tokens=48 latency_ms=1259 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:06.363 | INFO  | c96c6aca | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1259ms, 입력: 450토큰, 출력: 48토큰, 총: 498토큰) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:06.367 | INFO  | c96c6aca | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:07.541 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:07.541 | INFO  | c96c6aca | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=988 output_chars=195 input_tokens=450 output_tokens=48 latency_ms=1174 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:07.541 | INFO  | c96c6aca | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1174ms, 입력: 450토큰, 출력: 48토큰, 총: 498토큰) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:07.541 | INFO  | c96c6aca | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:09.267 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:09.268 | INFO  | c96c6aca | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=988 output_chars=195 input_tokens=450 output_tokens=48 latency_ms=1727 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:09.268 | INFO  | c96c6aca | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1727ms, 입력: 450토큰, 출력: 48토큰, 총: 498토큰) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:09.272 | INFO  | c96c6aca | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:10.877 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:10.877 | INFO  | c96c6aca | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=988 output_chars=195 input_tokens=450 output_tokens=48 latency_ms=1604 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:10.877 | INFO  | c96c6aca | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1604ms, 입력: 450토큰, 출력: 48토큰, 총: 498토큰) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:10.877 | INFO  | c96c6aca | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:12.583 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:12.583 | INFO  | c96c6aca | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=986 output_chars=195 input_tokens=448 output_tokens=48 latency_ms=1707 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:12.583 | INFO  | c96c6aca | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1707ms, 입력: 448토큰, 출력: 48토큰, 총: 496토큰) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:12.583 | INFO  | c96c6aca | callbacks.py:107:on_chat_model_start - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:14.585 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [5단계: 국가법령정보센터 조회(statute_search)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:14.587 | INFO  | c96c6aca | callbacks.py:196:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM_IO_SIZE] agent=None node=execute_statute_search input_chars=988 output_chars=275 input_tokens=450 output_tokens=97 latency_ms=2003 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:14.587 | INFO  | c96c6aca | callbacks.py:205:on_llm_end  - [5단계: 국가법령정보센터 조회(statute_search)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 2003ms, 입력: 450토큰, 출력: 97토큰, 총: 547토큰) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:14.587 | INFO  | c96c6aca | legal_workflow.py:4411:execute_statute_search_node - [5단계: 국가법령정보센터 조회(statute_search)] [TEMPORAL_P5] decisions=40 status=UNCONFIRMED [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:14.587 | INFO  | c96c6aca | decorators.py:373:log_success - [5단계: 국가법령정보센터 조회(statute_search)] [3단계: 공식 법령 조회] 단계 완료 (38382.1ms) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:14.636 | INFO  | c96c6aca | consultation.py:569:on_step  - [3단계 진행 상태] 공식 법령 정보 조회 중 (노드: execute_statute_search) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:14.653 | INFO  | c96c6aca | decorators.py:340:log_entry  - [4단계: 쟁점별 재분석] 단계 시작 (re_analyze_node) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:14.663 | INFO  | c96c6aca | callbacks.py:107:on_chat_model_start - [5단계: 확보 법령 기반 재분석(re_analyze)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 1건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:33.852 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [5단계: 확보 법령 기반 재분석(re_analyze)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:33.853 | INFO  | c96c6aca | callbacks.py:196:on_llm_end  - [5단계: 확보 법령 기반 재분석(re_analyze)] [LLM_IO_SIZE] agent=None node=re_analyze input_chars=54469 output_chars=3768 input_tokens=35217 output_tokens=2289 latency_ms=19191 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:33.854 | INFO  | c96c6aca | callbacks.py:205:on_llm_end  - [5단계: 확보 법령 기반 재분석(re_analyze)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 19191ms, 입력: 35,217토큰, 출력: 2,289토큰, 총: 37,506토큰) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:33.856 | INFO  | c96c6aca | legal_workflow.py:4702:re_analyze_node - [5단계: 확보 법령 기반 재분석(re_analyze)] [RE_ANALYZE] 법령 검색 후 재분석 완료 | 길이=3768 | 해시=8e1c564e | 확보조문수=44 | revision_count=1 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:33.856 | INFO  | c96c6aca | decorators.py:373:log_success - [5단계: 확보 법령 기반 재분석(re_analyze)] [4단계: 쟁점별 재분석] 단계 완료 (19206.4ms) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:33.858 | INFO  | c96c6aca | consultation.py:569:on_step  - [4단계 진행 상태] 법령 검색 결과 기반 재분석 중 (노드: re_analyze) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:33.868 | INFO  | c96c6aca | decorators.py:340:log_entry  - [5단계: 근거 검증] 단계 시작 (verification_node) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:33.875 | INFO  | c96c6aca | decorators.py:340:log_entry  - [5단계: 법령·증거 근거 검증(verification)] [5단계: 조문·증거 일치성 검증] 단계 시작 (run_verification) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:33.877 | INFO  | c96c6aca | qa_checker.py:174:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 검사 시작 (초안길이: 3768자 | 질문: '저는 등록 민간임대주택의 임대사업자입니다. 2026년 11월 1일에 새로운 임대차계약을 체결했습니다. 임대차...') [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:33.881 | INFO  | c96c6aca | qa_checker.py:202:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 출처 존재 검사: PASS (인용출처: 29건 정상) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:33.881 | INFO  | c96c6aca | qa_checker.py:233:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 금액 단순 정규식 자동교정 비활성화: 역할 미확정 금액은 기존 검증 단계에서 판단 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:33.881 | INFO  | c96c6aca | qa_checker.py:257:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 질문 충족: 1/1 (누락항목: 없음) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:33.882 | INFO  | c96c6aca | qa_checker.py:379:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] 형식 검사 PASS (법률적 의미 판단 아님) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:33.883 | INFO  | c96c6aca | qa_checker.py:441:check_deterministic_qa - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ANSWER_QA] LLM 추가 검토 사유:
+  - 법적 권리의 발생·소멸·우선순위 복합 법률요건 적용 검토
+  - 사건 사실관계 및 증거 기반 법률요건 검증 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:33.887 | INFO  | c96c6aca | callbacks.py:107:on_chat_model_start - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 1건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:51.941 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:51.942 | INFO  | c96c6aca | callbacks.py:196:on_llm_end  - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [LLM_IO_SIZE] agent=verification_agent node=verification input_chars=46301 output_chars=4147 input_tokens=27194 output_tokens=1824 latency_ms=18056 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:51.942 | INFO  | c96c6aca | callbacks.py:205:on_llm_end  - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 18056ms, 입력: 27,194토큰, 출력: 1,824토큰, 총: 29,018토큰) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:51.943 | INFO  | c96c6aca | verification.py:1089:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION_SCHEMA] 검증 출력 수신 및 스키마 검증 시작 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:51.944 | INFO  | c96c6aca | verification.py:1091:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION_SCHEMA] 스키마 검증 및 정규화 결과: SUCCESS (주장수=8, 상태=PASS) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:51.945 | INFO  | c96c6aca | verification.py:1092:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION] 법률 주장 검증 계속 진행 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:51.945 | INFO  | c96c6aca | verification.py:1597:run_verification - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION] status=PASS, claims=8, unverified=0, unsupported=0 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:51.945 | INFO  | c96c6aca | decorators.py:373:log_success - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [5단계: 조문·증거 일치성 검증] 단계 완료 (18070.0ms) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:51.947 | INFO  | c96c6aca | legal_workflow.py:1983:verification_node - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [TEMPORAL_VERIFICATION] gate=CAUTION pre=PASS post=PASS reasons=['TEMPORAL_INTERPRETATION_UNCONFIRMED'] [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:51.951 | DEBUG | c96c6aca | legal_workflow.py:2027:verification_node - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] Langfuse 검증 점수 기록 실패: could not convert string to float: 'N/A' [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:51.951 | INFO  | c96c6aca | settlement_calculator.py:232:extract_case_contract_deposit - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [DEPOSIT_UNCONFIRMED] 근거가 확인된 총 보증금 원금 없음 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:51.952 | DEBUG | c96c6aca | issue_verifier.py:1000:verify_issue - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [ISSUE_VERIFIER] 쟁점 검증(ISSUE_GENERAL_ANALYSIS) -> 상태=NEEDS_EVIDENCE (확인사실=0건, 법령근거=0건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:51.952 | INFO  | c96c6aca | legal_workflow.py:2151:verification_node - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [VERIFICATION] 초안 검증 완료 | 판정=PASS | 사유코드=NONE | 후보법령=[] | 검증출처수=0 | 쟁점결과수=1 | 초안해시=8e1c564e [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:51.952 | INFO  | c96c6aca | decorators.py:373:log_success - [verification_agent >> 5단계: 법령·증거 근거 검증(verification)] [5단계: 근거 검증] 단계 완료 (18086.9ms) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:51.954 | INFO  | c96c6aca | legal_workflow.py:2315:supervisor_verification_decision - [DISPOSITION] 쟁점 기반 처분 결정: WITHHELD (모든 쟁점(1건)의 증거 또는 법률 근거가 불충분하여 법률 판단을 유보합니다.) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:51.954 | INFO  | c96c6aca | legal_workflow.py:2447:supervisor_verification_decision - [VERIFY_ROUTING] 쟁점 사실관계 증거는 미확보(NEEDS_EVIDENCE)이나 핵심 법리가 출처에 의해 정상 뒷받침되므로 finalize 확정 분기 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:51.955 | INFO  | c96c6aca | consultation.py:569:on_step  - [5단계 진행 상태] 증거 및 법률 근거 검증 중 (노드: verification) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:51.970 | INFO  | c96c6aca | decorators.py:340:log_entry  - [6단계: 최종 답변 작성] 단계 시작 (finalize_node) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:51.977 | INFO  | c96c6aca | settlement_calculator.py:232:extract_case_contract_deposit - [6단계: 최종 답변 확정(finalize)] [DEPOSIT_UNCONFIRMED] 근거가 확인된 총 보증금 원금 없음 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:51.980 | INFO  | c96c6aca | callbacks.py:107:on_chat_model_start - [6단계: 최종 답변 확정(finalize)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:54.087 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [6단계: 최종 답변 확정(finalize)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:54.087 | INFO  | c96c6aca | callbacks.py:196:on_llm_end  - [6단계: 최종 답변 확정(finalize)] [LLM_IO_SIZE] agent=None node=finalize input_chars=977 output_chars=163 input_tokens=477 output_tokens=72 latency_ms=2108 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:54.087 | INFO  | c96c6aca | callbacks.py:205:on_llm_end  - [6단계: 최종 답변 확정(finalize)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 2108ms, 입력: 477토큰, 출력: 72토큰, 총: 549토큰) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:54.102 | INFO  | c96c6aca | callbacks.py:107:on_chat_model_start - [6단계: 최종 답변 확정(finalize)] [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:56.023 | INFO  | c96c6aca | _client.py:1085:_send_single_request - [6단계: 최종 답변 확정(finalize)] [외부 API 통신 완료] POST https://skax.ai-talentlab.com/openai/deployments/gpt-5.4/chat/completions?api-version=2024-12-01-preview -> 응답: HTTP/1.1 200 OK [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:56.024 | INFO  | c96c6aca | callbacks.py:196:on_llm_end  - [6단계: 최종 답변 확정(finalize)] [LLM_IO_SIZE] agent=None node=finalize input_chars=990 output_chars=320 input_tokens=461 output_tokens=147 latency_ms=1922 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:56.024 | INFO  | c96c6aca | callbacks.py:205:on_llm_end  - [6단계: 최종 답변 확정(finalize)] [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 1922ms, 입력: 461토큰, 출력: 147토큰, 총: 608토큰) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:56.412 | INFO  | c96c6aca | legal_workflow.py:3704:finalize_node - [6단계: 최종 답변 확정(finalize)] [FINALIZE] 최종 답변 작성 시작
+[FINALIZE] 답변 생성 방식: DRAFT_PRESERVED
+[FINALIZE] Verification 결과: PASS
+[FINALIZE] 초안 SHA256: 8e1c564eeed1c62208d8a69f0b59f7953629f7536820bae812545917841af820
+[FINALIZE] 최종 SHA256: 48e07428211b56213c9bbd1e38e13404c698fe2bafd2ff31176805f932a0f4b4
+[FINALIZE] 답변 내용 변경: 있음
+[FINALIZE] 인용 출처: 0건
+[FINALIZE] 완료 [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:56.412 | INFO  | c96c6aca | decorators.py:373:log_success - [6단계: 최종 답변 확정(finalize)] [6단계: 최종 답변 작성] 단계 완료 (4444.9ms) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:56.424 | INFO  | c96c6aca | consultation.py:569:on_step  - [6단계 진행 상태] 최종 상담 답변 작성 중 (노드: finalize) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:56.948 | INFO  | c96c6aca | decorators.py:373:log_success - [통합 법률 상담 워크플로우] 단계 완료 (130518.5ms) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:44:56.949 | INFO  | c96c6aca | consultation.py:683:process_consultation - [상담 분석 완료] 6단계 분석 및 검증 완료 (요청: cb69e3e3 | 소요: 130520.6ms | 처분: WITHHELD | 검증: PASS | 인용출처: 0건) [case:v5_20261, req:cb69e3e3]
+2026-11-14 21:47:30.914 | INFO  | d6c09521 | cases.py:75:list_cases       - 사건 목록 조회 완료 (총 793건) [req:f701b040]
+2026-11-14 21:47:30.920 | INFO  | d6c09521 | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases" 200 (49.1ms) [req:f701b040]
+2026-11-14 21:47:30.922 | INFO  | 11d50a0b | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/auth/me" 200 (32.2ms) [req:fda3e730]
+2026-11-14 21:47:30.929 | INFO  | f764710a | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/auth/me" 200 (5.5ms) [req:e67e8663]
+2026-11-14 21:47:30.935 | INFO  | 31f82132 | cases.py:75:list_cases       - 사건 목록 조회 완료 (총 793건) [req:6e8c56f9]
+2026-11-14 21:47:30.939 | INFO  | 31f82132 | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases" 200 (16.2ms) [req:6e8c56f9]
+2026-11-14 22:11:33.542 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-11-14 22:11:33.644 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-11-14 22:11:33.681 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-11-14 22:11:33.719 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-11-14 22:11:33.720 | INFO  | -------- | server.py:113:_serve         - Finished server process [70316]
+2026-11-14 22:11:41.666 | INFO  | -------- | server.py:103:_serve         - Started server process [47244]
+2026-11-14 22:11:41.667 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-11-14 22:11:41.688 | INFO  | -------- | legal_workflow.py:202:init_checkpointer - [체크포인터] PostgreSQL 체크포인트 테이블 초기화 완료
+2026-11-14 22:11:41.689 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - [그래프 동기화 워커] 백그라운드 그래프 동기화 워커가 시작되었습니다.
+2026-11-14 22:11:41.707 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-11-14 22:18:13.039 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-11-14 22:18:13.153 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-11-14 22:18:13.612 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-11-14 22:18:13.634 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-11-14 22:18:13.635 | INFO  | -------- | server.py:113:_serve         - Finished server process [47244]
+2026-11-14 22:18:20.791 | INFO  | -------- | server.py:103:_serve         - Started server process [38708]
+2026-11-14 22:18:20.791 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-11-14 22:18:20.827 | INFO  | -------- | legal_workflow.py:202:init_checkpointer - [체크포인터] PostgreSQL 체크포인트 테이블 초기화 완료
+2026-11-14 22:18:20.828 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - [그래프 동기화 워커] 백그라운드 그래프 동기화 워커가 시작되었습니다.
+2026-11-14 22:18:20.845 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-11-14 22:19:45.402 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-11-14 22:19:45.511 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-11-14 22:19:45.966 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-11-14 22:19:45.991 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-11-14 22:19:45.991 | INFO  | -------- | server.py:113:_serve         - Finished server process [38708]
+2026-11-14 22:19:53.181 | INFO  | -------- | server.py:103:_serve         - Started server process [16560]
+2026-11-14 22:19:53.182 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-11-14 22:19:53.197 | INFO  | -------- | legal_workflow.py:202:init_checkpointer - [체크포인터] PostgreSQL 체크포인트 테이블 초기화 완료
+2026-11-14 22:19:53.198 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - [그래프 동기화 워커] 백그라운드 그래프 동기화 워커가 시작되었습니다.
+2026-11-14 22:19:53.207 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-11-14 22:20:05.671 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-11-14 22:20:05.785 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-11-14 22:20:06.258 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-11-14 22:20:06.278 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-11-14 22:20:06.279 | INFO  | -------- | server.py:113:_serve         - Finished server process [16560]
+2026-11-14 22:20:13.498 | INFO  | -------- | server.py:103:_serve         - Started server process [63624]
+2026-11-14 22:20:13.498 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-11-14 22:20:13.517 | INFO  | -------- | legal_workflow.py:202:init_checkpointer - [체크포인터] PostgreSQL 체크포인트 테이블 초기화 완료
+2026-11-14 22:20:13.518 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - [그래프 동기화 워커] 백그라운드 그래프 동기화 워커가 시작되었습니다.
+2026-11-14 22:20:13.529 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-11-14 22:21:24.888 | INFO  | 163e45c2 | cases.py:75:list_cases       - 사건 목록 조회 완료 (총 793건) [req:91af09e3]
+2026-11-14 22:21:24.894 | INFO  | 163e45c2 | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases" 200 (58.0ms) [req:91af09e3]
+2026-11-14 22:21:24.896 | INFO  | 995886c2 | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/auth/me" 200 (39.5ms) [req:d44fe49c]
+2026-11-14 22:21:24.905 | INFO  | b5f1be88 | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/auth/me" 200 (6.3ms) [req:f58a4e85]
+2026-11-14 22:21:24.911 | INFO  | 958e58dc | cases.py:75:list_cases       - 사건 목록 조회 완료 (총 793건) [req:8861475d]
+2026-11-14 22:21:24.917 | INFO  | 958e58dc | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases" 200 (18.9ms) [req:8861475d]
+2026-11-14 22:24:29.328 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-11-14 22:24:29.441 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-11-14 22:24:29.888 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-11-14 22:24:29.904 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-11-14 22:24:29.904 | INFO  | -------- | server.py:113:_serve         - Finished server process [63624]
+2026-11-14 22:24:37.225 | INFO  | -------- | server.py:103:_serve         - Started server process [70412]
+2026-11-14 22:24:37.225 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-11-14 22:24:37.243 | INFO  | -------- | legal_workflow.py:202:init_checkpointer - [체크포인터] PostgreSQL 체크포인트 테이블 초기화 완료
+2026-11-14 22:24:37.243 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - [그래프 동기화 워커] 백그라운드 그래프 동기화 워커가 시작되었습니다.
+2026-11-14 22:24:37.250 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-11-14 22:25:15.870 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-11-14 22:25:15.975 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-11-14 22:25:16.443 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-11-14 22:25:16.461 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-11-14 22:25:16.461 | INFO  | -------- | server.py:113:_serve         - Finished server process [70412]
+2026-11-14 22:25:23.525 | INFO  | -------- | server.py:103:_serve         - Started server process [57528]
+2026-11-14 22:25:23.526 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-11-14 22:25:23.542 | INFO  | -------- | legal_workflow.py:202:init_checkpointer - [체크포인터] PostgreSQL 체크포인트 테이블 초기화 완료
+2026-11-14 22:25:23.542 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - [그래프 동기화 워커] 백그라운드 그래프 동기화 워커가 시작되었습니다.
+2026-11-14 22:25:23.561 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-11-14 22:26:25.411 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-11-14 22:26:25.512 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-11-14 22:26:25.982 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-11-14 22:26:25.998 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-11-14 22:26:25.999 | INFO  | -------- | server.py:113:_serve         - Finished server process [57528]
+2026-11-14 22:26:33.117 | INFO  | -------- | server.py:103:_serve         - Started server process [16372]
+2026-11-14 22:26:33.117 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-11-14 22:26:33.154 | INFO  | -------- | legal_workflow.py:202:init_checkpointer - [체크포인터] PostgreSQL 체크포인트 테이블 초기화 완료
+2026-11-14 22:26:33.154 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - [그래프 동기화 워커] 백그라운드 그래프 동기화 워커가 시작되었습니다.
+2026-11-14 22:26:33.171 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-11-14 22:26:59.144 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-11-14 22:26:59.246 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-11-14 22:26:59.712 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-11-14 22:26:59.727 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-11-14 22:26:59.728 | INFO  | -------- | server.py:113:_serve         - Finished server process [16372]
+2026-11-14 22:27:06.947 | INFO  | -------- | server.py:103:_serve         - Started server process [71404]
+2026-11-14 22:27:06.952 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-11-14 22:27:06.969 | INFO  | -------- | legal_workflow.py:202:init_checkpointer - [체크포인터] PostgreSQL 체크포인트 테이블 초기화 완료
+2026-11-14 22:27:06.969 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - [그래프 동기화 워커] 백그라운드 그래프 동기화 워커가 시작되었습니다.
+2026-11-14 22:27:06.986 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-11-14 22:29:09.629 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-11-14 22:29:09.732 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-11-14 22:29:10.199 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-11-14 22:29:10.219 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-11-14 22:29:10.220 | INFO  | -------- | server.py:113:_serve         - Finished server process [71404]
+2026-11-14 22:29:17.794 | INFO  | -------- | server.py:103:_serve         - Started server process [11328]
+2026-11-14 22:29:17.794 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-11-14 22:29:17.815 | INFO  | -------- | legal_workflow.py:202:init_checkpointer - [체크포인터] PostgreSQL 체크포인트 테이블 초기화 완료
+2026-11-14 22:29:17.816 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - [그래프 동기화 워커] 백그라운드 그래프 동기화 워커가 시작되었습니다.
+2026-11-14 22:29:17.824 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-11-14 22:34:51.647 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-11-14 22:34:51.757 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-11-14 22:34:52.219 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-11-14 22:34:52.239 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-11-14 22:34:52.239 | INFO  | -------- | server.py:113:_serve         - Finished server process [11328]
+2026-11-14 22:35:00.084 | INFO  | -------- | server.py:103:_serve         - Started server process [69376]
+2026-11-14 22:35:00.085 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-11-14 22:35:00.107 | INFO  | -------- | legal_workflow.py:202:init_checkpointer - [체크포인터] PostgreSQL 체크포인트 테이블 초기화 완료
+2026-11-14 22:35:00.107 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - [그래프 동기화 워커] 백그라운드 그래프 동기화 워커가 시작되었습니다.
+2026-11-14 22:35:00.124 | INFO  | -------- | on.py:62:startup             - Application startup complete.

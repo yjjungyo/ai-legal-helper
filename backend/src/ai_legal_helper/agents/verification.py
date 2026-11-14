@@ -1487,10 +1487,12 @@ def run_verification(
             result.warnings.append(f"법적 근거 확인이 불확실한 판단 {len(uncertain_core_claims)}건이 포함되어 있어 비확정적 안내로 보완이 필요합니다.")
 
         # B-2) 결정론적 경량 QA 검사에서 법률 적용 위험(legal_risk_passed=False)이 감지된 경우 PASS 엄격 차단 및 강등
+        # [P1-REASON-CODE]: 이는 법령 부족(LEGAL_SOURCE_INSUFFICIENT)이 아니라 답변의 법률 단정 오류이므로
+        # ANSWER_REVISION_REQUIRED를 부여하여 불필요한 외부 법령 재검색 헛바퀴를 차단하고 초안 수정으로 직행시킨다.
         if qa_check and not qa_check.legal_risk_passed and result.status == "PASS":
             result.status = "REVISE"
             if result.reason_code in ("NONE", None):
-                result.reason_code = "LEGAL_SOURCE_INSUFFICIENT"
+                result.reason_code = "ANSWER_REVISION_REQUIRED"
             result.recommended_action = "REVISE_DRAFT"
             for rt in getattr(qa_check, "repair_targets", []) or []:
                 if rt.repair_reason not in result.revision_instructions:
@@ -1536,7 +1538,7 @@ def run_verification(
             if result.status == "PASS":
                 result.status = "REVISE"
                 if result.reason_code == "NONE":
-                    result.reason_code = "LEGAL_SOURCE_INSUFFICIENT"
+                    result.reason_code = "CITATION_INVALID"
                 result.recommended_action = "REVISE_DRAFT"
 
         # D) status=PASS인데 reason_code가 결함 코드인 논리적 모순 방지

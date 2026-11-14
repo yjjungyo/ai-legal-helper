@@ -444,46 +444,57 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
     # 답변 전체를 폐기(WITHHELD)하지 않고 검증된 초안을 그대로 보존(DRAFT_PRESERVED)하여 CAUTIONARY로 승인한다.
     if snapshot_valid and not valid and result.get("claims") and not temporal_blocked and search_status != "API_ERROR":
         has_supported = any(c.get("grounding_status") == "SUPPORTED" for c in result.get("claims", []))
-        # 핵심 법률 적용(LEGAL_APPLICATION/LEGAL_RULE) 중 미입증(UNSUPPORTED), 불확실(UNCERTAIN),
-        # 필수 법률 근거 누락(missing_legal_issues/LEGAL_SOURCE_MISSING), 허위 인용,
-        # 또는 결정론적 법률 위험 감지(legal_risk_passed=False)가 남아있다면 PASS로 승격하지 않고 엄격히 차단한다.
-        has_legal_claims = any(
-            c.get("claim_type") in ("LEGAL_RULE", "LEGAL_APPLICATION")
-            for c in result.get("claims", [])
-        )
-        # [P0-DEFENSE] 초안 본문에 법률적 권리·효과 단정(대항력, 보증금 청구/반환, 경매 인수, 계약 해지 등)이 포함되어 있으나,
-        # 검증 Claims 중 이를 뒷받침(SUPPORTED)하는 법률 주장(LEGAL_APPLICATION/LEGAL_RULE)이 단 1건도 존재하지 않는 경우
-        # (검증기 추출 누락으로 인한 위험한 미검증 법률 결론 누출 차단)
-        draft_legal_assertion_patterns = [
-            re.compile(r"(?:낙찰자|매수인|경락인|임대인)(?:에게|를\s*상대로)?\s*(?:[^\r\n]{0,25})?(?:대항|청구|반환청구|요구)할\s*수\s*있"),
-            re.compile(r"(?:낙찰자|매수인|경락인)(?:가|는|이)\s*(?:[^\r\n]{0,25})?인수해야\s*(?:합|한)"),
-            re.compile(r"(?:소멸하지\s*않고|대항력을\s*유지하여)\s*(?:낙찰자|매수인|경락인)에게\s*인수"),
-            re.compile(r"(?:계약|임대차)이?\s*(?:적법하게\s*)?(?:종료|해지)(?:되었|됐|된\s*것으로)"),
+
+        # 1. 법률적 클레임(LEGAL_RULE, LEGAL_APPLICATION) 선별
+        legal_claims = [
+            c for c in result.get("claims", [])
+            if c.get("claim_type") in ("LEGAL_RULE", "LEGAL_APPLICATION")
         ]
-        has_unverified_draft_legal_assertion = (
-            any(p.search(draft) for p in draft_legal_assertion_patterns)
+        has_legal_claims = bool(legal_claims)
+
+        # 법률 클레임 중 미입증(UNSUPPORTED)이나 불확실(UNCERTAIN)이 존재하는지 엄격 검사
+        has_unsupported_or_uncertain_legal_claim = any(
+            c.get("grounding_status") in ("UNSUPPORTED", "UNCERTAIN")
+            for c in legal_claims
+        )
+
+        # 2. 초안 본문에 법률적 권리·의무·효과 단정(대항력, 우선변제권, 경매 매수인 인수/소멸, 계약 무효/해지 등)이 존재하는지 포괄 검사
+        legal_effect_keywords = (
+            "대항력", "우선변제권", "최우선변제", "배당", "낙찰자", "매수인", "경락인",
+            "인수해야", "소멸하므로", "소멸하게", "소멸하며", "무효", "해제", "해지",
+            "반환청구할 수 있", "청구할 수 있", "청구권", "효력이 있", "효력이 없", "부당이득", "손해배상청구"
+        )
+        draft_contains_legal_effects = any(kw in draft for kw in legal_effect_keywords)
+
+        # 본문에 법률 효과 단정 문구가 포함되어 있으나 이를 뒷받침(SUPPORTED)하는 LEGAL_APPLICATION이 없는 경우
+        # (미검증 법률 결론이 검증기 추출 누락을 통해 몰래 PASS로 승격되는 치명적 결함 원천 차단)
+        unverified_legal_effects_present = (
+            draft_contains_legal_effects
             and not any(
-                c.get("grounding_status") == "SUPPORTED"
-                and c.get("claim_type") in ("LEGAL_RULE", "LEGAL_APPLICATION")
-                for c in result.get("claims", [])
+                c.get("grounding_status") == "SUPPORTED" and c.get("claim_type") in ("LEGAL_RULE", "LEGAL_APPLICATION")
+                for c in legal_claims
             )
         )
-        has_fatal_legal_error = (
-            any(
-                c.get("grounding_status") in ("UNSUPPORTED", "UNCERTAIN")
-                and c.get("claim_type") in ("LEGAL_RULE", "LEGAL_APPLICATION")
-                for c in result.get("claims", [])
-            )
-            or bool(result.get("contradictions"))
-            or (has_legal_claims and bool(result.get("missing_legal_issues")))
+
+        # 3. 필수 법률 근거/조문 누락 여부 확인
+        has_statute_defects = (
+            (has_legal_claims and bool(result.get("missing_legal_issues")))
             or any(
                 any(kw in ml for kw in ("법", "조", "판례", "소멸", "대항", "우선변제", "경매", "인수"))
                 for ml in result.get("missing_legal_issues", [])
             )
+        )
+
+        has_fatal_legal_error = (
+            has_unsupported_or_uncertain_legal_claim
+            or unverified_legal_effects_present
+            or has_statute_defects
+            or bool(result.get("contradictions"))
             or result.get("reason_code") in ("LEGAL_SOURCE_MISSING", "LEGAL_SOURCE_INSUFFICIENT", "CITATION_INVALID")
             or (isinstance(result.get("qa_summary"), dict) and result.get("qa_summary", {}).get("legal_risk_passed") is False)
-            or has_unverified_draft_legal_assertion
         )
+
+        # 지지되는 주장(SUPPORTED)이 존재하고 치명적 법률 결함이 없는 경우에 한해 DRAFT_PRESERVED 승인
         if has_supported and not has_fatal_legal_error:
             result["pre_fallback_status"] = result.get("status")
             result["status"] = "PASS"

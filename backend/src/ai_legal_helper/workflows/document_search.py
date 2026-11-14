@@ -232,15 +232,32 @@ def _retrieve_from_domain_collections(
         )
         if c in col_names
     ]
+    # 법령명 표기(공백 포함 정식명칭 vs 공백 제거 정규화명칭) 및 메타데이터 필드(law_name vs statute_name)
+    # 불일치로 인한 로컬 인덱스 검색 누락(Local-First Miss)을 원천 차단하기 위해 후보군을 구성하여 조회한다.
     target_law = norm_name or law_name
+    candidate_laws = list(dict.fromkeys([
+        law_name,
+        norm_name,
+        " ".join(law_name.split()) if law_name else "",
+        "".join(law_name.split()) if law_name else "",
+    ]))
+    candidate_laws = [c for c in candidate_laws if c]
+
     for cname in domain_cols:
         try:
             col = client.get_collection(cname)
             if target_articles:
-                res = col.get(where={"law_name": target_law}, include=["documents", "metadatas"])
-                ids = res.get("ids") or []
-                docs = res.get("documents") or []
-                metas = res.get("metadatas") or []
+                ids, docs, metas = [], [], []
+                for cand in candidate_laws:
+                    for field in ("law_name", "statute_name"):
+                        res = col.get(where={field: cand}, include=["documents", "metadatas"])
+                        if res.get("ids"):
+                            ids = res["ids"]
+                            docs = res.get("documents") or []
+                            metas = res.get("metadatas") or []
+                            break
+                    if ids:
+                        break
                 if not ids:
                     continue
                 matched = []
@@ -302,7 +319,8 @@ def _retrieve_from_domain_collections(
                         break
                 if matched:
                     return matched
-        except Exception:
+        except Exception as _ex:
+            logger.debug("[DOMAIN_COLLECTION] 도메인 컬렉션(%s) 조회 예외: %s", cname, _ex)
             continue
     return []
 
@@ -346,15 +364,28 @@ def _retrieve_from_local_index(
         norm_name = normalize_law_name(law_name)
         target_articles = set(articles) if articles else set()
 
+        # 법령명 표기(공백 포함 vs 공백 제거) 및 메타데이터 필드(statute_name vs law_name) 후보군 생성
+        candidate_laws = list(dict.fromkeys([
+            law_name,
+            norm_name,
+            " ".join(law_name.split()) if law_name else "",
+            "".join(law_name.split()) if law_name else "",
+        ]))
+        candidate_laws = [c for c in candidate_laws if c]
+
         if target_articles:
-            # 명시 조문이 요청된 경우 법령명 기준 로드 후 선별
-            res = collection.get(
-                where={"statute_name": norm_name or law_name},
-                include=["documents", "metadatas"],
-            )
-            ids = res.get("ids") or []
-            docs = res.get("documents") or []
-            metas = res.get("metadatas") or []
+            # 명시 조문이 요청된 경우 법령명 표기 후보군으로 로드 후 선별
+            ids, docs, metas = [], [], []
+            for cand in candidate_laws:
+                for field in ("statute_name", "law_name"):
+                    res = collection.get(where={field: cand}, include=["documents", "metadatas"])
+                    if res.get("ids"):
+                        ids = res["ids"]
+                        docs = res.get("documents") or []
+                        metas = res.get("metadatas") or []
+                        break
+                if ids:
+                    break
             if not ids:
                 return _retrieve_from_domain_collections(
                     client, col_names, norm_name, law_name, target_articles, query, limit, require_all
@@ -507,6 +538,11 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
         if has_unnumbered or not references:
             references.append(name)
 
+        # 0. 승인 여부 검사: 미승인 법령(또는 거절)은 로컬 인덱스 및 외부 API 검색을 모두 차단한다.
+        if not approved and name not in (state.get("approved_statute_laws") or []):
+            logger.info("[DOCUMENT_SEARCH] 미승인 법령('%s')이므로 검색을 생략합니다.", name)
+            continue
+
         # 1. Local-First: 이미 영구 적재된 공식 법령 인덱스(law_docs_global)에서 선조회 시도
         local_matched = _retrieve_from_local_index(
             law_name=name,
@@ -537,10 +573,6 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
             found.extend(local_matched)
             continue
 
-        # 2. 로컬 인덱스 부재 또는 누락 조문 존재 시 외부 API 승인 여부 검사
-        if not approved and name not in (state.get("approved_statute_laws") or []):
-            logger.info("[DOCUMENT_SEARCH] 로컬 미보유 법령('%s')이나 미승인 상태이므로 외부 API 호출을 생략합니다.", name)
-            continue
 
         # 3. 승인된 경우에 한해 OpenLaw 실시간 공식 API 호출
         diagnostic = {}
