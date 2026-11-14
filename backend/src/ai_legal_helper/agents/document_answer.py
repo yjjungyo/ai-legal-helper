@@ -286,9 +286,11 @@ def write_document_answer(
             statutes = it.get("required_statutes") or it.get("candidate_statutes") or []
             item: Dict[str, Any] = {"쟁점": title}
             if questions:
-                item["핵심 법률 질문"] = questions[:2]
+                # 쟁점의 핵심 판단 질문(예: 매수인 인수·소멸 여부 등)이 잘리지 않도록 충분히 보존
+                item["핵심 법률 질문"] = [q for q in questions if isinstance(q, str) and q.strip()][:5]
             if statutes:
-                item["관련 법령"] = statutes[:3]
+                # 민사집행법 제91조 등 필수 적용 법령이 누락되지 않도록 충분히 보존
+                item["관련 법령"] = [s for s in statutes if isinstance(s, str) and s.strip()][:8]
             simplified_tasks.append(item)
         if simplified_tasks:
             payload["사건 분석 핵심 쟁점 계획(포섭 대상)"] = simplified_tasks

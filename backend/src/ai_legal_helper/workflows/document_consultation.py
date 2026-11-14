@@ -444,12 +444,28 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
     # 답변 전체를 폐기(WITHHELD)하지 않고 검증된 초안을 그대로 보존(DRAFT_PRESERVED)하여 CAUTIONARY로 승인한다.
     if snapshot_valid and not valid and result.get("claims") and not temporal_blocked and search_status != "API_ERROR":
         has_supported = any(c.get("grounding_status") == "SUPPORTED" for c in result.get("claims", []))
-        # 핵심 법률 적용(LEGAL_APPLICATION) 중 미입증(UNSUPPORTED) 오류나 중대한 사실 모순이 남아있다면 PASS로 승격하지 않는다.
-        has_fatal_legal_error = any(
-            c.get("grounding_status") == "UNSUPPORTED"
-            and c.get("claim_type") in ("LEGAL_RULE", "LEGAL_APPLICATION")
+        # 핵심 법률 적용(LEGAL_APPLICATION/LEGAL_RULE) 중 미입증(UNSUPPORTED), 불확실(UNCERTAIN),
+        # 필수 법률 근거 누락(missing_legal_issues/LEGAL_SOURCE_MISSING), 허위 인용,
+        # 또는 결정론적 법률 위험 감지(legal_risk_passed=False)가 남아있다면 PASS로 승격하지 않고 엄격히 차단한다.
+        has_legal_claims = any(
+            c.get("claim_type") in ("LEGAL_RULE", "LEGAL_APPLICATION")
             for c in result.get("claims", [])
-        ) or bool(result.get("contradictions"))
+        )
+        has_fatal_legal_error = (
+            any(
+                c.get("grounding_status") in ("UNSUPPORTED", "UNCERTAIN")
+                and c.get("claim_type") in ("LEGAL_RULE", "LEGAL_APPLICATION")
+                for c in result.get("claims", [])
+            )
+            or bool(result.get("contradictions"))
+            or (has_legal_claims and bool(result.get("missing_legal_issues")))
+            or any(
+                any(kw in ml for kw in ("법", "조", "판례", "소멸", "대항", "우선변제", "경매", "인수"))
+                for ml in result.get("missing_legal_issues", [])
+            )
+            or result.get("reason_code") in ("LEGAL_SOURCE_MISSING", "LEGAL_SOURCE_INSUFFICIENT", "CITATION_INVALID")
+            or (isinstance(result.get("qa_summary"), dict) and result.get("qa_summary", {}).get("legal_risk_passed") is False)
+        )
         if has_supported and not has_fatal_legal_error:
             result["pre_fallback_status"] = result.get("status")
             result["status"] = "PASS"

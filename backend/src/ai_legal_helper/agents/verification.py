@@ -1486,6 +1486,17 @@ def run_verification(
             result.recommended_action = "REVISE_DRAFT"
             result.warnings.append(f"법적 근거 확인이 불확실한 판단 {len(uncertain_core_claims)}건이 포함되어 있어 비확정적 안내로 보완이 필요합니다.")
 
+        # B-2) 결정론적 경량 QA 검사에서 법률 적용 위험(legal_risk_passed=False)이 감지된 경우 PASS 엄격 차단 및 강등
+        if qa_check and not qa_check.legal_risk_passed and result.status == "PASS":
+            result.status = "REVISE"
+            if result.reason_code in ("NONE", None):
+                result.reason_code = "LEGAL_SOURCE_INSUFFICIENT"
+            result.recommended_action = "REVISE_DRAFT"
+            for rt in getattr(qa_check, "repair_targets", []) or []:
+                if rt.repair_reason not in result.revision_instructions:
+                    result.revision_instructions.append(rt.repair_reason)
+            result.warnings.append("결정론적 법률 위험 검사에서 심각한 법률 적용 오류가 감지되어 재작성이 요구됩니다.")
+
         # B-1) 미등록 임의 가상 증거번호 감지 시 PASS 차단 및 REVISE 강제 (T05)
         unregistered_evidences = [
             cid for cid, r in audit.get("rejection_reasons", {}).items()

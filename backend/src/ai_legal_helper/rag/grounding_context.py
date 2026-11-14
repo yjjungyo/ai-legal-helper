@@ -249,7 +249,8 @@ def prune_sources_for_verification(
             kw in str(src.get("filename") or "").lower() or kw in str(src.get("document_name") or "").lower()
             for kw in ("등기", "계약", "registry", "contract", "전부증명서", "가압류", "근저당")
         )
-        snippet_len = max(max_unreferenced_snippet, 400) if is_core_evidence else max_unreferenced_snippet
+        # 등기부 을구(근저당·가압류)나 계약서 특약사항 등 후반부 핵심 반대 증거(Counter-Evidence)가 유실되지 않도록 최소 1,500자 보존
+        snippet_len = max(max_unreferenced_snippet, 1500) if is_core_evidence else max_unreferenced_snippet
         if len(raw_content) > snippet_len:
             condensed = dict(src)
             condensed["content"] = f"{raw_content[:snippet_len]}... (초안 미인용 증거: 상세 본문 생략)"

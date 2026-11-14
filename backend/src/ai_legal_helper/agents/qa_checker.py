@@ -295,10 +295,19 @@ def check_deterministic_qa(
     # 4-2. [SC-013 3단계] 선순위 담보권과 경매 매각 시 대항력 소멸주의(민사집행법 제91조 제3항) 결정론적 검사
     # 질문 또는 사건 맥락에 선순위 담보권/근저당권이 명시된 사안에서, 후순위 임차인이 경매 낙찰자(매수인)에게
     # 대항할 수 있다거나 보증금 반환/인수를 요구할 수 있다고 잘못 결론 내린 단정문 탐지
+    # 질문/사건맥락뿐 아니라 등록된 사건 출처(등기부 등)에 선순위 근저당권·담보권이 설정된 사실이 포함된 경우도 감지
+    sources_has_mortgage = any(
+        (src.get("source_type") == "CASE_EVIDENCE" or "등기" in str(src.get("filename") or "") or "등기" in str(src.get("document_name") or ""))
+        and any(kw in str(src.get("content") or "") for kw in ("근저당권설정", "근저당권 설정", "채권최고액", "1순위 근저당"))
+        for src in (retrieved_sources or []) if isinstance(src, dict)
+    )
     has_prior_encumbrance = (
-        any(
-            kw in question or kw in case_context
-            for kw in ("선순위 근저당", "선순위근저당", "선순위 담보", "1순위 근저당", "근저당권(20", "근저당권이 설정된 후", "근저당권 설정 후")
+        (
+            any(
+                kw in question or kw in case_context
+                for kw in ("선순위 근저당", "선순위근저당", "선순위 담보", "1순위 근저당", "근저당권(20", "근저당권이 설정된 후", "근저당권 설정 후")
+            )
+            or sources_has_mortgage
         )
         and not any(
             no_kw in question or no_kw in case_context
