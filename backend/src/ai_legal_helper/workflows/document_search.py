@@ -163,6 +163,8 @@ def search_is_approved(state: dict[str, Any], requests: list[dict[str, Any]]) ->
     Returns:
         승인된 법령에 대한 요청만 있으면 True.
     """
+    if state.get("approval_status") == "DENIED":
+        return False
     if state.get("auto_approve_statute_search") is False:
         auto_approve = False
     else:
@@ -282,20 +284,26 @@ def _retrieve_from_domain_collections(
                 if matched:
                     return matched
             else:
-                if not query or not query.strip():
-                    continue
                 from ai_legal_helper.llm.gateway import get_embeddings
                 emb = get_embeddings()
-                q_vec = emb.embed_query(f"{target_law} {query}")
-                res = col.query(
-                    query_embeddings=[q_vec],
-                    n_results=limit * 2,
-                    where={"law_name": target_law},
-                    include=["documents", "metadatas"],
-                )
-                ids = (res.get("ids") or [[]])[0]
-                docs = (res.get("documents") or [[]])[0]
-                metas = (res.get("metadatas") or [[]])[0]
+                search_query_text = f"{target_law} {query}".strip() if query else target_law
+                q_vec = emb.embed_query(search_query_text)
+                ids, docs, metas = [], [], []
+                for cand in candidate_laws:
+                    for field in ("statute_name", "law_name"):
+                        res = col.query(
+                            query_embeddings=[q_vec],
+                            n_results=limit * 2,
+                            where={field: cand},
+                            include=["documents", "metadatas"],
+                        )
+                        if res.get("ids") and res["ids"][0]:
+                            ids = res["ids"][0]
+                            docs = (res.get("documents") or [[]])[0]
+                            metas = (res.get("metadatas") or [[]])[0]
+                            break
+                    if ids:
+                        break
                 if not ids:
                     continue
                 matched = []
@@ -538,7 +546,13 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
         if has_unnumbered or not references:
             references.append(name)
 
-        # 0. 승인 여부 검사: 미승인 법령(또는 거절)은 로컬 인덱스 및 외부 API 검색을 모두 차단한다.
+        # 0. 승인 여부 검사: 사용자가 거절(DENIED)했거나 승인 목록에 없는 법령은 로컬/외부 모두 검색을 차단한다.
+        if state.get("approval_status") == "DENIED":
+            logger.info("[DOCUMENT_SEARCH] 거절(DENIED) 상태이므로 검색을 생략합니다.")
+            continue
+        if state.get("approved_statute_laws") is not None and name not in (state.get("approved_statute_laws") or []):
+            logger.info("[DOCUMENT_SEARCH] 미승인 법령('%s')이므로 검색을 생략합니다.", name)
+            continue
         if not approved and name not in (state.get("approved_statute_laws") or []):
             logger.info("[DOCUMENT_SEARCH] 미승인 법령('%s')이므로 검색을 생략합니다.", name)
             continue
@@ -577,6 +591,7 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
         # 3. 승인된 경우에 한해 OpenLaw 실시간 공식 API 호출
         diagnostic = {}
         try:
+            channels_used.add("OPENLAW_API")
             api_found = search_official_statutes(
                 query=" ".join(r["issue"] for r in items), candidate_laws=references,
                 missing_issues=[r["issue"] for r in items], max_articles_per_law=max(len(articles), 4),

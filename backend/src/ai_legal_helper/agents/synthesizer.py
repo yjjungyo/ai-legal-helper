@@ -4,6 +4,7 @@
 모든 답변 모드에 동일한 사실·출처 구분 지침을 적용하여 사용자 진술과
 검증된 근거, 조건부 판단을 보존한다. 예시는 출력 구조만 안내한다.
 """
+import re
 from typing import Any, Dict, List, Optional
 from langchain_core.messages import AIMessage, HumanMessage, AnyMessage
 from langchain_core.prompts import PromptTemplate
@@ -35,7 +36,7 @@ def _extract_last_question(messages: List[AnyMessage]) -> str:
             return m.content if isinstance(m.content, str) else str(m.content)
     return ""
 
-def _format_findings(results: Dict[str, str], per_cat_limit: int = 2400) -> str:
+def _format_findings(results: Dict[str, str], per_cat_limit: int = 3000) -> str:
     lines: List[str] = []
     for cat, text in results.items():
         t = (text or "").strip()
@@ -92,17 +93,17 @@ SYNTH_FEWSHOT = """
 결론을 바꿀 수 있는 핵심 정보만 요청합니다. 위 문장이나 소제목을 그대로 복사하지 마세요.
 """
 SYNTH_FOLLOWUP_SYSTEM = """당신은 대한민국 법률 전문가입니다.
-- 의뢰인의 후속 세부 질문에 대해 직전 상담 내용을 바탕으로 직접적이고 명쾌하게 한국어로 답변하세요.
+- 의뢰인의 후속 질문 및 요청에 대해 직전 대화 맥락을 바탕으로 직접적이고 실용적으로 한국어로 답변하세요.
 - 사고 과정(Chain-of-Thought)을 출력하지 마세요.
 - 중요 원칙:
   1. 이전 상담의 서론이나 일반 법리를 처음부터 장황하게 반복하지 마세요.
-  2. 5단계 의견서 형식을 강제하지 마세요. 질문받은 세부 쟁점에 집중하여 다음 3개 핵심 구조로 간결하게 답변하세요:
-     [1. 질문에 대한 핵심 결론 및 직접 답변]
-     [2. 세부 법적 요건 및 근거] (관련 조문 및 판례 근거만 간결하게 설명)
-     [3. 실무상 유의사항 및 다음 조치]
+  2. 고정된 목차(1/2/3단계)를 기계적으로 강제하지 말고, 의뢰인이 요청한 형태에 맞추어 유연하고 자연스럽게 구성하세요:
+     - 세부 법률 쟁점 질문: 핵심 결론과 직접 답변을 먼저 제시하고, 필요한 법적 근거 및 실무 유의사항을 설명하세요.
+     - 실무 산출물(체크리스트, 표, 비교표, 서식 가이드 등) 요청 또는 직전 제안 수락: 불필요한 서론이나 법률 의견서 틀을 생략하고, 의뢰인이 실무에서 바로 활용할 수 있는 완성된 체크리스트 표나 항목별 안내를 본문 최상단에 직접 작성하세요.
   3. 사실 상태를 엄격히 구분하여 작성하고, 증거 인용 시 번호 축약(`[01]`, `[E01]`)을 금지하며 전체 파일명(`[01_임대차_주요내용.txt]`)을 온전히 표기하세요. 실제 등록되지 않은 가상의 증거 번호('증거 1', '증거 2' 등)를 절대 생성하지 마세요.
   4. 중요한 핵심 단어에는 **볼드** 강조를 적절히 사용하세요.
   5. 법령명·조문·파일명·페이지·URL은 입력에서 확인된 항목만 인용하세요. PDF가 아닌 문서에 PDF 파일명이나 페이지를 만들지 마세요.
+  6. 답변 끝에 '원하시면 ~해드리겠습니다', '필요하시면 ~도와드리겠습니다'와 같은 불필요한 후속 제안 문구를 덧붙이지 마세요. 요청받은 본문만 명확하고 완결성 있게 작성하세요.
 """
 
 SYNTH_FOLLOWUP_FEWSHOT = """
@@ -153,6 +154,32 @@ SYNTH_PROMPT = PromptTemplate.from_template(
 """
 )
 
+
+
+def _format_last_answer_context(last_answer: Optional[str], max_chars: int = 700) -> str:
+    """직전 턴 AI 답변 원문에서 핵심 결론(앞부분)과 후속 제안·행동(말미)을 보존하여 포맷팅한다.
+
+    과거 답변 전체가 수천 자에 달할 수 있으므로 앞부분의 핵심 판단과 뒷부분의 제안 문맥을
+    동시에 추출하여 LLM 프롬프트에 주입함으로써, 제안 문구의 절삭을 원천 방지한다.
+
+    Args:
+        last_answer: 직전 턴 AI 답변 원문 텍스트.
+        max_chars: 포맷팅 후 최대 허용 글자 수.
+
+    Returns:
+        str: 정제된 직전 답변 요지 및 제안 문맥 문자열.
+    """
+    if not last_answer or not isinstance(last_answer, str) or not last_answer.strip():
+        return ""
+    text = last_answer.strip()
+    if len(text) <= max_chars:
+        return text
+    # 앞부분 300자(결론) + 뒷부분 350자(제안 및 유의사항) 보존
+    head = text[:300].strip()
+    tail = text[-350:].strip()
+    return f"{head}\n\n[...(중간 법률 세부 분석 생략)...]\n\n{tail}"
+
+
 @trace
 def synthesize(
     messages: List[AnyMessage],
@@ -162,6 +189,11 @@ def synthesize(
     issue_tasks: Optional[List[Dict[str, Any]]] = None,
     source_registry: Optional[Dict[str, Any]] = None,
     legal_evidence_bundle: Optional[Dict[str, Any]] = None,
+    *,
+    resolved_query: Optional[str] = None,
+    user_question: Optional[str] = None,
+    last_answer: Optional[str] = None,
+    last_question: Optional[str] = None,
 ) -> List[AnyMessage]:
     """질문 의도별 답변 지침과 공통 근거 원칙으로 종합 답변을 생성한다.
 
@@ -186,8 +218,15 @@ def synthesize(
 
     chat_brief = _brief_history(messages)
     question = _extract_last_question(messages)
+
+    # [멀티턴 질의 복원] 복원된 작업 질의(resolved_query)가 존재하면 작성 목표 질문으로 채택
+    effective_question = resolved_query or question or "(질문 없음)"
+    if resolved_query and user_question and resolved_query.strip() != user_question.strip():
+        target_question_str = f"{resolved_query} (의뢰인 발언: {user_question})"
+    else:
+        target_question_str = effective_question
     # [P0-05/Gate 3] 프롬프트 토큰 최적화: per_cat_limit 1500자, briefing 2500자 제한
-    findings = _format_findings(results, per_cat_limit=1500)
+    findings = _format_findings(results, per_cat_limit=3000)
 
     # 사건 증거 브리핑 텍스트 구성 (P0-01, P0-02, P0-07)
     # 사건 브리핑(formatted_summary)에 이미 확정 사실관계([입증된 사실]), 타임라인, 등록 증거가
@@ -220,15 +259,33 @@ def synthesize(
         # 의도(intent)에 따른 적응형 프롬프트 및 양식 선택 (P1 / Section 8)
         cur_system = SYNTH_SYSTEM
         cur_fewshot = SYNTH_FEWSHOT
-        if intent == "FOLLOWUP_QUESTION":
+        if intent in ("FOLLOWUP_QUESTION", "FOLLOWUP_ACTION"):
             cur_system = SYNTH_FOLLOWUP_SYSTEM
             cur_fewshot = SYNTH_FOLLOWUP_FEWSHOT
+            # 제안 수락 및 후속 조치 시 무한 제안 루프 방지 지침 보강
+            cur_system = (
+                cur_system
+                + "\n\n[후속 조치 및 제안 수락 실행 원칙]\n"
+                + "1. 의뢰인이 직전 AI의 제안(체크리스트 작성, 실무 요약 등)을 수락하거나 후속 조치를 요청한 경우,\n"
+                + "   '원하시면 ~해드리겠습니다'와 같은 재제안 문구를 반복하지 마세요.\n"
+                + "2. 의뢰인이 요청한 결과물(신고 체크리스트 표, 세부 요건 정리 가이드 등)을 본문에서 즉시 완성된 형태로 작성하세요.\n"
+                + "3. 직전 상담의 법률 분석 결론을 임의로 왜곡하거나 가상의 법령을 생성하지 마세요."
+            )
         elif intent == "FACT_CLARIFICATION":
             cur_system = SYNTH_FACT_CLARIFICATION_SYSTEM
             cur_fewshot = ""
         elif intent == "DOCUMENT_REQUEST":
             cur_system = SYNTH_DOCUMENT_SYSTEM
             cur_fewshot = ""
+
+        # 직전 답변 요지 및 제안 맥락 주입 (후속 턴 제안 문맥 보존)
+        last_ans_text = _format_last_answer_context(last_answer)
+        if last_ans_text:
+            cur_system = (
+                cur_system
+                + "\n\n[직전 상담 답변 요지 및 제안 맥락 (대화 맥락 참고용이며 법령 원문 대체 근거 아님)]\n"
+                + last_ans_text
+            )
 
         # P7: 기존 Agent 답변에 더해 공식 법령/부칙 원문 출처를 Synthesizer에도
         # 직접 제공한다. 버전 역할/시행일 미확인 상태를 유지하고 임의 법률효과
@@ -257,7 +314,7 @@ def synthesize(
         prompt = SYNTH_PROMPT.format(
             system=cur_system,
             chat_brief=chat_brief,
-            question=question or "(질문 없음)",
+            question=target_question_str,
             findings=findings,
             fewshot=cur_fewshot,
         )
@@ -282,6 +339,16 @@ def synthesize(
         summary = expand_evidence_citations(summary, evidence_sources)
 
     summary = clean_markdown_formatting(summary)
+
+    # 후속 턴에서 관성적으로 덧붙는 말미 제안 문구 정리 (무한 제안 루프 차단)
+    if intent in ("FOLLOWUP_QUESTION", "FOLLOWUP_ACTION"):
+        summary = re.sub(
+            r"\n+(?:원하시면|필요하시면|원하실\s*경우|궁금하신\s*점이|추가로)[^\n]+(?:해\s*드리겠습니다|드리겠습니다|도와\s*드리겠습니다|안내해\s*드리겠습니다|바꿔\s*드리겠습니다|작성해\s*드리겠습니다|제공해\s*드리겠습니다|말씀해\s*주세요)[.!?]?\s*$",
+            "",
+            summary,
+            flags=re.MULTILINE,
+        ).strip()
+
     # 분야별 원문을 중복 첨부하지 않고 질문 의도에 맞게 생성한 종합 답변만 전달한다.
     final_text = summary
     return messages + [AIMessage(content=final_text)]

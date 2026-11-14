@@ -141,8 +141,9 @@ def make_statute_search_message(
         (f"국가법령정보센터에서 '{open_target_str}' 찾는 중..." if open_target_str else "국가법령정보센터에서 법령 찾는 중...")
         if openlaw_status == "RUNNING"
         else f"{', '.join(open_stats)}을 찾았습니다." if open_stats
-        else "추가 조회가 필요하지 않아 생략되었습니다." if openlaw_status in ("SKIPPED", "NOT_NEEDED", "PENDING")
-        else "법령을 찾지 못했습니다." if openlaw_status == "COMPLETED" and open_target_str
+        else (f"로컬 벡터DB에서 이미 확보되어 '{open_target_str}' 외부 조회를 생략했습니다." if open_target_str and openlaw_status in ("SKIPPED", "NOT_NEEDED")
+              else "추가 조회가 필요하지 않아 생략되었습니다.") if openlaw_status in ("SKIPPED", "NOT_NEEDED", "PENDING")
+        else "법령을 찾지 못했습니다." if openlaw_status == "COMPLETED"
         else "추가 조회가 필요하지 않아 생략되었습니다."
     )
     payload = {

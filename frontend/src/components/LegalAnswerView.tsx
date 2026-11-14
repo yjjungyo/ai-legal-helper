@@ -254,10 +254,10 @@ export function renderInlineMarkdown(
     // 인라인 법령 조문 인용 배지 및 공식 법령 링크: (주택임대차보호법 제2조, 제3조 등)
     if (part.startsWith('(') && part.endsWith(')') && /제\s*\d+\s*조/.test(part)) {
       const inner = part.slice(1, -1).trim();
-      const mLaw = inner.match(/([가-힣]+(?:법률|법|시행령|시행규칙))/);
+      const mLaw = inner.match(/([가-힣0-9\s]+?(?:법률|법|시행령|시행규칙))\s*(?:(?=제\s*\d+)|(?=부칙)|$)/);
       const mArt = inner.match(/제\s*(\d+(?:조(?:의\d+)?))/);
       if (mLaw) {
-        const rawStat = mLaw[1];
+        const rawStat = mLaw[1].trim();
         const cleanStat = rawStat.replace(/\(법률\)|\(대통령령\)|\(시행령\)|\(시행규칙\)/g, '').trim();
         const artStr = mArt ? `제${mArt[1].replace(/\s+/g, '')}` : '';
         const lawUrl = `https://www.law.go.kr/법령/${encodeURIComponent(cleanStat)}${artStr ? `/${encodeURIComponent(artStr)}` : ''}`;

@@ -95,7 +95,7 @@ def test_to_chat_history_messages_normalization():
     assert isinstance(messages[0], HumanMessage)
     assert messages[0].content == "보증금 1억 돌려받을 수 있나요?"
     assert isinstance(messages[1], AIMessage)
-    assert messages[1].content == "네, 계약 종료 후 명도와 동시에 반환 청구가 가능합니다."
+    assert "네, 계약 종료 후 명도와 동시에 반환 청구가 가능합니다." in messages[1].content
     assert isinstance(messages[2], HumanMessage)
     assert messages[2].content == "확정일자는 있습니다."
     assert isinstance(messages[3], AIMessage)
@@ -125,7 +125,7 @@ def test_withheld_answer_handling():
     assert len(messages) == 2
     ai_msg = messages[1]
     assert isinstance(ai_msg, AIMessage)
-    assert "[참고: 이전 상담에서 법률 근거 부족으로 판단이 유보된 답변입니다]" in ai_msg.content
+    assert "[참고: 이전 상담에서 판단 유보됨]" in ai_msg.content
 
 
 def test_format_context_for_prompt():

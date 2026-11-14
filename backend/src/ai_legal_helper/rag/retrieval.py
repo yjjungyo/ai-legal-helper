@@ -83,7 +83,7 @@ def deduplicate_chunks(docs: List[Any], threshold: float = 0.85) -> List[Any]:
 def rerank_with_article_and_keywords(
     query: str,
     scored_docs: List[Tuple[Any, float]],
-    top_k: int = 3,
+    top_k: int = 10,
 ) -> List[Tuple[Any, float]]:
     """질의에 포함된 법률 조문 번호(예: 제6조의2) 및 핵심 어휘와 문서 간의 일치도를 반영하여 재순위화(Re-ranking)한다.
 
@@ -330,7 +330,7 @@ def retrieve_official_by_ids(
 
 
 @trace
-def retrieve_with_status(query: str, k: int = 3, category: Optional[str] = None, metadata_filter: Optional[Dict[str, Any]] = None) -> RetrievalResult:
+def retrieve_with_status(query: str, k: int = 10, category: Optional[str] = None, metadata_filter: Optional[Dict[str, Any]] = None) -> RetrievalResult:
     """질의에 대해 연관 법률 문서 청크를 검색하고 구조화된 상태(RetrievalResult)를 반환한다.
 
     검색 결과 부재(NO_MATCH)와 인프라 장애(COLLECTION_MISSING, RETRIEVER_UNAVAILABLE, EMBEDDING_ERROR)를
@@ -373,7 +373,7 @@ def retrieve_with_status(query: str, k: int = 3, category: Optional[str] = None,
             )
         try:
             vs = _get_vs(coll)
-            fetch_k = max(k * 2, 4)
+            fetch_k = max(k * 2, 10)
             raw_scored: List[Tuple[Any, float]] = []
             try:
                 raw_scored = vs.similarity_search_with_relevance_scores(query, k=fetch_k, filter=metadata_filter)
@@ -449,7 +449,7 @@ def retrieve_with_status(query: str, k: int = 3, category: Optional[str] = None,
             used_index_info=used_info,
         )
 
-    reranked = rerank_with_article_and_keywords(query, hits, top_k=max(k * 2, 4))
+    reranked = rerank_with_article_and_keywords(query, hits, top_k=max(k * 2, 10))
     candidate_docs = [d for d, _ in reranked]
     from ai_legal_helper.rag.hybrid_retrieval import restore_parent_content
     restored_candidates = [restore_parent_content(d) for d in candidate_docs]
@@ -475,7 +475,7 @@ def retrieve_with_status(query: str, k: int = 3, category: Optional[str] = None,
 
 
 @trace
-def retrieve(query: str, k: int = 3, category: Optional[str] = None) -> List:
+def retrieve(query: str, k: int = 10, category: Optional[str] = None) -> List:
     """질의에 대해 연관 법률 문서 청크를 검색한다 (하위 호환성 유지 함수).
 
     Args:

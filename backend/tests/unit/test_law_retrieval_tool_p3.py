@@ -132,7 +132,8 @@ def test_feature_flag_disabled_restores_legacy_single_category_search(monkeypatc
         "ai_legal_helper.rag.retrieval.retrieve_with_status", new=legacy,
     ):
         output = _make_tool().func("가상임대차법 제3조")
-    assert calls == [(2, "civil")]
+    from ai_legal_helper.rag.retrieval_factory import MAX_DOCS
+    assert calls == [(MAX_DOCS, "civil")]
     assert "[CITE] (가상임대차법.pdf, p.3)" in output
     assert len(get_retrieved_sources()) == 1
 

@@ -27,7 +27,7 @@ from ai_legal_helper.rag.query_rewrite import rewrite_query
 
 logger = get_logger(__name__)
 
-MAX_DOCS = 2
+MAX_DOCS = 10
 SNIP = 240
 
 

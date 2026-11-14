@@ -523,9 +523,13 @@ export const ConsultationProgress: React.FC<ConsultationProgressProps> = ({
                               <span className="chat-statute-found-tail">을 찾았습니다.</span>
                             </div>
                           ) : tree.openlaw.status === 'RUNNING' ? null : (tree.openlaw.status === 'SKIPPED' || tree.openlaw.status === 'NOT_NEEDED' || !tree.openlaw.target) ? (
-                            <span className="chat-statute-skipped-text">추가 조회가 필요하지 않아 생략되었습니다.</span>
+                            <span className="chat-statute-skipped-text">
+                              {tree.openlaw.message || '추가 조회가 필요하지 않아 생략되었습니다.'}
+                            </span>
                           ) : (
-                            <span className="chat-statute-empty-text">법령을 찾지 못했습니다.</span>
+                            <span className="chat-statute-empty-text">
+                              {tree.openlaw.message || '법령을 찾지 못했습니다.'}
+                            </span>
                           )}
                         </div>
                       </div>
