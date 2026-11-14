@@ -239,3 +239,59 @@ async def test_process_consultation_completion_logging(monkeypatch):
     assert saved_resp.sources[0].statute_name == "주택임대차보호법"
 
 
+
+
+
+@pytest.mark.asyncio
+async def test_process_consultation_resume_preserves_second_approval_required(monkeypatch):
+    """[L-02 회귀] HITL 재개(process_consultation_resume) 후 2차 승인 요청(APPROVAL_REQUIRED) 반환 시 SUCCESS로 덮어쓰지 않고 APPROVAL_REQUIRED를 유지하는지 검증한다."""
+    from unittest.mock import AsyncMock, MagicMock
+    from ai_legal_helper.api.routes.consultation import process_consultation_resume
+    from ai_legal_helper.api.schemas.consultation import ApprovalDecisionRequest
+
+    req_id = "req-resume-second-hitl"
+    _consultations[req_id] = ConsultationResponse(
+        request_id=req_id,
+        conversation_id="conv-resume-1",
+        turn_index=1,
+        trace_id="trace-resume-1",
+        status="IN_PROGRESS",
+        execution_status="IN_PROGRESS",
+        verification_status="UNVERIFIED",
+        answer_status="WITHHELD",
+        created_at="2026-11-14T10:00:00Z",
+        progress=create_initial_progress(req_id, "2026-11-14T10:00:00Z"),
+    )
+
+    mock_resume_result = {
+        "status": "APPROVAL_REQUIRED",
+        "answer": "2차 법령 원문 검색 승인이 필요합니다.",
+        "approval_request": {"candidate_laws": ["민법"], "phase": "POST_VERIFICATION"},
+        "verification_result": {"status": "INSUFFICIENT"},
+    }
+    monkeypatch.setattr(
+        "ai_legal_helper.api.routes.consultation.run_legal_consultation",
+        AsyncMock(return_value=mock_resume_result),
+    )
+    mock_db = MagicMock()
+    mock_db.query.return_value.filter.return_value.with_for_update.return_value.first.return_value = MagicMock()
+    mock_session_ctx = MagicMock()
+    mock_session_ctx.__enter__.return_value = mock_db
+    monkeypatch.setattr(
+        "ai_legal_helper.api.routes.consultation.SessionLocal",
+        MagicMock(return_value=mock_session_ctx),
+    )
+
+    await process_consultation_resume(
+        request_id=req_id,
+        trace_id="trace-resume-1",
+        case_id="case-resume-1",
+        decision=ApprovalDecisionRequest(approved=True, reason="승인"),
+    )
+
+    saved = _consultations[req_id]
+    assert saved.status == "APPROVAL_REQUIRED"
+    assert saved.execution_status == "APPROVAL_REQUIRED"
+    assert saved.answer_status == "WITHHELD"
+    assert saved.approval_request == {"candidate_laws": ["민법"], "phase": "POST_VERIFICATION"}
+    _consultations.pop(req_id, None)

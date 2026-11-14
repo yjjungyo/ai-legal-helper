@@ -298,6 +298,10 @@ def start_trace(
     if git_sha and "git_commit" not in trace_metadata:
         trace_metadata["git_commit"] = git_sha
 
+    # HITL 재개(Resume) 등으로 동일 trace_id가 명시적으로 재시작되는 경우
+    # 이전 인터럽트 시점의 종료 마커(_ended_traces)를 해제하여 재개 구간의 Span/Generation 누락을 방지한다.
+    _ended_traces.discard(trace_id)
+
     if trace_id not in _active_traces:
         try:
             trace = lf.trace(
@@ -332,6 +336,8 @@ def end_trace(trace_id: str):
         return
 
     # 종료된 Trace 식별자를 기록하여 지연 콜백에 의한 임의 생성/오염 차단 (TC-P0-10)
+    if len(_ended_traces) >= 5000:
+        _ended_traces.clear()
     _ended_traces.add(trace_id)
     _active_traces.pop(trace_id, None)
 

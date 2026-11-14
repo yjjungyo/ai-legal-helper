@@ -36,12 +36,13 @@ from ai_legal_helper.agents.verification import audit_citations_and_claims
 logger = get_logger(__name__)
 
 # 위험한 법률 효과 단정 표현 패턴 (통지 도달 전 확정 종료, 무조건 승소 등)
+# ReDoS(Catastrophic Backtracking) 방지를 위해 중첩 수량자 대신 최대 30자 비탐욕 탐색([^.?!;\n]{0,30}?) 적용
 UNCONFIRMED_TERMINATION_PATTERNS = [
     re.compile(
-        r"(\d{4}[년\.\-]\s*\d{1,2}[월\.\-]\s*\d{1,2}일?)(?:에|자로)?\s*(?:[가-힣A-Za-z0-9_]+\s*)*(?:완전히|확정적으로)?\s*(?:종료됩니다|해지됩니다|소멸합니다|끝납니다)",
+        r"(\d{4}[년\.\-]\s*\d{1,2}[월\.\-]\s*\d{1,2}일?)(?:에|자로)?\s*[^.?!;\n]{0,30}?(?:완전히|확정적으로)?\s*(?:종료됩니다|해지됩니다|소멸합니다|끝납니다)",
         re.IGNORECASE,
     ),
-    re.compile(r"(?:즉시|무조건|당연히|바로)\s*(?:[가-힣A-Za-z0-9_]+\s*)*(?:종료|해지|효력|반환받을\s*수\s*있|반환|승소)", re.IGNORECASE),
+    re.compile(r"(?:즉시|무조건|당연히|바로)\s*[^.?!;\n]{0,30}?(?:종료|해지|효력|반환받을\s*수\s*있|반환|승소)", re.IGNORECASE),
 ]
 
 # 브래킷 출처 ID 패턴 (예: [E01], [E99], [STATUTE-001])

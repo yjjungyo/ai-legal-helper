@@ -31,7 +31,7 @@ MAX_DOCS = 2
 SNIP = 240
 
 
-@trace
+# Tool 객체 생성 팩토리 함수이므로 @trace를 제외하고, 실제 검색 실행 함수(_run)에만 @trace를 유지한다.
 def make_fixed_retrieval_tool(tool_name: str, category_eng: str, label_ko: str) -> Tool:
     """기존 Agent Tool 계약을 유지하되 내부 구현을 공통 법령 검색으로 위임한다."""
 

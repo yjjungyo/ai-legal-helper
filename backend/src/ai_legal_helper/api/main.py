@@ -15,6 +15,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 import time
 import asyncio
@@ -168,8 +169,10 @@ async def trace_context_middleware(request: Request, call_next):
         )
 
     start_time = time.time()
+    response_status = 500
     try:
         response = await call_next(request)
+        response_status = response.status_code
         elapsed_ms = (time.time() - start_time) * 1000
         response.headers["X-Trace-Id"] = trace_id
         response.headers["X-Request-Id"] = request_id
@@ -185,7 +188,10 @@ async def trace_context_middleware(request: Request, call_next):
 
         return response
     finally:
-        if not is_noise and not is_consultation_post:
+        # POST /api/v1/consultations 계열은 정상 접수(2xx) 시 백그라운드 태스크가 end_trace를 호출하지만,
+        # 요청 검증 실패·권한 오류(4xx/5xx) 또는 예외 발생 시에는 백그라운드 태스크가 실행되지 않으므로
+        # 미들웨어에서 즉시 end_trace를 호출하여 _active_traces 메모리 누수를 방지한다.
+        if not is_noise and (not is_consultation_post or response_status >= 400):
             end_trace(trace_id)
         reset_trace_id(t_token)
         reset_request_id(r_token)

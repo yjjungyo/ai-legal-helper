@@ -132,3 +132,33 @@ def test_llm_token_tracking_multiple_retries():
     assert agg["unavailable"]["total_calls"] == 2
     assert agg["actual"]["total_calls"] == 1
     assert agg["actual"]["total_tokens"] == 30
+
+
+
+def test_token_tracker_get_trace_usage_and_max_records():
+    """[P-02 회귀] get_trace_usage 단일 패스 집계 및 max_records 초과 시 오래된 레코드 자동 방출을 검증한다."""
+    from ai_legal_helper.llm.usage import TokenTracker, LLMUsageRecord
+
+    tracker = TokenTracker(max_records=3)
+    for i in range(5):
+        tracker.add_record(
+            LLMUsageRecord(
+                call_id=f"c-{i}",
+                trace_id="t-1" if i % 2 == 0 else "t-2",
+                agent_name="Router" if i == 2 else "Verifier",
+                model_id="gpt-4o",
+                input_tokens=10,
+                output_tokens=20,
+                total_tokens=30,
+                usage_source="actual",
+            )
+        )
+
+    # max_records=3 이므로 최근 3개(i=2, 3, 4)만 유지되어야 함
+    assert len(tracker.records) == 3
+    assert [r.call_id for r in tracker.records] == ["c-2", "c-3", "c-4"]
+
+    t1_usage = tracker.get_trace_usage("t-1")
+    assert t1_usage["total_calls"] == 2
+    assert t1_usage["total_tokens"] == 60
+    assert t1_usage["agent_usage"] == {"Router": 30, "Verifier": 30}

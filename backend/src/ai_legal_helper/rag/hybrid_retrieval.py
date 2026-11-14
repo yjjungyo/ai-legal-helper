@@ -130,12 +130,13 @@ def restore_parent_content(doc: Document) -> Document:
     """Parent-Child 청크인 경우 전체 조문 원문(parent_content)을 복원한 새 Document를 반환한다.
 
     다운스트림 Specialist LLM이 잘리지 않은 완전한 법률 조문 맥락을 검토할 수 있도록 보장한다.
+    새로운 Document 객체를 생성할 때도 기존 doc.id 및 메타데이터 식별자를 누락 없이 계승한다.
 
     Args:
         doc: 검색된 원본 Document (Child 청크).
 
     Returns:
-        Document: 본문이 전체 조문 원문으로 복원되고 검색 스니펫이 메타데이터에 보존된 Document.
+        Document: 본문이 전체 조문 원문으로 복원되고 검색 스니펫 및 id가 보존된 Document.
     """
     meta = getattr(doc, "metadata", {}) or {}
     parent_content = meta.get("parent_content")
@@ -149,7 +150,17 @@ def restore_parent_content(doc: Document) -> Document:
             if law_name and not parent_content.startswith(f"[{law_name}]")
             else parent_content
         )
-        return Document(page_content=formatted_content, metadata=new_meta)
+        doc_id = (
+            getattr(doc, "id", None)
+            or new_meta.get("vector_id")
+            or new_meta.get("chunk_id")
+            or new_meta.get("source_id")
+        )
+        return Document(
+            id=str(doc_id) if doc_id else None,
+            page_content=formatted_content,
+            metadata=new_meta,
+        )
     return doc
 
 

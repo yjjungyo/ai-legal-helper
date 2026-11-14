@@ -86,5 +86,181 @@
     "llm_calls": 2,
     "verification_status": "PASS",
     "filename": "SC-012_draft_873acc5d-fcf2-4e3d-8743-51c7c0cec03f.json"
+  },
+  {
+    "case_id": "SC-014",
+    "title": "임차주택매매_대법원98마100_양수인승계이의제기",
+    "tag": "turn1",
+    "trace_id": "8f348fb9-add2-4fbf-8771-b20e880c6b9b",
+    "latency_sec": 273.17,
+    "total_tokens": 142129,
+    "llm_calls": 10,
+    "verification_status": "PASS",
+    "filename": "SC-014_turn1_8f348fb9-add2-4fbf-8771-b20e880c6b9b.json"
+  },
+  {
+    "case_id": "SC-014",
+    "title": "임차주택매매_대법원98마100_양수인승계이의제기",
+    "tag": "turn2",
+    "trace_id": "86f34567-4562-4b3f-9b45-7d99535a92b1",
+    "latency_sec": 68.66,
+    "total_tokens": 60042,
+    "llm_calls": 4,
+    "verification_status": "PASS",
+    "filename": "SC-014_turn2_86f34567-4562-4b3f-9b45-7d99535a92b1.json"
+  },
+  {
+    "case_id": "SC-014",
+    "title": "임차주택매매_대법원98마100_양수인승계이의제기",
+    "tag": "turn3",
+    "trace_id": "67435207-4ceb-4a76-ac44-d753e8edfee3",
+    "latency_sec": 280.67,
+    "total_tokens": 241178,
+    "llm_calls": 12,
+    "verification_status": "PASS",
+    "filename": "SC-014_turn3_67435207-4ceb-4a76-ac44-d753e8edfee3.json"
+  },
+  {
+    "case_id": "SC-014",
+    "title": "임차주택매매_대법원98마100_양수인승계이의제기",
+    "tag": "draft",
+    "trace_id": "c9caff50-faad-4a09-9512-9543582f3b03",
+    "latency_sec": 3.5,
+    "total_tokens": 3536,
+    "llm_calls": 2,
+    "verification_status": "PASS",
+    "filename": "SC-014_draft_c9caff50-faad-4a09-9512-9543582f3b03.json"
+  },
+  {
+    "case_id": "SC-016",
+    "title": "임대인동의전대차_합의해지대항_전차인보호",
+    "tag": "turn1",
+    "trace_id": "53165514-c149-4c63-bd7f-9954bf7a2780",
+    "latency_sec": 113.37,
+    "total_tokens": 100542,
+    "llm_calls": 7,
+    "verification_status": "PASS",
+    "filename": "SC-016_turn1_53165514-c149-4c63-bd7f-9954bf7a2780.json"
+  },
+  {
+    "case_id": "SC-016",
+    "title": "임대인동의전대차_합의해지대항_전차인보호",
+    "tag": "turn2",
+    "trace_id": "7bc2679d-4b30-4ea6-b310-b53cae0100ab",
+    "latency_sec": 63.96,
+    "total_tokens": 66528,
+    "llm_calls": 4,
+    "verification_status": "PASS",
+    "filename": "SC-016_turn2_7bc2679d-4b30-4ea6-b310-b53cae0100ab.json"
+  },
+  {
+    "case_id": "SC-016",
+    "title": "임대인동의전대차_합의해지대항_전차인보호",
+    "tag": "turn3",
+    "trace_id": "22bfdb21-9e7b-468f-9a31-af64467733ab",
+    "latency_sec": 116.29,
+    "total_tokens": 74589,
+    "llm_calls": 5,
+    "verification_status": "PASS",
+    "filename": "SC-016_turn3_22bfdb21-9e7b-468f-9a31-af64467733ab.json"
+  },
+  {
+    "case_id": "SC-016",
+    "title": "임대인동의전대차_합의해지대항_전차인보호",
+    "tag": "draft",
+    "trace_id": "4c075ff0-6713-4b96-8fc5-bfce53ba5c09",
+    "latency_sec": 3.5,
+    "total_tokens": 2006,
+    "llm_calls": 2,
+    "verification_status": "WARN",
+    "filename": "SC-016_draft_4c075ff0-6713-4b96-8fc5-bfce53ba5c09.json"
+  },
+  {
+    "case_id": "SC-018",
+    "title": "전세자금대출_질권설정채권양도_만기도래분쟁",
+    "tag": "turn1",
+    "trace_id": "35d99d65-dcc1-48fb-aeb8-fa3202634ff5",
+    "latency_sec": 65.92,
+    "total_tokens": 27223,
+    "llm_calls": 3,
+    "verification_status": "PASS",
+    "filename": "SC-018_turn1_35d99d65-dcc1-48fb-aeb8-fa3202634ff5.json"
+  },
+  {
+    "case_id": "SC-018",
+    "title": "전세자금대출_질권설정채권양도_만기도래분쟁",
+    "tag": "turn2",
+    "trace_id": "a30aa07e-bbde-4ccc-ad23-54e2cfe9be75",
+    "latency_sec": 69.69,
+    "total_tokens": 58633,
+    "llm_calls": 5,
+    "verification_status": "PASS",
+    "filename": "SC-018_turn2_a30aa07e-bbde-4ccc-ad23-54e2cfe9be75.json"
+  },
+  {
+    "case_id": "SC-018",
+    "title": "전세자금대출_질권설정채권양도_만기도래분쟁",
+    "tag": "turn3",
+    "trace_id": "0e658aaa-3de5-416b-ad4a-4f5e19b541f2",
+    "latency_sec": 228.29,
+    "total_tokens": 173440,
+    "llm_calls": 10,
+    "verification_status": "PASS",
+    "filename": "SC-018_turn3_0e658aaa-3de5-416b-ad4a-4f5e19b541f2.json"
+  },
+  {
+    "case_id": "SC-018",
+    "title": "전세자금대출_질권설정채권양도_만기도래분쟁",
+    "tag": "draft",
+    "trace_id": "2ecdfdc0-2374-4824-8365-c8e3320285e6",
+    "latency_sec": 3.5,
+    "total_tokens": 2746,
+    "llm_calls": 2,
+    "verification_status": "PASS",
+    "filename": "SC-018_draft_2ecdfdc0-2374-4824-8365-c8e3320285e6.json"
+  },
+  {
+    "case_id": "SC-019",
+    "title": "실거주허위갱신거절_제3자재임대_법정손해배상",
+    "tag": "turn1",
+    "trace_id": "0593d491-aa25-4c57-8ace-f6352db585ee",
+    "latency_sec": 55.98,
+    "total_tokens": 28075,
+    "llm_calls": 3,
+    "verification_status": "PASS",
+    "filename": "SC-019_turn1_0593d491-aa25-4c57-8ace-f6352db585ee.json"
+  },
+  {
+    "case_id": "SC-019",
+    "title": "실거주허위갱신거절_제3자재임대_법정손해배상",
+    "tag": "turn2",
+    "trace_id": "aaa33d68-2891-45df-94ec-2797839024b8",
+    "latency_sec": 49.35,
+    "total_tokens": 30423,
+    "llm_calls": 2,
+    "verification_status": "PASS",
+    "filename": "SC-019_turn2_aaa33d68-2891-45df-94ec-2797839024b8.json"
+  },
+  {
+    "case_id": "SC-019",
+    "title": "실거주허위갱신거절_제3자재임대_법정손해배상",
+    "tag": "turn3",
+    "trace_id": "3af75356-22b9-4270-bbca-858193286551",
+    "latency_sec": 372.57,
+    "total_tokens": 179928,
+    "llm_calls": 11,
+    "verification_status": "PASS",
+    "filename": "SC-019_turn3_3af75356-22b9-4270-bbca-858193286551.json"
+  },
+  {
+    "case_id": "SC-019",
+    "title": "실거주허위갱신거절_제3자재임대_법정손해배상",
+    "tag": "draft",
+    "trace_id": "f25a9b8d-0ae4-4647-8d71-83326542dbc2",
+    "latency_sec": 3.5,
+    "total_tokens": 3746,
+    "llm_calls": 2,
+    "verification_status": "WARN",
+    "filename": "SC-019_draft_f25a9b8d-0ae4-4647-8d71-83326542dbc2.json"
   }
 ]

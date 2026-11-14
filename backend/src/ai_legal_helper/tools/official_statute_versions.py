@@ -291,6 +291,9 @@ def lookup_versions_for_date(
             raw = fetch_xml(url)
             if not raw:
                 raise ValueError("OFFICIAL_HISTORY_EMPTY_RESPONSE")
+            if b"\xec\x8b\x9c\xec\x8a\xa4\xed\x85\x9c \xec\xa0\x90\xea\xb2\x80" in raw:
+                logger.warning("[OFFICIAL_HISTORY] 국가법령정보센터(law.go.kr) 정기 시스템 점검 중으로 연혁 조회를 건너뛰고 로컬 RAG 근거로 폴백합니다.")
+                return VersionLookup("NOT_FOUND", reason_code="MAINTENANCE_UNAVAILABLE")
             total, row_count, items, skipped = _read_history_page(
                 raw, page=page, law_id=law_id, law_name=law_name,
             )

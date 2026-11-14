@@ -12,11 +12,12 @@ React 프론트엔드와 통신하는 FastAPI 라우터 모듈이다.
 4. TokenTracker를 이용해 Trace 범위 내의 사용량 집계
 
 [주의사항]
-- P1 단계 구조로 In-memory 딕셔너리(`_consultations`)를 사용하므로 
-  서버 재시작 시 상태가 초기화된다.
+- 진행 중 실시간 폴링 속도를 위해 In-memory 캐시(`_consultations`)를 병행 사용하며,
+  모든 상담 레코드·진행 단계·확정 스냅샷은 PostgreSQL(`ConsultationRecord`)에 영구 저장되어 서버 재시작 후에도 보존된다.
 - BackgroundTask 실패 시 에러가 조용히 무시되지 않도록 로깅 및 상태 업데이트를 수행한다.
 """
 import os
+import json
 import uuid
 import time
 import threading
@@ -51,12 +52,51 @@ from ai_legal_helper.presentation.evidence_manifest import (
 
 router = APIRouter()
 
-# In-memory store for consultation tasks (ephemeral for P1)
+# In-memory cache for active consultation tasks (persisted in PostgreSQL ConsultationRecord)
 _consultations: Dict[str, ConsultationResponse] = {}
 
 # 대화 세션 단위 동시성 제어 락 (P0-3.1 작업 4)
 _conversation_locks: Dict[str, threading.Lock] = {}
 _global_conv_lock = threading.Lock()
+
+
+MAX_IN_MEMORY_CONSULTATIONS = 500
+MAX_CONVERSATION_LOCKS = 500
+
+
+def _evict_completed_consultations_if_needed() -> None:
+    """인메모리 상담 캐시(_consultations)가 최대 한도를 초과할 경우,
+    이미 DB에 영구 저장 완료된(SUCCESS/ERROR) 가장 오래된 항목부터 정리하여 메모리 누수를 방지한다.
+    """
+    if len(_consultations) <= MAX_IN_MEMORY_CONSULTATIONS:
+        return
+    overflow = len(_consultations) - MAX_IN_MEMORY_CONSULTATIONS
+    removable_keys = [
+        k for k, v in list(_consultations.items())
+        if getattr(v, "status", None) in ("SUCCESS", "ERROR")
+    ]
+    for k in removable_keys[:overflow]:
+        _consultations.pop(k, None)
+
+
+def _normalize_and_deduplicate_sources(sources_data: Optional[List[Any]]) -> List[Source]:
+    """원시 출처 목록을 표준 Source 스키마로 정규화하고 의미 기반 키로 중복을 제거한다."""
+    from ai_legal_helper.rag.source_schema import normalize_source_dict
+    dedup_sources: List[Source] = []
+    seen_source_keys = set()
+    for s in (sources_data or []):
+        std_dict = normalize_source_dict(s)
+        stype = std_dict.get("source_type")
+        if stype == "CASE_EVIDENCE":
+            key = (stype, std_dict.get("file"), str(std_dict.get("page") or "1"))
+        elif stype == "STATUTE":
+            key = (stype, std_dict.get("statute_name") or std_dict.get("title"), std_dict.get("article"))
+        else:
+            key = (std_dict.get("source_id"), std_dict.get("file"), str(std_dict.get("page") or ""))
+        if key not in seen_source_keys:
+            seen_source_keys.add(key)
+            dedup_sources.append(Source(**std_dict))
+    return dedup_sources
 
 
 def _get_conversation_lock(conversation_id: str) -> threading.Lock:
@@ -67,6 +107,11 @@ def _get_conversation_lock(conversation_id: str) -> threading.Lock:
     """
     with _global_conv_lock:
         if conversation_id not in _conversation_locks:
+            if len(_conversation_locks) >= MAX_CONVERSATION_LOCKS:
+                for old_cid, old_lock in list(_conversation_locks.items()):
+                    if not old_lock.locked():
+                        _conversation_locks.pop(old_cid, None)
+                        break
             _conversation_locks[conversation_id] = threading.Lock()
         return _conversation_locks[conversation_id]
 
@@ -119,13 +164,18 @@ def make_statute_search_message(
 
 NODE_TO_PROGRESS_STEP: Dict[str, tuple[str, str]] = {
     "supervisor_initialize": ("step_1", "사건 기본정보 및 대화 맥락 확인 완료"),
+    # [하위 호환 유지] intent_analysis 및 plan은 그래프에서 supervisor_initialize/route로 통폐합되었으나,
+    # 기존 단위 테스트(test_case_centric_chat_api.py) 계약 유지를 위해 매핑 키를 보존한다.
     "intent_analysis": ("step_1", "의뢰인 질의 의도 분석 완료"),
     "general_conversation": ("step_6", "일반 안내 답변 생성 완료"),
+    "evidence_unavailable": ("step_6", "사건 증거 원문 확인 안내 완료"),
+    "routing_exit": ("step_6", "질의 구체화 및 추가 정보 안내 완료"),
     "followup_action": ("step_4", "후속 실행 조치 분석 완료"),
     "route": ("step_2", "사실관계 및 타임라인 조회 중"),
     "plan": ("step_2", "사실관계 및 타임라인 검토 완료"),
     "statute_search_plan": ("step_2", "법령 적용 시점 및 사실관계 검토 완료"),
     "run_agents": ("step_3", "법령 및 판례 검색 중"),
+    "legal_evidence_bundle": ("step_3", "법령 및 판례 근거 정리 완료"),
     "synthesize": ("step_4", "법률 쟁점별 분석 중"),
     "verification": ("step_5", "증거 및 법률 근거 검증 중"),
     "revise": ("step_5", "검증 피드백 기반 보강 중"),
@@ -159,17 +209,28 @@ def update_progress_step(
                 if not s.completed_at:
                     s.completed_at = now_str
             elif s_idx == curr_idx:
-                s.status = status
-                if status == ConsultationStepStatus.RUNNING and not s.started_at:
-                    s.started_at = now_str
-                elif status in (ConsultationStepStatus.COMPLETED, ConsultationStepStatus.WAITING_APPROVAL, ConsultationStepStatus.FAILED):
-                    s.completed_at = now_str
-                if message:
-                    # 3단계 등 이미 구조화된 법령 검색 결과(JSON)가 보존되어 있는 경우 단순 텍스트로 덮어쓰지 않는다.
-                    if s.message and s.message.strip().startswith("{") and not message.strip().startswith("{"):
-                        pass
-                    else:
-                        s.message = message
+                # 3단계(법령 검색) 등 노드 내부에서 이미 구조화된 완료(COMPLETED) JSON을 기록한 직후,
+                # astream 후행 콜백(on_step)이 단순 텍스트와 RUNNING 상태로 역전시키는 현상을 방지한다.
+                if (
+                    s.status == ConsultationStepStatus.COMPLETED
+                    and status == ConsultationStepStatus.RUNNING
+                    and s.message
+                    and s.message.strip().startswith("{")
+                    and (not message or not message.strip().startswith("{"))
+                ):
+                    pass
+                else:
+                    s.status = status
+                    if status == ConsultationStepStatus.RUNNING and not s.started_at:
+                        s.started_at = now_str
+                    elif status in (ConsultationStepStatus.COMPLETED, ConsultationStepStatus.WAITING_APPROVAL, ConsultationStepStatus.FAILED):
+                        s.completed_at = now_str
+                    if message:
+                        # 3단계 등 이미 구조화된 법령 검색 결과(JSON)가 보존되어 있는 경우 단순 텍스트로 덮어쓰지 않는다.
+                        if s.message and s.message.strip().startswith("{") and not message.strip().startswith("{"):
+                            pass
+                        else:
+                            s.message = message
             else:
                 s.status = ConsultationStepStatus.PENDING
 
@@ -518,18 +579,9 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
         
         elapsed_ms = (time.time() - start_time) * 1000
         
-        # Aggregate token usage for this trace
-        agg = global_token_tracker.aggregate_by("trace_id").get(trace_id, {})
-        
-        # Agent usage specifically for this trace
-        agent_usage = {}
-        for r in global_token_tracker.records:
-            if r.trace_id == trace_id:
-                agent = r.agent_name or "unknown"
-                if agent not in agent_usage:
-                    agent_usage[agent] = 0
-                if r.total_tokens:
-                    agent_usage[agent] += r.total_tokens
+        # 단일 패스로 현재 trace_id의 토큰 통계 및 에이전트별 사용량 집계
+        agg = global_token_tracker.get_trace_usage(trace_id)
+        agent_usage = agg.get("agent_usage", {})
         
         usage_summary = UsageSummary(
             total_calls=agg.get("total_calls", 0),
@@ -604,24 +656,8 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
                         s.completed_at = now_iso
         
         # Map sources (서버 Source Registry 기반 표준 Source 스키마 정규화 및 의미 기반 중복 제거)
-        from ai_legal_helper.rag.source_schema import normalize_source_dict
         sources_data = result.get("cited_sources") or result.get("sources", [])
-        dedup_sources = []
-        seen_source_keys = set()
-        for s in sources_data:
-            std_dict = normalize_source_dict(s)
-            stype = std_dict.get("source_type")
-            if stype == "CASE_EVIDENCE":
-                key = (stype, std_dict.get("file"), str(std_dict.get("page") or "1"))
-            elif stype == "STATUTE":
-                key = (stype, std_dict.get("statute_name") or std_dict.get("title"), std_dict.get("article"))
-            else:
-                key = (std_dict.get("source_id"), std_dict.get("file"), str(std_dict.get("page") or ""))
-
-            if key not in seen_source_keys:
-                seen_source_keys.add(key)
-                dedup_sources.append(Source(**std_dict))
-        resp.sources = dedup_sources
+        resp.sources = _normalize_and_deduplicate_sources(sources_data)
         
         resp.elapsed_ms = elapsed_ms
         resp.usage_summary = usage_summary
@@ -755,6 +791,7 @@ async def process_consultation(request_id: str, trace_id: str, req: Consultation
                     frozen = _freeze_record_presentation(rec, resp)
                     db_session.commit()
                     resp.presentation_snapshot = frozen
+            _evict_completed_consultations_if_needed()
         except Exception as db_err:
             logger.error(f"[상담 DB 저장 실패] 상담 결과 데이터베이스 커밋 실패 (요청: {request_id[:8]}): {db_err}")
 
@@ -811,15 +848,7 @@ async def get_consultation(
     if not AUTH_BYPASS and record.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="해당 상담에 접근할 권한이 없습니다.")
         
-    from ai_legal_helper.rag.source_schema import normalize_source_dict
-    sources = []
-    seen_keys = set()
-    for s in (record.sources or []):
-        std_dict = normalize_source_dict(s)
-        key = (std_dict.get("source_id"), std_dict.get("file"), str(std_dict.get("page") or ""))
-        if key not in seen_keys:
-            seen_keys.add(key)
-            sources.append(Source(**std_dict))
+    sources = _normalize_and_deduplicate_sources(record.sources)
 
     ans_status = _resolve_legacy_answer_status(
         getattr(record, "answer_status", None),
@@ -1038,13 +1067,9 @@ async def process_consultation_resume(
 
         elapsed_ms = (time.time() - start_time) * 1000
 
-        # 사용량 집계
-        agg = global_token_tracker.aggregate_by("trace_id").get(trace_id, {})
-        agent_usage = {}
-        for r in global_token_tracker.records:
-            if r.trace_id == trace_id:
-                agent = r.agent_name or "unknown"
-                agent_usage[agent] = agent_usage.get(agent, 0) + (r.total_tokens or 0)
+        # 단일 패스 사용량 집계
+        agg = global_token_tracker.get_trace_usage(trace_id)
+        agent_usage = agg.get("agent_usage", {})
 
         usage_summary = UsageSummary(
             total_calls=agg.get("total_calls", 0),
@@ -1062,62 +1087,73 @@ async def process_consultation_resume(
             resp = ConsultationResponse(
                 request_id=request_id,
                 trace_id=trace_id,
-                status="SUCCESS",
+                status="IN_PROGRESS",
             )
             _consultations[request_id] = resp
 
+        is_approval_required = (result.get("status") == "APPROVAL_REQUIRED")
+        is_error = (result.get("status") == "ERROR")
         ver_res = result.get("verification_result") or {}
         ver_status = ver_res.get("status") or "UNVERIFIED"
-
-        resp.status = "SUCCESS"
-        resp.execution_status = "COMPLETED"
-        resp.verification_status = ver_status
         resp.routing_status = result.get("routing_status", "CLASSIFIED")
-        final_disp = result.get("final_disposition")
-        if final_disp in ("DELIVERED", "CAUTIONARY", "WITHHELD"):
-            resp.answer_status = final_disp
-        elif ver_status == "PASS":
-            resp.answer_status = "DELIVERED"
-        elif ver_status == "REVISE":
-            resp.answer_status = "CAUTIONARY"
-        else:
+
+        # [L-02 결함 수정] HITL 재개 후 2차 승인 요청(APPROVAL_REQUIRED)이나 오류(ERROR) 발생 시
+        # 무조건 SUCCESS로 덮어쓰지 않고 실제 반환 상태에 맞게 분기 처리한다.
+        if is_error:
+            resp.status = "ERROR"
+            resp.execution_status = "ERROR"
+            resp.verification_status = ver_status
             resp.answer_status = "WITHHELD"
-        resp.answer = result.get("answer", "")
+            resp.approval_request = None
+            resp.answer = result.get("answer", "처리 중 오류가 발생했습니다.")
+            if resp.progress:
+                resp.progress.updated_at = get_kst_iso()
+                if resp.progress.current_step:
+                    for s in resp.progress.steps:
+                        if s.step_id == resp.progress.current_step:
+                            s.status = ConsultationStepStatus.FAILED
+        elif is_approval_required:
+            resp.status = "APPROVAL_REQUIRED"
+            resp.execution_status = "APPROVAL_REQUIRED"
+            resp.verification_status = ver_status
+            resp.answer_status = "WITHHELD"
+            resp.approval_request = result.get("approval_request")
+            resp.answer = result.get("answer", "추가 공식 법령 원문 검색 진행을 위해 사용자 승인이 필요합니다.")
+            update_progress_step(request_id, "step_3", ConsultationStepStatus.WAITING_APPROVAL, "공식 법령 원문 검색 승인 대기 중")
+        else:
+            resp.status = "SUCCESS"
+            resp.execution_status = "COMPLETED"
+            resp.verification_status = ver_status
+            final_disp = result.get("final_disposition")
+            if final_disp in ("DELIVERED", "CAUTIONARY", "WITHHELD"):
+                resp.answer_status = final_disp
+            elif ver_status == "PASS":
+                resp.answer_status = "DELIVERED"
+            elif ver_status == "REVISE":
+                resp.answer_status = "CAUTIONARY"
+            else:
+                resp.answer_status = "WITHHELD"
+            resp.answer = result.get("answer", "")
+            resp.approval_request = result.get("approval_request")
+            if resp.progress:
+                resp.progress.current_step = None
+                now_iso = get_kst_iso()
+                resp.progress.updated_at = now_iso
+                for s in resp.progress.steps:
+                    s.status = ConsultationStepStatus.COMPLETED
+                    if not s.completed_at:
+                        s.completed_at = now_iso
+
         resp.elapsed_ms = elapsed_ms
         resp.usage_summary = usage_summary
         resp.verification_result = ver_res
         resp.revision_count = result.get("revision_count", 0)
         resp.selected_agents = result.get("selected_agents", [])
         resp.warnings.extend(result.get("warnings", []))
-        resp.approval_request = result.get("approval_request")
-        if resp.progress:
-            resp.progress.current_step = None
-            now_iso = get_kst_iso()
-            resp.progress.updated_at = now_iso
-            for s in resp.progress.steps:
-                s.status = ConsultationStepStatus.COMPLETED
-                if not s.completed_at:
-                    s.completed_at = now_iso
 
         # Sources 정규화 (의미 기반 중복 제거)
-        from ai_legal_helper.rag.source_schema import normalize_source_dict
         sources_data = result.get("cited_sources") or result.get("sources", [])
-        dedup_sources = []
-        seen_source_keys = set()
-        for s in sources_data:
-            std_dict = normalize_source_dict(s)
-            stype = std_dict.get("source_type")
-            if stype == "CASE_EVIDENCE":
-                key = (stype, std_dict.get("file"), str(std_dict.get("page") or "1"))
-            elif stype == "STATUTE":
-                key = (stype, std_dict.get("statute_name") or std_dict.get("title"), std_dict.get("article"))
-            else:
-                key = (std_dict.get("source_id"), std_dict.get("file"), str(std_dict.get("page") or ""))
-
-            if key not in seen_source_keys:
-                seen_source_keys.add(key)
-                dedup_sources.append(Source(**std_dict))
-        resp.sources = dedup_sources
+        resp.sources = _normalize_and_deduplicate_sources(sources_data)
 
         # Langfuse span 업데이트 (P2-02)
         try:
@@ -1236,14 +1272,7 @@ async def list_case_consultations(
             results.append(live_resp)
             continue
 
-        sources = []
-        seen_keys = set()
-        for s in (rec.sources or []):
-            std_dict = normalize_source_dict(s)
-            key = (std_dict.get("source_id"), std_dict.get("file"), str(std_dict.get("page") or ""))
-            if key not in seen_keys:
-                seen_keys.add(key)
-                sources.append(Source(**std_dict))
+        sources = _normalize_and_deduplicate_sources(rec.sources)
         ans_status = _resolve_legacy_answer_status(
             getattr(rec, "answer_status", None),
             getattr(rec, "verification_status", None),
@@ -1373,14 +1402,7 @@ async def get_case_conversation_detail(
 
     turns: List[ConsultationResponse] = []
     for rec in records:
-        sources = []
-        seen_keys = set()
-        for s in (rec.sources or []):
-            std_dict = normalize_source_dict(s)
-            key = (std_dict.get("source_id"), std_dict.get("file"), str(std_dict.get("page") or ""))
-            if key not in seen_keys:
-                seen_keys.add(key)
-                sources.append(Source(**std_dict))
+        sources = _normalize_and_deduplicate_sources(rec.sources)
 
         ans_status = _resolve_legacy_answer_status(
             getattr(rec, "answer_status", None),

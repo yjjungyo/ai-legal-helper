@@ -111,7 +111,7 @@ def extract_dates_from_text(text: str) -> List[str]:
     if not text:
         return []
     dates: Set[str] = set()
-    for m in re.finditer(r"(\d{4})[년\.\-\s]+(\d{1,2})[월\.\-\s]+(\d{1,2})(?:일|\b|\.|\s|$)", text):
+    for m in re.finditer(r"(\d{4})[년\.\-\s]+(\d{1,2})[월\.\-\s]+(\d{1,2})(?:일|\b|\.|\s|까지|부터|에|경|$)", text):
         y, mm, dd = m.groups()
         dates.add(f"{y}.{int(mm):02d}.{int(dd):02d}")
     return sorted(dates)

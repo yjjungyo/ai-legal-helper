@@ -100,17 +100,19 @@ def test_preflight_plan_routes_to_existing_hitl_node_only_when_ready():
 
 
 def test_approval_payload_shows_laws_and_asof_date_and_scope():
+    import os
     seen = []
     def interrupt_stub(payload):
         seen.append(payload)
         return {"approved": True}
-    with patch("ai_legal_helper.workflows.legal_workflow.interrupt", new=interrupt_stub):
+    with patch.dict(os.environ, {"AUTO_APPROVE_STATUTE_SEARCH": "false"}), patch("ai_legal_helper.workflows.legal_workflow.interrupt", new=interrupt_stub):
         out = statute_search_approval_node({
             "law_search_plan": _plan(),
             "statute_search_phase": "PRE_ANALYSIS",
             "verification_result": {},
             "question": "기준일 개정법 질문",
             "warnings": [],
+            "auto_approve_statute_search": False,
         })
     assert seen[0]["as_of_date"] == "2026-11-01"
     assert seen[0]["search_phase"] == "PRE_ANALYSIS"
@@ -206,7 +208,9 @@ async def test_preflight_sources_not_overwritten_by_specialist_search():
     assert {s["source_id"] for s in out["retrieved_sources"]} == {"V:1", "OFFICIAL:1"}
 
 
-def test_new_preflight_node_is_in_compiled_graph():
+def test_preflight_plan_node_removed_from_compiled_graph():
+    """statute_search_plan 노드가 그래프에서 제외되고 run_agents로 직결되는지 검증한다."""
     from langgraph.checkpoint.memory import MemorySaver
     graph = build_legal_graph(checkpointer=MemorySaver())
-    assert "statute_search_plan" in graph.nodes
+    assert "statute_search_plan" not in graph.nodes
+    assert "run_agents" in graph.nodes

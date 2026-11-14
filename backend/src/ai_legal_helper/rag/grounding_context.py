@@ -232,8 +232,13 @@ def prune_sources_for_verification(
             if len(base_name) >= 3 and base_name in draft_lower:
                 is_cited = True
 
-        # 초안에 실제 인용된 증거는 원문 전문 100% 보존
-        if is_cited:
+        # 공식 법령(OFFICIAL: / STATUTE)이나 초안에 실제 인용된 증거는 원문 전문 100% 보존
+        is_official_or_statute = (
+            str(src.get("source_id") or "").startswith(("OFFICIAL:", "STATUTE:"))
+            or src.get("source_type") in ("STATUTE", "PRECEDENT")
+            or src.get("retrieval_method") == "OFFICIAL_STATUTE_SEARCH"
+        )
+        if is_cited or is_official_or_statute:
             pruned_evidence_sources.append(src)
             continue
 

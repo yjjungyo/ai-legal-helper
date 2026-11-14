@@ -1,4 +1,4 @@
-"""초안 작성 전 법령 검색 완전성 점검. 특정 법령명이나 사건 유형을 고정하지 않는다."""
+"""초안 작성 전 법령 검색 완전성 점검 보조 모듈 (현재 정규 그래프는 synthesize 이후 synthesis_law_gate_condition을 사용하며, 본 모듈은 독립 점검 헬퍼로 보존됨)."""
 import json
 import logging
 

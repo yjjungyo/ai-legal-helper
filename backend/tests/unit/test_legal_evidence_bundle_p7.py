@@ -155,3 +155,16 @@ def test_compiled_graph_has_evidence_bundle_before_synthesizer():
     from langgraph.checkpoint.memory import MemorySaver
     compiled = build_legal_graph(checkpointer=MemorySaver())
     assert "legal_evidence_bundle" in compiled.nodes
+
+
+
+def test_evidence_bundle_node_skips_in_document_mode():
+    """DOCUMENT_MODE에서는 generate_answer가 직접 출처를 포맷팅하므로 legal_evidence_bundle 생성을 생략하는지 검증한다."""
+    src = source("200", "NEXT_EFFECTIVE_CANDIDATE")
+    state = {
+        "answer_mode": "DOCUMENT_GROUNDED",
+        "retrieved_sources": [src],
+        "temporal_resolution": temporal(),
+    }
+    output = legal_evidence_bundle_node(state)
+    assert output == {"legal_evidence_bundle": None}

@@ -1,7 +1,7 @@
 """문서가 등록된 사건의 원문 작성·검증·확정 경로.
 
 검색은 법률 자료 확보에만 사용하고 답변 작성자는 하나로 유지한다. 검증 실패 시
-공식 법령 검색 또는 제한된 재작성을 거치며, 미통과 초안을 최종 조언으로 승격하지 않는다.
+공식 법령 검색 또는 제한된 재작성(최대 3회)을 거치며, 재작성 한도 도달 시 지지된 근거(SUPPORTED)가 확인된 경우에만 기존 초안을 조건부 안내(CAUTIONARY)로 보존하고 그 외에는 판단 유보(WITHHELD)로 처리한다.
 """
 
 import hashlib
@@ -213,8 +213,8 @@ def generate_answer(
     except Exception as exc:
         # 모델 오류나 원문 누락을 성공 답변으로 바꾸지 않으며 상담 원문/예외 본문은 기록하지 않는다.
         logger.warning("문서 답변 작성 실패: %s (%s)", type(exc).__name__, exc)
-        # 수정 실패 시 기존 초안을 파괴하지 않는다. 실패 상태를 명시하여
-        # Verification/Finalize가 이를 검증 통과 답변으로 취급하지 못하게 한다.
+        # 최초 초안 생성 실패(else 분기)는 answer_generation_error를 기록하여 판단 유보(WITHHELD)로 차단하되,
+        # 수정보강(repair) 단계 실패 시에는 이미 생성된 기존 초안을 안전하게 보존한다.
         if repair and state.get("draft_answer"):
             # 수정보강(repair) 실패 시 이미 생성된 기존 초안을 안전하게 보존하고,
             # 전체 답변이 파기되는 치명적 보류(WITHHELD)로 빠지지 않도록 generation_error를 발생시키지 않는다.
@@ -484,7 +484,7 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
         ]
         # [P0-FINAL-DISPOSITION-NORMALIZATION]
         # DELIVERED vs CAUTIONARY 판정:
-        # 1. 제한 답변을 사용했거나(limited_used),
+        # 1. 재작성 한도 도달 후 지지 주장(SUPPORTED)이 포함된 기존 초안을 폴백 보존했거나(limited_used),
         # 2. 사실관계 충돌(CONFLICTED) 또는 추가 증거 확인 필요(EVIDENCE_NEEDED) 상태의 주장이 존재하거나,
         # 3. SUPPORTED로 완전히 입증되지 않은 미확정 주장(UNCERTAIN 등)이 포함된 경우에만 CAUTIONARY로 분류한다.
         # 반면 정상 입증(SUPPORTED)된 사건 정황 추론(INFERENCE)이나 사용자 진술(USER_STATEMENT)은

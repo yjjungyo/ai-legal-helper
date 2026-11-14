@@ -20,7 +20,7 @@ flowchart TD
         Chunker{"3대 청킹 전략"}
         Chunker -->|Strategy A| S_A["Fixed-size (800자 / 120 Overlap)"]
         Chunker -->|Strategy B| S_B["Article-aware (조문 단위 경계)"]
-        Chunker -->|Strategy C (기본)| S_C["Parent-Child (항·호 검색 + 조문 원문 복원)"]
+        Chunker -->|Strategy C 기본| S_C["Parent-Child (항·호 검색 + 조문 원문 복원)"]
     end
 
     subgraph Embedding_Indexing ["3. 임베딩 및 인덱싱 (indexer.py / index_worker.py)"]

@@ -131,14 +131,14 @@ def select_grounded_facts_for_display(
     query: Optional[str] = None,
     max_facts: int = 5,
 ) -> List[Any]:
-    """등록된 사실관계 중 핵심 요건사실과 질문 연관 사실을 우선 선별하고 출처 다양성 및 의미론적 중복을 제거한다 (P0-03/Gate 2).
+    """등록된 사실관계 중 핵심 요건사실과 질문 연관 사실을 우선 선별하고 출처 다양성 확보 및 동일 문장 중복을 제거한다 (P0-03/Gate 2).
 
     선별 원칙:
     1. 신뢰 상태가 직접 입증(EVIDENCE_SUPPORTED, CORROBORATED)된 사실만 대상.
     2. 문서 제목, 단순 서명란, 연락처 등 부차적 메타데이터 배제.
     3. 요건사실 가중치(보증금, 임대차 기간, 대항력, 통고 등) 내림차순 정렬.
-    4. 의미론적 중복 제거: 동일한 보증금 금액(예: 계약서, 송금내역, 영수증 3건), 동일한 계약기간 사실은
-       가장 구체적이고 신뢰도 높은 1건만 대표로 선별.
+    4. 정확 일치 중복 제거(_extract_semantic_fact_key): 공백 정규화 기준 완전히 동일한 진술만 중복 제거하며,
+       유사한 금액 숫자가 포함되더라도 법적 의미가 다른 사실(원금·계약금·반환액·미반환 잔액 등)은 각각 보존.
     5. 출처 다양성 보장: 동일 증거 라벨에서 최대 2건까지만 선택하여 여러 증거가 고루 포섭되도록 함.
     6. 기본 최대 3~5건으로 간결하게 구성하여 사용자 가독성을 극대화.
 
@@ -192,7 +192,7 @@ def select_grounded_facts_for_display(
                 if len(selected) >= max_facts:
                     return selected
 
-    # 1차 라운드: 증거 라벨별 다양성 확보 및 의미론적 중복 제거
+    # 1차 라운드: 증거 라벨별 다양성 확보 및 정규화 문장 중복 제거
     for f in scored_facts:
         norm_stmt = f.statement.strip()
         sem_key = _extract_semantic_fact_key(norm_stmt)
@@ -211,7 +211,7 @@ def select_grounded_facts_for_display(
         else:
             remaining_pool.append(f)
 
-    # 슬롯이 남은 경우 나머지 상위 가중치 사실로 보충 (의미론적 중복 여전히 배제)
+    # 슬롯이 남은 경우 나머지 상위 가중치 사실로 보충 (정규화 문장 중복 여전히 배제)
     if len(selected) < max_facts and remaining_pool:
         for f in remaining_pool:
             norm_stmt = f.statement.strip()

@@ -17,6 +17,7 @@ import hashlib
 import logging
 import math
 import os
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Callable, Optional
@@ -32,7 +33,112 @@ from ai_legal_helper.tools.statute_temporal import article_effective_date, extra
 logger = logging.getLogger(__name__)
 
 COLLECTION_NAME = "law_docs_global"
+DEFAULT_COLLECTION_NAME = "law_docs_global"
 MAX_ATTEMPTS = 3
+
+# 법령별 관할 도메인(민사, 행정, 형사, 노동, 상사, 조세, 헌법 등) 정규화 매핑 테이블
+LAW_DOMAIN_MAPPING: dict[str, str] = {
+    # 1. 민사 (civil)
+    "민법": "law_docs_civil",
+    "주택임대차보호법": "law_docs_civil",
+    "상가건물임대차보호법": "law_docs_civil",
+    "가등기담보등에관한법률": "law_docs_civil",
+    "부동산실권리자명의등기에관한법률": "law_docs_civil",
+    "집합건물의소유및관리에관한법률": "law_docs_civil",
+    "민사소송법": "law_docs_civil",
+    "민사집행법": "law_docs_civil",
+    "채무자회생및파산에관한법률": "law_docs_civil",
+    "소액사건심판법": "law_docs_civil",
+    "이자제한법": "law_docs_civil",
+    "대부업등의등록및금융이용자보호에관한법률": "law_docs_civil",
+
+    # 2. 형사 (criminal)
+    "형법": "law_docs_criminal",
+    "형사소송법": "law_docs_criminal",
+    "특정범죄가중처벌등에관한법률": "law_docs_criminal",
+    "특정경제범죄가중처벌등에관한법률": "law_docs_criminal",
+    "폭력행위등처벌에관한법률": "law_docs_criminal",
+    "도로교통법": "law_docs_criminal",
+    "교통사고처리특례법": "law_docs_criminal",
+    "성폭력범죄의처벌등에관한특례법": "law_docs_criminal",
+    "마약류관리에관한법률": "law_docs_criminal",
+
+    # 3. 행정 (administrative)
+    "민간임대주택에관한특별법": "law_docs_administrative",
+    "공인중개사법": "law_docs_administrative",
+    "부동산거래신고등에관한법률": "law_docs_administrative",
+    "행정기본법": "law_docs_administrative",
+    "행정절차법": "law_docs_administrative",
+    "행정소송법": "law_docs_administrative",
+    "행정심판법": "law_docs_administrative",
+    "건축법": "law_docs_administrative",
+    "국토의계획및이용에관한법률": "law_docs_administrative",
+    "식품위생법": "law_docs_administrative",
+
+    # 4. 상사 (commercial)
+    "상법": "law_docs_commercial",
+    "자본시장과금융투자업에관한법률": "law_docs_commercial",
+    "어음법": "law_docs_commercial",
+    "수표법": "law_docs_commercial",
+
+    # 5. 노동 (labor)
+    "근로기준법": "law_docs_labor",
+    "노동조합및노동관계조정법": "law_docs_labor",
+    "남녀고용평등과일가정양립지원에관한법률": "law_docs_labor",
+    "산업안전보건법": "law_docs_labor",
+    "산업재해보상보험법": "law_docs_labor",
+    "근로자퇴직급여보장법": "law_docs_labor",
+
+    # 6. 조세 (tax)
+    "국세기본법": "law_docs_tax",
+    "소득세법": "law_docs_tax",
+    "법인세법": "law_docs_tax",
+    "부가가치세법": "law_docs_tax",
+    "상속세및증여세법": "law_docs_tax",
+    "지방세법": "law_docs_tax",
+
+    # 7. 헌법 (constitution)
+    "대한민국헌법": "law_docs_constitution",
+    "헌법재판소법": "law_docs_constitution",
+    "국회법": "law_docs_constitution",
+}
+
+
+def resolve_law_collection(law_name: str) -> str:
+    """법령명을 기반으로 적재할 대상 Chroma 컬렉션을 판별한다.
+
+    1. 시행령, 시행규칙 등 하위법령은 모법 명칭을 추출하여 관할 도메인을 판별한다.
+    2. 매핑 테이블(민사, 행정, 형사, 노동, 상사, 조세, 헌법)에 해당하는 경우 해당 도메인 컬렉션을 반환한다.
+    3. 도메인이 명확히 분류되지 않거나 미등록된 일반 법령은 기본 전역 컬렉션(law_docs_global)으로 폴백한다.
+
+    Args:
+        law_name: 판별할 법령명 (예: '민법', '주택임대차보호법', '민간임대주택에 관한 특별법 시행령').
+
+    Returns:
+        str: 적재할 ChromaDB 컬렉션 이름 (예: 'law_docs_civil', 'law_docs_administrative', 'law_docs_global').
+    """
+    if not law_name:
+        return DEFAULT_COLLECTION_NAME
+
+    clean = re.sub(r"[^가-힣A-Za-z0-9]", "", law_name)
+
+    # 1. 완전 일치 검사
+    if clean in LAW_DOMAIN_MAPPING:
+        return LAW_DOMAIN_MAPPING[clean]
+
+    # 2. 시행령, 시행규칙 등 접미어 제거 후 모법 일치 검사
+    base_clean = re.sub(r"(시행령|시행규칙|규칙)$", "", clean)
+    if base_clean and base_clean in LAW_DOMAIN_MAPPING:
+        return LAW_DOMAIN_MAPPING[base_clean]
+
+    # 3. 키워드 기반 포함 검사
+    for mapped_law, col in LAW_DOMAIN_MAPPING.items():
+        if mapped_law in clean:
+            return col
+
+    # 4. 도메인 미분류 법령은 전역 폴백
+    return DEFAULT_COLLECTION_NAME
+
 
 def validate_embedding_vectors(vectors, expected_count: int) -> None:
     if len(vectors) != expected_count:
@@ -189,7 +295,7 @@ def official_xml_chunks(xml_bytes: bytes, version: OfficialLawVersion) -> list[d
                 "temporal_status": "EFFECTIVE_DATE_VERIFIED" if effective else "UNCONFIRMED",
                 "promulgation_date": version.promulgation_date or "",
                 "promulgation_number": version.promulgation_number,
-                "retrieval_collection": COLLECTION_NAME,
+                "retrieval_collection": resolve_law_collection(version.law_name),
             }
         })
     # 부칙은 해당 MST의 법적 효력 판단에 필요하므로 일반 조문과 별도 청크로 보존한다.
@@ -213,7 +319,7 @@ def official_xml_chunks(xml_bytes: bytes, version: OfficialLawVersion) -> list[d
                 "promulgation_date": addendum.promulgation_date or "",
                 "promulgation_number": version.promulgation_number,
                 "addendum_id": f"{version.mst}:{version.promulgation_number}:{idx}",
-                "retrieval_collection": COLLECTION_NAME,
+                "retrieval_collection": resolve_law_collection(version.law_name),
             },
         })
     if not chunks:
@@ -438,9 +544,15 @@ def process_next_job(
         if (existing_version is not None and existing_version.official_xml_hash
                 and existing_version.official_xml_hash != payload_hash):
             raise ValueError("OFFICIAL_XML_HASH_CHANGED_FOR_MST")
+        # 법령별 관할 도메인 컬렉션 결정 (식별 시 law_docs_{category}, 미식별 시 law_docs_global)
+        target_col_name = resolve_law_collection(v.law_name)
+        actual_collection = chroma_collection
+        if hasattr(chroma_collection, "_client") and getattr(chroma_collection, "name", None) != target_col_name:
+            actual_collection = chroma_collection._client.get_or_create_collection(target_col_name)
+
         count = index_one_version(
             v, api_key=api_key, fetch_xml=lambda _url: payload,
-            chroma_collection=chroma_collection, embeddings=embeddings,
+            chroma_collection=actual_collection, embeddings=embeddings,
         )
         persist_index_coverage(session, v, payload, chunks)
         # PostgreSQL coverage is not yet committed. Recheck that Chroma
@@ -450,7 +562,7 @@ def process_next_job(
             raise ValueError("DUPLICATE_INDEXED_VECTOR_ID")
         for start in range(0, len(chunks), 200):
             batch_ids = [entry["id"] for entry in chunks[start:start + 200]]
-            observed = chroma_collection.get(ids=batch_ids, include=[])
+            observed = actual_collection.get(ids=batch_ids, include=[])
             if set(observed.get("ids") or []) != set(batch_ids):
                 raise ValueError("CHROMA_COVERAGE_NOT_CONFIRMED")
         # Flush first so the source rows are queryable in this transaction.

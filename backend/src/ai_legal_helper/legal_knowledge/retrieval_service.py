@@ -472,6 +472,7 @@ class LawRetrievalService:
         # Similarity top-k is not a completeness guarantee. For explicit
         # articles, fetch the indexed vector IDs directly from PostgreSQL
         # coverage and verify the returned Chroma text before accepting it.
+        # 조문이 검색되면 해당 법령 버전(MST)의 부칙(시행일·적용례) 청크를 필수 동반 인출(Companion Fetch)한다.
         if ready_mst:
             requested = list(dict.fromkeys(
                 _normalized_article(x) for x in _ARTICLE_PATTERN.findall(question)
@@ -486,14 +487,22 @@ class LawRetrievalService:
                     for src in found
                 )
             }
+            # 요청 조문 청크 ID 목록
             ids = [
                 vector_id for (law_id, mst, vector_id), (article, _hash) in coverage_by_vector.items()
                 if (law_id, _normalized_article(article)) in missing_pairs
                 and mst == ready_mst.get(law_id)
             ]
-            if ids:
+            # 조문과 불가분의 짝인 부칙 청크 ID 목록을 항상 동반 인출 대상에 추가
+            addenda_ids = [
+                vector_id for (law_id, mst, vector_id), (article, _hash) in coverage_by_vector.items()
+                if article == "부칙" and mst == ready_mst.get(law_id)
+            ]
+            ids_to_fetch = list(dict.fromkeys(ids + addenda_ids))
+
+            if ids_to_fetch:
                 try:
-                    for doc in self.exact_fetch_fn(ids):
+                    for doc in self.exact_fetch_fn(ids_to_fetch):
                         src = build_source_from_chroma_doc(
                             doc, category=category_eng, retrieval_method="CHROMA_EXACT_ID",
                         )
@@ -503,10 +512,11 @@ class LawRetrievalService:
                         mst = str(src.get("version_id") or "")
                         expected = coverage_by_vector.get((law_id, mst, vector_id))
                         content_hash = hashlib.sha256(src.get("content", "").encode("utf-8")).hexdigest()
+                        is_addendum = (str(src.get("article") or "") == "부칙")
                         if (expected is None or mst != ready_mst.get(law_id)
                                 or expected != (str(src.get("article") or ""), content_hash)
                                 or src.get("content_hash") != content_hash
-                                or (law_id, _normalized_article(src.get("article"))) not in missing_pairs
+                                or (not is_addendum and (law_id, _normalized_article(src.get("article"))) not in missing_pairs)
                                 or not any(_source_matches_law(src, law) for law in selected)):
                             response.reason_codes.append("POSTGRES_VECTOR_COVERAGE_MISMATCH")
                             continue
@@ -521,6 +531,55 @@ class LawRetrievalService:
                                    type(exc).__name__)
                     failures.append(GLOBAL_LAW_COLLECTION)
                     response.reason_codes.append("EXACT_ARTICLE_FETCH_UNAVAILABLE")
+
+        # 벡터 검색 결과에서 법령 조문이 식별되었으나 부칙이 없는 경우(ready_mst 미사용 시),
+        # 해당 컬렉션에서 부칙 청크(part='부칙' 또는 article='부칙')를 동반 조회하여 보강
+        if not ready_mst and found:
+            statute_laws_in_found = {
+                (src.get("retrieval_collection"), src.get("statute_name") or src.get("law_name"))
+                for src in found
+                if src.get("source_type") == "STATUTE" and src.get("article") != "부칙"
+            }
+            client = None
+            for coll_name, law_name in statute_laws_in_found:
+                if not coll_name or not law_name:
+                    continue
+                # 이미 해당 법령의 부칙이 found에 있으면 건너뜀
+                if any(
+                    (s.get("statute_name") == law_name or s.get("law_name") == law_name)
+                    and (s.get("article") == "부칙" or "부칙" in str(s.get("title") or "") or s.get("part") == "부칙")
+                    for s in found
+                ):
+                    continue
+                try:
+                    if client is None:
+                        from ai_legal_helper.rag.retrieval import _get_client
+                        client = _get_client()
+                    col = client.get_collection(coll_name)
+                    addenda_records = col.get(where={"part": "부칙"}, limit=5)
+                    if not addenda_records.get("ids"):
+                        addenda_records = col.get(where={"article": "부칙"}, limit=5)
+                    for b_id, b_text, b_meta in zip(
+                        addenda_records.get("ids") or [],
+                        addenda_records.get("documents") or [],
+                        addenda_records.get("metadatas") or [],
+                    ):
+                        meta = dict(b_meta or {})
+                        if meta.get("law_name") != law_name and meta.get("statute_name") != law_name:
+                            continue
+                        from langchain_core.documents import Document
+                        doc_obj = Document(id=b_id, page_content=b_text or "", metadata=meta)
+                        add_src = build_source_from_chroma_doc(
+                            doc_obj, category=category_eng, retrieval_method="CHROMA_COMPANION_ADDENDA"
+                        )
+                        add_src["retrieval_collection"] = coll_name
+                        add_src["source_id"] = _canonical_source_id(add_src)
+                        m_key = _source_identity(add_src)
+                        if m_key not in seen:
+                            seen.add(m_key)
+                            found.append(add_src)
+                except Exception as exc:
+                    logger.debug("[LAW_RETRIEVAL] companion addenda lookup failed coll=%s law=%s: %s", coll_name, law_name, exc)
 
         # 복합 질문에서 첫 번째 법령이 모든 slot을 채워 다른 법령을
         # 누락시키지 않도록 요청 법령마다 최소 1건씩 먼저 배정한다.
@@ -556,7 +615,25 @@ class LawRetrievalService:
                         prioritized.append(candidate)
         prioritized.extend(src for src in found if src not in prioritized)
         required_slots = len(selected) * len(requested_article_order) if selected and requested_article_order else len(selected)
-        response.sources = prioritized[:max(k, required_slots)]
+        top_articles = prioritized[:max(k, required_slots)]
+
+        # 조문이 선정된 법령의 부칙(시행일·적용례)은 유사도 점수나 k 상한에 의해 잘려나가지 않도록 항상 동반 보존
+        selected_law_ids = {
+            str(s.get("law_id") or "") for s in top_articles if s.get("source_type") == "STATUTE" and s.get("law_id")
+        }
+        selected_law_names = {
+            str(s.get("statute_name") or s.get("law_name") or "") for s in top_articles if s.get("source_type") == "STATUTE"
+        }
+        companion_addenda = [
+            src for src in found
+            if (src.get("article") == "부칙" or "부칙" in str(src.get("title") or "") or src.get("part") == "부칙")
+            and (
+                (str(src.get("law_id") or "") in selected_law_ids and str(src.get("law_id") or ""))
+                or (str(src.get("statute_name") or src.get("law_name") or "") in selected_law_names)
+            )
+            and src not in top_articles
+        ]
+        response.sources = top_articles + companion_addenda
         if unavailable:
             response.reason_codes.append("COLLECTION_MISSING")
         if failures:

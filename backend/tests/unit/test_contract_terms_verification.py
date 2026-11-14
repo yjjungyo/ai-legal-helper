@@ -180,3 +180,112 @@ def test_unsupported_legal_rule_without_statute_remains_unsupported(sample_sourc
     assert claim["grounding_status"] == "UNSUPPORTED"
     assert "법률 효과로 분류된 주장에 법령·판례 근거가 연결되지 않았습니다" in claim["reason"]
     assert result["status"] == "REVISE"
+
+
+def test_trace_21096bd4_case_inference_and_user_statement_pass_without_false_revise():
+    """Trace 21096bd4: 검증 LLM이 PASS 판정한 사건 정황 추론(CASE_INFERENCE)과
+    사용자 진술·문서 사실(LEGAL_APPLICATION + USER_STATEMENT), 유보적 표현(UNCERTAIN)이
+    과도한 Python 후처리로 인해 UNSUPPORTED/REVISE로 번복되지 않고 PASS를 유지하는지 검증한다.
+    """
+    sources = [
+        {
+            "source_id": "E05_임대인_지급연기문자.txt",
+            "source_type": "CASE_EVIDENCE",
+            "filename": "E05_임대인_지급연기문자.txt",
+            "content": "임대인 문자: 2억 8천을 은행에 못 넣고 있습니다.",
+        },
+        {
+            "source_id": "E06_은행_연체경고문자.txt",
+            "source_type": "CASE_EVIDENCE",
+            "filename": "E06_은행_연체경고문자.txt",
+            "content": "우리은행 알림톡: 전세자금대출 만기 후 미상환 시 연체이자가 부과됩니다.",
+        },
+        {
+            "source_id": "민법_제353조",
+            "source_type": "STATUTE",
+            "statute_name": "민법",
+            "article": "제353조",
+            "content": "질권자는 질권의 목적이 된 채권을 직접 청구할 수 있다.",
+        },
+    ]
+    question = "제가 입주 시 우리은행에서 전세자금대출 2억 8천만 원을 받으면서 질권설정을 했습니다. 임대인이 저에게 직접 줘도 되나요?"
+    c5 = '특히 임대인 스스로도 **"2억 8천을 은행에 못 넣고 있다"**고 말했으므로, 임대인도 해당 금액이 **은행으로 가야 할 돈**이라는 구조를 인식하고 있는 것으로 보입니다'
+    c7 = "은행 대출의 채무자는 기본적으로 당신이므로, 은행이 당신에게 **연체이자**를 청구하는 구조 자체는 이상하지 않습니다."
+    c8 = "임대인의 반환 지체로 인해 당신에게 연체이자 등 손해가 발생했다면 그 손해를 임대인에게 별도로 다투거나 청구할 여지는 있습니다."
+    draft = f"{c5} [E05_임대인_지급연기문자.txt]\n{c7} [E06_은행_연체경고문자.txt]\n{c8} [민법_제353조]"
+
+    mock_llm_response = {
+        "status": "PASS",
+        "reason_code": "NONE",
+        "recommended_action": "FINALIZE",
+        "claims": [
+            {
+                "claim": c5,
+                "claim_type": "CASE_INFERENCE",
+                "fact_status": "INFERENCE",
+                "source_ids": ["E05_임대인_지급연기문자.txt"],
+                "grounding_status": "SUPPORTED",
+                "reason": "문자 원문에 '2억 8천을 은행에 못 넣고 있다'는 표현이 있어 합리적인 추론이다.",
+                "inference_basis": "임대인 문자에 '2억 8천을 은행에 못 넣고 있습니다'라고 기재됨.",
+                "inference_limit": "답변도 '인식하고 있는 것으로 보입니다'라고 추론 수준으로 표현해 단정하지 않았다.",
+            },
+            {
+                "claim": c7,
+                "claim_type": "LEGAL_APPLICATION",
+                "fact_status": "USER_STATEMENT",
+                "source_ids": ["E06_은행_연체경고문자.txt"],
+                "grounding_status": "SUPPORTED",
+                "reason": "사용자 질문과 은행 알림톡 내용에 부합한다.",
+                "user_statement_basis": "제가 입주 시 우리은행에서 전세자금대출 2억 8천만 원을 받으면서",
+                "user_statement_equivalent": True,
+            },
+            {
+                "claim": c8,
+                "claim_type": "LEGAL_APPLICATION",
+                "fact_status": "INFERENCE",
+                "source_ids": ["민법_제353조"],
+                "grounding_status": "UNCERTAIN",
+                "reason": "유보적·일반론적 설명으로 표현되어 있다.",
+            },
+        ],
+        "question_coverage": [
+            {
+                "question": "임대인이 직접 지급해도 되는지 여부",
+                "answered": True,
+                "answerable": True,
+                "limitation_disclosed": False,
+                "limitation_statement": "",
+                "reason": "충실히 답변됨",
+            }
+        ],
+        "consistency_checks": {
+            "opening_conclusion": {"passed": True, "reason": "일치", "source_ids": ["E05_임대인_지급연기문자.txt"]},
+            "timeline": {"passed": True, "reason": "일치", "source_ids": ["E05_임대인_지급연기문자.txt"]},
+            "expressed_intent": {"passed": True, "reason": "일치", "source_ids": ["E05_임대인_지급연기문자.txt"]},
+            "provenance": {"passed": True, "reason": "일치", "source_ids": ["E05_임대인_지급연기문자.txt"]},
+        },
+        "contradictions": [],
+        "missing_issues": [],
+        "missing_legal_issues": [],
+        "revision_instructions": [],
+        "warnings": [],
+        "legal_search_requests": [],
+        "preserved_points": [],
+    }
+
+    llm = MagicMock()
+    llm.invoke.return_value.content = json.dumps(mock_llm_response, ensure_ascii=False)
+
+    with patch("ai_legal_helper.llm.gateway.get_llm", return_value=llm):
+        result = run_verification(
+            question=question,
+            draft_answer=draft,
+            retrieved_sources=sources,
+            case_context="",
+            require_question_coverage=True,
+        )
+
+    assert result["claims"][0]["grounding_status"] == "SUPPORTED"
+    assert result["claims"][1]["grounding_status"] == "SUPPORTED"
+    assert result["status"] == "PASS"
+    assert result["recommended_action"] == "FINALIZE"

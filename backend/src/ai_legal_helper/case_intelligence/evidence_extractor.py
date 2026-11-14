@@ -187,7 +187,11 @@ def detect_conflicting_fact(
         evidence_id=evidence_id,
         enable_llm_verification=False,
     )
-    contradictions = eval_res.get("contradictions", [])
+    contradictions = list(eval_res.get("contradictions", []))
+    if not contradictions:
+        for p_dec in eval_res.get("potential_conflicts", []):
+            if getattr(p_dec, "reason_code", "") == "OPPOSITE_POLARITY_ON_SAME_SUBJECT":
+                contradictions.append(p_dec)
     if not contradictions:
         return None
 

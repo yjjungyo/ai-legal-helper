@@ -43,8 +43,8 @@ def test_graph_structure_excludes_intent_and_plan():
     # 필수 노드들은 유지되어야 함
     assert "supervisor_initialize" in node_keys
     assert "route" in node_keys
-    assert "statute_search_plan" in node_keys
     assert "run_agents" in node_keys
+    assert "statute_search_plan" not in node_keys
     assert "synthesize" in node_keys
     assert "verification" in node_keys
     assert "finalize" in node_keys
@@ -82,12 +82,20 @@ def test_case_question_initializes_briefing_and_routes_to_route_node():
     assert branch == "route"
 
 
-def test_route_condition_bypasses_plan_to_statute_search_plan():
-    """route_condition이 더미 plan 노드를 거치지 않고 statute_search_plan으로 직결하는지 검증한다."""
+def test_route_condition_bypasses_plan_to_run_agents():
+    """route_condition이 더미/선행 계획 노드를 거치지 않고 run_agents로 직결하는지 검증한다."""
     state = {
         "router_status": RouterStatus.CLASSIFIED.value,
         "categories": ["민법"],
         "answer_mode": None,
     }
     branch = route_condition(state)
-    assert branch == "statute_search_plan"
+    assert branch == "run_agents"
+
+
+
+def test_graph_structure_excludes_unreachable_followup_action_node():
+    """진입 엣지가 단절된 고립 노드(followup_action)가 컴파일된 그래프 노드에서 제외되었는지 검증한다."""
+    app = build_legal_graph()
+    node_keys = list(app.get_graph().nodes.keys())
+    assert "followup_action" not in node_keys

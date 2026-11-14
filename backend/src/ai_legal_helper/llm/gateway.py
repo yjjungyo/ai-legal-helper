@@ -68,13 +68,26 @@ def get_llm(
     return llm
 
 
+# 임베딩 모델 인스턴스 캐시 (매 벡터 검색마다 httpx 커넥션 풀 재생성 방지)
+_embeddings_cache: dict[tuple[str, str, str], AzureOpenAIEmbeddings] = {}
+
+
 def get_embeddings() -> AzureOpenAIEmbeddings:
-    """Azure OpenAI 텍스트 임베딩 모델 인스턴스를 반환한다.
+    """Azure OpenAI 텍스트 임베딩 모델 싱글톤 인스턴스를 반환한다.
+
+    동일 배포명·API 버전·엔드포인트 설정에 대해 기존 인스턴스를 재사용하여
+    반복적인 벡터DB 컬렉션 조회 시 불필요한 객체 및 HTTP 커넥션 재생성 오버헤드를 제거한다.
 
     Returns:
         AzureOpenAIEmbeddings: 설정된 임베딩 배포 인스턴스
     """
-    return AzureOpenAIEmbeddings(
-        azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT_EMBED", "text-embedding-3-large"),
-        api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
-    )
+    deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT_EMBED", "text-embedding-3-large")
+    api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview")
+    endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "")
+    cache_key = (deployment, api_version, endpoint)
+    if cache_key not in _embeddings_cache:
+        _embeddings_cache[cache_key] = AzureOpenAIEmbeddings(
+            azure_deployment=deployment,
+            api_version=api_version,
+        )
+    return _embeddings_cache[cache_key]

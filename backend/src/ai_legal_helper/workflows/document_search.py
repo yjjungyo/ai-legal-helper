@@ -163,7 +163,11 @@ def search_is_approved(state: dict[str, Any], requests: list[dict[str, Any]]) ->
     Returns:
         승인된 법령에 대한 요청만 있으면 True.
     """
-    if state.get("auto_approve_statute_search") or os.getenv("AUTO_APPROVE_STATUTE_SEARCH", "").lower() in ("true", "1", "yes"):
+    if state.get("auto_approve_statute_search") is False:
+        auto_approve = False
+    else:
+        auto_approve = bool(state.get("auto_approve_statute_search")) or os.getenv("AUTO_APPROVE_STATUTE_SEARCH", "").lower() in ("true", "1", "yes")
+    if auto_approve:
         return bool(requests)
     approved = set(state.get("approved_statute_laws") or [])
     return (state.get("approval_status") == "APPROVED" and bool(requests)
@@ -203,6 +207,104 @@ def _verified_local_fallback(state: dict[str, Any], requests: list[dict[str, Any
             return []
         matched.extend(candidates)
     return list({src["source_id"]: src for src in matched if src.get("source_id")}.values())
+
+
+def _retrieve_from_domain_collections(
+    client: Any,
+    col_names: list[str],
+    norm_name: str,
+    law_name: str,
+    target_articles: set[str],
+    query: str,
+    limit: int,
+    require_all: bool,
+) -> list[dict[str, Any]]:
+    """law_docs_global에 미적재된 법령을 도메인별 ChromaDB 컬렉션(행정·형법·상법·노동 등)에서 보조 조회한다."""
+    import urllib.parse
+    from ai_legal_helper.rag.source_schema import build_source_from_chroma_doc
+    from langchain_core.documents import Document
+
+    domain_cols = [
+        c for c in (
+            "law_docs_administrative", "law_docs_criminal", "law_docs_commercial",
+            "law_docs_civil", "law_docs_labor", "law_docs_tax",
+            "law_docs_constitution", "law_docs_international",
+        )
+        if c in col_names
+    ]
+    target_law = norm_name or law_name
+    for cname in domain_cols:
+        try:
+            col = client.get_collection(cname)
+            if target_articles:
+                res = col.get(where={"law_name": target_law}, include=["documents", "metadatas"])
+                ids = res.get("ids") or []
+                docs = res.get("documents") or []
+                metas = res.get("metadatas") or []
+                if not ids:
+                    continue
+                matched = []
+                seen_art = set()
+                for doc_id, text, meta in zip(ids, docs, metas):
+                    meta_dict = dict(meta or {})
+                    art = meta_dict.get("article")
+                    if art in target_articles and art not in seen_art:
+                        seen_art.add(art)
+                        full_text = meta_dict.get("parent_content") or text
+                        meta_dict.setdefault("statute_name", target_law)
+                        d = Document(id=doc_id, page_content=full_text, metadata=meta_dict)
+                        s_dict = build_source_from_chroma_doc(
+                            d, category=cname.replace("law_docs_", ""), retrieval_method="OFFICIAL_STATUTE_SEARCH",
+                        )
+                        if not s_dict.get("source_url") and target_law and art:
+                            s_dict["source_url"] = f"https://www.law.go.kr/법령/{urllib.parse.quote(target_law)}/{art}"
+                        matched.append(s_dict)
+                found_articles = {s.get("article") for s in matched}
+                if require_all and not target_articles.issubset(found_articles):
+                    continue
+                if matched:
+                    return matched
+            else:
+                if not query or not query.strip():
+                    continue
+                from ai_legal_helper.llm.gateway import get_embeddings
+                emb = get_embeddings()
+                q_vec = emb.embed_query(f"{target_law} {query}")
+                res = col.query(
+                    query_embeddings=[q_vec],
+                    n_results=limit * 2,
+                    where={"law_name": target_law},
+                    include=["documents", "metadatas"],
+                )
+                ids = (res.get("ids") or [[]])[0]
+                docs = (res.get("documents") or [[]])[0]
+                metas = (res.get("metadatas") or [[]])[0]
+                if not ids:
+                    continue
+                matched = []
+                seen_art = set()
+                for doc_id, text, meta in zip(ids, docs, metas):
+                    meta_dict = dict(meta or {})
+                    art = meta_dict.get("article") or doc_id
+                    if art in seen_art:
+                        continue
+                    seen_art.add(art)
+                    full_text = meta_dict.get("parent_content") or text
+                    meta_dict.setdefault("statute_name", target_law)
+                    d = Document(id=doc_id, page_content=full_text, metadata=meta_dict)
+                    s_dict = build_source_from_chroma_doc(
+                        d, category=cname.replace("law_docs_", ""), retrieval_method="OFFICIAL_STATUTE_SEARCH",
+                    )
+                    if not s_dict.get("source_url") and target_law and meta_dict.get("article"):
+                        s_dict["source_url"] = f"https://www.law.go.kr/법령/{urllib.parse.quote(target_law)}/{meta_dict['article']}"
+                    matched.append(s_dict)
+                    if len(matched) >= limit:
+                        break
+                if matched:
+                    return matched
+        except Exception:
+            continue
+    return []
 
 
 def _retrieve_from_local_index(
@@ -254,6 +356,10 @@ def _retrieve_from_local_index(
             docs = res.get("documents") or []
             metas = res.get("metadatas") or []
             if not ids:
+                return _retrieve_from_domain_collections(
+                    client, col_names, norm_name, law_name, target_articles, query, limit, require_all
+                )
+            if False:
                 return []
 
             matched = []
@@ -275,6 +381,10 @@ def _retrieve_from_local_index(
             found_articles = {s.get("article") for s in matched}
             if require_all and not target_articles.issubset(found_articles):
                 return []
+            if not matched:
+                return _retrieve_from_domain_collections(
+                    client, col_names, norm_name, law_name, target_articles, query, limit, require_all
+                )
             return matched
         else:
             # 조문 번호가 특정되지 않은 경우 질의 기반 벡터 유사도 검색으로 상위 조문 추출
@@ -305,6 +415,10 @@ def _retrieve_from_local_index(
                 if not s_dict.get("source_url") and law_name and meta_dict.get("article"):
                     s_dict["source_url"] = f"https://www.law.go.kr/법령/{urllib.parse.quote(law_name)}/{meta_dict['article']}"
                 matched.append(s_dict)
+            if not matched:
+                return _retrieve_from_domain_collections(
+                    client, col_names, norm_name, law_name, target_articles, query, limit, require_all
+                )
             return matched
     except Exception as exc:
         logger.warning("[LOCAL_FIRST_SEARCH] 로컬 인덱스 조회 중 예외 발생: %s", exc)
@@ -368,11 +482,13 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
         return {
             "statute_search_results": [],
             "statute_search_status": "MAX_COUNT_REACHED",
+            "statute_search_count": curr_count + 1,
         }
     if not requests:
         return {
             "statute_search_results": [],
             "statute_search_status": "NOT_APPROVED" if not approved else "NO_PENDING",
+            "statute_search_count": curr_count + 1,
         }
     grouped: dict[str, list[dict]] = {}
     for request in requests:
@@ -416,6 +532,7 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
                     "article": s_art,
                     "title": s_title,
                     "display": disp.strip(),
+                    "channel": "VECTOR_DB",
                 })
             found.extend(local_matched)
             continue
@@ -447,6 +564,7 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
                         "article": s_art,
                         "title": s_title,
                         "display": disp.strip(),
+                        "channel": "OPENLAW_API",
                     })
                 found.extend(api_found)
         except Exception as exc:
@@ -456,7 +574,7 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
         diagnostics.append(diagnostic)
     fallback = []
     api_error = any(d.get("api_error") or any(
-        entry.get("reason_code") not in ("", "LAW_NOT_FOUND", "NO_MATCH", "NO_VERSIONS")
+        entry.get("reason_code") not in ("", "LAW_NOT_FOUND", "NO_MATCH", "NO_VERSIONS", "MAINTENANCE_UNAVAILABLE")
         for entry in d.get("lookups", []) if entry.get("status") == "UNCONFIRMED"
     ) for d in diagnostics)
     if not found and not api_error:
@@ -492,7 +610,7 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
     )
     # P9: 사용자 승인 하에 새로 확보된 공식 법령 조문 버전을 백그라운드 인덱싱 작업 큐에 등록.
     # 실시간 상담 스레드에서 무거운 임베딩이나 XML 저장을 직접 수행하지 않고 비동기 작업 큐로 격리한다.
-    import os
+
     if found and os.getenv("LEGAL_BACKGROUND_INDEX_ENABLED", "1") in ("1", "true", "True"):
         try:
             from ai_legal_helper.legal_knowledge.index_worker import enqueue_approved_sources

@@ -157,7 +157,7 @@ def test_document_question_is_not_rewritten_or_action_template(document_state):
     updated = workflow.intent_analysis_node(document_state)
     assert updated["resolved_query"] == document_state["question"]
     assert workflow.intent_condition({**document_state, **updated}) == "route"
-    assert workflow.route_condition(document_state) == "plan"
+    assert workflow.route_condition(document_state) == "run_agents"
 
 
 def test_pure_greeting_is_not_withheld_but_mixed_question_is_analyzed(document_state):
@@ -186,7 +186,8 @@ def test_verified_answer_is_preserved_and_modified_answer_is_withheld(document_s
 
 def test_missing_article_search_is_not_skipped_by_same_law_name(document_state):
     """같은 법의 일부 조문이 있어도 누락 조문 요청은 공식 검색으로 연결한다."""
-    state = {**document_state, "retrieved_sources": [{"statute_name": "주택임대차보호법", "article": "제2조"}],
+    state = {**document_state, "auto_approve_statute_search": False,
+             "retrieved_sources": [{"statute_name": "주택임대차보호법", "article": "제2조"}],
              "verification_result": {"status": "REVISE", "reason_code": "LEGAL_SOURCE_INSUFFICIENT",
                                      "candidate_laws": ["주택임대차보호법"]}}
     assert workflow.verification_condition(state) == "statute_search_approval"
@@ -716,14 +717,16 @@ def test_trace_0e4d5603_soft_landing_preserves_high_support_limited_answer(docum
     }
 
     with patch.object(consultation, "validate_document_snapshot"), \
-            patch.object(consultation, "write_document_answer", return_value={"draft_answer": limited_draft}), \
-            patch("ai_legal_helper.agents.verification.run_verification", return_value=limited_ver):
+            patch.object(consultation, "write_document_answer", return_value={"draft_answer": limited_draft}) as mock_write, \
+            patch("ai_legal_helper.agents.verification.run_verification", return_value=limited_ver) as mock_ver:
         out = consultation.finish_answer(state)
 
-    assert out["final_disposition"] == "WITHHELD"
-    assert out["final_answer"] != limited_draft
+    # FINALIZE-NO-LLM 원칙에 따라 추가 LLM 호출 없이 검증된 기존 초안을 CAUTIONARY로 보존하며 미검증 limited_draft를 사용하지 않는다.
+    mock_write.assert_not_called()
+    mock_ver.assert_not_called()
+    assert out["final_disposition"] == "CAUTIONARY"
+    assert out["final_answer"] == draft
     assert "적법하게 종료되었습니다" not in out["final_answer"]
-    assert out["sources"] == []
 
 
 def test_successful_document_repair_clears_previous_generation_error(document_state):

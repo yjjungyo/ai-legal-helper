@@ -176,7 +176,7 @@ def get_used_index_info() -> str:
     return _used_index_info
 
 
-@trace
+# 내부 싱글톤 클라이언트 반환 헬퍼이므로 불필요한 Langfuse Span 생성을 방지하기 위해 @trace를 적용하지 않는다.
 def _get_client():
     """Chroma 클라이언트 인스턴스를 반환한다.
 
@@ -229,12 +229,12 @@ def _get_client():
             _used_index_info = "EPHEMERAL_FALLBACK"
     return _client
 
-@trace
+# retrieve_with_status 내부에서 호출되는 벡터스토어 래퍼이므로 중복 Span 방지를 위해 @trace를 제외한다.
 def _get_vs(coll_name: str) -> Chroma:
     """특정 컬렉션에 대한 LangChain Chroma 벡터스토어 객체를 반환한다."""
     return Chroma(client=_get_client(), collection_name=coll_name, embedding_function=get_embeddings())
 
-@trace
+# retrieve_with_status 내부에서 호출되는 컬렉션 목록 조회 헬퍼이므로 중복 Span 방지를 위해 @trace를 제외한다.
 def _list_collections() -> List[str]:
     """현재 연결된 Chroma 클라이언트의 컬렉션 이름 목록을 반환한다."""
     try:
@@ -247,36 +247,85 @@ def _list_collections() -> List[str]:
         return []
 
 
-def _normalize_doc(d):
-    """검색된 문서 객체의 파일명 메타데이터를 표준화한다."""
+def _normalize_doc(d: Any) -> Any:
+    """검색된 문서 객체의 파일명 메타데이터를 표준화하고 누락된 Document ID를 보정한다.
+
+    LangChain의 기본 Chroma VectorStore 래퍼는 검색 결과를 Document 객체로 변환할 때
+    Chroma의 레코드 Key(ids)를 Document.id로 전달하지 않고 누락(None)시키는 한계가 있다.
+    따라서 메타데이터에 보존된 'vector_id', 'chunk_id', 'source_id' 중 유효한 식별자를
+    Document.id로 주입하여 Langfuse 추적 및 다운스트림 처리 시 일관성을 보장한다.
+
+    Args:
+        d: 검색된 Document 또는 유사 문서 객체.
+
+    Returns:
+        Any: 파일명 및 id가 정규화된 문서 객체.
+    """
     if hasattr(d, "metadata") and isinstance(d.metadata, dict):
         fn = d.metadata.get("file_name")
         if fn:
             d.metadata["file_name"] = os.path.basename(fn)
+        if getattr(d, "id", None) is None:
+            doc_id = (
+                d.metadata.get("vector_id")
+                or d.metadata.get("chunk_id")
+                or d.metadata.get("source_id")
+            )
+            if doc_id:
+                try:
+                    d.id = str(doc_id)
+                except Exception:
+                    pass
     return d
 
 
 
-def retrieve_official_by_ids(vector_ids: List[str]) -> List[Any]:
-    """Fetch exact official XML chunks by their PostgreSQL coverage IDs."""
+def retrieve_official_by_ids(
+    vector_ids: List[str],
+    collection_names: Optional[List[str]] = None,
+) -> List[Any]:
+    """PostgreSQL 커버리지 ID 목록(vector_ids)을 기반으로 ChromaDB에서 공식 조문·부칙 청크를 직접 인출한다.
+
+    글로벌 컬렉션('law_docs_global')뿐만 아니라 분야별 컬렉션('law_docs_civil', 'law_docs_administrative' 등)에
+    분산 적재된 조문 및 부칙 청크도 누락 없이 탐색하여 회수한다.
+    """
     from langchain_core.documents import Document
 
     if not vector_ids:
         return []
     client = _get_client()
-    collection = client.get_collection("law_docs_global")
-    documents = []
-    for start in range(0, len(vector_ids), 200):
-        requested = vector_ids[start:start + 200]
-        rows = collection.get(ids=requested, include=["documents", "metadatas"])
-        for vector_id, body, metadata in zip(
-            rows.get("ids") or [], rows.get("documents") or [],
-            rows.get("metadatas") or [],
-        ):
-            meta = dict(metadata or {})
-            if meta.get("vector_id") != vector_id:
+    remaining_ids = set(vector_ids)
+    documents: List[Any] = []
+
+    all_cols = _list_collections()
+    target_cols = collection_names or [
+        "law_docs_global",
+        *[c for c in all_cols if c.startswith("law_docs_") and c != "law_docs_global"],
+    ]
+
+    for col_name in target_cols:
+        if not remaining_ids:
+            break
+        try:
+            col = client.get_collection(col_name)
+        except Exception:
+            continue
+        req_list = list(remaining_ids)
+        for start in range(0, len(req_list), 200):
+            chunk_req = req_list[start:start + 200]
+            try:
+                rows = col.get(ids=chunk_req, include=["documents", "metadatas"])
+            except Exception:
                 continue
-            documents.append(Document(id=vector_id, page_content=body or "", metadata=meta))
+            for vector_id, body, metadata in zip(
+                rows.get("ids") or [], rows.get("documents") or [],
+                rows.get("metadatas") or [],
+            ):
+                meta = dict(metadata or {})
+                if meta.get("vector_id") != vector_id:
+                    continue
+                documents.append(Document(id=vector_id, page_content=body or "", metadata=meta))
+                remaining_ids.discard(vector_id)
     return documents
 
 

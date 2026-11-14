@@ -1,6 +1,7 @@
 /**
  * @fileoverview LangGraph 6단계 법률 상담 진행 상태 추적 및 HITL 승인 인터랙션 컴포넌트
- * 사건 분석 의도 파악부터 증거 매핑, 법령 분석, 쟁점 교차 검증, 미보유 법령 승인, 최종 답변 종합까지
+ * 1단계(사건 정보·맥락 확인), 2단계(사실관계·타임라인·증거 조회), 3단계(관련 법령 및 판례 검색·HITL 승인),
+ * 4단계(법률 쟁점별 분석), 5단계(증거·법률 근거 검증), 6단계(최종 상담 답변 작성)의
  * 실시간 상태(RUNNING, COMPLETED, WAITING_APPROVAL, SKIPPED, FAILED)를 단계별 체크리스트로 시각화합니다.
  * 특히 3단계(관련 법령 및 판례 검색)에서는 벡터DB 및 국가법령정보센터 2대 채널의 실시간 검색 진행과
  * 찾은 법령명·제목 결과를 계층형 트리(Tree) 구조로 상세 표시하며, 다른 단계의 중복 안내 문구는 배제합니다.
@@ -32,12 +33,12 @@ export interface ConsultationProgressProps {
  * 기본 6단계 정의 (서버 프로그레스가 아직 없을 때 기본 템플릿으로 사용)
  */
 const DEFAULT_STEPS: ConsultationStep[] = [
-  { step_id: 'INTENT_ANALYSIS', title: '사건 정보와 이전 상담 맥락 확인', status: 'PENDING' },
-  { step_id: 'FACT_RETRIEVAL', title: '사실관계·타임라인·증거 조회', status: 'PENDING' },
-  { step_id: 'LEGAL_RESEARCH', title: '관련 법령 및 판례 검색', status: 'PENDING' },
-  { step_id: 'VERIFICATION', title: '법률 쟁점별 분석', status: 'PENDING' },
-  { step_id: 'STATUTE_APPROVAL', title: '증거·법률 근거 검증', status: 'PENDING' },
-  { step_id: 'FINAL_SYNTHESIS', title: '최종 상담 답변 작성', status: 'PENDING' },
+  { step_id: 'step_1', title: '사건 정보와 이전 상담 맥락 확인', status: 'PENDING' },
+  { step_id: 'step_2', title: '사실관계·타임라인·증거 조회', status: 'PENDING' },
+  { step_id: 'step_3', title: '관련 법령 및 판례 검색', status: 'PENDING' },
+  { step_id: 'step_4', title: '법률 쟁점별 분석', status: 'PENDING' },
+  { step_id: 'step_5', title: '증거·법률 근거 검증', status: 'PENDING' },
+  { step_id: 'step_6', title: '최종 상담 답변 작성', status: 'PENDING' },
 ];
 
 /**
@@ -156,15 +157,23 @@ function parseStatuteSearchTree(step: ConsultationStep): StatuteSearchTree {
     try {
       const parsed = JSON.parse(raw);
       if (parsed.vector_db || parsed.openlaw) {
+        const rawVecStatus = parsed.vector_db?.status || defaultTree.vectorDb.status;
+        const rawOpenStatus = parsed.openlaw?.status || defaultTree.openlaw.status;
         return {
           vectorDb: {
-            status: isCompleted ? 'COMPLETED' : (parsed.vector_db?.status || defaultTree.vectorDb.status),
+            status:
+              isCompleted && rawVecStatus !== 'SKIPPED' && rawVecStatus !== 'NOT_NEEDED'
+                ? 'COMPLETED'
+                : rawVecStatus,
             target: parsed.vector_db?.target || '',
             statutes: Array.isArray(parsed.vector_db?.statutes) ? parsed.vector_db.statutes : [],
             message: parsed.vector_db?.message || defaultTree.vectorDb.message,
           },
           openlaw: {
-            status: isCompleted ? 'COMPLETED' : (parsed.openlaw?.status || defaultTree.openlaw.status),
+            status:
+              isCompleted && rawOpenStatus !== 'SKIPPED' && rawOpenStatus !== 'NOT_NEEDED'
+                ? 'COMPLETED'
+                : rawOpenStatus,
             target: parsed.openlaw?.target || '',
             statutes: Array.isArray(parsed.openlaw?.statutes) ? parsed.openlaw.statutes : [],
             message: parsed.openlaw?.message || defaultTree.openlaw.message,

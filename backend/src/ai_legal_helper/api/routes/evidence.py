@@ -134,8 +134,6 @@ def list_evidence(case: Case = Depends(get_case_for_user), db: Session = Depends
     자동으로 APPROVED 상태로 동기화하여 반환한다.
     또한 사건 전체 문서에 대한 결정론적 증거 번호 라벨(E01, E02...)을 부여하여 반환한다.
     """
-    from ai_legal_helper.case_intelligence.case_briefing import assign_evidence_labels
-
     docs = (
         db.query(EvidenceDocument)
         .filter_by(case_id=case.id)
@@ -217,6 +215,9 @@ def get_evidence_conflicts(
     doc_map = {d.id: d for d in case_docs}
     case_facts = db.query(Fact).filter_by(case_id=case.id).all()
     fact_map = {f.id: f for f in case_facts}
+    # N+1 쿼리 방지를 위해 사건에 속한 모든 EvidenceClaim을 1회 일괄 조회하여 메모리 맵으로 참조한다.
+    case_claims = db.query(EvidenceClaim).filter_by(case_id=case.id).all()
+    claim_map = {c.id: c for c in case_claims}
     fact_doc_names = {
         f.id: doc_map[f.source_ref].original_filename
         for f in case_facts
@@ -235,7 +236,7 @@ def get_evidence_conflicts(
     )
     for link in links:
         doc = doc_map.get(link.evidence_id)
-        claim = db.query(EvidenceClaim).filter_by(id=link.claim_id).first() if link.claim_id else None
+        claim = claim_map.get(link.claim_id) if link.claim_id else None
         if claim and claim.review_status == "REJECTED":
             continue
 

@@ -30,7 +30,7 @@
 
 등록 문서가 있는 사건: 원문 준비 → 법률 자료 검색 → 단일 답변 작성 → 질문·원문 검증
 
-  → 누락 법령 승인 검색 또는 최대 두 번 재작성 → 통과한 동일 답변 확정 / 판단 유보
+  → 누락 법령 승인 검색 또는 최대 세 번 재작성 → 통과한 동일 답변 확정 / 조건부 안내 / 판단 유보
 
 
 
@@ -42,7 +42,7 @@
 
   → Route (분야 판별)
 
-  → Plan (도구/계획 수립)
+  → Statute Search Plan (법령 적용 시점 및 검색 계획 수립)
 
   → Run Agents (전문 에이전트 실행)
 
@@ -74,7 +74,7 @@
 
 [주의사항]
 
-- 문서 상담 재작성은 공식 검색 후 재분석을 포함해 총 두 번, 기존 일반 상담은 한 번으로 제한한다.
+- 문서 상담 재작성은 최대 세 번(`revision_count < 3`), 일반 상담은 기본 한 번(HITL 외부 법령 검색 실행 시 최대 두 번)으로 제한한다.
 
 - 비동기 `run_agents_node` 호출 시 ContextVar의 복제 동작을 위해 파이썬 내장 `asyncio.to_thread`를 사용한다.
 
@@ -754,7 +754,7 @@ def route_condition(state: LegalState) -> str:
 
 
 
-    - CLASSIFIED: 정상 분류되었으므로 전문 에이전트 계획 수립('plan')으로 전이.
+    - CLASSIFIED: 정상 분류되었으므로 법령 적용 시점 및 검색 계획 수립('statute_search_plan')으로 전이.
 
     - NEEDS_CLARIFICATION: 정보 부족으로 판단 보류 안내 노드('routing_exit')로 전이.
 
@@ -786,19 +786,19 @@ def route_condition(state: LegalState) -> str:
 
         if has_approved:
 
-            return "statute_search_plan"
+            return "run_agents"
 
         # 승인 문서 확인이 누락되었거나 지연되더라도, 라우터가 정상 분류(CLASSIFIED)에
 
         # 성공한 경우에는 추가 정보 안내(routing_exit)로 이탈하지 않고
 
-        # 일반 법률 분석 계획(plan)으로 폴백하여 상담 단절을 방지한다.
+        # 전문 에이전트(run_agents)로 직결하여 상담 단절을 방지한다.
 
         status = state.get("router_status")
 
         if status == RouterStatus.CLASSIFIED.value or (not status and state.get("categories")):
 
-            return "statute_search_plan"
+            return "run_agents"
 
         return "routing_exit"
 
@@ -806,7 +806,7 @@ def route_condition(state: LegalState) -> str:
 
     if status == RouterStatus.CLASSIFIED.value or (not status and state.get("categories")):
 
-        return "statute_search_plan"
+        return "run_agents"
 
     return "routing_exit"
 
@@ -965,8 +965,8 @@ def statute_search_plan_node(state: LegalState) -> Dict:
     # 실패 시에는 검색 계획 SKIP으로 복귀하고 법령 적용을 추정하지 않는다.
 
 
-    # intent_analyzer에서 이미 식별된 event_date가 존재할 경우, event_type이 명시되지 않았더라도
-    # 기본 행위 유형(CONTRACT_SIGNED 등)으로 보완하여 중복 LLM 시점 추출을 회피한다.
+    # intent_analyzer에서 식별된 event_date와 event_type을 조회하되,
+    # event_type이 명시되지 않은 경우 임의의 행위 유형으로 단정하지 않고 None을 유지한다.
     ev_date = state.get("event_date")
     ev_type = state.get("event_type")
     if ev_date and not ev_type:
@@ -1041,13 +1041,29 @@ def statute_search_plan_condition(state: LegalState) -> str:
 
 
 
-@trace
-
-
+# UI 표시용 단순 문자열 포맷터이므로 반복 호출 시 Langfuse Span 노이즈를 방지하기 위해 @trace를 적용하지 않는다.
 def format_statute_display(s: dict) -> Optional[str]:
-    """출처 딕셔너리에서 정제된 법령명 및 조문제목('법령명 제O조 (제목)')을 추출한다."""
+    """출처 딕셔너리에서 정제된 법령명·조문제목('법령명 제O조 (제목)') 또는 판례 표시명을 추출한다.
+
+    Args:
+        s: 검색된 표준 Source 딕셔너리.
+
+    Returns:
+        Optional[str]: 화면 배지에 표시할 법령·판례 요약 문자열. 사건 증거(CASE_EVIDENCE) 등은 None을 반환한다.
+    """
     if not isinstance(s, dict):
         return None
+    stype = str(s.get("source_type") or "").upper()
+    if stype == "CASE_EVIDENCE":
+        return None
+
+    # 판례(PRECEDENT) 출처인 경우 법원명 + 사건번호 우선 표시
+    case_no = s.get("case_number")
+    court = s.get("court") or ""
+    if stype == "PRECEDENT" or case_no:
+        if case_no:
+            return f"{court} {case_no}".strip()
+
     law = s.get("statute_name") or s.get("law_name")
     article = s.get("article") or s.get("article_number") or ""
     title = s.get("article_title") or ""
@@ -1057,16 +1073,16 @@ def format_statute_display(s: dict) -> Optional[str]:
         if not c:
             continue
         if not law:
-            m_law = re.search(r"([가-힣]+(?:법|령|규칙))", c)
+            m_law = re.search(r"([가-힣][가-힣\s·]{0,25}?(?:법률|시행령|시행규칙|법|령|규칙))", c)
             if m_law:
-                law = m_law.group(1)
+                law = m_law.group(1).strip()
         if not article:
             m_art = re.search(r"(?:제\s*)?(\d+조(?:의\d+)?)", c)
             if m_art:
                 article = m_art.group(1)
         if not title:
             m_title = re.search(r"\(([^)]+)\)", c)
-            if m_title and not re.search(r"\d{8}", m_title.group(1)):
+            if m_title and not re.search(r"\d{8}", m_title.group(1)) and m_title.group(1) not in ("법률", "대통령령", "부령", "총리령"):
                 title = m_title.group(1)
 
     if not law:
@@ -1078,22 +1094,14 @@ def format_statute_display(s: dict) -> Optional[str]:
         disp += f" ({title})"
     return disp
 
+@trace
 async def run_agents_node(state: LegalState) -> Dict:
 
     """문서 사건은 법률 자료만 검색하고, 일반 상담은 기존 전문 에이전트를 실행한다.
-
-
-
     Args:
-
         state: 현재 질문, 사건 원문 및 검색할 법률 분야.
-
-
-
     Returns:
-
         검색 출처와 실행 결과. 문서 사건에서는 전문 에이전트 답변을 생성하지 않는다.
-
     """
 
     set_node_name("run_agents")
@@ -1109,7 +1117,7 @@ async def run_agents_node(state: LegalState) -> Dict:
                     vector_target_candidates.append(law_name)
     if not vector_target_candidates and state.get("categories"):
         vector_target_candidates = [str(c) for c in state.get("categories") if c]
-    vector_target_str = ", ".join(vector_target_candidates[:3]) if vector_target_candidates else ""
+    vector_target_str = ", ".join(vector_target_candidates[:3]) if vector_target_candidates else "관련 법령·판례"
 
     if req_id:
         try:
@@ -1154,11 +1162,14 @@ async def run_agents_node(state: LegalState) -> Dict:
         # (특정 법령명/조문을 강제로 하드코딩하지 않고, 도출된 쟁점 질문의 법률적 핵심 취지를 반영)
         user_raw_q = state.get("resolved_query") or state.get("question", "")
         query_parts = [user_raw_q] if user_raw_q else []
+        case_title = str((state.get("case_evidence_briefing") or {}).get("title") or "").strip()
+        if case_title and case_title not in query_parts:
+            query_parts.append(case_title)
         issue_tasks = state.get("issue_tasks") or []
         for task in issue_tasks[:3]:
             if isinstance(task, dict):
                 lqs = task.get("legal_questions") or []
-                if lqs:
+                if lqs and lqs[0] not in query_parts:
                     query_parts.append(lqs[0])
         retrieval_query = " \n".join(query_parts) if query_parts else user_raw_q
 
@@ -1390,6 +1401,27 @@ async def run_agents_node(state: LegalState) -> Dict:
         f"완료분야={list(results.keys())} | 수집출처수={len(all_sources)}"
     )
 
+    if req_id:
+        try:
+            from ai_legal_helper.api.routes.consultation import update_progress_step, make_statute_search_message
+            from ai_legal_helper.api.schemas.consultation import ConsultationStepStatus
+            found_displays = []
+            for s in all_sources:
+                disp = format_statute_display(s)
+                if disp and disp not in found_displays:
+                    found_displays.append(disp)
+            step3_msg = make_statute_search_message(
+                vector_status="COMPLETED",
+                vector_target=vector_target_str,
+                vector_statutes=found_displays[:6],
+                openlaw_status="SKIPPED",
+                openlaw_target="",
+                openlaw_statutes=[],
+            )
+            update_progress_step(req_id, "step_3", ConsultationStepStatus.COMPLETED, step3_msg)
+        except Exception as ex:
+            logger.warning("[RUN_AGENTS] 일반 상담 3단계 완료 진행 알림 예외: %s", ex)
+
     return {"results": results, "agent_results": results, "retrieved_sources": all_sources}
 
 
@@ -1407,6 +1439,13 @@ def legal_evidence_bundle_node(state: LegalState) -> Dict:
     """
 
     set_node_name("legal_evidence_bundle")
+
+    # 문서 상담 모드(DOCUMENT_GROUNDED)는 synthesize_node(generate_answer)에서
+    # document_sources(state)를 통해 원문과 법령을 직접 포맷팅하며 legal_evidence_bundle을 참조하지 않으므로,
+    # 불필요한 요약 문자열 생성 및 LangGraph 체크포인트 상태 비대화를 방지하기 위해 생략한다.
+    if state.get("answer_mode") == DOCUMENT_MODE:
+        logger.info("[EVIDENCE_BUNDLE] DOCUMENT_MODE 감지 — document_sources 직접 포맷팅 경로 사용으로 번들 생성 생략")
+        return {"legal_evidence_bundle": None}
 
     from ai_legal_helper.legal_knowledge.evidence_bundle import build_legal_evidence_bundle
 
@@ -2153,7 +2192,7 @@ def supervisor_verification_decision(state: LegalState) -> str:
 
        사용자 승인을 구하는 HITL 노드(`statute_search_approval`)로 라우팅한다.
 
-    3. 최초 검증 실패 시(REVISE 또는 일반 INSUFFICIENT): 1회에 한해 적응형 보강 검색(`revise`).
+    3. 최초 검증 실패 시(REVISE 또는 일반 INSUFFICIENT): 기본 1회(HITL 실행 시 최대 2회) 적응형 보강 검색(`revise`).
 
     4. HITL 공식 법령 검색이 이미 수행된 경우:
 
@@ -2409,19 +2448,38 @@ def supervisor_verification_decision(state: LegalState) -> str:
 
                 return "finalize"
 
+            # [P0-VER-02] 법령 원문 부재(LEGAL_SOURCE_MISSING), 적용 시점/부칙 미확인(TEMPORAL_APPLICABILITY_UNCONFIRMED 등)으로
+            # 쟁점 처분이 WITHHELD인 상태에서, 이미 외부 법령 조회를 거쳤거나(hitl_executed=True 또는 statute_search_count >= 1)
+            # 외부 조회가 불가/실패한 경우:
+            # revise 노드는 문맥/표현만 다듬을 뿐 로컬 DB에 없는 법령 원문(부칙)을 새로 생성할 수 없다(환각 방지 원칙).
+            # 따라서 동일한 부재 결함으로 verification -> revise 헛바퀴 루프(100초 이상 지연 및 수만 토큰 소모)를 도는 것을 방지하고
+            # 즉시 판단 유보(insufficient) 노드로 확정 분기한다.
+            temporal_unconfirmed = any(
+                "원문이 검색 출처에 없습니다" in w or "부칙" in w
+                for w in (ver_res.get("warnings") or []) + (state.get("warnings") or [])
+            ) or reason_code in ("TEMPORAL_APPLICABILITY_UNCONFIRMED", "TEMPORAL_INTERPRETATION_UNCONFIRMED")
+
+            statute_missing_unresolvable = (
+                reason_code in ("LEGAL_SOURCE_MISSING", "TEMPORAL_APPLICABILITY_UNCONFIRMED", "TEMPORAL_INTERPRETATION_UNCONFIRMED")
+                or temporal_unconfirmed
+            ) and (hitl_executed or bool(state.get("statute_search_count", 0) >= 1))
+
+            if statute_missing_unresolvable:
+                logger.info(
+                    f"[VERIFY_ROUTING] 법령 원문/부칙 미확보로 인한 WITHHELD이며 외부 검색 완료/불가 상태이므로, "
+                    f"불필요한 revise 루프를 건너뛰고 즉시 insufficient(판단 유보)로 분기합니다. (reason_code={reason_code})"
+                )
+                return "insufficient"
+
             # 1회 재검토 가능하면 revise 시도 (HITL 검색 완료 후에도 1회 재검토 기회 보장)
-
             max_revisions = 2 if hitl_executed else 1
-
             if revision_count < max_revisions:
-
                 logger.info(f"[VERIFY_ROUTING] 쟁점 처분 WITHHELD 재검토 분기 -> revise (revision_count={revision_count}/{max_revisions})")
-
                 return "revise"
 
             logger.info(f"[VERIFY_ROUTING] 쟁점 처분 WITHHELD 한도 도달 분기 -> insufficient (revision_count={revision_count}/{max_revisions})")
-
             return "insufficient"
+
 
 
 
@@ -2529,15 +2587,29 @@ def supervisor_verification_decision(state: LegalState) -> str:
 
     #    HITL 외부 법령 검색(re_analyze) 완료 후에도 신규 초안에 대해 1회의 수정 기회(max_revisions=2)를 동등하게 부여한다.
 
+    # 단, 법령 원문 부재/시점 미확인 결함은 revise로 해결 불가능하므로 즉시 insufficient 분기
+    temporal_unconfirmed_general = any(
+        "원문이 검색 출처에 없습니다" in w or "부칙" in w
+        for w in (ver_res.get("warnings") or []) + (state.get("warnings") or [])
+    ) or reason_code in ("TEMPORAL_APPLICABILITY_UNCONFIRMED", "TEMPORAL_INTERPRETATION_UNCONFIRMED")
+
+    statute_missing_unresolvable_general = (
+        reason_code in ("LEGAL_SOURCE_MISSING", "TEMPORAL_APPLICABILITY_UNCONFIRMED", "TEMPORAL_INTERPRETATION_UNCONFIRMED")
+        or temporal_unconfirmed_general
+    ) and (hitl_executed or bool(state.get("statute_search_count", 0) >= 1))
+
+    if statute_missing_unresolvable_general:
+        logger.info(
+            f"[VERIFY_ROUTING] 법령 원문/부칙 미확보 상태이며 외부 검색 완료/불가이므로 즉시 insufficient 분기 (reason_code={reason_code})"
+        )
+        return "insufficient"
+
     max_revisions = 2 if hitl_executed else 1
-
     if revision_count < max_revisions:
-
         if status == "REVISE" or (status == "INSUFFICIENT" and reason_code in ("ANSWER_REVISION_REQUIRED", "NONE")):
-
             logger.info(f"[VERIFY_ROUTING] 최초 검증 실패 재검토 분기 -> revise (status={status}, reason_code={reason_code}, revision_count={revision_count}/{max_revisions})")
-
             return "revise"
+
 
 
 
@@ -2571,9 +2643,9 @@ def supervisor_verification_decision(state: LegalState) -> str:
 
         #    - 단위 쟁점 중 검증 완료(VERIFIED) 또는 조건부(CONDITIONAL) 쟁점이 1건 이상 존재하고 사건 브리핑이 있는 경우:
 
-        #      전체 답변을 일괄 WITHHELD로 폐기하지 않고 assemble_grounded_answer를 통해
+        #      전체 답변을 일괄 WITHHELD로 폐기하지 않고 finalize_node로 라우팅하여
 
-        #      검증된 쟁점과 확인된 사실만을 조립하여 조건부 답변(CAUTIONARY)을 제공한다.
+        #      검증 정제된 초안 보존(또는 초안 부재 시 쟁점 조립)으로 조건부 답변(CAUTIONARY)을 제공한다.
 
         issue_results = ver_res.get("issue_results") or state.get("issue_results") or []
 
@@ -3384,7 +3456,7 @@ def finalize_node(state: LegalState) -> Dict:
 
 
 
-    # [P0-VER-01] 질문이 사건 브리핑과 실질적으로 연관된 경우에만 assemble_grounded_answer로 사건 쟁점을 조립한다.
+    # [P0-VER-01] 질문이 사건 브리핑과 실질적으로 연관된 경우에만 쟁점별 검증 처분(determine_final_disposition) 및 델타 감지를 반영한다.
 
     # 사건과 무관한 일반 법령 질문(미성년자 재산처분 등)은 draft_answer의 정제본을 그대로 사용하여 사건 오염을 방지한다.
 
@@ -4059,9 +4131,14 @@ def execute_statute_search_node(state: LegalState) -> Dict:
 
     # HITL 거절·미승인 시 공식 OpenLaw 호출은 엄격히 차단한다.
 
-    if state.get("approval_status") != "APPROVED":
+    auto_approve = bool(
+        state.get("auto_approve_statute_search", False)
+        or os.getenv("AUTO_APPROVE_STATUTE_SEARCH", "").lower() in ("true", "1", "yes")
+    )
+    if state.get("approval_status") != "APPROVED" and not auto_approve:
 
         return {"statute_search_results": [],
+                "statute_search_count": (state.get("statute_search_count") or 0) + 1,
 
                 "warnings": list(state.get("warnings") or [])
 
@@ -4071,7 +4148,8 @@ def execute_statute_search_node(state: LegalState) -> Dict:
 
     if preflight and authorized_plan(dict(state)) is None:
 
-        return {"statute_search_results": [], "warnings":
+        return {"statute_search_results": [],
+                "statute_search_count": (state.get("statute_search_count") or 0) + 1, "warnings":
 
                 list(state.get("warnings") or [])
 
@@ -4081,6 +4159,8 @@ def execute_statute_search_node(state: LegalState) -> Dict:
 
         search_state = dict(state)
 
+        if auto_approve and search_state.get("approval_status") != "APPROVED":
+            search_state["approval_status"] = "APPROVED"
         if search_state.get("approval_status") == "APPROVED" and not search_state.get("approved_statute_laws"):
 
             raw_refs = list(candidate_laws) + [
@@ -4101,6 +4181,8 @@ def execute_statute_search_node(state: LegalState) -> Dict:
             disp = format_statute_display(s)
             if disp and disp not in prior_statutes:
                 prior_statutes.append(disp)
+        vector_cats = [str(c) for c in (state.get("categories") or []) if c]
+        prior_vector_target = ", ".join(vector_cats[:3]) if vector_cats else "관련 법령·판례"
         openlaw_target_str = ", ".join(str(c) for c in (candidate_laws or search_state.get("approved_statute_laws") or [])[:3])
         if req_id:
             try:
@@ -4108,7 +4190,7 @@ def execute_statute_search_node(state: LegalState) -> Dict:
                 from ai_legal_helper.api.schemas.consultation import ConsultationStepStatus
                 run_msg = make_statute_search_message(
                     vector_status="COMPLETED",
-                    vector_target="",
+                    vector_target=prior_vector_target,
                     vector_statutes=prior_statutes[:4],
                     openlaw_status="RUNNING",
                     openlaw_target=openlaw_target_str,
@@ -4120,11 +4202,23 @@ def execute_statute_search_node(state: LegalState) -> Dict:
 
         doc_search_out = execute_document_search(search_state)
 
+        local_extra = []
         openlaw_found = []
-        for s in (doc_search_out.get("statute_search_results") or []):
-            disp = format_statute_display(s)
-            if disp and disp not in openlaw_found:
-                openlaw_found.append(disp)
+        for item in (doc_search_out.get("statute_search_items") or []):
+            disp = item.get("display")
+            if not disp:
+                continue
+            if item.get("channel") == "OPENLAW_API":
+                if disp not in openlaw_found:
+                    openlaw_found.append(disp)
+            else:
+                if disp not in local_extra:
+                    local_extra.append(disp)
+
+        # 로컬 공식 인덱스(law_docs_global/도메인 컬렉션)에서 추가 확보한 핵심 조문을 벡터DB 목록 상단에 우선 배치
+        combined_vector_statutes = list(dict.fromkeys(local_extra + prior_statutes))
+        channels_used = doc_search_out.get("statute_search_channels") or []
+        openlaw_was_called = "OPENLAW_API" in channels_used or bool(openlaw_found)
 
         if req_id:
             try:
@@ -4132,10 +4226,10 @@ def execute_statute_search_node(state: LegalState) -> Dict:
                 from ai_legal_helper.api.schemas.consultation import ConsultationStepStatus
                 done_msg = make_statute_search_message(
                     vector_status="COMPLETED",
-                    vector_target="",
-                    vector_statutes=prior_statutes[:4],
-                    openlaw_status="COMPLETED",
-                    openlaw_target=openlaw_target_str,
+                    vector_target=openlaw_target_str or prior_vector_target,
+                    vector_statutes=combined_vector_statutes[:6],
+                    openlaw_status="COMPLETED" if openlaw_was_called else "SKIPPED",
+                    openlaw_target=openlaw_target_str if openlaw_was_called else "",
                     openlaw_statutes=openlaw_found[:6],
                 )
                 update_progress_step(req_id, "step_3", ConsultationStepStatus.COMPLETED, done_msg)
@@ -4148,7 +4242,12 @@ def execute_statute_search_node(state: LegalState) -> Dict:
 
             warnings.append("공식 법령 원문 검색 시스템에서 요청하신 법령의 해당 조문을 찾지 못했습니다.")
 
-        return {**doc_search_out, "warnings": warnings}
+        out_payload = {**doc_search_out, "warnings": warnings}
+        if auto_approve and state.get("approval_status") != "APPROVED":
+            out_payload["approval_status"] = "APPROVED"
+            if search_state.get("approved_statute_laws"):
+                out_payload["approved_statute_laws"] = search_state["approved_statute_laws"]
+        return out_payload
 
     missing_issues = list(ver_res.get("missing_legal_issues", []) or ver_res.get("missing_issues", []) or [])
 
@@ -4202,7 +4301,8 @@ def execute_statute_search_node(state: LegalState) -> Dict:
 
     if not candidate_laws:
 
-        return {"statute_search_results": [], "warnings":
+        return {"statute_search_results": [],
+                "statute_search_count": (state.get("statute_search_count") or 0) + 1, "warnings":
 
                 list(state.get("warnings") or [])
 
@@ -4232,7 +4332,7 @@ def execute_statute_search_node(state: LegalState) -> Dict:
 
     # 상담 스레드에서 XML 재조회·임베딩은 절대 수행하지 않는다.
 
-    import os
+
 
     if (state.get("approval_status") == "APPROVED"
 
@@ -4388,13 +4488,14 @@ def statute_search_result_condition(state: LegalState) -> str:
 
     results = state.get("statute_search_results") or []
 
-    if results or status in ("NOT_FOUND", "PARTIAL_SUCCESS", "VERIFIED_LOCAL_FALLBACK"):
+    # 1. 추가 조문을 확보한 경우 re_analyze 로 재작성
+    if results:
 
         return "re_analyze"
 
-    # 초안이 존재하는 경우 외부 검색 실패로 전체 상담을 판단 유보하지 않고 안전하게 재분석 진행
-
-    if state.get("draft_answer"):
+    # 2. 추가 조문을 확보하지 못했더라도(NOT_FOUND 등), 기존 초안(draft_answer)이 이미 작성되어 있다면
+    #    기존 답변을 폐기(insufficient)하지 않고 re_analyze 로 분기하여 기존 확인된 법률·증거 범위 내에서 최종 답변 보존
+    if state.get("draft_answer") and status in ("NOT_FOUND", "PARTIAL_SUCCESS", "VERIFIED_LOCAL_FALLBACK"):
 
         return "re_analyze"
 
@@ -4412,11 +4513,23 @@ def re_analyze_node(state: LegalState) -> Dict:
 
     전세보증금 사건 하드코딩을 제거하고, 사건 유형(categories) 및 기존 전문 에이전트 분석을 동적으로 반영하는
 
-    도메인 중립적 4단계 표준 구조([1. 핵심 결론], [2. 지금 해야 할 일], [3. 쟁점별 상세 법률 분석], [4. 추가 확인사항 및 유의사항])를 적용한다.
+    도메인 중립적 참고 구성([1. 핵심 결론], [2. 사건 사실관계 및 증거], [3. 쟁점별 법률 분석], [4. 우선순위별 다음 행동], [5. 추가 확인사항]) 중 질문에 필요한 항목을 선택 적용한다.
 
     """
 
     set_node_name("re_analyze")
+
+    # 사후 HITL 공식 법령 검색(step_3) 완료 후 재분석 진입 시 4단계 진행 상태를 실시간 갱신한다.
+    # DOCUMENT_MODE에서는 첫 재분석 시 revision_count를 차감하지 않도록(increment_revision=False)
+    # revise_node와 분리된 전용 노드로 유지한다.
+    req_id = state.get("request_id") or get_request_id()
+    if req_id:
+        try:
+            from ai_legal_helper.api.routes.consultation import update_progress_step
+            from ai_legal_helper.api.schemas.consultation import ConsultationStepStatus
+            update_progress_step(req_id, "step_4", ConsultationStepStatus.RUNNING, "법령 검색 결과 기반 재분석 중")
+        except Exception as ex:
+            logger.warning("[RE_ANALYZE] 4단계 진행 알림 예외: %s", ex)
 
     if state.get("answer_mode") == DOCUMENT_MODE:
 
@@ -4613,14 +4726,18 @@ def re_analyze_node(state: LegalState) -> Dict:
 @trace
 
 def intent_analysis_node(state: LegalState) -> Dict:
+    """[레거시 호환 유지] 사용자 질문의 의도(ConsultationIntent)와 문맥 복원 질의(resolved_query)를 도출한다.
 
-    """사용자 질문의 의도(ConsultationIntent)와 문맥 복원 질의(resolved_query)를 도출한다.
+    [보존 사유]
+    주 LangGraph(build_legal_graph)에서는 supervisor_initialize_node로 통폐합되어 그래프 노드에서 제외되었으나,
+    기존 단위 테스트(test_adaptive_workflow.py, test_hitl_statute_search.py 등)의 직접 임포트 및
+    unittest.mock.patch 경로 호환성을 보장하기 위해 동일 모듈 내에 보존한다.
 
 
 
     후속 질문에서 대명사·생략 표현이 복원되어 resolved_query가 원문 question과 달라진 경우,
 
-    사건 ID가 존재하면 resolved_query로 PostgreSQL + Neo4j 사건 증거를 보강 검색하여
+    사건 ID가 존재하고 사건 증거 모드(CASE_EVIDENCE)인 경우 PostgreSQL 원문 서증 기반 CaseEvidenceBriefing 및 쟁점 과업을 지연 로딩하여
 
     graph_evidence 및 case_context에 반영한다.
 
@@ -4906,7 +5023,7 @@ def intent_analysis_node(state: LegalState) -> Dict:
 
 
 
-    # 지연 로딩 단계에서 이미 resolved_query로 GraphRAG를 조회했으므로
+    # 지연 로딩 단계에서 이미 resolved_query로 사건 브리핑(CaseEvidenceBriefing)을 조회했으므로
 
     # 동일한 질문으로 다시 검색하지 않는다(중복 DB/Neo4j 호출 방지).
 
@@ -5304,28 +5421,15 @@ def followup_action_node(state: LegalState) -> Dict:
 
 
 
-@trace
-
+# 그래프 객체 컴파일 빌더 함수이므로 실행 Span 노이즈 방지를 위해 @trace를 제외한다.
 def build_legal_graph(checkpointer: Optional[Any] = None):
 
     """법률 상담 LangGraph 상태 머신을 구성 및 컴파일한다.
-
-
-
     HITL 법령 원문 검색 및 Checkpointer가 포함된다.
-
-
-
     Args:
-
         checkpointer: 명시적으로 주입할 LangGraph 체크포인터 (미지정 시 get_checkpointer() 사용)
-
-
-
     Returns:
-
         CompiledStateGraph: 실행 가능한 LangGraph 애플리케이션.
-
     """
 
     graph = StateGraph(LegalState)
@@ -5336,11 +5440,12 @@ def build_legal_graph(checkpointer: Optional[Any] = None):
 
     graph.add_node("evidence_unavailable", evidence_unavailable_node)
 
-    graph.add_node("followup_action", followup_action_node)
-
+    # [그래프 토폴로지 정리] followup_action_node는 supervisor_initialize 통합 이후 진입 엣지가 없는
+    # 고립 노드(Unreachable Node)였으므로 그래프 노드 등록에서 제외하고, revise_node 내부 헬퍼 및
+    # 단위 테스트 호환 함수로만 유지한다.
     graph.add_node("route", route_node)
 
-    graph.add_node("statute_search_plan", statute_search_plan_node)
+    # [그래프 토폴로지 정리] statute_search_plan_node는 실효성 부족(대부분 SKIP) 및 verification 노드의 후행 법령 검색 전담에 따라 그래프 노드에서 제외하고 route -> run_agents 직결한다.
 
     graph.add_node("run_agents", run_agents_node)
 
@@ -5384,11 +5489,9 @@ def build_legal_graph(checkpointer: Optional[Any] = None):
 
     graph.add_edge("evidence_unavailable", END)
 
-    graph.add_edge("followup_action", "verification")
-
     graph.add_conditional_edges("route", route_condition, {
 
-        "statute_search_plan": "statute_search_plan",
+        "run_agents": "run_agents",
 
         "routing_exit": "routing_exit",
 
@@ -5396,13 +5499,7 @@ def build_legal_graph(checkpointer: Optional[Any] = None):
 
     graph.add_edge("routing_exit", END)
 
-    graph.add_conditional_edges("statute_search_plan", statute_search_plan_condition, {
-
-        "statute_search_approval": "statute_search_approval",
-
-        "run_agents": "run_agents",
-
-    })
+    # [그래프 토폴로지 정리] route -> run_agents 직결 완료 (statute_search_plan 조건부 엣지 제거)
 
     graph.add_edge("run_agents", "legal_evidence_bundle")
 
@@ -5611,6 +5708,8 @@ async def _execute_consultation(
             inputs = {
 
                 "question": question,
+
+                "request_id": thread_id,
 
                 "messages": history_messages + [HumanMessage(content=question)],
 

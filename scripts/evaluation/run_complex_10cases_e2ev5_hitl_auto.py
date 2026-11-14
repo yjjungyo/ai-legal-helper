@@ -65,7 +65,7 @@ from ai_legal_helper.workflows.legal_workflow import run_legal_consultation
 from ai_legal_helper.workflows.conversation_context import ConversationContext, load_conversation_context
 from ai_legal_helper.llm.usage import global_token_tracker
 from ai_legal_helper.observability.context import set_trace_id, reset_trace_id, set_case_id, reset_case_id
-from ai_legal_helper.observability.langfuse_client import get_langfuse, flush_langfuse
+from ai_legal_helper.observability.langfuse_client import get_langfuse, flush_langfuse, start_trace, end_trace
 from scripts.evaluation.create_complex_10cases_testset import TEST_CASES
 from scripts.evaluation.update_kpi_excel_v5 import create_and_update_v5_kpi
 
@@ -343,6 +343,7 @@ async def run_case_evaluation(
             trace_id = str(uuid.uuid4())
             t_tok = set_trace_id(trace_id)
             c_tok = set_case_id(db_case_id)
+            start_trace(trace_id=trace_id, name="LegalAgent", session_id=db_case_id, metadata={"case_id": case_id, "turn": t_idx})
             start_time = time.time()
 
             # 대화 맥락 로드 (다회차 턴 누적)
@@ -364,6 +365,7 @@ async def run_case_evaluation(
                 latency = round(time.time() - start_time, 2)
             except Exception as e:
                 logger.error(f"상담 실행 중 치명적 오류 발생: {e}", exc_info=True)
+                end_trace(trace_id)
                 flush_langfuse()
                 fallback_meta = {
                     "turn_index": t_idx,
@@ -375,6 +377,7 @@ async def run_case_evaluation(
                 export_trace_json(lf, trace_id, case_id, f"turn{t_idx}_FATAL", fallback_meta)
                 raise RuntimeError(f"[{case_id} 턴 {t_idx}] 상담 중 예외 발생으로 즉시 중단: {e}") from e
             finally:
+                end_trace(trace_id)
                 reset_trace_id(t_tok)
                 reset_case_id(c_tok)
 
@@ -516,6 +519,7 @@ async def run_case_evaluation(
         doc_trace_id = str(uuid.uuid4())
         dt_tok = set_trace_id(doc_trace_id)
         dc_tok = set_case_id(db_case_id)
+        start_trace(trace_id=doc_trace_id, name="LegalAgent", session_id=db_case_id, metadata={"case_id": case_id, "step": "draft"})
         try:
             doc_app = build_document_graph()
             doc_state = DocumentState(
@@ -523,11 +527,12 @@ async def run_case_evaluation(
                 action_id=first_action_id,
                 document_type=doc_type
             )
-            final_doc_state = doc_app.invoke(doc_state.dict())
+            final_doc_state = doc_app.invoke(doc_state.model_dump() if hasattr(doc_state, "model_dump") else doc_state.dict())
             draft_content = final_doc_state.get("draft_content", "")
             doc_verif = final_doc_state.get("verification_status", "PASS")
             logger.info(f"    ✓ 법률 문서 초안 생성 완료 ({len(draft_content)}자), 검증: {doc_verif}")
         finally:
+            end_trace(doc_trace_id)
             reset_trace_id(dt_tok)
             reset_case_id(dc_tok)
 

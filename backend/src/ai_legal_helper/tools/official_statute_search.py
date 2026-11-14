@@ -383,6 +383,9 @@ def search_official_statutes(
                 logger.warning(f"[OFFICIAL_STATUTE] '{clean_law_name}' 검색 응답 수신 실패")
                 continue
 
+            if b"\xec\x8b\x9c\xec\x8a\xa4\xed\x85\x9c \xec\xa0\x90\xea\xb2\x80" in search_xml_bytes:
+                logger.warning(f"[OFFICIAL_STATUTE] 국가법령정보센터(law.go.kr) 정기 시스템 점검 중으로 '{clean_law_name}' 원격 조회를 건너뛰고 로컬 RAG 근거로 폴백합니다.")
+                continue
             search_root = ET.fromstring(search_xml_bytes)
             
             # 정확한 법령명 일치 우선 탐색 (예: '민법' 검색 시 '난민법'이 먼저 매칭되는 현상 방지)
@@ -441,8 +444,11 @@ def search_official_statutes(
             # 현재 공포번호에 해당하는 부칙만 정확히 식별한다.
             matched_addenda = extract_addenda(detail_root, law_no)
             date_sensitive = bool(re.search(r"(?:20\d{2}\s*[년./-]\s*\d{1,2}|시행일|공포일|적용시점)", query or ""))
-            if date_sensitive and not matched_addenda:
-                logger.warning("[STATUTE_TEMPORAL] 개정/시점 질문인데 해당 공포번호의 부칙을 확보하지 못함 | 법령=%s | 공포번호=%s", official_law_name, law_no)
+            if not matched_addenda:
+                if date_sensitive:
+                    logger.warning("[STATUTE_TEMPORAL] 개정/시점 질문인데 해당 공포번호의 부칙을 확보하지 못함 | 법령=%s | 공포번호=%s", official_law_name, law_no)
+                else:
+                    logger.info("[STATUTE_TEMPORAL] 해당 공포번호 부칙 미존재 | 법령=%s | 공포번호=%s", official_law_name, law_no)
             if not article_nodes:
                 logger.warning(f"[OFFICIAL_STATUTE] '{official_law_name}'의 세부 조문이 없습니다.")
                 continue
@@ -710,9 +716,10 @@ def search_official_statutes(
                 }
                 retrieved_sources.append(normalize_source_dict(source_dict))
 
-            # 날짜가 쟁점인 질문에서는 부칙의 시행일·적용례까지 근거로 제공한다.
-            # 부칙 원문을 검색 결과에서 버리면 LLM이 공포일과 시행일을 혼동할 수 있다.
-            if date_sensitive:
+            # 조문이 검색되면 해당 법령 버전(MST)의 부칙(시행일·적용례·경과조치)을 항상 동반 출처(Companion Source)로 제공한다.
+            # 질문에 '시행일'이나 특정 날짜 키워드가 없더라도, 조문의 법적 효력 및 적용 시점 판단을 위해
+            # 부칙 원문은 항상 조문과 함께 제공되어야 한다.
+            if selected_articles and matched_addenda:
                 for addendum in matched_addenda:
                     addendum_effective = None  # semantic review deferred
                     addendum_title = f"{official_law_name} 부칙 [공포번호 {law_no_disp}]"
@@ -758,7 +765,7 @@ def search_official_statutes(
                         "retrieved_at": _get_kst_iso(),
                         "verified": False,
                     }))
-            logger.info(f"[OFFICIAL_STATUTE] '{official_law_name}'에서 조문 {len(selected_articles)}건 확보 완료 | 부칙 {len(matched_addenda) if date_sensitive else 0}건")
+            logger.info(f"[OFFICIAL_STATUTE] '{official_law_name}'에서 조문 {len(selected_articles)}건 확보 완료 | 동반 부칙 {len(matched_addenda) if (selected_articles and matched_addenda) else 0}건")
 
         except Exception as e:
             if diagnostic is not None:

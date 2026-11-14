@@ -163,8 +163,17 @@ class TokenTrackingCallbackHandler(BaseCallbackHandler):
         if not current_trace_id:
             try:
                 from ai_legal_helper.observability.langfuse_client import _active_traces
-                if _active_traces:
-                    current_trace_id = list(_active_traces.keys())[-1]
+                # 단일 활성 Trace만 존재할 때는 즉시 귀속하고, 다중 요청 동시 실행 중일 때는
+                # 현재 case_id(session_id)가 일치하는 Trace만 매칭하여 타 사용자 Trace 오염을 차단한다.
+                if len(_active_traces) == 1:
+                    current_trace_id = next(iter(_active_traces.keys()))
+                elif len(_active_traces) > 1:
+                    curr_case = get_case_id()
+                    if curr_case:
+                        for tid, tr_obj in reversed(list(_active_traces.items())):
+                            if getattr(tr_obj, "session_id", None) == curr_case:
+                                current_trace_id = tid
+                                break
             except Exception:
                 pass
 
@@ -251,8 +260,15 @@ class TokenTrackingCallbackHandler(BaseCallbackHandler):
         if not err_trace_id:
             try:
                 from ai_legal_helper.observability.langfuse_client import _active_traces
-                if _active_traces:
-                    err_trace_id = list(_active_traces.keys())[-1]
+                if len(_active_traces) == 1:
+                    err_trace_id = next(iter(_active_traces.keys()))
+                elif len(_active_traces) > 1:
+                    curr_case = get_case_id()
+                    if curr_case:
+                        for tid, tr_obj in reversed(list(_active_traces.items())):
+                            if getattr(tr_obj, "session_id", None) == curr_case:
+                                err_trace_id = tid
+                                break
             except Exception:
                 pass
 

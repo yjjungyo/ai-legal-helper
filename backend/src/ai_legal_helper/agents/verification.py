@@ -1204,12 +1204,11 @@ def run_verification(
             claim_obj.source_ids = verified_claim_sids
 
             # 질문에서 그대로 확인되는 사용자 진술은 사건 문서 출처가 없어도 상담 전제다.
-            # 의미가 유사하다는 추측만으로 변환하지 않으며, 법률 효과 주장은 제외한다.
+            # 의미가 유사하다는 추측만으로 변환하지 않으며, 순수 법률 규범 선언(LEGAL_RULE)은 제외한다.
             if (require_question_coverage
-                    and claim_obj.claim_type == "CASE_FACT"
+                    and claim_obj.claim_type in ("CASE_FACT", "LEGAL_APPLICATION")
                     and claim_obj.fact_status == "USER_STATEMENT"
                     and claim_obj.grounding_status == "SUPPORTED"
-                    and not claim_obj.source_ids
                     and _norm_quote(claim_obj.claim)
                     and (
                         _norm_quote(claim_obj.claim) in _norm_quote(question)
@@ -1239,12 +1238,6 @@ def run_verification(
                 if s.get("source_type") == "CASE_EVIDENCE" and s.get("source_id")
             }
 
-            _INFERENCE_RISK_MARKERS = (
-                "위험", "가능성", "정황", "신호", "재평가", "자금난", "자금 압박", "자금사정",
-                "전액 상환", "마련하기 어렵", "어려울 수", "쉽지 않을", "곤란",
-                "사라지는 것은 아니지만", "없어지는 것은 아니지만", "소멸하는 것은 아니지만",
-                "보전하려는 조치", "단정할 수", "추론", "한계", "우려", "압박",
-            )
             _CATEGORICAL_LEGAL_ENDINGS = (
                 "확정되었다.", "확정되었습니다.", "소멸하였다.", "소멸하였습니다.",
                 "해지되었다.", "해지되었습니다.", "무효이다.", "무효입니다.",
@@ -1257,20 +1250,10 @@ def run_verification(
                 "반환 약정", "반환의무 약정", "명도 약정", "차임 약정", "보증금 약정", "특약사항",
             )
 
-            def _is_case_risk_inference_claim(c_obj: ClaimVerification, norm_draft_text: str) -> bool:
-                """사건 증거에 기반한 회수 위험·자금사정 추론인지(단정적 법률효과 주장과 구별) 판별한다."""
-                if c_obj.fact_status != "INFERENCE" and c_obj.claim_type != "CASE_INFERENCE":
-                    return False
-                if not case_evidence_ids.intersection(c_obj.source_ids):
-                    return False
+            def _is_categorical_legal_effect(c_obj: ClaimVerification) -> bool:
+                """법령 근거 없이 법적 효력 발생·소멸을 단정하는 문장인지 판별한다."""
                 c_text = (c_obj.claim or "").strip()
-                if any(c_text.endswith(ending) for ending in _CATEGORICAL_LEGAL_ENDINGS):
-                    return False
-                has_limit_in_draft = bool(
-                    c_obj.inference_limit.strip() and _norm_quote(c_obj.inference_limit) in norm_draft_text
-                )
-                has_risk_marker = any(marker in c_text for marker in _INFERENCE_RISK_MARKERS)
-                return has_limit_in_draft or has_risk_marker
+                return any(c_text.endswith(ending) for ending in _CATEGORICAL_LEGAL_ENDINGS)
 
             def _is_contract_terms_claim(c_obj: ClaimVerification) -> bool:
                 """계약서 원문 약정 및 조항에 직접 기초한 권리·의무 주장인지(법령 효과와 구별되는 계약사실) 판별한다."""
@@ -1281,49 +1264,48 @@ def run_verification(
                 return any(kw in c_text or kw in reason_text for kw in _CONTRACT_TERMS_KEYWORDS)
 
             for claim_obj in result.claims:
-                # 계약서·당사자 메모를 법령 근거로 표시한 검증 응답도 그대로 신뢰하지 않는다.
-                # 단, 사건 증거에 기반한 회수 위험·자금사정 정황 추론(fact_status=INFERENCE)을
-                # 검증기가 LEGAL_APPLICATION/LEGAL_RULE로 분류한 경우에는 CASE_INFERENCE로 정규화하여 오탐을 방지한다.
+                # 1. 법령·판례 출처 없이 사건 문서만으로 법률 규범/효과를 주장한 경우의 객관적 스키마 정합성 정규화:
+                #    - 검증 LLM이 fact_status="INFERENCE"로 판단하고 유효한 사건 증거가 연결된 정황 추론은 CASE_INFERENCE로 정규화
+                #    - 계약서 약정에 기초한 주장은 CASE_FACT로 정규화
+                #    - 순수 법령 규범(LEGAL_RULE)이거나 단정적 법적 효력 선언(_is_categorical_legal_effect)인데 법령 출처가 전무한 경우만 UNSUPPORTED 강등
                 if (claim_obj.claim_type in ("LEGAL_RULE", "LEGAL_APPLICATION")
                         and not legal_source_ids.intersection(claim_obj.source_ids)):
                     if (claim_obj.grounding_status in ("SUPPORTED", "UNCERTAIN")
-                            and _is_case_risk_inference_claim(claim_obj, norm_draft)):
+                            and claim_obj.fact_status == "INFERENCE"
+                            and case_evidence_ids.intersection(claim_obj.source_ids)
+                            and not _is_categorical_legal_effect(claim_obj)):
                         claim_obj.claim_type = "CASE_INFERENCE"
-                        claim_obj.fact_status = "INFERENCE"
                         claim_obj.grounding_status = "SUPPORTED"
                         if not claim_obj.inference_basis.strip():
-                            claim_obj.inference_basis = claim_obj.reason.strip() or "등록된 사건 자료 기반 위험·정황 추론"
-                        if not claim_obj.inference_limit.strip() or _norm_quote(claim_obj.inference_limit) not in norm_draft:
+                            claim_obj.inference_basis = claim_obj.reason.strip() or "등록된 사건 자료 기반 정황 추론"
+                        if not claim_obj.inference_limit.strip():
                             claim_obj.inference_limit = claim_obj.claim.strip()
                     elif (claim_obj.grounding_status in ("SUPPORTED", "UNCERTAIN")
                           and _is_contract_terms_claim(claim_obj)):
-                        # 계약서 원문 약정 및 조항에 직접 기초한 주장은 계약서(CASE_EVIDENCE)로 뒷받침되는 처분문서 약정 사실이다.
-                        # LLM 검증기가 LEGAL_APPLICATION/LEGAL_RULE로 분류했더라도 CASE_FACT로 정규화하여 허위 결함 강등을 방지한다.
                         claim_obj.claim_type = "CASE_FACT"
                         claim_obj.fact_status = "VERIFIED_FACT"
                         claim_obj.grounding_status = "SUPPORTED"
-                    elif claim_obj.grounding_status == "SUPPORTED":
+                    elif (claim_obj.grounding_status == "SUPPORTED"
+                          and (claim_obj.claim_type == "LEGAL_RULE" or _is_categorical_legal_effect(claim_obj))):
                         claim_obj.grounding_status = "UNSUPPORTED"
                         claim_obj.reason = (
                             "법률 효과로 분류된 주장에 법령·판례 근거가 연결되지 않았습니다. "
                             "사건의 정황 평가라면 법률 효과와 문장을 분리하고 자료와 추론 한계를 설명해야 합니다."
                         )
                         result.revision_instructions.append(claim_obj.reason)
+
+                # 2. CASE_INFERENCE는 검증 LLM의 의미론적 판정(grounding_status)을 존중하되,
+                #    유효한 출처(source_ids)가 존재하는지만 객관적으로 확인하고 기본 메타데이터만 보정한다.
                 if claim_obj.claim_type == "CASE_INFERENCE":
-                    if _is_case_risk_inference_claim(claim_obj, norm_draft) and (
-                        (claim_obj.inference_basis.strip() and claim_obj.inference_limit.strip()
-                         and _norm_quote(claim_obj.inference_limit) in norm_draft)
-                        or (claim_obj.grounding_status == "SUPPORTED" and claim_obj.reason.strip())
-                    ):
-                        claim_obj.fact_status = "INFERENCE"
+                    claim_obj.fact_status = "INFERENCE"
+                    if claim_obj.grounding_status == "SUPPORTED" and claim_obj.source_ids:
                         if not claim_obj.inference_basis.strip():
-                            claim_obj.inference_basis = claim_obj.reason.strip()
-                        if not claim_obj.inference_limit.strip() or _norm_quote(claim_obj.inference_limit) not in norm_draft:
+                            claim_obj.inference_basis = claim_obj.reason.strip() or "등록된 사건 자료 기반 추론"
+                        if not claim_obj.inference_limit.strip():
                             claim_obj.inference_limit = claim_obj.claim.strip()
-                    else:
-                        # 추론 유형을 법률 근거 검사의 우회 통로로 쓰지 못하게 출처·한계 모두 요구한다.
+                    elif claim_obj.grounding_status == "SUPPORTED" and not claim_obj.source_ids:
                         claim_obj.grounding_status = "UNSUPPORTED"
-                        claim_obj.reason = "사건 추론의 증거, 추론 관계, 답변에 명시된 한계를 확인해야 합니다."
+                        claim_obj.reason = "사건 추론을 뒷받침하는 사건 자료 출처 ID가 지정되지 않았습니다."
 
             # [P0-2] 날짜 역할(발견일 vs 등기 접수일·열람 기준일) 구분 및 동일 역할 날짜 충돌 검사
             _DATE_ROLE_PATTERNS = {
@@ -1386,11 +1368,11 @@ def run_verification(
                     ]
                     result.missing_issues = [
                         iss for iss in result.missing_issues
-                        if not ("발견" in iss or "2026.08.12" in iss or "8월 12일" in iss)
+                        if "발견" not in iss
                     ]
                     result.revision_instructions = [
                         inst for inst in result.revision_instructions
-                        if not ("발견" in inst or "2026.08.12" in inst or "8월 12일" in inst)
+                        if "발견" not in inst
                     ]
 
             # [P1-2] 사용자 질문과 연결되지 않고 답변의 핵심 주장 결함도 아닌 불필요한 하위 법령 요구 필터링
@@ -1429,10 +1411,10 @@ def run_verification(
                     if inst != "시간 순서, 의사표시 내용, 증명 수준을 원문과 대조하여 결론을 보완하세요."
                 ]
 
-            # 사실 오류나 출처 없는 법률 주장도 필터링 후 PASS로 남지 않게 한다.
-            # 의뢰인의 질문 진술·상담 전제 사실(USER_STATEMENT)은 공적 원본 부재만을 이유로 결함 주장으로 취급하지 않는다.
+            # 사실 오류나 출처 없는 법률 주장(UNSUPPORTED)도 필터링 후 PASS로 남지 않게 한다.
+            # 의뢰인의 질문 진술·상담 전제 사실(USER_STATEMENT)이나 유보적 표현(UNCERTAIN)만으로 LLM의 PASS 판정을 번복하지 않는다.
             defective_claims = [c for c in result.claims if (
-                c.grounding_status in ("UNSUPPORTED", "UNCERTAIN")
+                c.grounding_status == "UNSUPPORTED"
                 and c.claim_type in ("CASE_FACT", "CASE_INFERENCE", "LEGAL_RULE", "LEGAL_APPLICATION")
             ) or (c.claim_type in ("CASE_FACT", "CASE_INFERENCE", "LEGAL_RULE", "LEGAL_APPLICATION")
                   and c.grounding_status == "SUPPORTED" and not c.source_ids)]
@@ -1498,10 +1480,11 @@ def run_verification(
             result.warnings.append(f"법률 조문 또는 판례에 의해 뒷받침되지 않는 핵심 법적 판단 {len(unsupported_core_claims)}건이 감지되어 조건부 수정(REVISE)이 요구됩니다.")
 
         if uncertain_core_claims and result.status == "PASS":
-            result.status = "REVISE"
-            if result.reason_code == "NONE":
-                result.reason_code = "ANSWER_REVISION_REQUIRED"
-            result.recommended_action = "REVISE_DRAFT"
+            if not require_question_coverage:
+                result.status = "REVISE"
+                if result.reason_code == "NONE":
+                    result.reason_code = "ANSWER_REVISION_REQUIRED"
+                result.recommended_action = "REVISE_DRAFT"
             result.warnings.append(f"법적 근거 확인이 불확실한 판단 {len(uncertain_core_claims)}건이 포함되어 있어 비확정적 안내로 보완이 필요합니다.")
 
         # B-1) 미등록 임의 가상 증거번호 감지 시 PASS 차단 및 REVISE 강제 (T05)

@@ -332,4 +332,58 @@ def test_additional_4_action_and_document_update_schemas_and_routes():
     assert doc_upd.review_status == "APPROVED"
 
 
+def test_document_workflow_generate_node_enforces_first_person_sender_perspective():
+    """당사자 본인 발신 내용증명 생성 시 제3자 검토보고서 투('의뢰인', '제공 자료에 따르면')가 제거되고 발신인 1인칭 시점으로 정제되는지 검증한다."""
+    from ai_legal_helper.workflows.document_workflow import (
+        DocumentDraftSchema,
+        DocumentState,
+        generate_node,
+    )
+
+    mock_structured_llm = MagicMock()
+    mock_structured_llm.invoke.return_value = DocumentDraftSchema(
+        title="전세보증금 반환 및 질권설정채권 상환 관련 통지",
+        sender="배수민 [주소: 확인 필요]",
+        receiver="오상구 [주소: 확인 필요]",
+        body_sections=[
+            {
+                "1. 계약 사실": "의뢰인 배수민의 주장 및 제공 자료에 따르면, 전세보증금은 350,000,000원입니다.",
+            },
+            {
+                "5. 문자 내역": "의뢰인 배수민이 제공한 문자 내역에 따르면, 오상구는 연장을 요청하였습니다. 위 내용은 의뢰인이 제공한 자료에 따른 주장으로서, 별도의 추가 확인이 필요할 수 있습니다.",
+            },
+        ],
+        conclusion="아울러 의뢰인에게 추가적인 연체이자나 불이익이 발생하지 않도록 이행하여 주시기 바랍니다.",
+        full_content=(
+            "발신인: 배수민\n수신인: 오상구\n\n"
+            "1. 의뢰인 배수민의 주장 및 제공 자료에 따르면, 전세보증금은 350,000,000원입니다.\n"
+            "2. 제공 자료에 따르면, 입금확인증에 350,000,000원이 입금 완료되었습니다.\n"
+            "5. 의뢰인 배수민이 제공한 문자 내역에 따르면, 오상구는 연장을 요청하였습니다. "
+            "위 내용은 의뢰인이 제공한 자료에 따른 주장으로서, 별도의 추가 확인이 필요할 수 있습니다.\n"
+            "7. 아울러 의뢰인에게 추가적인 연체이자나 불이익이 발생하지 않도록 이행하여 주시기 바랍니다."
+        ),
+    )
+    mock_llm = MagicMock()
+    mock_llm.with_structured_output.return_value = mock_structured_llm
+
+    st = DocumentState(
+        case_id="case-1",
+        document_type="내용증명",
+        context_text="[사건: 전세보증금 반환]\n[당사자]\n- 임차인: 배수민\n- 임대인: 오상구",
+        requirements_met=True,
+    )
+    with patch("ai_legal_helper.workflows.document_workflow.get_llm", return_value=mock_llm):
+        out = generate_node(st)
+
+    sent_prompt = mock_structured_llm.invoke.call_args.args[0]
+    assert "발신인 자신을 절대로 '의뢰인'이라고 지칭하지 말고" in sent_prompt
+    assert "의뢰인에게" not in out.draft_content
+    assert "본인(발신인)에게 추가적인 연체이자" in out.draft_content
+    assert "제공 자료에 따르면" not in out.draft_content
+    assert "별도의 추가 확인이 필요할 수 있습니다" not in out.draft_content
+    assert "의뢰인에게" not in out.structured_content["conclusion"]
+    assert "본인(발신인)에게" in out.structured_content["conclusion"]
+
+
+
 
