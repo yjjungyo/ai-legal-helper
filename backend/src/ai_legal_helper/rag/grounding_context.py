@@ -243,10 +243,16 @@ def prune_sources_for_verification(
             continue
 
         # 미인용 증거는 메타데이터 유지 + 본문 스니펫 축약
+        # 단, 권리관계 및 사실 판단에 핵심적인 서증(등기부등본, 계약서 등)은 최소 400자 및 핵심 권리내역 보존
         raw_content = str(src.get("content") or "").strip()
-        if len(raw_content) > max_unreferenced_snippet:
+        is_core_evidence = any(
+            kw in str(src.get("filename") or "").lower() or kw in str(src.get("document_name") or "").lower()
+            for kw in ("등기", "계약", "registry", "contract", "전부증명서", "가압류", "근저당")
+        )
+        snippet_len = max(max_unreferenced_snippet, 400) if is_core_evidence else max_unreferenced_snippet
+        if len(raw_content) > snippet_len:
             condensed = dict(src)
-            condensed["content"] = f"{raw_content[:max_unreferenced_snippet]}... (초안 미인용 증거: 상세 본문 생략)"
+            condensed["content"] = f"{raw_content[:snippet_len]}... (초안 미인용 증거: 상세 본문 생략)"
             pruned_evidence_sources.append(condensed)
         else:
             pruned_evidence_sources.append(src)

@@ -83,3 +83,70 @@ def test_write_document_answer_injects_issue_tasks(monkeypatch):
     assert len(injected_tasks) == 1
     assert injected_tasks[0]["쟁점"] == "차임 증액 청구 5% 상한 준수 여부"
     assert "주택임대차보호법 제7조" in injected_tasks[0]["관련 법령"]
+
+
+def test_document_verification_prompt_no_sc013_auction_hardcoding():
+    """DOCUMENT_VERIFICATION_PROMPT에서 SC-013 전용 경매 결론 하드코딩이 제거되고 범용 포섭 절차로 대체되었는지 검증한다."""
+    from ai_legal_helper.agents.document_verification_prompt import DOCUMENT_VERIFICATION_PROMPT
+
+    prompt = DOCUMENT_VERIFICATION_PROMPT
+    # 1. SC-013 특정 조문(제3조의5 단서) 및 결론 하드코딩 제거 검증
+    assert "주택임대차보호법 제3조의5 단서 적용 한계 엄격 검증" not in prompt
+    assert "보증금이 모두 변제되지 아니한 대항력 있는 임차권은 소멸하지 아니한다'는 단서 예외는, 애당초" not in prompt
+
+    # 2. 범용 요건 포섭 및 시점 적용 원칙 반영 검증
+    assert "[LEGAL_APPLICATION 주장의 4단계 포섭 검증 원칙]" in prompt
+    assert "[법령 시행일자와 시점 적용 검증 원칙]" in prompt
+    assert "사건 시점 이후 개정·시행된 조문을 부칙의 경과조치나 적용례 근거 없이 과거 사건에 소급 적용" in prompt
+
+
+def test_finish_answer_blocks_fallback_when_fatal_legal_error_persists():
+    """재작성 한도 도달 시 치명적인 미입증 법률 적용(LEGAL_APPLICATION)이 남아있으면 폴백 PASS 승인을 차단하고 WITHHELD 처리한다."""
+    import hashlib
+    from ai_legal_helper.workflows.document_consultation import finish_answer
+
+    draft = "선순위 근저당권이 있어도 낙찰자에게 보증금을 전액 청구할 수 있습니다."
+    draft_sha = hashlib.sha256(draft.encode("utf-8")).hexdigest()
+
+    mock_sources = [
+        {"source_id": "01_계약서.txt", "filename": "01_계약서.txt", "source_type": "CASE_EVIDENCE", "content": "계약 내용"}
+    ]
+    from ai_legal_helper.rag.grounding_context import format_grounding_sources
+    _, manifest = format_grounding_sources(mock_sources)
+
+    # 1건은 사실 지지(SUPPORTED), 1건은 치명적 법률 적용 오류(UNSUPPORTED)
+    ver_result = {
+        "status": "REVISE",
+        "reason_code": "LEGAL_SOURCE_INSUFFICIENT",
+        "claims": [
+            {
+                "claim": "2022년에 계약을 체결했습니다.",
+                "claim_type": "CASE_FACT",
+                "grounding_status": "SUPPORTED",
+                "source_ids": ["01_계약서.txt"],
+            },
+            {
+                "claim": "선순위 근저당권이 있어도 낙찰자에게 보증금을 전액 청구할 수 있습니다.",
+                "claim_type": "LEGAL_APPLICATION",
+                "grounding_status": "UNSUPPORTED",
+                "source_ids": [],
+            },
+        ],
+        "verified_answer_sha256": draft_sha,
+        "source_manifest": manifest,
+        "missing_legal_issues": ["경매 매각소멸주의"],
+    }
+
+    state = {
+        "draft_answer": draft,
+        "verification_result": ver_result,
+        "case_evidence_sources": mock_sources,
+        "legal_sources": [],
+        "revision_count": 3,  # 재작성 한도 도달
+    }
+
+    out = finish_answer(state)
+
+    # 치명적 법률 오류가 남아있으므로 PASS 폴백이 차단되고 WITHHELD로 확정되어야 함
+    assert out["final_disposition"] == "WITHHELD"
+    assert "질문에 대한 답변을 확정할 만큼 근거 확인을 마치지 못했습니다" in out["final_answer"]

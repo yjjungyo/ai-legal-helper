@@ -1480,11 +1480,10 @@ def run_verification(
             result.warnings.append(f"법률 조문 또는 판례에 의해 뒷받침되지 않는 핵심 법적 판단 {len(unsupported_core_claims)}건이 감지되어 조건부 수정(REVISE)이 요구됩니다.")
 
         if uncertain_core_claims and result.status == "PASS":
-            if not require_question_coverage:
-                result.status = "REVISE"
-                if result.reason_code == "NONE":
-                    result.reason_code = "ANSWER_REVISION_REQUIRED"
-                result.recommended_action = "REVISE_DRAFT"
+            result.status = "REVISE"
+            if result.reason_code == "NONE":
+                result.reason_code = "ANSWER_REVISION_REQUIRED"
+            result.recommended_action = "REVISE_DRAFT"
             result.warnings.append(f"법적 근거 확인이 불확실한 판단 {len(uncertain_core_claims)}건이 포함되어 있어 비확정적 안내로 보완이 필요합니다.")
 
         # B-1) 미등록 임의 가상 증거번호 감지 시 PASS 차단 및 REVISE 강제 (T05)
@@ -1547,6 +1546,7 @@ def run_verification(
             and not unsupported_citations
             and not result.contradictions
             and not unregistered_evidences
+            and not (qa_check and not qa_check.legal_risk_passed)
         )
         coverage_satisfied = (not require_question_coverage) or (coverage_complete and consistency_complete)
         if coverage_satisfied and has_supported_core_claims and has_no_defects and result.status == "REVISE":
