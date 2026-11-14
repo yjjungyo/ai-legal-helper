@@ -200,6 +200,7 @@ def generate_answer(
             verification=ver_res if repair else None,
             as_of_date=(state.get("case_evidence_briefing") or {}).get("as_of_date"),
             preserved_points=preserved if repair else None,
+            issue_tasks=state.get("issue_tasks"),
             rag_only_notice=(state.get("statute_search_status") in ("NOT_FOUND", "PARTIAL_SUCCESS")),
             allow_need_more_law=effective_allow_need_more_law,
         )
