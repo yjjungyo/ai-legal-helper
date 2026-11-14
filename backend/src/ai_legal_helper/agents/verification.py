@@ -967,6 +967,7 @@ def run_verification(
         draft_answer=draft_answer,
         retrieved_sources=retrieved_sources,
         case_context=case_context,
+        citation_audit=audit,
     )
 
     # 단순 법령 질의이면서 결정론적 검사 ALL PASS인 경우: 불필요한 LLM 호출을 건너뛰고 조기 PASS 확정
@@ -1088,6 +1089,8 @@ def run_verification(
         try:
             logger.info("[VERIFICATION_SCHEMA] 검증 출력 수신 및 스키마 검증 시작")
             result = VerificationOutput(**data)
+            initial_llm_status = result.status
+            initial_llm_reason_code = result.reason_code
             logger.info(f"[VERIFICATION_SCHEMA] 스키마 검증 및 정규화 결과: SUCCESS (주장수={len(result.claims)}, 상태={result.status})")
             logger.info("[VERIFICATION] 법률 주장 검증 계속 진행")
         except ValidationError as val_err:
@@ -1125,6 +1128,13 @@ def run_verification(
             if result.reason_code in (None, "NONE"):
                 result.reason_code = "ANSWER_REVISION_REQUIRED"
             result.revision_instructions.append("시간 순서, 의사표시 내용, 증명 수준을 원문과 대조하여 결론을 보완하세요.")
+
+        # Some non-strict consultation paths skip the detailed claim/date gate.
+        # Initialize its findings so late PASS normalization cannot raise an
+        # UnboundLocalError or accidentally inherit a previous invocation.
+        defective_claims = []
+        malformed_claims = []
+        same_role_date_conflict = False
 
         # 3. LLM이 반환한 Claim별 source_ids가 실제 Source Registry에 존재하는지 교차 검증
         def _norm_quote(txt: str) -> str:
@@ -1549,6 +1559,15 @@ def run_verification(
             and not (qa_check and not qa_check.legal_risk_passed)
         )
         coverage_satisfied = (not require_question_coverage) or (coverage_complete and consistency_complete)
+        # The earlier gate must not be bypassed when a substantive legal issue
+        # or a malformed/ungrounded claim remains unresolved.
+        has_no_defects = (
+            has_no_defects
+            and not result.missing_legal_issues
+            and not defective_claims
+            and not malformed_claims
+            and not same_role_date_conflict
+        )
         if coverage_satisfied and has_supported_core_claims and has_no_defects and result.status == "REVISE":
             if result.reason_code in ("LEGAL_SOURCE_INSUFFICIENT", "ANSWER_REVISION_REQUIRED", "CASE_EVIDENCE_MISSING", "NONE"):
                 logger.info("[VERIFICATION] 모든 핵심 주장이 검색 출처에 의해 온전히 뒷받침(SUPPORTED 100%)되므로 PASS로 확정합니다.")
@@ -1623,6 +1642,24 @@ def run_verification(
         except Exception:
             pass
         out_dict = result.model_dump()
+        # Preserve the model verdict separately from post-processing policy decisions.
+        # This is diagnostic only: it does not alter PASS/REVISE/INSUFFICIENT behavior.
+        out_dict["verification_decision_trace"] = {
+            "llm_status": initial_llm_status,
+            "llm_reason_code": initial_llm_reason_code,
+            "final_status": result.status,
+            "final_reason_code": result.reason_code,
+            "status_changed": initial_llm_status != result.status,
+            "reason_changed": initial_llm_reason_code != result.reason_code,
+            "revision_instructions": list(result.revision_instructions),
+            "missing_legal_issues": list(result.missing_legal_issues),
+        }
+        if initial_llm_status != result.status or initial_llm_reason_code != result.reason_code:
+            logger.info(
+                "[VERIFICATION_DECISION] llm=%s/%s -> final=%s/%s; revisions=%s; missing_legal=%s",
+                initial_llm_status, initial_llm_reason_code, result.status, result.reason_code,
+                result.revision_instructions, result.missing_legal_issues,
+            )
         # STEP 5: 경량 QA 검사 결과(repair_targets 및 qa_summary) 결합
         if qa_check.repair_targets and not out_dict.get("repair_targets"):
             out_dict["repair_targets"] = [rt.model_dump() for rt in qa_check.repair_targets]

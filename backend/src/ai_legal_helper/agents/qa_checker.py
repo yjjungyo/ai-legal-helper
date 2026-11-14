@@ -152,6 +152,8 @@ def check_deterministic_qa(
     draft_answer: str,
     retrieved_sources: List[Dict[str, Any]],
     case_context: str = "",
+    *,
+    citation_audit: Optional[Dict[str, Any]] = None,
 ) -> QACheckResult:
     """초안 답변을 대상으로 결정론적 규칙 기반 경량 검사를 수행한다.
 
@@ -179,7 +181,9 @@ def check_deterministic_qa(
     llm_eval_reasons: List[str] = []
 
     # 1. 출처 존재 검사 (audit_citations_and_claims + BRACKET_SOURCE_ID_PATTERN 검사)
-    audit = audit_citations_and_claims(draft_answer, retrieved_sources, case_context=case_context)
+    audit = citation_audit if citation_audit is not None else audit_citations_and_claims(
+        draft_answer, retrieved_sources, case_context=case_context
+    )
     unverified_cits = list(audit.get("unverified_citations", []))
     unsupported_cits = list(audit.get("unsupported_citations", []))
     rejected_ids = set(audit.get("rejected_citation_ids", []))
