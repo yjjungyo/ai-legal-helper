@@ -134,27 +134,39 @@ async def trace_context_middleware(request: Request, call_next):
     from ai_legal_helper.observability.langfuse_client import start_trace, end_trace, get_system_name
     path = request.url.path
 
-    # 헬스체크, CORS 사전 요청(OPTIONS), 프론트엔드 단주기 상담 상태 폴링(GET /consultations/{id})을 노이즈로 분류
-    # -> 무의미한 빈 Langfuse Root Trace 누적 방지 및 터미널 반복 로그 스팸 차단
+    # 1. 터미널 콘솔 로그 노이즈 분류
+    # 헬스체크, CORS 사전 요청(OPTIONS), 프론트엔드 단주기 상담 상태 폴링(GET /consultations/{id})
+    # -> 200 정상 응답 시 콘솔 로깅 생략, 오류(4xx, 5xx) 시에만 WARNING 로깅
     is_health_or_options = (
         path.endswith("/health/live")
         or path.endswith("/health")
-        or request.method == "OPTIONS"
+        or request.method in ("OPTIONS", "HEAD")
     )
     is_consultation_polling = (
         request.method == "GET"
         and "/api/v1/consultations/" in path
     )
     is_noise = is_health_or_options or is_consultation_polling
+
+    # 2. Langfuse Root Trace 대상 판별
+    # Langfuse는 LLM/AI 관측성(Observability) 플랫폼이므로, 실제 AI 에이전트/생성 워크플로우 엔드포인트에 한해서만
+    # 미들웨어 수준의 Root Trace를 생성한다.
+    # 단순 RDB CRUD(모든 GET 조회, 정적 리소스, 인증, 단순 상태 수정 등)는 빈 트레이스 노이즈
+    # 방지를 위해 Langfuse Trace 생성을 제외한다 (P0-Observability-Noise-Reduction).
     is_consultation_post = (
         request.method == "POST"
         and "/api/v1/consultations" in path
     )
+    is_ai_workflow_post = (
+        request.method == "POST"
+        and any(p in path for p in ("/api/v1/documents", "/extract", "/actions/plan"))
+    )
+    should_trace = is_consultation_post or is_ai_workflow_post
 
-    if not is_noise:
+    if should_trace:
         sys_name = get_system_name()
         # 상담 파이프라인(POST)은 시작부터 'LegalAgent'으로 명명하여 Langfuse 추적 명확성 확보 (P0-3)
-        trace_name = "LegalAgent" if is_consultation_post else f"HTTP:{request.method}_{path}"
+        trace_name = "LegalAgent" if is_consultation_post else f"Workflow:{request.method}_{path}"
         start_trace(
             trace_id=trace_id,
             name=trace_name,
@@ -188,10 +200,10 @@ async def trace_context_middleware(request: Request, call_next):
 
         return response
     finally:
-        # POST /api/v1/consultations 계열은 정상 접수(2xx) 시 백그라운드 태스크가 end_trace를 호출하지만,
-        # 요청 검증 실패·권한 오류(4xx/5xx) 또는 예외 발생 시에는 백그라운드 태스크가 실행되지 않으므로
-        # 미들웨어에서 즉시 end_trace를 호출하여 _active_traces 메모리 누수를 방지한다.
-        if not is_noise and (not is_consultation_post or response_status >= 400):
+        # should_trace 대상 중 POST /api/v1/consultations 계열은 정상 접수(2xx) 시 백그라운드 태스크가
+        # end_trace를 호출하지만, 요청 검증 실패·권한 오류(4xx/5xx) 또는 동기 워크플로우는
+        # 미들웨어에서 end_trace를 호출하여 _active_traces 메모리 누수를 방지한다.
+        if should_trace and (not is_consultation_post or response_status >= 400):
             end_trace(trace_id)
         reset_trace_id(t_token)
         reset_request_id(r_token)

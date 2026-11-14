@@ -1727,3 +1727,143 @@ sqlite3.ProgrammingError: SQLite objects created in a thread can only be used in
 2026-11-14 14:25:24.686 | INFO  | 0ca57e3d | main.py:184:trace_context_middleware - [verification_agent] testclient - "POST /api/v1/cases/03d6d7fb-0d35-462e-a1fe-8ca568d6acc1/documents" 200 (98.2ms) [case:03d6d7fb, req:700eb749]
 2026-11-14 14:25:24.716 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
 2026-11-14 14:25:24.728 | INFO  | b832bae6 | main.py:184:trace_context_middleware - [verification_agent] testclient - "GET /api/v1/cases/426e61f2-e6f9-40fe-88d3-6679e96f5c5b/documents" 200 (11.1ms) [case:426e61f2, req:4eec4748]
+2026-11-14 20:02:36.599 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:02:36.618 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:02:36.666 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:02:36.796 | INFO  | c0aa3ca5 | cases.py:75:list_cases       - 사건 목록 조회 완료 (총 793건) [req:d3c84323]
+2026-11-14 20:04:28.092 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:04:28.110 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:04:28.141 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:04:28.272 | INFO  | 8a108c5e | cases.py:75:list_cases       - 사건 목록 조회 완료 (총 793건) [req:05d2c7d4]
+2026-11-14 20:04:28.282 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:06:00.647 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:06:00.660 | WARN  | e7ba3896 | main.py:199:trace_context_middleware - testclient - "GET /api/v1/consultations/test-poll-12345" 403 (12.0ms) [req:df2e1f7a]
+2026-11-14 20:06:01.101 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:06:01.257 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:06:01.283 | INFO  | 0e8618fe | cases.py:75:list_cases       - 사건 목록 조회 완료 (총 4건) [req:7e8d988b]
+2026-11-14 20:06:01.290 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:06:02.184 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:06:02.220 | INFO  | 2e535f91 | cases.py:65:create_case      - 새로운 사건이 생성되었습니다: 'Test Case' (ID: a2f1fa0d-4cd7-4d9a-b92b-c5ebe3c534e5) [req:800621e5]
+2026-11-14 20:06:02.221 | INFO  | 2e535f91 | main.py:196:trace_context_middleware - testclient - "POST /api/v1/cases" 200 (36.3ms) [req:800621e5]
+2026-11-14 20:06:02.224 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:06:02.265 | INFO  | 83bc842f | decorators.py:340:log_entry  - [증거 문서 수집 및 색인] 단계 시작 (ingest_evidence) [case:a2f1fa0d, req:31af75ec]
+2026-11-14 20:06:02.333 | INFO  | 83bc842f | decorators.py:373:log_success - [증거 문서 수집 및 색인] 단계 완료 (68.2ms) [case:a2f1fa0d, req:31af75ec]
+2026-11-14 20:06:02.340 | INFO  | 83bc842f | main.py:196:trace_context_middleware - testclient - "POST /api/v1/cases/a2f1fa0d-4cd7-4d9a-b92b-c5ebe3c534e5/evidence" 200 (114.5ms) [case:a2f1fa0d, req:31af75ec]
+2026-11-14 20:06:02.369 | INFO  | 83bc842f | decorators.py:340:log_entry  - [증거 문서 원문 텍스트 추출] 단계 시작 (extract_text_from_evidence) [case:a2f1fa0d, req:31af75ec]
+2026-11-14 20:06:02.392 | INFO  | 83bc842f | decorators.py:373:log_success - [증거 문서 원문 텍스트 추출] 단계 완료 (23.5ms) [case:a2f1fa0d, req:31af75ec]
+2026-11-14 20:06:02.392 | INFO  | 83bc842f | decorators.py:340:log_entry  - [증거 문서 주장·사실 추출] 단계 시작 (extract_claims_from_evidence) [case:a2f1fa0d, req:31af75ec]
+2026-11-14 20:06:03.281 | INFO  | 83bc842f | callbacks.py:107:on_chat_model_start - [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:a2f1fa0d, req:31af75ec]
+2026-11-14 20:06:06.431 | INFO  | 83bc842f | callbacks.py:196:on_llm_end  - [LLM_IO_SIZE] agent=None node=None input_chars=1854 output_chars=0 input_tokens=1695 output_tokens=329 latency_ms=3151 [case:a2f1fa0d, req:31af75ec]
+2026-11-14 20:06:06.432 | INFO  | 83bc842f | callbacks.py:205:on_llm_end  - [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 3151ms, 입력: 1,695토큰, 출력: 329토큰, 총: 2,024토큰) [case:a2f1fa0d, req:31af75ec]
+2026-11-14 20:06:06.451 | INFO  | 83bc842f | decorators.py:373:log_success - [증거 문서 주장·사실 추출] 단계 완료 (4059.0ms) [case:a2f1fa0d, req:31af75ec]
+2026-11-14 20:06:06.458 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:06:06.486 | INFO  | 15068707 | main.py:196:trace_context_middleware - testclient - "GET /api/v1/cases/a2f1fa0d-4cd7-4d9a-b92b-c5ebe3c534e5/evidence" 200 (27.2ms) [case:a2f1fa0d, req:a79e2ccf]
+2026-11-14 20:06:06.489 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:06:06.510 | INFO  | 24ab2f81 | main.py:196:trace_context_middleware - testclient - "GET /api/v1/cases/a2f1fa0d-4cd7-4d9a-b92b-c5ebe3c534e5/evidence/718126d6-cc3c-4118-a4f3-858d363a4c4f/claims" 200 (18.0ms) [case:a2f1fa0d, req:70d0c8f9]
+2026-11-14 20:06:06.512 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:06:06.534 | INFO  | a131b32d | main.py:196:trace_context_middleware - testclient - "POST /api/v1/cases/a2f1fa0d-4cd7-4d9a-b92b-c5ebe3c534e5/evidence/718126d6-cc3c-4118-a4f3-858d363a4c4f/extract" 200 (20.2ms) [case:a2f1fa0d, req:5dc60ef8]
+2026-11-14 20:06:06.537 | INFO  | a131b32d | decorators.py:340:log_entry  - [증거 문서 원문 텍스트 추출] 단계 시작 (extract_text_from_evidence) [case:a2f1fa0d, req:5dc60ef8]
+2026-11-14 20:06:06.538 | WARN  | a131b32d | langfuse_client.py:445:start_span - [DELAYED_CALLBACK_IGNORED] 종료된 트레이스의 지연 스팬 생성 무시: trace_id=a131b32d-5e02-4326-b6f3-e874faf1266f, span=extract_text_from_evidence(2b5ee13a-b0ae-4781-8768-99cc757f72db) [case:a2f1fa0d, req:5dc60ef8]
+2026-11-14 20:06:06.555 | INFO  | a131b32d | decorators.py:373:log_success - [증거 문서 원문 텍스트 추출] 단계 완료 (17.5ms) [case:a2f1fa0d, req:5dc60ef8]
+2026-11-14 20:06:06.555 | INFO  | a131b32d | decorators.py:340:log_entry  - [증거 문서 주장·사실 추출] 단계 시작 (extract_claims_from_evidence) [case:a2f1fa0d, req:5dc60ef8]
+2026-11-14 20:06:06.556 | WARN  | a131b32d | langfuse_client.py:445:start_span - [DELAYED_CALLBACK_IGNORED] 종료된 트레이스의 지연 스팬 생성 무시: trace_id=a131b32d-5e02-4326-b6f3-e874faf1266f, span=extract_claims_from_evidence(c0aa04af-82f9-4bff-b8f3-b61ab1f227de) [case:a2f1fa0d, req:5dc60ef8]
+2026-11-14 20:06:07.156 | INFO  | a131b32d | callbacks.py:107:on_chat_model_start - [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:a2f1fa0d, req:5dc60ef8]
+2026-11-14 20:06:11.565 | INFO  | a131b32d | callbacks.py:196:on_llm_end  - [LLM_IO_SIZE] agent=None node=None input_chars=1854 output_chars=0 input_tokens=1697 output_tokens=346 latency_ms=4409 [case:a2f1fa0d, req:5dc60ef8]
+2026-11-14 20:06:11.565 | INFO  | a131b32d | callbacks.py:205:on_llm_end  - [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 4409ms, 입력: 1,697토큰, 출력: 346토큰, 총: 2,043토큰) [case:a2f1fa0d, req:5dc60ef8]
+2026-11-14 20:06:11.566 | WARN  | a131b32d | langfuse_client.py:600:log_generation - [DELAYED_CALLBACK_IGNORED] 종료된 트레이스의 지연 LLM 기록 무시: trace_id=a131b32d-5e02-4326-b6f3-e874faf1266f, gen=LegalAgent [case:a2f1fa0d, req:5dc60ef8]
+2026-11-14 20:06:11.577 | INFO  | a131b32d | decorators.py:373:log_success - [증거 문서 주장·사실 추출] 단계 완료 (5022.0ms) [case:a2f1fa0d, req:5dc60ef8]
+2026-11-14 20:06:11.582 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:06:11.594 | INFO  | 13a0501d | main.py:196:trace_context_middleware - testclient - "POST /api/v1/cases/a2f1fa0d-4cd7-4d9a-b92b-c5ebe3c534e5/evidence/invalid-doc-id/extract" 404 (10.5ms) [case:a2f1fa0d, req:7bff54d5]
+2026-11-14 20:06:11.596 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:06:11.644 | INFO  | c3bed871 | neo4j.py:114:get_driver      - Neo4j 연결 성공 [case:a2f1fa0d, req:2217a4d4]
+2026-11-14 20:06:11.767 | INFO  | c3bed871 | main.py:196:trace_context_middleware - testclient - "GET /api/v1/cases/a2f1fa0d-4cd7-4d9a-b92b-c5ebe3c534e5/evidence/conflicts" 200 (170.2ms) [case:a2f1fa0d, req:2217a4d4]
+2026-11-14 20:06:11.774 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:06:11.789 | INFO  | dbd94789 | cases.py:65:create_case      - 새로운 사건이 생성되었습니다: 'Cascade Fact Test Case' (ID: 4c6b823c-58b6-4c94-a6b5-0a9525134249) [req:dfd8d135]
+2026-11-14 20:06:11.789 | INFO  | dbd94789 | main.py:196:trace_context_middleware - testclient - "POST /api/v1/cases" 200 (14.2ms) [req:dfd8d135]
+2026-11-14 20:06:11.792 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:06:11.799 | INFO  | 8adb62cd | decorators.py:340:log_entry  - [증거 문서 수집 및 색인] 단계 시작 (ingest_evidence) [case:4c6b823c, req:86e72b3a]
+2026-11-14 20:06:11.816 | INFO  | 8adb62cd | decorators.py:373:log_success - [증거 문서 수집 및 색인] 단계 완료 (17.3ms) [case:4c6b823c, req:86e72b3a]
+2026-11-14 20:06:11.822 | INFO  | 8adb62cd | main.py:196:trace_context_middleware - testclient - "POST /api/v1/cases/4c6b823c-58b6-4c94-a6b5-0a9525134249/evidence" 200 (29.3ms) [case:4c6b823c, req:86e72b3a]
+2026-11-14 20:06:11.824 | INFO  | 8adb62cd | decorators.py:340:log_entry  - [증거 문서 원문 텍스트 추출] 단계 시작 (extract_text_from_evidence) [case:4c6b823c, req:86e72b3a]
+2026-11-14 20:06:11.838 | INFO  | 8adb62cd | decorators.py:373:log_success - [증거 문서 원문 텍스트 추출] 단계 완료 (14.2ms) [case:4c6b823c, req:86e72b3a]
+2026-11-14 20:06:11.839 | INFO  | 8adb62cd | decorators.py:340:log_entry  - [증거 문서 주장·사실 추출] 단계 시작 (extract_claims_from_evidence) [case:4c6b823c, req:86e72b3a]
+2026-11-14 20:06:12.433 | INFO  | 8adb62cd | callbacks.py:107:on_chat_model_start - [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:4c6b823c, req:86e72b3a]
+2026-11-14 20:06:16.006 | INFO  | 8adb62cd | callbacks.py:196:on_llm_end  - [LLM_IO_SIZE] agent=None node=None input_chars=1815 output_chars=0 input_tokens=1677 output_tokens=334 latency_ms=3573 [case:4c6b823c, req:86e72b3a]
+2026-11-14 20:06:16.007 | INFO  | 8adb62cd | callbacks.py:205:on_llm_end  - [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 3573ms, 입력: 1,677토큰, 출력: 334토큰, 총: 2,011토큰) [case:4c6b823c, req:86e72b3a]
+2026-11-14 20:06:16.021 | INFO  | 8adb62cd | decorators.py:373:log_success - [증거 문서 주장·사실 추출] 단계 완료 (4181.8ms) [case:4c6b823c, req:86e72b3a]
+2026-11-14 20:06:16.036 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:06:16.054 | INFO  | c3f075ce | main.py:196:trace_context_middleware - testclient - "GET /api/v1/cases/4c6b823c-58b6-4c94-a6b5-0a9525134249/evidence/f4f352e9-b3e2-477e-b1d2-5b1883b45ecc/claims" 200 (16.9ms) [case:4c6b823c, req:4fb97a5c]
+2026-11-14 20:06:16.058 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:06:16.130 | INFO  | 8311a627 | decorators.py:340:log_entry  - [사건 타임라인 구성] 단계 시작 (build_timeline_from_facts) [case:4c6b823c, req:57ac0f71]
+2026-11-14 20:06:16.131 | INFO  | 8311a627 | decorators.py:373:log_success - [사건 타임라인 구성] 단계 완료 (0.5ms) [case:4c6b823c, req:57ac0f71]
+2026-11-14 20:06:16.146 | INFO  | 8311a627 | main.py:196:trace_context_middleware - testclient - "POST /api/v1/cases/4c6b823c-58b6-4c94-a6b5-0a9525134249/evidence/f4f352e9-b3e2-477e-b1d2-5b1883b45ecc/claims/ff290347-89e5-49aa-9539-4320059f38ca/review" 200 (86.6ms) [case:4c6b823c, req:57ac0f71]
+2026-11-14 20:06:16.151 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:06:16.206 | INFO  | 47cf2c80 | decorators.py:340:log_entry  - [사건 타임라인 구성] 단계 시작 (build_timeline_from_facts) [case:4c6b823c, req:4c4136cf]
+2026-11-14 20:06:16.207 | INFO  | 47cf2c80 | decorators.py:373:log_success - [사건 타임라인 구성] 단계 완료 (0.5ms) [case:4c6b823c, req:4c4136cf]
+2026-11-14 20:06:16.380 | INFO  | 47cf2c80 | evidence_manager.py:1061:delete_evidence_document_and_cascade - [DELETE_EVIDENCE] Neo4j 동기 그래프 재투영 완료: case=4c6b823c-58b6-4c94-a6b5-0a9525134249, status=CASE_NOT_FOUND [case:4c6b823c, req:4c4136cf]
+2026-11-14 20:06:16.387 | INFO  | 47cf2c80 | main.py:196:trace_context_middleware - testclient - "DELETE /api/v1/cases/4c6b823c-58b6-4c94-a6b5-0a9525134249/evidence/f4f352e9-b3e2-477e-b1d2-5b1883b45ecc" 200 (234.7ms) [case:4c6b823c, req:4c4136cf]
+2026-11-14 20:06:53.491 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:06:53.628 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:06:53.640 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:06:53.660 | INFO  | 5b943c85 | cases.py:75:list_cases       - 사건 목록 조회 완료 (총 0건) [req:5ad6cb93]
+2026-11-14 20:06:53.666 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:06:54.667 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:06:54.703 | INFO  | a3700d43 | cases.py:65:create_case      - 새로운 사건이 생성되었습니다: 'Test Case' (ID: 6ac1d633-ab7a-44a7-9692-9bb65dbc6724) [req:61cebb6d]
+2026-11-14 20:06:54.704 | INFO  | a3700d43 | main.py:196:trace_context_middleware - testclient - "POST /api/v1/cases" 200 (35.5ms) [req:61cebb6d]
+2026-11-14 20:06:54.706 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:06:54.749 | INFO  | 76c8c0cf | decorators.py:340:log_entry  - [증거 문서 수집 및 색인] 단계 시작 (ingest_evidence) [case:6ac1d633, req:f9e58b98]
+2026-11-14 20:06:54.823 | INFO  | 76c8c0cf | decorators.py:373:log_success - [증거 문서 수집 및 색인] 단계 완료 (74.6ms) [case:6ac1d633, req:f9e58b98]
+2026-11-14 20:06:54.921 | INFO  | 76c8c0cf | main.py:196:trace_context_middleware - testclient - "POST /api/v1/cases/6ac1d633-ab7a-44a7-9692-9bb65dbc6724/evidence" 200 (212.7ms) [case:6ac1d633, req:f9e58b98]
+2026-11-14 20:06:54.949 | INFO  | 76c8c0cf | decorators.py:340:log_entry  - [증거 문서 원문 텍스트 추출] 단계 시작 (extract_text_from_evidence) [case:6ac1d633, req:f9e58b98]
+2026-11-14 20:06:55.063 | INFO  | 76c8c0cf | decorators.py:373:log_success - [증거 문서 원문 텍스트 추출] 단계 완료 (114.0ms) [case:6ac1d633, req:f9e58b98]
+2026-11-14 20:06:55.064 | INFO  | 76c8c0cf | decorators.py:340:log_entry  - [증거 문서 주장·사실 추출] 단계 시작 (extract_claims_from_evidence) [case:6ac1d633, req:f9e58b98]
+2026-11-14 20:06:55.985 | INFO  | 76c8c0cf | callbacks.py:107:on_chat_model_start - [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:6ac1d633, req:f9e58b98]
+2026-11-14 20:06:59.903 | INFO  | 76c8c0cf | callbacks.py:196:on_llm_end  - [LLM_IO_SIZE] agent=None node=None input_chars=1854 output_chars=0 input_tokens=1694 output_tokens=325 latency_ms=3918 [case:6ac1d633, req:f9e58b98]
+2026-11-14 20:06:59.903 | INFO  | 76c8c0cf | callbacks.py:205:on_llm_end  - [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 3918ms, 입력: 1,694토큰, 출력: 325토큰, 총: 2,019토큰) [case:6ac1d633, req:f9e58b98]
+2026-11-14 20:06:59.917 | INFO  | 76c8c0cf | decorators.py:373:log_success - [증거 문서 주장·사실 추출] 단계 완료 (4853.0ms) [case:6ac1d633, req:f9e58b98]
+2026-11-14 20:06:59.923 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:06:59.946 | INFO  | 67fa0fdd | main.py:196:trace_context_middleware - testclient - "GET /api/v1/cases/6ac1d633-ab7a-44a7-9692-9bb65dbc6724/evidence" 200 (21.8ms) [case:6ac1d633, req:0c316781]
+2026-11-14 20:06:59.949 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:06:59.969 | INFO  | 6a558409 | main.py:196:trace_context_middleware - testclient - "GET /api/v1/cases/6ac1d633-ab7a-44a7-9692-9bb65dbc6724/evidence/caa4a869-17a0-405a-a05e-1406af1c67b1/claims" 200 (17.8ms) [case:6ac1d633, req:e3332934]
+2026-11-14 20:06:59.971 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:06:59.986 | INFO  | ccb3cb82 | main.py:196:trace_context_middleware - testclient - "POST /api/v1/cases/6ac1d633-ab7a-44a7-9692-9bb65dbc6724/evidence/caa4a869-17a0-405a-a05e-1406af1c67b1/extract" 200 (14.1ms) [case:6ac1d633, req:738a9396]
+2026-11-14 20:06:59.989 | INFO  | ccb3cb82 | decorators.py:340:log_entry  - [증거 문서 원문 텍스트 추출] 단계 시작 (extract_text_from_evidence) [case:6ac1d633, req:738a9396]
+2026-11-14 20:06:59.989 | WARN  | ccb3cb82 | langfuse_client.py:445:start_span - [DELAYED_CALLBACK_IGNORED] 종료된 트레이스의 지연 스팬 생성 무시: trace_id=ccb3cb82-6831-484e-87c8-7acb8c158bdd, span=extract_text_from_evidence(ad7996d4-fed3-4bc4-b998-8d744ed93a86) [case:6ac1d633, req:738a9396]
+2026-11-14 20:07:00.004 | INFO  | ccb3cb82 | decorators.py:373:log_success - [증거 문서 원문 텍스트 추출] 단계 완료 (15.1ms) [case:6ac1d633, req:738a9396]
+2026-11-14 20:07:00.004 | INFO  | ccb3cb82 | decorators.py:340:log_entry  - [증거 문서 주장·사실 추출] 단계 시작 (extract_claims_from_evidence) [case:6ac1d633, req:738a9396]
+2026-11-14 20:07:00.004 | WARN  | ccb3cb82 | langfuse_client.py:445:start_span - [DELAYED_CALLBACK_IGNORED] 종료된 트레이스의 지연 스팬 생성 무시: trace_id=ccb3cb82-6831-484e-87c8-7acb8c158bdd, span=extract_claims_from_evidence(3405daa7-70de-483f-8a9c-840eba802d71) [case:6ac1d633, req:738a9396]
+2026-11-14 20:07:00.574 | INFO  | ccb3cb82 | callbacks.py:107:on_chat_model_start - [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:6ac1d633, req:738a9396]
+2026-11-14 20:07:04.566 | INFO  | ccb3cb82 | callbacks.py:196:on_llm_end  - [LLM_IO_SIZE] agent=None node=None input_chars=1854 output_chars=0 input_tokens=1692 output_tokens=324 latency_ms=3992 [case:6ac1d633, req:738a9396]
+2026-11-14 20:07:04.566 | INFO  | ccb3cb82 | callbacks.py:205:on_llm_end  - [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 3992ms, 입력: 1,692토큰, 출력: 324토큰, 총: 2,016토큰) [case:6ac1d633, req:738a9396]
+2026-11-14 20:07:04.567 | WARN  | ccb3cb82 | langfuse_client.py:600:log_generation - [DELAYED_CALLBACK_IGNORED] 종료된 트레이스의 지연 LLM 기록 무시: trace_id=ccb3cb82-6831-484e-87c8-7acb8c158bdd, gen=LegalAgent [case:6ac1d633, req:738a9396]
+2026-11-14 20:07:04.578 | INFO  | ccb3cb82 | decorators.py:373:log_success - [증거 문서 주장·사실 추출] 단계 완료 (4573.5ms) [case:6ac1d633, req:738a9396]
+2026-11-14 20:07:04.582 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:07:04.593 | INFO  | 12cbe55c | main.py:196:trace_context_middleware - testclient - "POST /api/v1/cases/6ac1d633-ab7a-44a7-9692-9bb65dbc6724/evidence/invalid-doc-id/extract" 404 (9.5ms) [case:6ac1d633, req:09cef0c8]
+2026-11-14 20:07:04.595 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:07:04.639 | INFO  | 14272acc | neo4j.py:114:get_driver      - Neo4j 연결 성공 [case:6ac1d633, req:0b087adc]
+2026-11-14 20:07:04.669 | INFO  | 14272acc | main.py:196:trace_context_middleware - testclient - "GET /api/v1/cases/6ac1d633-ab7a-44a7-9692-9bb65dbc6724/evidence/conflicts" 200 (73.2ms) [case:6ac1d633, req:0b087adc]
+2026-11-14 20:07:04.674 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:07:04.688 | INFO  | 946d1ed3 | cases.py:65:create_case      - 새로운 사건이 생성되었습니다: 'Cascade Fact Test Case' (ID: 8869b506-df6d-4c6a-b12a-91184afd2542) [req:7726ff65]
+2026-11-14 20:07:04.689 | INFO  | 946d1ed3 | main.py:196:trace_context_middleware - testclient - "POST /api/v1/cases" 200 (13.6ms) [req:7726ff65]
+2026-11-14 20:07:04.691 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:07:04.698 | INFO  | 59b08859 | decorators.py:340:log_entry  - [증거 문서 수집 및 색인] 단계 시작 (ingest_evidence) [case:8869b506, req:21f59f01]
+2026-11-14 20:07:04.708 | INFO  | 59b08859 | decorators.py:373:log_success - [증거 문서 수집 및 색인] 단계 완료 (10.0ms) [case:8869b506, req:21f59f01]
+2026-11-14 20:07:04.714 | INFO  | 59b08859 | main.py:196:trace_context_middleware - testclient - "POST /api/v1/cases/8869b506-df6d-4c6a-b12a-91184afd2542/evidence" 200 (21.9ms) [case:8869b506, req:21f59f01]
+2026-11-14 20:07:04.716 | INFO  | 59b08859 | decorators.py:340:log_entry  - [증거 문서 원문 텍스트 추출] 단계 시작 (extract_text_from_evidence) [case:8869b506, req:21f59f01]
+2026-11-14 20:07:04.729 | INFO  | 59b08859 | decorators.py:373:log_success - [증거 문서 원문 텍스트 추출] 단계 완료 (13.3ms) [case:8869b506, req:21f59f01]
+2026-11-14 20:07:04.730 | INFO  | 59b08859 | decorators.py:340:log_entry  - [증거 문서 주장·사실 추출] 단계 시작 (extract_claims_from_evidence) [case:8869b506, req:21f59f01]
+2026-11-14 20:07:05.342 | INFO  | 59b08859 | callbacks.py:107:on_chat_model_start - [LLM 호출 시작] 모델: gpt-5.4 (입력 메시지: 2건) [case:8869b506, req:21f59f01]
+2026-11-14 20:07:10.277 | INFO  | 59b08859 | callbacks.py:196:on_llm_end  - [LLM_IO_SIZE] agent=None node=None input_chars=1815 output_chars=0 input_tokens=1682 output_tokens=354 latency_ms=4935 [case:8869b506, req:21f59f01]
+2026-11-14 20:07:10.277 | INFO  | 59b08859 | callbacks.py:205:on_llm_end  - [LLM 호출 완료] 모델: gpt-5.4-2026-03-05 (소요: 4935ms, 입력: 1,682토큰, 출력: 354토큰, 총: 2,036토큰) [case:8869b506, req:21f59f01]
+2026-11-14 20:07:10.288 | INFO  | 59b08859 | decorators.py:373:log_success - [증거 문서 주장·사실 추출] 단계 완료 (5558.3ms) [case:8869b506, req:21f59f01]
+2026-11-14 20:07:10.302 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:07:10.319 | INFO  | 84df07bc | main.py:196:trace_context_middleware - testclient - "GET /api/v1/cases/8869b506-df6d-4c6a-b12a-91184afd2542/evidence/f97a5f56-5738-4103-8b42-6607931f548c/claims" 200 (15.2ms) [case:8869b506, req:9a6c01e6]
+2026-11-14 20:07:10.322 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:07:10.387 | INFO  | 413f6145 | decorators.py:340:log_entry  - [사건 타임라인 구성] 단계 시작 (build_timeline_from_facts) [case:8869b506, req:b8abcae0]
+2026-11-14 20:07:10.387 | INFO  | 413f6145 | decorators.py:373:log_success - [사건 타임라인 구성] 단계 완료 (0.5ms) [case:8869b506, req:b8abcae0]
+2026-11-14 20:07:10.399 | INFO  | 413f6145 | main.py:196:trace_context_middleware - testclient - "POST /api/v1/cases/8869b506-df6d-4c6a-b12a-91184afd2542/evidence/f97a5f56-5738-4103-8b42-6607931f548c/claims/f2efde8b-3ec2-493c-8c57-4987b7e2b35e/review" 200 (75.5ms) [case:8869b506, req:b8abcae0]
+2026-11-14 20:07:10.404 | DEBUG | -------- | selector_events.py:54:__init__ - [비동기 이벤트 루프] 입출력 제어기 초기화 완료 (SelectSelector)
+2026-11-14 20:07:10.451 | INFO  | 15faf0ef | decorators.py:340:log_entry  - [사건 타임라인 구성] 단계 시작 (build_timeline_from_facts) [case:8869b506, req:a96633cd]
+2026-11-14 20:07:10.452 | INFO  | 15faf0ef | decorators.py:373:log_success - [사건 타임라인 구성] 단계 완료 (1.1ms) [case:8869b506, req:a96633cd]
+2026-11-14 20:07:10.507 | INFO  | 15faf0ef | evidence_manager.py:1061:delete_evidence_document_and_cascade - [DELETE_EVIDENCE] Neo4j 동기 그래프 재투영 완료: case=8869b506-df6d-4c6a-b12a-91184afd2542, status=CASE_NOT_FOUND [case:8869b506, req:a96633cd]
+2026-11-14 20:07:10.513 | INFO  | 15faf0ef | main.py:196:trace_context_middleware - testclient - "DELETE /api/v1/cases/8869b506-df6d-4c6a-b12a-91184afd2542/evidence/f97a5f56-5738-4103-8b42-6607931f548c" 200 (108.0ms) [case:8869b506, req:a96633cd]

@@ -1651,3 +1651,8 @@
 2026-11-14 19:53:49.156 | INFO  | 0cbbb3a6 | main.py:184:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/v5_20261114_sc002_50834c/consultations" 200 (46.1ms) [case:v5_20261, req:2107990c]
 2026-11-14 19:53:49.202 | INFO  | 128d7883 | main.py:184:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/v5_20261114_sc002_50834c/evidence" 200 (90.5ms) [case:v5_20261, req:b3ddaa3e]
 2026-11-14 19:54:28.134 | INFO  | d36874dc | main.py:184:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases/v5_20261114_sc002_50834c/evidence/27161b44-d07d-4b2c-8c5d-9a5c2e7696a7/claims" 200 (26.4ms) [case:v5_20261, req:19095287]
+2026-11-14 20:03:59.857 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-11-14 20:03:59.968 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-11-14 20:03:59.996 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-11-14 20:04:00.048 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-11-14 20:04:00.048 | INFO  | -------- | server.py:113:_serve         - Finished server process [31656]

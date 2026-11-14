@@ -121,6 +121,7 @@ def test_lazy_trace_creation_in_start_span_and_log_generation():
         assert mock_lf.trace.called
         assert orphan_trace_id in _active_traces
         assert span_id in _active_spans
+        end_trace(orphan_trace_id)
 
         # log_generation 역시 미등록 Trace에서 자동 복구되는지 확인
         gen_trace_id = str(uuid.uuid4())

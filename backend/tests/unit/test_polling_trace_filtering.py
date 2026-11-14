@@ -35,12 +35,14 @@ def test_polling_consultation_skips_langfuse_and_info_log():
     """GET /api/v1/consultations/{id} 폴링 시 Langfuse Trace 및 INFO 로그가 생략되는지 검증한다."""
     req_id = "test-poll-12345"
     # 메모리에 모의 응답 등록
-    _consultations[req_id] = ConsultationResponse(
+    mock_resp = ConsultationResponse(
         request_id=req_id,
         trace_id="tr-test-123",
         status="RUNNING",
         created_at="2026-10-27T12:00:00Z",
     )
+    mock_resp._user_id = mock_user.id
+    _consultations[req_id] = mock_resp
 
     with patch("ai_legal_helper.observability.langfuse_client.start_trace") as mock_start_trace, \
          patch("ai_legal_helper.api.main.logger.info") as mock_log_info, \
@@ -79,13 +81,30 @@ def test_polling_consultation_logs_warning_on_error():
         assert f"/api/v1/consultations/{req_id}" in mock_log_warning.call_args[0][0]
 
 
-def test_regular_request_records_trace_and_info_log():
-    """일반 API 요청(예: cases 목록 조회 등)은 Langfuse Trace와 INFO 로그가 정상 기록됨을 검증한다."""
+def test_read_only_get_skips_langfuse_trace_but_keeps_info_log():
+    """단순 DB 조회성 GET 요청(예: cases 목록 조회, claims 조회 등)은 빈 Langfuse Trace를 생성하지 않고, INFO 로그만 정상 기록함을 검증한다."""
     with patch("ai_legal_helper.observability.langfuse_client.start_trace") as mock_start_trace, \
          patch("ai_legal_helper.api.main.logger.info") as mock_log_info:
 
         resp = client.get("/api/v1/cases")
-        # 인증 여부와 무관하게 미들웨어의 trace_start 및 log_info는 정상 실행됨
-        assert mock_start_trace.called
+        # 단순 RDB 조회의 경우 Langfuse Root Trace를 생성하지 않아야 함 (빈 트레이스 노이즈 차단)
+        mock_start_trace.assert_not_called()
+        # 서버 액세스 로깅(INFO)은 정상 유지되어야 함
         assert mock_log_info.called
         assert "/api/v1/cases" in mock_log_info.call_args[0][0]
+
+
+def test_consultation_post_records_langfuse_trace():
+    """핵심 AI 상담 워크플로우(POST /api/v1/consultations)는 Langfuse Trace(LegalAgent)와 INFO 로그가 정상 기록됨을 검증한다."""
+    with patch("ai_legal_helper.observability.langfuse_client.start_trace") as mock_start_trace, \
+         patch("ai_legal_helper.api.main.logger.info") as mock_log_info, \
+         patch("ai_legal_helper.api.routes.consultation.process_consultation") as mock_process:
+
+        resp = client.post(
+            "/api/v1/consultations",
+            json={"question": "보증금 반환 문의드립니다.", "case_id": "test-case-id"},
+        )
+        # 상담 파이프라인은 'LegalAgent' 이름으로 Langfuse Root Trace가 생성되어야 함
+        assert mock_start_trace.called
+        assert mock_start_trace.call_args[1]["name"] == "LegalAgent"
+        assert mock_log_info.called
