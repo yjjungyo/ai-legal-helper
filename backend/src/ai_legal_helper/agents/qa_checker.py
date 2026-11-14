@@ -292,29 +292,56 @@ def check_deterministic_qa(
                     )
                     break
 
-    # 4-2. [SC-013 3단계] 선순위 담보권과 경매 매각 시 대항력 소멸주의(민사집행법 제91조 제3항) 결정론적 검사
+    # 4-2. [경매 권리관계 결정론적 검사 및 오탐 방지]
     # 질문 또는 사건 맥락에 선순위 담보권/근저당권이 명시된 사안에서, 후순위 임차인이 경매 낙찰자(매수인)에게
-    # 대항할 수 있다거나 보증금 반환/인수를 요구할 수 있다고 잘못 결론 내린 단정문 탐지
-    # 질문/사건맥락뿐 아니라 등록된 사건 출처(등기부 등)에 선순위 근저당권·담보권이 설정된 사실이 포함된 경우도 감지
+    # 대항할 수 있다거나 보증금 반환/인수를 요구할 수 있다고 잘못 결론 내린 단정문 탐지.
+    # [오탐 방지 핵심 원칙]:
+    # 1. 등기부에 근저당권이 존재하더라도 임차인이 근저당권보다 먼저 대항력을 취득한 '선순위 임차인'인 경우,
+    #    낙찰자에게 대항하거나 보증금 인수를 요구할 수 있는 것이 적법한 법리(주택임대차보호법 제3조 제4항, 민사집행법 제91조 제4항)이다.
+    # 2. 따라서 임차인의 선순위 대항력이 확인되거나 선순위 여부가 확정되지 않은 사안을 정규식으로 위반 단정(legal_risk_passed=False)하지 않는다.
+    # 3. 등기부 근저당권 존재 사실만 있고 선후순위가 미확정인 경우, 조기 PASS를 방지하고 LLM 심층 검증(requires_llm_eval=True)으로 위임한다.
     sources_has_mortgage = any(
         (src.get("source_type") == "CASE_EVIDENCE" or "등기" in str(src.get("filename") or "") or "등기" in str(src.get("document_name") or ""))
-        and any(kw in str(src.get("content") or "") for kw in ("근저당권설정", "근저당권 설정", "채권최고액", "1순위 근저당"))
+        and any(kw in str(src.get("content") or "") for kw in ("근저당권설정", "근저당권 설정", "채권최고액", "1순위 근저당", "2순위 근저당"))
         for src in (retrieved_sources or []) if isinstance(src, dict)
     )
-    has_prior_encumbrance = (
-        (
-            any(
-                kw in question or kw in case_context
-                for kw in ("선순위 근저당", "선순위근저당", "선순위 담보", "1순위 근저당", "근저당권(20", "근저당권이 설정된 후", "근저당권 설정 후")
-            )
-            or sources_has_mortgage
+    # 임차인이 근저당권보다 선순위(대항요건 먼저 구비)임을 나타내는 표현 감지
+    senior_tenant_explicit = any(
+        kw in question or kw in case_context
+        for kw in (
+            "선순위 임차인", "임차인이 선순위", "전입 후 근저당", "전입신고 후 근저당",
+            "대항력 취득 후 근저당", "후순위 근저당", "후순위근저당", "선순위 대항력",
+            "근저당권보다 앞선", "근저당권보다 먼저", "근저당권 전 전입", "근저당권 전 입주",
+            "선순위로 대항력"
         )
+    )
+    # 연도 기반 선후순위 간이 대조 (예: 2023년 전입 vs 2025년 근저당)
+    m_tenant_yr = re.search(r"(\d{4})년\s*(?:\d{1,2}월)?\s*(?:전입|계약|입주|대항력)", question + " " + case_context)
+    m_mortgage_yr = re.search(r"(\d{4})년\s*(?:\d{1,2}월)?\s*(?:근저당|담보|설정)", question + " " + case_context)
+    if m_tenant_yr and m_mortgage_yr and int(m_tenant_yr.group(1)) < int(m_mortgage_yr.group(1)):
+        senior_tenant_explicit = True
+
+    # 확실하게 임차인보다 앞선 선순위 담보권이 명시된 경우만 선순위 담보권 존재 사안으로 확정
+    has_confirmed_prior_encumbrance = (
+        any(
+            kw in question or kw in case_context
+            for kw in ("선순위 근저당", "선순위근저당", "선순위 담보", "1순위 근저당", "근저당권(20", "근저당권이 설정된 후", "근저당권 설정 후")
+        )
+        and not senior_tenant_explicit
         and not any(
             no_kw in question or no_kw in case_context
             for no_kw in ("선순위 담보권이 전혀 없", "선순위 담보권이 없", "선순위 근저당이 없", "선순위 권리 없음", "선순위 담보 없음", "선순위근저당 없음")
         )
     )
-    if has_prior_encumbrance:
+
+    if sources_has_mortgage and not senior_tenant_explicit and not has_confirmed_prior_encumbrance:
+        # 등기부상 근저당권이 존재하지만 선후순위가 질문/맥락상 명시되지 않은 경우:
+        # 정규식으로 위반 단정(legal_risk_passed=False)을 내리지 않고 LLM 의미 기반 심층 검증으로 전달
+        llm_eval_reasons.append(
+            "등기부상 근저당권 존재: 대항력 취득일과 근저당권 설정일의 선후순위 및 경매 시 인수·소멸 여부를 LLM 및 증거로 심층 검증"
+        )
+
+    if has_confirmed_prior_encumbrance:
         buyer_assumption_positive_pats = [
             re.compile(r"낙찰자(?:에게|를\s*상대로)?\s*(?:(?:미회수\s*)?보증금(?:\s*(?:의\s*)?반환)?|반환)을?\s*청구할\s*수\s*있"),
             re.compile(r"낙찰자(?:에게|를\s*상대로)?\s*대항할\s*수\s*있"),

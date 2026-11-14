@@ -451,6 +451,23 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
             c.get("claim_type") in ("LEGAL_RULE", "LEGAL_APPLICATION")
             for c in result.get("claims", [])
         )
+        # [P0-DEFENSE] 초안 본문에 법률적 권리·효과 단정(대항력, 보증금 청구/반환, 경매 인수, 계약 해지 등)이 포함되어 있으나,
+        # 검증 Claims 중 이를 뒷받침(SUPPORTED)하는 법률 주장(LEGAL_APPLICATION/LEGAL_RULE)이 단 1건도 존재하지 않는 경우
+        # (검증기 추출 누락으로 인한 위험한 미검증 법률 결론 누출 차단)
+        draft_legal_assertion_patterns = [
+            re.compile(r"(?:낙찰자|매수인|경락인|임대인)(?:에게|를\s*상대로)?\s*(?:[^\r\n]{0,25})?(?:대항|청구|반환청구|요구)할\s*수\s*있"),
+            re.compile(r"(?:낙찰자|매수인|경락인)(?:가|는|이)\s*(?:[^\r\n]{0,25})?인수해야\s*(?:합|한)"),
+            re.compile(r"(?:소멸하지\s*않고|대항력을\s*유지하여)\s*(?:낙찰자|매수인|경락인)에게\s*인수"),
+            re.compile(r"(?:계약|임대차)이?\s*(?:적법하게\s*)?(?:종료|해지)(?:되었|됐|된\s*것으로)"),
+        ]
+        has_unverified_draft_legal_assertion = (
+            any(p.search(draft) for p in draft_legal_assertion_patterns)
+            and not any(
+                c.get("grounding_status") == "SUPPORTED"
+                and c.get("claim_type") in ("LEGAL_RULE", "LEGAL_APPLICATION")
+                for c in result.get("claims", [])
+            )
+        )
         has_fatal_legal_error = (
             any(
                 c.get("grounding_status") in ("UNSUPPORTED", "UNCERTAIN")
@@ -465,6 +482,7 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
             )
             or result.get("reason_code") in ("LEGAL_SOURCE_MISSING", "LEGAL_SOURCE_INSUFFICIENT", "CITATION_INVALID")
             or (isinstance(result.get("qa_summary"), dict) and result.get("qa_summary", {}).get("legal_risk_passed") is False)
+            or has_unverified_draft_legal_assertion
         )
         if has_supported and not has_fatal_legal_error:
             result["pre_fallback_status"] = result.get("status")

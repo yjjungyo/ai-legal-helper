@@ -243,17 +243,55 @@ def prune_sources_for_verification(
             continue
 
         # 미인용 증거는 메타데이터 유지 + 본문 스니펫 축약
-        # 단, 권리관계 및 사실 판단에 핵심적인 서증(등기부등본, 계약서 등)은 최소 400자 및 핵심 권리내역 보존
+        # [의미 기반 핵심 증거 식별]: 파일명뿐 아니라 본문 내용에 권리관계 키워드가 포함된 경우도 핵심 증거로 분류
         raw_content = str(src.get("content") or "").strip()
-        is_core_evidence = any(
-            kw in str(src.get("filename") or "").lower() or kw in str(src.get("document_name") or "").lower()
-            for kw in ("등기", "계약", "registry", "contract", "전부증명서", "가압류", "근저당")
+        is_core_evidence = (
+            any(
+                kw in str(src.get("filename") or "").lower() or kw in str(src.get("document_name") or "").lower()
+                for kw in ("등기", "계약", "registry", "contract", "전부증명서", "가압류", "근저당")
+            )
+            or any(
+                kw in raw_content
+                for kw in ("근저당권설정", "근저당권 설정", "채권최고액", "가압류", "경매개시결정", "말소등기", "임차권등기", "확정일자")
+            )
         )
-        # 등기부 을구(근저당·가압류)나 계약서 특약사항 등 후반부 핵심 반대 증거(Counter-Evidence)가 유실되지 않도록 최소 1,500자 보존
+        # 핵심 증거는 1,500자까지 우선 보존하며, 1,500자 뒤에 위치한 핵심 반대 증거(Counter-Evidence: 말소, 가압류, 근저당 등)도
+        # 윈도우 발췌를 통해 검증 컨텍스트에서 유실되지 않도록 정밀 보존
         snippet_len = max(max_unreferenced_snippet, 1500) if is_core_evidence else max_unreferenced_snippet
         if len(raw_content) > snippet_len:
             condensed = dict(src)
-            condensed["content"] = f"{raw_content[:snippet_len]}... (초안 미인용 증거: 상세 본문 생략)"
+            deep_keywords = (
+                "근저당", "저당권", "가압류", "압류", "경매", "말소", "을구", "갑구",
+                "순위번호", "접수일", "채권최고액", "특약", "임차권등기", "배당요구"
+            )
+            deep_windows = []
+            for kw in deep_keywords:
+                pos = raw_content.find(kw, snippet_len)
+                while pos != -1:
+                    w_start = max(snippet_len, pos - 150)
+                    w_end = min(len(raw_content), pos + 250)
+                    deep_windows.append((w_start, w_end))
+                    pos = raw_content.find(kw, pos + len(kw) + 150)
+
+            if deep_windows:
+                deep_windows.sort()
+                merged_windows = []
+                cur_start, cur_end = deep_windows[0]
+                for s, e in deep_windows[1:]:
+                    if s <= cur_end + 50:
+                        cur_end = max(cur_end, e)
+                    else:
+                        merged_windows.append((cur_start, cur_end))
+                        cur_start, cur_end = s, e
+                merged_windows.append((cur_start, cur_end))
+
+                extracted_parts = [raw_content[:snippet_len]]
+                for ws, we in merged_windows[:3]:
+                    extracted_parts.append(f"\n... [핵심 권리/반대 증거 구간 발췌 (위치: {ws}~{we}자)] ...\n{raw_content[ws:we]}")
+                extracted_parts.append("\n... (초안 미인용 증거: 기타 상세 본문 생략)")
+                condensed["content"] = "".join(extracted_parts)
+            else:
+                condensed["content"] = f"{raw_content[:snippet_len]}... (초안 미인용 증거: 상세 본문 생략)"
             pruned_evidence_sources.append(condensed)
         else:
             pruned_evidence_sources.append(src)
