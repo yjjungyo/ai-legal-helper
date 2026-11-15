@@ -468,6 +468,19 @@ def analyze_consultation_intent(
     if decision.intent == ConsultationIntent.FOLLOWUP_ACTION:
         decision.requires_verification = True
 
+        # [안전 폴백] 장문의 사건 연계 요청을 LLM이 단순 조치 요청으로 잘못
+        # 축약한 경우 검증된 사건 사실·법령을 생략하지 않는다. 특정 법령·금액·
+        # 표현의 단어목록을 만들지 않고, 짧은 제안 수락과 독립 서술형 요청을
+        # 구분하는 최소 보수적 게이트이다. 실제 의도 판정은 LLM에 맡긴다.
+        # 형식 변경만 요청한 짧은 수락은 FOLLOWUP_ACTION으로 그대로 유지.
+        if (decision.consultation_mode == ConsultationMode.CASE_EVIDENCE
+                and len(question.strip()) >= 50):
+            decision.intent = ConsultationIntent.NEW_LEGAL_ANALYSIS
+            decision.requires_specialist = True
+            decision.requires_retrieval = True
+            decision.requires_full_analysis = True
+            decision.reason = (decision.reason or "") + " / 상세 사건 요청의 근거 재검증 우선"
+
     # 정책 C: GENERAL_CONVERSATION인 경우 모든 무거운 파이프라인 비활성화
     # 법률 무관 요청은 일반 인사와 별도 의도로 유지하고 무거운 분석을 중지한다.
     if decision.intent in (ConsultationIntent.GENERAL_CONVERSATION, ConsultationIntent.OUT_OF_SCOPE):
