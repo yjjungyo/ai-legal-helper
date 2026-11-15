@@ -86,7 +86,9 @@
 - 기존: Conversation Context Regression, Semantic Judgment Safety Regression 및 법령·증거 연계 워크플로우 검사도 PR에서 실행.
 - 최초 CI 커밋 `49275f6`: Syntax compile 통과, 새 회귀 포함 **22 passed / 2 failed**, 두 실패 모두 *새 테스트 픽스처에 필수 title 필드를 누락한 작성 실수*. `508926d2`에서 수정.
 - 같은 최초 CI의 Semantic Judgment Safety Regression은 **298 passed / 1 failed / 3 skipped**. 남은 오류 `test_official_statute_versions_p4.py::test_undated_legacy_official_xml_no_longer_fabricates_pdf_page`는 변경하지 않은 법령 검색의 *조문+부칙 2건* 반환과 테스트의 *1건 기대* 불일치로, Issue Planner 관련 로직 변경에 직접 원인이 없음을 파일 diff로 확인. 별도 법령 검색 품질 이슈로 추적 필요.
-- **최종 HEAD CI 판정은 Actions 실제 로그 확인 후 갱신.** 테스트 완료 전 '전부 통과'로 기록하지 않음.
+- 수정된 `508926d2`에 대한 Semantic Issue Planner Regression 및 Conversation Context Regression 등 **5개 관련 검사 성공** 확인.
+- 새로운 법령 후보가 출처 없이 VERIFIED 되지 않는 검증기 보호 테스트를 1개 추가한 `84f6906`에 대해 **Semantic Issue Planner Regression 25 passed, 2 warnings (Python 3.11, 1.61초)** 확인: https://github.com/yjjungyo/ai-legal-helper/actions/runs/43672392180
+- **최종 종합 CI 중 광범위 법령 의미 안전 검사는 기존 법령/부칙 기대 결과 충돌 때문에 불합격할 수 있으며, 이 상태를 전체 품질 PASS로 표시하지 않는다.** 테스트 항목·실패 원인 구분은 아래 검토에 남긴다.
 
 ## 5. 수동 검증 및 다음 단계
 
