@@ -88,7 +88,9 @@
 - 같은 최초 CI의 Semantic Judgment Safety Regression은 **298 passed / 1 failed / 3 skipped**. 남은 오류 `test_official_statute_versions_p4.py::test_undated_legacy_official_xml_no_longer_fabricates_pdf_page`는 변경하지 않은 법령 검색의 *조문+부칙 2건* 반환과 테스트의 *1건 기대* 불일치로, Issue Planner 관련 로직 변경에 직접 원인이 없음을 파일 diff로 확인. 별도 법령 검색 품질 이슈로 추적 필요.
 - 수정된 `508926d2`에 대한 Semantic Issue Planner Regression 및 Conversation Context Regression 등 **5개 관련 검사 성공** 확인.
 - 새로운 법령 후보가 출처 없이 VERIFIED 되지 않는 검증기 보호 테스트를 1개 추가한 `84f6906`에 대해 **Semantic Issue Planner Regression 25 passed, 2 warnings (Python 3.11, 1.61초)** 확인: https://github.com/yjjungyo/ai-legal-helper/actions/runs/43672392180
-- **최종 종합 CI 중 광범위 법령 의미 안전 검사는 기존 법령/부칙 기대 결과 충돌 때문에 불합격할 수 있으며, 이 상태를 전체 품질 PASS로 표시하지 않는다.** 테스트 항목·실패 원인 구분은 아래 검토에 남긴다.
+- 동일 `84f6906` 커밋의 GitHub Actions 6개 중 **5개 성공**: Semantic Issue Planner Regression, Conversation Context Regression, Temporal RAG P6 HITL workflow, Temporal RAG P7 evidence bundle, Temporal RAG P8 verification.
+- **1개 실패 (별도 기존 법령 테스트)**: Semantic Judgment Safety Regression: `1 failed, 298 passed, 3 skipped`. `backend/tests/unit/test_official_statute_versions_p4.py::test_undated_legacy_official_xml_no_longer_fabricates_pdf_page`가 조문 + 부칙 2건 실제 반환에 대해 1건을 기대하여 실패. 이번 PR에서 `official_statute_search.py`, `test_official_statute_versions_p4.py`는 수정하지 않았음. https://github.com/yjjungyo/ai-legal-helper/actions/runs/43672392135
+- 그러므로 **이번 변경의 표적 회귀는 PASS, 전체 PR CI는 미완전(5/6)**으로 표기한다. unrelated CI 실패를 숨기거나 본 PR에서 법령 기능 수정으로 섞지 않는다.
 
 ## 5. 수동 검증 및 다음 단계
 
