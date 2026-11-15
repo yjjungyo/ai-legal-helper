@@ -352,10 +352,11 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
     # 별도 신규 그래프 노드를 추가하지 않으며, Router는 분류 결과를 재사용한다.
     if has_history:
         case_memory = getattr(c_obj, "case_memory", None) or {}
-        case_hint = (
-            f"사건명: {str(case_memory.get('title') or '')[:100]}, "
-            f"사건 분야: {str(case_memory.get('case_type') or '')[:40]}"
-        )
+        # [ISSUE-SEMANTIC-04 / Gemini 인계] 사건명에는 평가용 정답 단어, 사용자 주장,
+        # 과거 AI 판단이 포함될 수 있다. Intent Analyzer의 중립적 쟁점 추출을
+        # 편향시키지 않도록 제목은 전달하지 않고 분야 메타데이터만 사용한다.
+        # 실제 사건 사실은 이후 case_evidence_briefing의 승인 증거가 권위 기준이다.
+        case_hint = f"사건 분야: {str(case_memory.get('case_type') or '')[:40]}"
         decision = analyze_consultation_intent(
             q, conversation_context=c_obj, case_context=case_hint, use_llm=True,
         )
@@ -433,7 +434,16 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
                 # 원문 질문과 문맥 복원 질의를 모두 사용할 수 있도록 한다.
                 # 특히 단문 후속 질문은 resolved_query가 증거 검색/쟁점 생성의 입력이 된다.
                 briefing = build_case_evidence_briefing(db, case_id, effective_resolved_query)
-                tasks = plan_legal_issues(effective_resolved_query, briefing)
+                # 기존 Intent Analyzer가 후속 질문에 대해 이미 의미를 복원한
+                # 결과를 Issue Planner로 직접 전달한다. 두 번째 LLM 호출이 없고,
+                # 사용자가 현재 묻는 쟁점 외의 레거시 키워드 분기 생성을 방지한다.
+                tasks = plan_legal_issues(
+                    effective_resolved_query,
+                    briefing,
+                    semantic_outlines=decision.legal_issue_outlines if decision else None,
+                    focus_current_question=has_history,
+                    original_question=q,
+                )
 
                 briefing_dict = briefing.model_dump()
                 issue_tasks_dict = [task.model_dump() for task in tasks]
@@ -497,6 +507,8 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
             "consultation_mode": consultation_mode,
             "categories": decision.categories if decision else [],
             "resolved_query": effective_resolved_query,
+            # 추적용 의미 쟁점 윤곽(확정 법적 판단이나 공식 출처 아님).
+            "legal_issue_outlines": decision.legal_issue_outlines if decision else [],
             "requires_specialist": decision.requires_specialist if decision else not pure_greeting,
             "requires_retrieval": decision.requires_retrieval if decision else not pure_greeting,
             "requires_verification": decision.requires_verification if decision else not pure_greeting,
@@ -1198,21 +1210,25 @@ async def run_agents_node(state: LegalState) -> Dict:
             # 분야 분류가 지정되지 않은 경우 전체 컬렉션(category=None)을 1회 검색
             categories_to_query = [None]
 
-        # [SC-013 2단계 검색 쿼리 정밀화]
-        # 사용자 질문에만 의존하지 않고, 쟁점 계획의 핵심 법률 질문을 간결하게 결합하여 법률적 요건사실 기반 검색 수행.
-        # (특정 법령명/조문을 강제로 하드코딩하지 않고, 도출된 쟁점 질문의 법률적 핵심 취지를 반영)
-        user_raw_q = state.get("resolved_query") or state.get("question", "")
+        # [ISSUE-SEMANTIC-05 / Gemini 인계] RAG 검색 입력 SSOT:
+        # (1) 사용자 원문 (2) 문맥 복원 질의 (3) 관련된 중립 법률 쟁점.
+        # 사건명/시나리오 ID에는 '불가분채무', '선순위' 같은 기대 결론이
+        # 섞일 수 있어 벡터 검색어로 사용하지 않는다(정답 누출 방지).
+        # 원문을 복원 질의로 덮어쓰지 않고, 의미가 같은 반복 내용은 생략한다.
+        # 법적 요건/시점은 원문+복원 질의에 보존하고, 모델이 만든 '정답'은
+        # 검색과 검증의 출처가 될 수 없다.
+        user_raw_q = str(state.get("question") or "").strip()
+        resolved_q = str(state.get("resolved_query") or "").strip()
         query_parts = [user_raw_q] if user_raw_q else []
-        case_title = str((state.get("case_evidence_briefing") or {}).get("title") or "").strip()
-        if case_title and case_title not in query_parts:
-            query_parts.append(case_title)
+        if resolved_q and resolved_q != user_raw_q:
+            query_parts.append(resolved_q)
         issue_tasks = state.get("issue_tasks") or []
         for task in issue_tasks[:3]:
             if isinstance(task, dict):
                 lqs = task.get("legal_questions") or []
-                if lqs and lqs[0] not in query_parts:
-                    query_parts.append(lqs[0])
-        retrieval_query = " \n".join(query_parts) if query_parts else user_raw_q
+                if lqs and isinstance(lqs[0], str) and lqs[0].strip() not in query_parts:
+                    query_parts.append(lqs[0].strip())
+        retrieval_query = " \n".join(query_parts) if query_parts else resolved_q
 
         for category in categories_to_query:
             try:
