@@ -313,16 +313,90 @@ def verify_answer(state: Dict[str, Any]) -> Dict[str, Any]:
             or (state.get("intent_decision") or {}).get("requires_full_analysis") is False
         )
         require_coverage = not is_followup
-        # 검증 함수의 반환값은 추적 SDK가 비동기로 직렬화한다. 추적 중인 딕셔너리에
-        # 해시·명세를 추가하면 순회 중 변경 오류로 관측값이 유실될 수 있어 새 객체를 만든다.
-        result = {**run_verification(consultation_question(state), draft, sources, context,
-                                     require_question_coverage=require_coverage), "source_manifest": manifest}
+        # [STEP5-PROGRESS-04 / Gemini] 재작성에서 초안/근거가 바뀌지
+        # 않았다면, 직전의 *완료된* 검증을 동일 입력 계약 아래에서만 재사용.
+        # 초안 해시 한 개만으로는 부족하다. 질문·검토일·출처 본문/건수·
+        # 질문 전체 검증 여부가 모두 일치하고 승인 문서 스냅샷도
+        # validate_document_snapshot()으로 다시 확인한 뒤 재사용한다.
+        # 법률 사실의 요건 충족 판정과 Temporal Gate는 재사용 결정에
+        # 끼워 넣지 않는다. Timestamp/시행일 모호 검토는 캐시 금지.
+        from ai_legal_helper.workflows.verification_progress import (
+            can_reuse_verification,
+            verification_input_hash,
+            verification_defect_signature,
+        )
+        question = consultation_question(state)
+        input_hash = verification_input_hash(
+            question=question,
+            draft_answer=draft,
+            manifest=manifest,
+            as_of_date=as_of,
+            require_question_coverage=require_coverage,
+        )
+        previous = state.get("verification_result") or {}
+        reusable = bool(
+            state.get("revision_no_progress") and can_reuse_verification(
+                previous=previous,
+                expected_input_hash=input_hash,
+                current_draft=draft,
+                current_manifest=manifest,
+            )
+        )
+        if reusable:
+            # 이미 독립 LLM 검증을 거친 결과만 복사한다. 실패 결론을
+            # PASS로 승격하거나 검증되지 않은 추가 법률효과를 인정하지 않는다.
+            result = {**previous, "source_manifest": manifest}
+            logger.info("[STEP5_VERIFY] 답변·질문·원문 불변: LLM 검증 호출 1회 생략")
+        else:
+            # 검증 함수의 반환값은 추적 SDK가 비동기로 직렬화한다.
+            # 해시·명세를 추가할 때는 원본을 수정하지 않고 새 객체를 만든다.
+            result = {**run_verification(question, draft, sources, context,
+                                         require_question_coverage=require_coverage),
+                      "source_manifest": manifest}
+        result["verification_input_hash"] = input_hash
     except Exception as exc:
         logger.warning("문서 원문 검증 실패: %s (%s)", type(exc).__name__, exc)
         result = {"status": "INSUFFICIENT", "reason_code": "VERIFICATION_ERROR",
                   "claims": [], "warnings": ["등록 자료와 답변의 대조를 완료하지 못했습니다."],
                   "missing_issues": [], "revision_instructions": []}
     result["verified_answer_sha256"] = hashlib.sha256(draft.encode("utf-8")).hexdigest()
+    # [STEP5-PROGRESS-05] 구조화 결함 fingerprint는 출처가 달라지거나
+    # 질문 충족·법령/판례 포섭 결과가 개선되면 바뀐다. 모델이 답변의
+    # 표현만 다르게 쓰고 동일 결함을 반복하면 그 사실만 표시한다.
+    # 이 함수는 법률적 참/거짓을 검사하지 않으며, 종료 정책은
+    # next_verification_step()과 기존 finish_answer()가 결정한다.
+    progress_history = list(state.get("verification_progress_history") or [])
+    reusable = bool(
+        result.get("verification_input_hash")
+        and state.get("revision_no_progress")
+        and result.get("verification_input_hash") ==
+            (state.get("verification_result") or {}).get("verification_input_hash")
+        and result.get("reason_code") not in (
+            "VERIFICATION_ERROR", "TEMPORAL_SEMANTIC_CONTRADICTION"
+        )
+        and not result.get("temporal_recheck_only")
+        and (result.get("temporal_gate") or {}).get("status") != "BLOCK"
+    )
+    if result.get("status") == "PASS":
+        progress_history = []
+        no_progress = False
+    elif result.get("reason_code") == "VERIFICATION_ERROR":
+        no_progress = False
+    else:
+        from ai_legal_helper.workflows.verification_progress import verification_defect_signature
+        issue_hash = verification_defect_signature(
+            result, question=consultation_question(state),
+            sources_sha256=(result.get("source_manifest") or {}).get("content_sha256") or "",
+        )
+        no_progress = issue_hash in progress_history or reusable
+        if issue_hash not in progress_history:
+            progress_history = (progress_history + [issue_hash])[-5:]
+    if no_progress:
+        logger.info(
+            "[STEP5_VERIFY] 재검증 후 동일 결함 재발 또는 동일 검증 재사용 "
+            "(revision_count=%d, source_delta_count=%s)",
+            state.get("revision_count") or 0, state.get("search_delta_count"),
+        )
     preserved = list(state.get("preserved_points") or [])
     for pt in result.get("preserved_points") or []:
         if isinstance(pt, str) and pt.strip() and pt.strip() not in preserved:
@@ -346,6 +420,11 @@ def verify_answer(state: Dict[str, Any]) -> Dict[str, Any]:
     )
     return {"verification_result": result, "retrieved_sources": sources, "issue_results": [],
             "preserved_points": preserved,
+            # 비교용 SHA256만 체크포인트에 저장하여 사건 원문/법률 초안을
+            # 별도의 progress 로그/상태에 복제하지 않는다.
+            "verification_progress_history": progress_history,
+            "verification_no_progress": no_progress,
+            "verification_reused": bool(reusable),
             "verified_sources": result.get("citation_audit", {}).get("verified_sources", [])}
 
 
