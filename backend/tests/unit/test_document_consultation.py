@@ -1128,3 +1128,150 @@ def test_finish_answer_withholds_draft_with_unsupported_legal_claim(document_sta
     assert result["final_disposition"] == "WITHHELD"
     assert result["verification_result"]["status"] == "INSUFFICIENT"
     assert "질문에 대한 답변을 확정할 만큼 근거 확인을 마치지 못했습니다" in result["final_answer"]
+
+
+
+def test_finish_answer_preserves_supported_draft_despite_advisory_provenance_failure_and_missing_statute(document_state):
+    """모든 주장이 SUPPORTED이고 실제 시점 모순이 없는 경우 출처 시점 권고 불합격과 조문 보강 메모가 있어도 초안을 CAUTIONARY로 보존한다.
+
+    Args:
+        document_state: 문서 상담 기본 테스트 상태 픽스처.
+
+    Description:
+        사건 사실과 법률 적용 주장이 모두 SUPPORTED로 입증되었고,
+        결정론적 법령 시점 오류(temporal_errors)가 존재하지 않는 상황에서,
+        단지 최신 법령 시행일자와 사건 일자 차이로 인한 검증 LLM의 provenance 권고 불합격이나
+        missing_legal_issues 추가 검색 권고만으로 고품질 초안을 WITHHELD로 전면 폐기하지 않고
+        CAUTIONARY로 안전 보존(DRAFT_PRESERVED)하는지 검증한다.
+    """
+    import hashlib
+    from unittest.mock import patch
+    from ai_legal_helper.rag.grounding_context import format_grounding_sources
+    import ai_legal_helper.workflows.document_consultation as consultation
+
+    draft = "임대차 계약이 적법하게 체결되었고 주택임대차보호법 제3조 제1항에 따라 대항력이 인정됩니다. [E01_계약서.txt]"
+    draft_sha = hashlib.sha256(draft.encode("utf-8")).hexdigest()
+    sources = consultation.document_sources(document_state)
+    _, manifest = format_grounding_sources(sources)
+
+    ver = {
+        "status": "REVISE",
+        "reason_code": "ANSWER_REVISION_REQUIRED",
+        "verified_answer_sha256": draft_sha,
+        "source_manifest": manifest,
+        "claims": [
+            {
+                "claim_type": "CASE_FACT",
+                "grounding_status": "SUPPORTED",
+                "source_ids": ["E01_계약서.txt"],
+                "claim": "임대차 계약이 적법하게 체결되었습니다.",
+            },
+            {
+                "claim_type": "LEGAL_APPLICATION",
+                "grounding_status": "SUPPORTED",
+                "source_ids": ["E01_계약서.txt"],
+                "claim": "주택임대차보호법 제3조 제1항에 따라 대항력이 인정됩니다.",
+            },
+        ],
+        "question_coverage": [
+            {"question": "대항력이 있나요?", "answered": True, "answerable": True}
+        ],
+        "required_question_coverage": True,
+        "consistency_checks": {
+            "opening_conclusion": {"passed": True, "reason": "일치"},
+            "timeline": {"passed": True, "reason": "일치"},
+            "expressed_intent": {"passed": True, "reason": "일치"},
+            "provenance": {
+                "passed": False,
+                "reason": "사건 기준일(2024년)과 제공된 법령의 최신 개정 시행일(2026년)이 형식적으로 불일치함",
+                "source_ids": ["E01_계약서.txt"],
+            },
+        },
+        "missing_legal_issues": ["2024년 대항력 취득 시점 조문 확인 권고"],
+        "citation_audit": {
+            "unverified_citations": [],
+            "unsupported_citations": [],
+            "cited_sources": sources,
+        },
+    }
+    state = {**document_state, "draft_answer": draft, "verification_result": ver}
+
+    with patch.object(consultation, "validate_document_snapshot"):
+        result = consultation.finish_answer(state)
+
+    assert result["final_disposition"] == "CAUTIONARY"
+    assert result["verification_result"]["status"] == "PASS"
+    assert "대항력이 인정됩니다" in result["final_answer"]
+    assert "질문에 대한 답변을 확정할 만큼 근거 확인을 마치지 못했습니다" not in result["final_answer"]
+
+
+def test_finish_answer_withholds_when_provenance_failure_accompanied_by_unsupported_fact(document_state):
+    """provenance 실패와 함께 미입증 사실(UNSUPPORTED CASE_FACT)이 존재하는 경우에는 WITHHELD로 엄격 차단한다.
+
+    Args:
+        document_state: 문서 상담 기본 테스트 상태 픽스처.
+
+    Description:
+        출처 일치성(provenance) 불합격과 더불어 사건 사실 날조나 미입증 사실이 잔존하는 경우,
+        단순 권고 수준이 아닌 실질적 사실관계 결함이므로 finish_answer가 DRAFT_PRESERVED 승인을 거부하고
+        WITHHELD로 답변을 차단하는지 검증한다.
+    """
+    import hashlib
+    from unittest.mock import patch
+    from ai_legal_helper.rag.grounding_context import format_grounding_sources
+    import ai_legal_helper.workflows.document_consultation as consultation
+
+    draft = "임대인과 계약했고 보증금 3억 원이 전액 지급되었습니다. [E01_계약서.txt]"
+    draft_sha = hashlib.sha256(draft.encode("utf-8")).hexdigest()
+    sources = consultation.document_sources(document_state)
+    _, manifest = format_grounding_sources(sources)
+
+    ver = {
+        "status": "REVISE",
+        "reason_code": "ANSWER_REVISION_REQUIRED",
+        "verified_answer_sha256": draft_sha,
+        "source_manifest": manifest,
+        "claims": [
+            {
+                "claim_type": "CASE_FACT",
+                "grounding_status": "SUPPORTED",
+                "source_ids": ["E01_계약서.txt"],
+                "claim": "임대인과 계약했습니다.",
+            },
+            {
+                "claim_type": "CASE_FACT",
+                "grounding_status": "UNSUPPORTED",
+                "model_grounding_status": "UNSUPPORTED",
+                "source_ids": [],
+                "claim": "보증금 3억 원이 전액 지급되었습니다.",
+            },
+        ],
+        "question_coverage": [
+            {"question": "보증금 지급 여부", "answered": True, "answerable": True}
+        ],
+        "required_question_coverage": True,
+        "consistency_checks": {
+            "opening_conclusion": {"passed": True, "reason": "일치"},
+            "timeline": {"passed": True, "reason": "일치"},
+            "expressed_intent": {"passed": True, "reason": "일치"},
+            "provenance": {
+                "passed": False,
+                "reason": "사건 사실 출처 불일치",
+                "source_ids": [],
+            },
+        },
+        "missing_legal_issues": [],
+        "citation_audit": {
+            "unverified_citations": [],
+            "unsupported_citations": [],
+            "cited_sources": sources,
+        },
+    }
+    state = {**document_state, "draft_answer": draft, "verification_result": ver}
+
+    with patch.object(consultation, "validate_document_snapshot"):
+        result = consultation.finish_answer(state)
+
+    assert result["final_disposition"] == "WITHHELD"
+    assert result["verification_result"]["status"] == "INSUFFICIENT"
+    assert "질문에 대한 답변을 확정할 만큼 근거 확인을 마치지 못했습니다" in result["final_answer"]

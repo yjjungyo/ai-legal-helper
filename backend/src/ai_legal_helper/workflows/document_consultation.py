@@ -595,12 +595,30 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
         )
 
         # 3. 필수 법률 근거/조문 누락 여부 확인
+        # 법률 클레임 중 명백한 미입증(UNSUPPORTED)이 있거나 본문에 법률 효과를 단정했는데 지지되지 않은 경우 결함으로 판정한다.
+        # 반면, 모든 법률 클레임이 SUPPORTED로 검증되었고 본문의 법률 효과가 지지되는 경우(unverified_legal_effects_present == False)에는
+        # 단순 권고성 추가 검색 요청이나 시점 보강 메모(missing_legal_issues)만으로 초안을 WITHHELD로 전면 폐기하지 않는다.
         has_statute_defects = (
-            (has_legal_claims and bool(result.get("missing_legal_issues")))
-            or any(
-                any(kw in ml for kw in ("법", "조", "판례", "소멸", "대항", "우선변제", "경매", "인수"))
-                for ml in result.get("missing_legal_issues", [])
+            has_unsupported_legal_claim
+            or unverified_legal_effects_present
+            or (
+                has_legal_claims
+                and not any(
+                    c.get("grounding_status") == "SUPPORTED"
+                    for c in legal_claims
+                )
+                and bool(result.get("missing_legal_issues"))
             )
+        )
+
+        # [P2] 모델의 실체적 사실 입증 보호:
+        # 검증 모델 자체가 유효한 증거로 입증(model_grounding_status == 'SUPPORTED')한 사건 사실은
+        # 단순 형식적 차이나 기타 휴리스틱으로 인해 치명적 사실 오류로 오탐되지 않도록 보호한다.
+        has_unsupported_case_fact = any(
+            c.get("claim_type") in ("CASE_FACT", "CASE_INFERENCE")
+            and c.get("grounding_status") == "UNSUPPORTED"
+            and c.get("model_grounding_status") != "SUPPORTED"
+            for c in result.get("claims", [])
         )
 
         # [STEP5-FINAL-01 / Gemini] 재작성 무진전으로 조기 finalize되어도
@@ -624,17 +642,43 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
             for item in coverage_items
         )
         consistency_items = result.get("consistency_checks") or {}
-        has_consistency_failure = (
+        # 핵심 일관성 점검(결론 일치, 사건 타임라인, 의사표시 통지)은 엄격 검사
+        core_consistency_names = ("opening_conclusion", "timeline", "expressed_intent")
+        has_core_consistency_failure = (
             required_coverage
             and not all(
                 isinstance(consistency_items.get(name), dict)
                 and consistency_items[name].get("passed") is True
-                for name in ("opening_conclusion", "timeline", "expressed_intent", "provenance")
+                for name in core_consistency_names
             )
         ) or any(
             isinstance(check, dict) and check.get("passed") is not True
-            for check in consistency_items.values()
+            for name, check in consistency_items.items()
+            if name in core_consistency_names
         )
+
+        # 출처 수준 구분(provenance) 점검:
+        # 사건 사실 날조(has_unsupported_case_fact)나 미입증 법률 효과, 출처 오류,
+        # 결정론적 법령 시점 충돌(temporal_errors)이 전혀 없고 모든 핵심 주장이 입증된 경우,
+        # LLM의 출처 시점 완벽주의적 권고 메모는 치명적 모순이 아닌 주의사항(CAUTIONARY)으로 수용한다.
+        from ai_legal_helper.tools.statute_temporal import temporal_answer_errors
+        temporal_errors = temporal_answer_errors(
+            state.get("question", ""), draft, result.get("citation_audit", {}).get("cited_sources", [])
+        )
+        prov_check = consistency_items.get("provenance") or {}
+        prov_failed = isinstance(prov_check, dict) and prov_check.get("passed") is False
+        has_provenance_failure = (
+            required_coverage and not isinstance(prov_check, dict)
+        ) or (
+            prov_failed and (
+                has_unsupported_case_fact
+                or has_unsupported_legal_claim
+                or unverified_legal_effects_present
+                or bool(temporal_errors)
+            )
+        )
+        has_consistency_failure = has_core_consistency_failure or has_provenance_failure
+
         application_audit = result.get("application_audit") or {}
         # [SUBSUMPTION / 방법 2: 참고 신호 전환] 포섭 감사는 참고 신호로 작동하므로,
         # 단순 포섭 감사 결함만으로 치명적 법률 결함(has_fatal_legal_error)으로 분류하여
@@ -643,15 +687,6 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
         citation_audit = result.get("citation_audit") or {}
         has_citation_failure = bool(
             citation_audit.get("unverified_citations") or citation_audit.get("unsupported_citations")
-        )
-        # [P2] 모델의 실체적 사실 입증 보호:
-        # 검증 모델 자체가 유효한 증거로 입증(model_grounding_status == 'SUPPORTED')한 사건 사실은
-        # 단순 형식적 차이나 기타 휴리스틱으로 인해 치명적 사실 오류로 오탐되지 않도록 보호한다.
-        has_unsupported_case_fact = any(
-            c.get("claim_type") in ("CASE_FACT", "CASE_INFERENCE")
-            and c.get("grounding_status") == "UNSUPPORTED"
-            and c.get("model_grounding_status") != "SUPPORTED"
-            for c in result.get("claims", [])
         )
         has_fatal_legal_error = (
             has_unsupported_legal_claim
@@ -663,7 +698,17 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
             or has_subsumption_failure
             or has_citation_failure
             or has_unsupported_case_fact
-            or result.get("reason_code") in ("LEGAL_SOURCE_MISSING", "LEGAL_SOURCE_INSUFFICIENT", "CITATION_INVALID")
+            or (
+                result.get("reason_code") in ("LEGAL_SOURCE_MISSING", "LEGAL_SOURCE_INSUFFICIENT", "CITATION_INVALID")
+                and (
+                    has_unsupported_legal_claim
+                    or unverified_legal_effects_present
+                    or not any(
+                        c.get("grounding_status") == "SUPPORTED" and c.get("claim_type") in ("LEGAL_RULE", "LEGAL_APPLICATION")
+                        for c in legal_claims
+                    )
+                )
+            )
         )
 
         # 지지되는 주장(SUPPORTED)이 존재하고 치명적 법률 결함이 없는 경우에 한해 DRAFT_PRESERVED 승인
