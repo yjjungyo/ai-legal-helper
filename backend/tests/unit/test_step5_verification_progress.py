@@ -404,3 +404,66 @@ def test_supervisor_initialize_exposes_progress_reset_fields():
     assert "verification_no_progress" in LegalState.__annotations__
     assert "verification_progress_history" in LegalState.__annotations__
     assert "search_delta_count" in LegalState.__annotations__
+
+
+@pytest.mark.parametrize("added_type,expected_count", [
+    ("NONE", 0), ("PRECEDENT", 1), ("STATUTE", 1),
+])
+def test_real_document_search_executor_tracks_actual_source_delta(
+    document_state, added_type, expected_count,
+):
+    """기존법령 API 재반환 vs 새 판례·조문 추가를 검색 노드 계약으로 검증.
+
+    [STEP5-TEST-02 / Gemini] 실제 `execute_statute_search_node`의
+    조회/병합 반환을 모의한다. 법령·판례가 찾은 *개수*가 아닌
+    Source Registry 신규 ID 개수만 다음 재분석의 진행 기준이다.
+    """
+    base = list(document_state["retrieved_sources"])
+    extra = []
+    if added_type == "PRECEDENT":
+        extra = [{
+            "source_id": "PRECEDENT:TEST-NEW", "source_type": "PRECEDENT",
+            "case_number": "2023다100", "content": "공식 판례 법률요건",
+        }]
+    elif added_type == "STATUTE":
+        extra = [{
+            "source_id": "STATUTE:TEST-NEW", "source_type": "STATUTE",
+            "statute_name": "민법", "article": "제2조", "content": "공식 조문",
+        }]
+
+    # API가 이전 원문을 1건 반복 반환해도 실제 신규 내용이 없을 수 있다.
+    api_return = base[-1:] + extra
+    combined = base + extra
+    mock_out = {
+        "retrieved_sources": combined,
+        "statute_search_results": [x for x in api_return if x["source_type"] == "STATUTE"],
+        "precedent_search_results": [x for x in api_return if x["source_type"] == "PRECEDENT"],
+        "statute_search_status": "OFFICIAL_SUCCESS",
+        "statute_search_count": 1,
+        "statute_search_items": [],
+        "precedent_search_items": [],
+        "statute_search_channels": ["OPENLAW_API"],
+    }
+    state = {
+        **document_state,
+        "answer_mode": dc.DOCUMENT_MODE,
+        "approval_status": "APPROVED",
+        "approved_statute_laws": ["민법"],
+        "auto_approve_statute_search": True,
+        "verification_result": {
+            "status":"REVISE", "reason_code":"LEGAL_SOURCE_INSUFFICIENT",
+            "candidate_laws":["민법"],
+            "claims": base_verification()["claims"],
+            "legal_search_requests": [],
+        },
+        "statute_search_phase": "POST_VERIFICATION",
+    }
+    with patch("ai_legal_helper.workflows.document_search.execute_document_search",
+               return_value=mock_out) as search:
+        out = workflow.execute_statute_search_node(state)
+    assert search.call_count == 1
+    assert out["search_delta_count"] == expected_count
+    assert len(out["search_added_source_ids"]) == expected_count
+    merged = {**state, **out}
+    expected_route = "re_analyze" if expected_count else "finalize"
+    assert workflow.statute_search_result_condition(merged) == expected_route
