@@ -4341,7 +4341,25 @@ def execute_statute_search_node(state: LegalState) -> Dict:
 
             warnings.append("공식 법령·판례 원문 검색에서 필요한 법률 근거를 확보하지 못했습니다.")
 
-        out_payload = {**doc_search_out, "warnings": warnings}
+        # [STEP5-PROGRESS-07 / Gemini] 검색 API에서 3건을 '찾았다'
+        # 는 값과 Source Registry에 신규 근거 3건이 *실제 추가됐다*는
+        # 값은 다르다. 기존 조문/판례가 재반환된 경우 ReAnalyze LLM을
+        # 다시 돌지 않도록 검색 이전과 병합 이후의 출처 ID를 비교한다.
+        # 출처 내용이 없는 가짜 ID/미승인 사건 문서는 새 근거로 세지 않음.
+        from ai_legal_helper.workflows.verification_progress import added_legal_source_ids
+        added_sids = added_legal_source_ids(
+            state.get("retrieved_sources") or [],
+            doc_search_out.get("retrieved_sources") or [],
+        )
+        out_payload = {
+            **doc_search_out, "warnings": warnings,
+            "search_delta_count": len(added_sids),
+            "search_added_source_ids": added_sids,
+        }
+        logger.info(
+            "[STEP5_SEARCH] 검색 신규 법령·판례 출처=%d (API 반환과 무관)",
+            len(added_sids),
+        )
         if auto_approve and state.get("approval_status") != "APPROVED":
             out_payload["approval_status"] = "APPROVED"
             if search_state.get("approved_statute_laws"):
@@ -4613,6 +4631,21 @@ def statute_search_result_condition(state: LegalState) -> str:
             return "run_agents"
 
         return "insufficient"
+
+    # [STEP5-PROGRESS-08 / Gemini] POST_VERIFICATION 이후 새 출처가
+    # 0개면 같은 법령/판례를 다시 받아도 새로운 법률 지식은 없다.
+    # 법률 근거 부족 상태에서 대답 표현만 고치는 LLM 재분석을 생략.
+    # 이전에 작성·검증한 스냅샷은 finish_answer의 동일 원문/Temporal/
+    # 인용/미지지 법률효과 안전 검사를 통과할 때만 조건부 반환 가능.
+    # 그래프가 과거 저장 상태나 mock 데이터로 실행되는 경우
+    # delta key=None이면 기존 분기를 유지하여 호환성을 보장한다.
+    if (state.get("answer_mode") == DOCUMENT_MODE
+            and state.get("search_delta_count") == 0
+            and state.get("draft_answer")):
+        logger.info(
+            "[STEP5_SEARCH] 새 법률 출처 0건: 재분석 LLM 생략; 기존 초안 안전 종료"
+        )
+        return "finalize" if (state.get("verification_result") or {}).get("claims") else "insufficient"
 
     # POST_VERIFICATION 단계:
 
@@ -5622,6 +5655,11 @@ def build_legal_graph(checkpointer: Optional[Any] = None):
         "run_agents": "run_agents",
 
         "re_analyze": "re_analyze",
+
+        # [STEP5-PROGRESS-09] 중복/실패 검색 후에도 기존 검증된 주장만
+        # 있는 경우 안전한 CAUTIONARY를 받을 수 있게 finish_answer로
+        # 연결. 미지원 법리·Temporal BLOCK은 여기서 절대 PASS 안 함.
+        "finalize": "finalize",
 
         "insufficient": "insufficient"
 
