@@ -38,4 +38,6 @@ jobs:
             backend/tests/unit/test_multi_turn_followup_resolution.py \
             backend/tests/unit/test_conversation_context.py \
             backend/tests/unit/test_conversation_context_diet.py \
+            backend/tests/unit/test_intent_analyzer.py \
+            backend/tests/unit/test_adaptive_workflow.py \
             -q
