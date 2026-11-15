@@ -686,10 +686,17 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
         if state.get("approval_status") == "DENIED":
             logger.info("[DOCUMENT_SEARCH] 거절(DENIED) 상태이므로 검색을 생략합니다.")
             continue
-        if state.get("approved_statute_laws") is not None and name not in (state.get("approved_statute_laws") or []):
-            logger.info("[DOCUMENT_SEARCH] 미승인 법령('%s')이므로 검색을 생략합니다.", name)
-            continue
-        if not approved and name not in (state.get("approved_statute_laws") or []):
+
+        approved_laws = state.get("approved_statute_laws") or []
+        is_law_approved = (
+            approved  # search_is_approved() 결과 (auto_approve 등 반영)
+            or not approved_laws
+            or any(
+                name == app or name in app or app in name
+                for app in approved_laws
+            )
+        )
+        if not is_law_approved:
             logger.info("[DOCUMENT_SEARCH] 미승인 법령('%s')이므로 검색을 생략합니다.", name)
             continue
 

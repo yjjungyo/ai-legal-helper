@@ -147,8 +147,10 @@ def detect_unregistered_evidence_references(
     unregistered: List[str] = []
 
     # 1. '증거 N호증', '증거 A', '증거 99', '증거 제1호' 등 패턴 탐색
+    # '증거를', '증거에', '증거의' 등 일반 한국어 조사 결합은 가공 증거로 오탐하지 않도록
+    # 식별자(숫자, 호증/호/번 접미사, 영문 라벨)를 명확히 요구한다.
     ev_expr_matches = re.findall(
-        r"(증거\s*(?:제\s*)?([0-9A-Za-z가-힣]+(?:호증|호|번)?|[A-Za-z]))",
+        r"(증거\s*(?:제\s*)?(\d+(?:호증|호|번)?|[A-Za-z](?=[가-힣\s]|$)|[가-힣0-9]+(?:호증|호|번)))",
         question,
     )
     for full_expr, sub_part in ev_expr_matches:

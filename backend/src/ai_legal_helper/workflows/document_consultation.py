@@ -545,13 +545,16 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
         "확보된 공식 법령 및 RAG 자료를 바탕으로 검토했으며, "
         "미확인 법령의 최신성 및 적용 시점은 추가 확인이 필요합니다."
     ) if search_status in ("NOT_FOUND", "PARTIAL_SUCCESS") else ""
-    # 안내는 검증된 답변의 일부로 취급한다. 검증 이후 내용을 덧붙이지 않는다.
-    if notice and snapshot_valid and not draft.startswith("**안내:**"):
-        snapshot_valid = False
+    # 안내는 검증된 답변의 일부로 취급한다.
+    # 단, 초안 작성 이후 0-delta 검색 결과로 finalize에 조기 도달한 경우,
+    # 초안 자체의 스냅샷 무결성(snapshot_valid)을 깨뜨리지 않고
+    # 무조건적인 PASS 승인만 차단(valid=False)하여 안전한 CAUTIONARY로 보존되게 한다.
+    has_notice_gap = bool(notice and not draft.startswith("**안내:**"))
+    if has_notice_gap:
         result["reason_code"] = "SEARCH_DISCLOSURE_NOT_VERIFIED"
 
     temporal_blocked = (result.get("temporal_gate") or {}).get("status") == "BLOCK"
-    valid = snapshot_valid and result.get("status") == "PASS" and not temporal_blocked
+    valid = snapshot_valid and result.get("status") == "PASS" and not temporal_blocked and not has_notice_gap
     limited_used = False
 
     # [FINALIZE-NO-LLM] finalize_node / finish_answer에서는 추가 LLM 재작성(write_document_answer)이나
@@ -750,6 +753,8 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
             if src not in all_sources:
                 all_sources.append(src)
         final = expand_evidence_citations(draft, all_sources)
+        if notice and not final.startswith("**안내:**"):
+            final = f"{notice}\n\n{final}"
         cited_ids = {sid for claim in result.get("claims", [])
                      if claim.get("grounding_status") == "SUPPORTED" for sid in claim.get("source_ids", [])}
         sources = [s for s in sources_list if s.get("source_id") in cited_ids] or [

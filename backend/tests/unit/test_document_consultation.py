@@ -1275,3 +1275,69 @@ def test_finish_answer_withholds_when_provenance_failure_accompanied_by_unsuppor
     assert result["final_disposition"] == "WITHHELD"
     assert result["verification_result"]["status"] == "INSUFFICIENT"
     assert "질문에 대한 답변을 확정할 만큼 근거 확인을 마치지 못했습니다" in result["final_answer"]
+
+
+
+def test_detect_unregistered_evidence_does_not_flag_korean_grammatical_particles():
+    """'증거를 종합해' 등 일반 한국어 조사가 결합된 문구를 가공 증거 라벨로 오탐하지 않는다.
+
+    Description:
+        사용자가 '제출한 증거를 종합해'와 같이 일상적인 법률 상담 질문을 작성했을 때,
+        '증거를'의 조사 '를'을 식별자로 오인하여 가공 증거(ISSUE_FAKE_CITATION) 과업을 생성하거나
+        초안 서두에 불필요한 가공증거 부인 문구가 작성되어 서두 결론 불일치(opening_conclusion)로
+        오탐되는 현상을 방지하는지 검증한다.
+    """
+    from unittest.mock import MagicMock
+    from ai_legal_helper.workflows.issue_planner import detect_unregistered_evidence_references
+
+    briefing = MagicMock()
+    briefing.evidences = []
+    briefing.source_registry = {}
+
+    question = (
+        "임대차가 끝났는데 집주인이 보증금을 일부만 반환하고 있습니다. "
+        "제출한 증거를 종합해 제가 실제로 청구할 수 있는 보증금과 대응 순서를 알려주세요."
+    )
+    unregistered = detect_unregistered_evidence_references(question, briefing)
+    assert unregistered == [], f"'증거를'이 미등록 가공 증거로 오탐되지 않아야 함: {unregistered}"
+
+
+def test_execute_document_search_approves_compound_and_subset_laws(document_state):
+    """복합 법령명('민사소송법 또는 소액사건심판법')으로 승인되었을 때 개별 하위 법령('소액사건심판법') 검색을 허용한다.
+
+    Args:
+        document_state: 문서 상담 기본 테스트 상태 픽스처.
+
+    Description:
+        사전 승인 단계에서 후보 법령이 '민사소송법 또는 소액사건심판법' 형태로 승인되었더라도,
+        검증 단계에서 파생된 개별 법령('소액사건심판법') 요청이 단순 문자열 불일치로 미승인 간주되어
+        검색이 생략(NOT_FOUND)되는 버그를 방지하고 정상 승인되어 검색되는지 검증한다.
+    """
+    from ai_legal_helper.workflows.document_search import execute_document_search
+
+    state = {
+        **document_state,
+        "verification_result": {
+            "status": "REVISE",
+            "reason_code": "LEGAL_SOURCE_INSUFFICIENT",
+            "legal_search_requests": [
+                {
+                    "source_type": "STATUTE",
+                    "law_name": "소액사건심판법",
+                    "articles": ["제2조"],
+                    "issue": "소액사건 관할 및 기준 금액 확인",
+                    "question_part": "대응 순서를 알려주세요.",
+                }
+            ],
+            "candidate_laws": ["소액사건심판법"],
+            "missing_legal_issues": ["소액사건 기준 금액 확인 필요"],
+        },
+        "approved_statute_laws": ["주택임대차보호법", "민법", "민사소송법 또는 소액사건심판법"],
+        "approval_status": "APPROVED",
+        "statute_search_count": 0,
+        "retrieved_sources": [],
+    }
+
+    result = execute_document_search(state)
+    assert result["statute_search_status"] in ("OFFICIAL_SUCCESS", "VERIFIED_LOCAL_FALLBACK"),         f"복합 승인 법령 내의 '소액사건심판법'이 정상 검색되어야 함: {result['statute_search_status']}"
+    assert len(result["statute_search_results"]) > 0, "로컬 인덱스 또는 공식 API에서 소액사건심판법 조문이 확보되어야 함"

@@ -204,7 +204,14 @@ def _prepare_search_targets(candidate_laws: List[str]) -> List[StatuteSearchTarg
         입력 순서를 유지하며 법령별 요청 조문을 합친 검색 대상 목록.
     """
     targets: Dict[str, StatuteSearchTarget] = {}
-    for reference in candidate_laws:
+    expanded_candidates: List[str] = []
+    for c in candidate_laws:
+        if isinstance(c, str) and re.search(r"\s+(?:또는|및)\s+", c):
+            expanded_candidates.extend(re.split(r"\s+(?:또는|및)\s+", c))
+        else:
+            expanded_candidates.append(c)
+
+    for reference in expanded_candidates:
         parsed = _split_statute_reference(reference)
         if parsed is None:
             logger.warning("[OFFICIAL_STATUTE] 법령명을 식별할 수 없는 후보 1건을 제외했습니다.")
