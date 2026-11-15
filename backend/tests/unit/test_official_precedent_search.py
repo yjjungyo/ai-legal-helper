@@ -209,6 +209,16 @@ def test_unapproved_or_wrong_scope_never_fetches_external_precedents(monkeypatch
     assert not result.get("precedent_search_results")
 
 
+def test_case_party_name_in_query_is_blocked_even_without_digit_or_email():
+    """한국어 성명은 중앙 PII 정규식이 완벽히 잡지 못하므로 등록 당사자명과 대조한다."""
+    state = _approved_state(query="공동상속 이진우 보증금 반환채무")
+    state["approved_precedent_queries"] = ["공동상속 이진우 보증금 반환채무"]
+    state["case_evidence_briefing"] = {
+        "parties": [{"name": "이진우", "role": "상속인"}],
+    }
+    assert pending_precedent_searches(state) == []
+
+
 def test_precedent_only_can_be_searched_without_statute_name():
     state = _approved_state()
     assert next_verification_step(state) == "execute_statute_search"
