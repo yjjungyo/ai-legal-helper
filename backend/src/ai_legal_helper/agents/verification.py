@@ -178,6 +178,12 @@ class VerificationOutput(BaseModel):
     missing_legal_issues: List[str] = Field(default_factory=list, description="법령 검색이 필요한 구체적 법률 쟁점 목록")
     candidate_laws: List[str] = Field(default_factory=list, description="부족한 쟁점을 규율하는 대한민국 국가법령정보센터 공식 법령명 목록 (예: ['소송촉진 등에 관한 특례법', '주택임대차보호법', '민법']. '특례법', '주임법' 등 약칭 절대 사용 금지)")
     legal_search_requests: List[Dict[str, Any]] = Field(default_factory=list, description="질문 부분·법령·조문·누락 법리별 검색 요청")
+    # [SUBSUMPTION-06 / Gemini] 새 LLM 호출 없이 같은 검증 JSON에서
+    # 법률 효과별 요건·예외·사실근거·판례 적용 범위를 구조화한다.
+    # 구형 JSON과의 파싱 호환을 위해 default []이나 LEGAL_APPLICATION
+    # 주장이 SUPPORTED라면 아래 감사에서 누락을 PASS로 인정하지 않는다.
+    application_checks: List[Dict[str, Any]] = Field(default_factory=list)
+    application_audit: Dict[str, Any] = Field(default_factory=dict)
     preserved_points: List[str] = Field(default_factory=list, description="다음 수정에서도 원문 대조 후 유지할 올바른 설명")
     recommended_action: Optional[str] = Field(
         default="FINALIZE",
@@ -1553,6 +1559,56 @@ def run_verification(
             result.status = "REVISE"
             result.recommended_action = "REVISE_DRAFT"
 
+        # [SUBSUMPTION-07 / Gemini] P0-VER-01 '자동 PASS 승격' 직전,
+        # 요건 대조를 구조적으로 감사한다. 기존 근거·시점·출처 검사와
+        # 독립된 안전장치이며, 판례 검색만 성공했다는 이유로 PASS 금지.
+        # 이 감사는 법리의 사실상 옳고 그름을 regex로 재판정하지 않는다.
+        # 내용의 법적 타당성은 독립 LLM verifier가 판단하고, 여기서는
+        # 해당 검토가 실제 법률 주장, 출처 원문, 요구 사실, 예외에
+        # 연결되는지 검사한다. 완전한 일반 법령 설명에는 적용하지 않는다.
+        from ai_legal_helper.agents.subsumption_audit import audit_legal_applications
+        application_audit = audit_legal_applications(
+            claims=result.claims,
+            application_checks=result.application_checks,
+            retrieved_sources=retrieved_sources,
+            question=question,
+            answer=draft_answer,
+        )
+        result.application_audit = application_audit
+        if application_audit["failed_claims"]:
+            for idx in application_audit["unsupported_indices"]:
+                # 다른 LEGAL_RULE/USER_STATEMENT 또는 확인된 일반 사실 주장을
+                # 임의로 강등하지 않고 포섭 누락이 확인된 주장만 수정 대상으로 지정.
+                claim_obj = result.claims[idx]
+                claim_obj.grounding_status = "UNSUPPORTED"
+                claim_obj.reason = (
+                    (claim_obj.reason or "").strip()
+                    + " (법령·판례 요건과 사건 사실의 포섭 연결 미검증)"
+                ).strip()
+            # 사용자의 질문에 답하기 위해 요건 검토를 보완하도록 안내한다.
+            # LLM의 PASS나 이전 P0-VER-01 승격 정책으로 덮이지 않게 한다.
+            if result.status == "PASS":
+                result.status = "REVISE"
+            if result.reason_code in ("NONE", None):
+                result.reason_code = "ANSWER_REVISION_REQUIRED"
+            result.recommended_action = "REVISE_DRAFT"
+            note = (
+                "핵심 법률효과 주장 중 요건·사실근거·예외 또는 판례의 사건 적용 "
+                "대조가 불완전합니다. 해당 법률효과의 전제와 반대사실을 "
+                "공식 출처 및 현재 질문에 직접 연결해 수정하세요."
+            )
+            if note not in result.revision_instructions:
+                result.revision_instructions.append(note)
+            logger.warning(
+                "[SUBSUMPTION] legal application audit failed claims=%d / %d codes=%s",
+                application_audit["failed_claims"],
+                application_audit["audited_claims"],
+                [
+                    finding.get("reason_codes")
+                    for finding in application_audit.get("findings", [])
+                ],
+            )
+
         # E) [P0-VER-01] 모든 핵심 법률 주장이 검색 출처에 의해 100% 뒷받침되고 결함이 없는 경우 객관적 PASS 확정
         # 검증 LLM이 모든 주장을 SUPPORTED로 판정하고도 단문 질의의 사실관계 증빙 부재 등을 이유로 REVISE 또는 LEGAL_SOURCE_INSUFFICIENT를 반환하는 오판정 차단
         has_supported_core_claims = any(
@@ -1562,6 +1618,7 @@ def run_verification(
         has_no_defects = (
             not unsupported_core_claims
             and not uncertain_core_claims
+            and not application_audit["failed_claims"]
             and not unverified_citations
             and not unsupported_citations
             and not result.contradictions
