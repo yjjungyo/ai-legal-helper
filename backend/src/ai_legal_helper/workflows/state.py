@@ -66,6 +66,13 @@ class LegalState(MessagesState):
     approval_request: Optional[Dict[str, Any]]
     approval_status: Optional[str]  # NONE, PENDING, APPROVED, REJECTED, EXPIRED
     approved_statute_laws: Optional[List[str]]
+    # [PRECEDENT-07] HITL 승인된 *그 검색어*만 원격 판례 조회 가능.
+    # 다른 쟁점의 판례검색 요청으로 사용자 승인을 재사용하지 않는다.
+    approved_precedent_search: Optional[bool] = None
+    approved_precedent_queries: Optional[List[str]] = None
+    precedent_search_results: Optional[List[Dict[str, Any]]] = None
+    precedent_search_status: Optional[str] = None
+    precedent_search_history: Optional[List[str]] = None
     # P6: 기존 HITL와 재개 상태에 보존되는 사건일별 사전 공식 검색 계획.
     law_search_plan: Optional[Dict[str, Any]]
     statute_search_phase: Optional[str]  # PRE_ANALYSIS / POST_VERIFICATION
