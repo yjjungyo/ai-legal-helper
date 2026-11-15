@@ -298,7 +298,12 @@ def test_finish_answer_blocks_fallback_when_core_legal_claim_uncertain():
 
 
 def test_verification_preserves_llm_pass_with_qa_warning(monkeypatch):
-    """LLM이 status=PASS를 반환한 경우, 경량 QA의 정규식 탐지는 참고 경고(warnings)로 기록하며 PASS를 강제로 REVISE로 뒤집지 않는다."""
+    """[SUBSUMPTION-12] LLM PASS 또는 경량 QA 경고가 실제 법률요건 포섭 누락을 덮으면 안 된다.
+
+    근저당권이 임차인보다 선순위인 사실이 명시되어도 매수인에 대해
+    보증금 청구가 가능하다고 단정한 응답은 별도 요건·예외 대조 없이
+    PASS가 될 수 없다. 정규식 법률 판단이 아니라 증거 연결 누락의 검증이다.
+    """
     import json
     from ai_legal_helper.agents.verification import run_verification
 
@@ -357,9 +362,9 @@ def test_verification_preserves_llm_pass_with_qa_warning(monkeypatch):
         require_question_coverage=True,
     )
 
-    # [QA_CHECKER_REFACTOR]: 정규식에 의한 PASS->REVISE 강제 강등이 제거되어 LLM의 의미 검증 결과(PASS)가 보존됨
-    assert result["status"] == "PASS"
-    assert result["reason_code"] == "NONE" 
+    # LLM이 unsupported conclusion에 PASS를 내도 새 요건 포섭 게이트가 차단.
+    assert result["status"] == "REVISE"
+    assert result["application_audit"]["failed_claims"] == 1 
 
 
 def test_grounding_context_preserves_deep_evidence_beyond_400_chars():
@@ -470,7 +475,7 @@ def test_senior_tenant_buyer_assumption_not_demoted_by_qa_check(monkeypatch):
             "source_type": "STATUTE",
             "statute_name": "주택임대차보호법",
             "article": "제3조",
-            "content": "제3조(대항력 등) ④ 임차주택의 양수인은 임대인의 지위를 승계한 것으로 본다.",
+            "content": "제3조(대항력 등) ① 주택의 인도와 주민등록을 마친 때 다음 날부터 제3자에게 효력이 생긴다. ④ 임차주택의 양수인은 임대인의 지위를 승계한 것으로 본다.",
         },
     ]
 
@@ -500,6 +505,28 @@ def test_senior_tenant_buyer_assumption_not_demoted_by_qa_check(monkeypatch):
                     "inference_limit": "",
                 }
             ],
+            # [SUBSUMPTION-13] 선순위 임차인이라는 표현만으로 PASS하지
+            # 않는다. 사용자가 명시한 2023년 전입·점유와 등기부 원문의
+            # 2025년 첫 근저당을 분리 대조하고 예외를 검토했다는 사실이
+            # 같은 Verifier 호출 결과에 포함될 때만 유지할 수 있다.
+            "application_checks": [{
+                "claim": "임차인은 2023년에 대항력을 취득하여 2025년 근저당권보다 선순위이므로, 경매 낙찰자에게 대항할 수 있고 낙찰자가 임대차보증금을 인수해야 합니다.",
+                "legal_effect": "매각 이후 대항력과 양수인 임대인 지위 승계",
+                "rule_source_ids": ["STATUTE:001248:current:제3조:hash1"],
+                "requirements": [
+                    {"requirement": "임차인의 인도 및 주민등록 시점",
+                     "status": "MET", "fact_source_ids": [],
+                     "fact_quote": "2023년에 전입신고하고 거주 중인데",
+                     "reason": "현재 질문의 직접 진술에서 확인함"},
+                    {"requirement": "선순위 담보권 설정일과 대항력 효력일의 비교",
+                     "status": "MET", "fact_source_ids": ["E01_등기사항전부증명서.txt"],
+                     "fact_quote": "근저당권설정 2025년 5월 10일",
+                     "reason": "해당 등기부 1순위 담보권과 사용자 진술의 시점을 대조함"},
+                ],
+                "exception_analysis": "선순위 근저당·후순위 매각소멸 등 예외를 검토하였고 제공 자료상 2025년의 담보권은 전입 후임.",
+                "precedent_analyses": [],
+                "conclusion_status": "SUPPORTED",
+            }],
             "question_coverage": [{"question": "대항 여부", "answered": True, "reason": "답변됨"}],
             "consistency_checks": {
                 "opening_conclusion": {"passed": True, "reason": "일치", "source_ids": ["STATUTE:001248:current:제3조:hash1"]},
