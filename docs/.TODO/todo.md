@@ -1,31 +1,67 @@
 화면 출력 형태가 또 달라졌다. 
 
 
+
+=======
+
+
+
+
+SPAN route_node
+2026. 11. 15. 오후 2:11:28
+
+Latency: 0.00s
+
+
+Annotate
+Add to dataset
+Input
+
+{
+args: [
+0: "{'messages': [HumanMessage(content='망 이강호 씨와 체결한 2억 5천만 원 임대차계약서와 송금영수증입니다. 전입신고와 확정일자를 모두 갖추었는데 계약 기간 중 임대인이 사망했습니다. 제 임대차계약은 유지되나요?', additional_kwargs={}, response_metadata={}, id='637e15a0-45a9-4dd7-9f71-d8ebcac44132')], 'question': '망 이강호 씨와 체결한 2억 5천만 원 임대차계약서와 송금영수증입니다. 전입신고와 확정일자를 모두 갖추었는데 계약 기간 중 임대인이 사망했습니다. 제 임대차계약은 유지되나요?', 'categories': [], 'request_id': 'c71544b6-4be3-4bad-84ed-78059d38444e', 'trace_id': '16006e4c-41af-4652-9572-ec4364567d32', 'retrieved_sources': [], 'answer_mode'"
+]
+kwargs: {
+}
+}
+Output
+
+{
+categories: [
+0: "민법"
+]
+router_reason: "DOCUMENT_MODE 기본 법률 분야 적용 (LLM 호출 생략)"
+router_status: "CLASSIFIED"
+selected_agents: [
+0: "민법"
+]
+router_error_code: null
+}
+
+
 최초 초안답변 생성 synthesize 에서 정확도를 높일 수 있는 방안
 16e94592-33e6-474b-94fb-d69e00418cc4 보면 revise 되고 있다. 
 
+=========
+ - 실행방법 : C:\myprjs\ai-legal-helper\backend\scripts\windows-local-start.ps1
+ 
+  run_official_law_index_worker.py 를 실행해 기존 누락된 부칙을 인덱싱(재처리)합니다.
+=========
 
-C:\myprjs\ai-legal-helper\backend\scripts\windows-local-start.ps1
-
-
-run_official_law_index_worker.py 를 실행해 기존 누락된 부칙을 인덱싱(재처리)합니다.
-
-
-legal_evidence_bundle_node 제거하자
-
-
-\
-qa_checker.py  필요성
-
-
-done --그리고, 3단계 벡터 검색(RAG)의 수집 한계 (k=4) 여기서 k를 10으로 늘린걸 다시 7로 조정 완료. 
-
-토큰 증가량 분석:
-retrieval_factory.py는 조문 원문 전체 대신 SNIP = 240자 내외의 요약 스니펫을 Agent Observation으로 전달합니다.
+===
+ legal_evidence_bundle_node 제거하자
+===
 
 
 
 
+-----
+TODO : 국가법령정보센터
+추가 조회가 필요하지 않아 생략되었습니다.
+-
+찾고 있는데 화면에 표시는 되지 않는다. 
+
+====
 
 
 done --SC011 ~ SC020까지 자동테스트 진행하고 결과보고서 및  kpi까지 작성하자.  
