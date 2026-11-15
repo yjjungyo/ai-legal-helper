@@ -29,7 +29,7 @@ retrieval_factory.py는 조문 원문 전체 대신 SNIP = 240자 내외의 요�
 
 
 
-SC011 ~ SC020까지 자동테스트 진행하고 결과보고서 및  kpi까지 작성하자.  
+done --SC011 ~ SC020까지 자동테스트 진행하고 결과보고서 및  kpi까지 작성하자.  
 오류, 개선이 필요한 부분이 있으면 별도 파일로 저장하여 보기 쉽게 하라.
 각 사건 등록할때 제목에 20261114_E2E_V6 를 넣어라.
 AI_Legal_Helper_KPI_20261113_자동평가_e2ev5_hitl_auto.xlsx 파일에 작성하라. 
@@ -37,7 +37,7 @@ AI_Legal_Helper_KPI_20261113_자동평가_e2ev5_hitl_auto.xlsx 파일에 작성�
 기존 V5 버전과 비교 평가하여 특이사항란 마지막에  (V5 대비 속도 몇배 향상, 토큰 몇% 절감, 비용 몇% 절감)  처럼 V5 대비 V6를 측정한다. 
 langfuse trace 를 json으로 받아 저장하여 chatgpt가 분석할 수 있도록 한다. 
 
-SC011 ~ SC020까지 자동테스트 진행하고 결과보고서 및  kpi까지 작성하자.  
+done --SC011 ~ SC020까지 자동테스트 진행하고 결과보고서 및  kpi까지 작성하자.  
 각 사건 등록할때 제목에 20261114_E2E_V6 를 넣어라.
 AI_Legal_Helper_KPI_20261113_자동평가_e2ev5_hitl_auto.xlsx 파일에 작성하라. 
 각 테스트 시나리오별 E2E V6 버전용 행을 추가하여 작성한다. 
@@ -45,6 +45,11 @@ AI_Legal_Helper_KPI_20261113_자동평가_e2ev5_hitl_auto.xlsx 파일에 작성�
 langfuse trace 를 json으로 받아 저장하여 chatgpt가 분석할 수 있도록 한다. 
 이번 테스트의 목적은 오류 해결, 논리충돌, 응답시간, 비용, 토큰 사용량 등 성능개선이 필요한 부분을 찾는것이다. 
 개선할 부분이 있으면 별도 파일로 저장하여 보기 쉽게 하라.
+- [E2E V6 종합 평가 보고서](file:///c:/myprjs/ai-legal-helper/docs/evaluation/E2E_V6_COMPREHENSIVE_EVALUATION_REPORT.md)
+- [E2E V6 자동테스트 결과보고서](file:///c:/myprjs/ai-legal-helper/docs/evaluation/E2E_V6_EVALUATION_REPORT.md)
+- [E2E V6 성능 개선 및 오류/논리충돌/지연/비용 분석 보고서](file:///c:/myprjs/ai-legal-helper/docs/evaluation/E2E_V6_IMPROVEMENTS_REPORT.md)
+- [KPI 엑셀 파일](file:///c:/myprjs/ai-legal-helper/docs/evaluation/kpi/AI_Legal_Helper_KPI_20261113_자동평가_e2ev5_hitl_auto.xlsx)
+- [Langfuse 트레이스 카탈로그](file:///c:/myprjs/ai-legal-helper/artifacts/langfuse_review_v6/README_V6.md)
 
 ===
 
