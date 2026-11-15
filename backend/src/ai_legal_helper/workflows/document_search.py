@@ -207,7 +207,12 @@ def precedent_search_is_approved(state: dict[str, Any], requests: list[dict[str,
         or os.getenv("AUTO_APPROVE_STATUTE_SEARCH", "").lower() in ("true", "1", "yes")
     ):
         return True
-    return state.get("approval_status") == "APPROVED" and state.get("approved_precedent_search") is True
+    approved_queries = set(state.get("approved_precedent_queries") or [])
+    return (
+        state.get("approval_status") == "APPROVED"
+        and state.get("approved_precedent_search") is True
+        and all(r["precedent_query"] in approved_queries for r in requests)
+    )
 
 
 
