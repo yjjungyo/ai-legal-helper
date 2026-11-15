@@ -184,6 +184,10 @@ def detect_unregistered_evidence_references(
 def plan_legal_issues(
     question: str,
     briefing: CaseEvidenceBriefing,
+    *,
+    semantic_outlines: Optional[List[Dict[str, Any]]] = None,
+    focus_current_question: bool = False,
+    original_question: str = "",
 ) -> List[LegalIssueTask]:
     """사용자의 복합 상담 질문과 사건 브리핑을 분석하여 독립적인 법률 쟁점 목록을 계획한다.
 
@@ -199,6 +203,9 @@ def plan_legal_issues(
     Args:
         question: 사용자 상담 질문.
         briefing: 사건 증거 및 사실관계 브리핑 모델.
+        semantic_outlines: 기존 Intent Analyzer LLM이 같은 호출에서 생성한 법률 쟁점 윤곽.
+        focus_current_question: 후속 특정 질문을 레거시 전역 키워드 Issue보다 우선시할지 여부.
+        original_question: 사용자가 실제 입력한 원문. LLM 복원 질의와 구분해 범위를 보존.
 
     Returns:
         List[LegalIssueTask]: 도출된 단위 법률 쟁점 과업 목록.
@@ -227,6 +234,96 @@ def plan_legal_issues(
                 priority="HIGH",
             )
         )
+
+    # [ISSUE-SEMANTIC-03 / Gemini 인계]
+    # 이 함수의 아래쪽 레거시 규칙은 '반환'->계약 종료, '분할'->분할변제 등
+    # 질문과 무관한 Issue를 생성할 수 있다. 후속 *특정 법률 질문*에서는 기존
+    # Intent Analyzer가 같은 LLM 호출로 반환한 법률 쟁점 윤곽을 사용하여
+    # 정확히 그 질문에 관한 Issue만 만든다. 법 분야/상속/시나리오별 if 금지.
+    # 첫 턴 또는 명시적 구버전 호출(plan_legal_issues(q, briefing))은 아래
+    # 레거시 경로를 그대로 실행하여 기존 SC-013 등의 동작을 보존한다.
+    if focus_current_question:
+        focused_tasks: List[LegalIssueTask] = []
+        seen_questions: set[str] = set()
+        for raw in (semantic_outlines or [])[:4]:
+            if not isinstance(raw, dict):
+                continue
+            legal_q = raw.get("question")
+            if not isinstance(legal_q, str):
+                continue
+            legal_q = " ".join(legal_q.strip().split())[:350]
+            key = re.sub(r"\s+", "", legal_q).lower()
+            if len(legal_q) < 8 or key in seen_questions:
+                continue
+            seen_questions.add(key)
+
+            fact_keys_raw = raw.get("required_fact_keys") or []
+            fact_keys = [
+                k.strip()[:70]
+                for k in (fact_keys_raw[:8] if isinstance(fact_keys_raw, list) else [])
+                if isinstance(k, str) and k.strip()
+            ]
+            # 의미윤곽의 후보 법령은 공식 원문 검증 전에는 확정 조문이 아니다.
+            # 현재 downstream은 candidate_statutes를 검색 힌트로만 사용한다.
+            laws_raw = raw.get("candidate_statutes") or []
+            candidate_laws = [
+                law.strip()[:100]
+                for law in (laws_raw[:6] if isinstance(laws_raw, list) else [])
+                if isinstance(law, str) and law.strip()
+            ]
+            fact_ids, _, evidence_labels = _match_facts_and_evidences(
+                fact_keys or [legal_q[:65]], briefing,
+            )
+            focused_tasks.append(LegalIssueTask(
+                issue_id=f"ISSUE_SEMANTIC_{len(focused_tasks) + 1:02d}",
+                issue_title=legal_q.rstrip("?？. ")[:130],
+                legal_questions=[legal_q],
+                required_fact_keys=fact_keys,
+                relevant_fact_ids=fact_ids,
+                relevant_evidence_ids=[],
+                relevant_evidence_labels=evidence_labels,
+                required_statutes=[],
+                candidate_statutes=list(dict.fromkeys(candidate_laws)),
+                missing_evidence=[],
+                priority="HIGH",
+            ))
+
+        if not focused_tasks:
+            # 구형 Intent Analyzer 또는 파싱 실패 시 안전 폴백:
+            # 사용자가 묻지 않은 해지/분할변제 질문을 창작하지 않고 정확한
+            # 현재 질문을 최소 1개 Issue로 보존한다. 짧은 대명사형 후속 질문은
+            # 이미 맥락 복원된 question(resolved_query)을 우선한다.
+            raw_user = (original_question or "").strip()
+            resolved = (question or "").strip()
+            primary_q = (
+                raw_user if len(raw_user) >= 25
+                else resolved or raw_user
+            )
+            if primary_q:
+                fact_ids, _, evidence_labels = _match_facts_and_evidences(
+                    [primary_q[:65]], briefing,
+                )
+                focused_tasks.append(LegalIssueTask(
+                    issue_id="ISSUE_CURRENT_QUESTION",
+                    issue_title="의뢰인이 현재 요청한 법률 판단",
+                    legal_questions=[primary_q],
+                    required_fact_keys=[],
+                    relevant_fact_ids=fact_ids,
+                    relevant_evidence_ids=[],
+                    relevant_evidence_labels=evidence_labels,
+                    required_statutes=[],
+                    missing_evidence=[],
+                    priority="HIGH",
+                ))
+        if focused_tasks:
+            # 가짜 증거 라벨 검사는 사용자가 *직접* 언급한 원문에도 적용한다.
+            # 아래 0번 안전 Issue를 유지하고, 현재 질문과 무관한 템플릿 Issue만
+            # 제외한다. 양쪽을 무작정 병합하면 SC-012 오분류가 다시 재현된다.
+            logger.info(
+                "[ISSUE_PLANNER] 현재 질문 중심 의미 쟁점 %d개 채택, 레거시 키워드 분기 생략",
+                len(focused_tasks),
+            )
+            return issues + focused_tasks
 
     # [P0-1 핵심 개선] 의뢰인이 전문 법률 용어를 몰라도 상황을 진술했을 때(종합 분석 및 대처 요청)
     # 사건에 등록된 증거(계약서, 가압류 등)를 바탕으로 핵심 법률 쟁점을 포섭한다.
