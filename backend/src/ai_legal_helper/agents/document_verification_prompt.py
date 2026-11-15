@@ -69,23 +69,23 @@ DOCUMENT_VERIFICATION_PROMPT = """당신은 문서 기반 상담 답변의 독�
   rule_source_ids: 실제 제공된 STATUTE 또는 PRECEDENT 출처 ID(법령·판례 본문)
     를 1개 이상 명시. 사건 증거 파일이나 임의의 판례번호를 법률 출처로 쓰지 마세요.
     같은 법률 출처를 claims[].source_ids에도 연결하세요.
-  requirements: [{"requirement":"법령 또는 판시법리가 요구하는 구체적 요건",
+  requirements: [{{"requirement":"법령 또는 판시법리가 요구하는 구체적 요건",
     "status":"MET|NOT_MET|UNKNOWN",
     "fact_source_ids":["현재 사건의 등록 증거 source_id"],
     "fact_quote":"판단 사실을 뒷받침하는 증거 원문 또는 현재 사용자 질문의 그대로 인용문",
-    "reason":"요건이 충족/불충족/불명인 법률상 이유"}].
+    "reason":"요건이 충족/불충족/불명인 법률상 이유"}}].
     실제 법리의 결론을 좌우하는 요건만 포함하되 핵심 요건 누락 금지.
     MET/NOT_MET는 관련 증거 원문이나 현재 질문 진술에 해당 사실이 실제로
     명시된 경우에만 부여하세요. 증거가 없다면 UNKNOWN으로 두세요.
     질문에 직접 명시된 사실은 문서가 없어도 상담 전제로 인정합니다.
   exception_analysis: 법령·판례의 예외/반대 요건 및 해당 여부, 없으면 없는 이유.
   precedent_analyses: 판례 법리를 실제로 활용한 경우 판례 출처 ID마다
-    {"source_id":"실제 PRECEDENT 출처 ID",
+    {{"source_id":"실제 PRECEDENT 출처 ID",
      "holding_quote":"판시사항/판결요지/원문에서 그대로 복사한 핵심 법리 한 문구",
      "material_similarities":"판례와 이 사건에 공통인 법률요건 사실",
      "material_differences":"중요한 사실상·법률상 차이. 없다면 왜 없는지 명시",
      "applicability":"SIMILAR|DISTINGUISHABLE|UNCERTAIN",
-     "reason":"차이가 법률 효과에 미치는 영향"}.
+     "reason":"차이가 법률 효과에 미치는 영향"}}.
     판례가 단순 검색되었을 뿐 근거로 사용되지 않았다면 적용 가능한 근거인 것처럼
     claims.source_ids 또는 rule_source_ids에 넣지 마세요.
   conclusion_status: SUPPORTED(요건 검토와 사실이 결론을 지지),
