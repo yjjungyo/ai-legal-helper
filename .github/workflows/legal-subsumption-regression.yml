@@ -10,6 +10,7 @@ on:
       - "backend/src/ai_legal_helper/agents/document_verification_prompt.py"
       - "backend/src/ai_legal_helper/rag/grounding_context.py"
       - "backend/tests/unit/test_legal_subsumption_audit.py"
+      - "backend/tests/unit/test_trace_dae222e6_quality_and_latency.py"
       - ".github/workflows/legal-subsumption-regression.yml"
   workflow_dispatch:
 
@@ -43,6 +44,7 @@ jobs:
             backend/src/ai_legal_helper/agents/issue_verifier.py \
             backend/src/ai_legal_helper/rag/grounding_context.py \
             backend/tests/unit/test_legal_subsumption_audit.py
+            backend/tests/unit/test_trace_dae222e6_quality_and_latency.py \
       - name: Law-fact subsumption and related verification regressions
         run: |
           # Scope-note / Gemini: 아래 3개는 변경되지 않은 기존 코드·테스트의
