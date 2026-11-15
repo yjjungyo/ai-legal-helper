@@ -287,201 +287,6 @@ def _brief_history(messages: List[Any], max_chars: int = 1000) -> str:
 
 
 
-_AFFIRMATIVE_WORDS = {
-    "그래", "응", "네", "예", "좋아", "좋아요", "알겠어", "알겠습니다",
-    "해줘", "해주세요", "부탁해", "부탁해요", "그렇게 해줘", "그렇게 해주세요",
-    "진행해줘", "진행해주세요", "정리해줘", "정리해주세요", "요약해줘", "요약해주세요",
-    "체크리스트", "체크리스트 줘", "체크리스트 정리해줘", "체크리스트로 해줘", "체크리스트 작성해줘",
-}
-
-_AFFIRMATIVE_RE = re.compile(
-    r"^(?:네|예|응|그래|좋아|좋아요|알겠어|알겠습니다|그럼|그러면|이어서|부탁해요|부탁해|어서)?[,\s]*"
-    r"(?:(?:그렇게|이어서|바로|다시|한눈에|표로|간결하게)\s*)?"
-    r"(?:해\s*줘|해\s*주세요|부탁\s*해|부탁\s*드려요|진행\s*해\s*줘|진행\s*해\s*주세요|"
-    r"정리\s*해\s*줘|정리\s*해\s*주세요|요약\s*해\s*줘|요약\s*해\s*주세요|작성\s*해\s*줘|작성\s*해\s*주세요|"
-    r"만들어\s*줘|만들어\s*주세요|알려\s*줘|알려\s*주세요|체크\s*리스트|가이드|목록\s*줘)"
-    r"[!~.?\s]*$"
-)
-
-
-def _is_short_followup_request(q: str, conv_ctx: Optional[Any]) -> bool:
-    """사용자 발언이 직전 상담 작업에 대한 단문 후속 동의/요청인지 판별한다.
-
-    이전 대화가 존재하고, 사용자의 발언이 단문(35자 이내)이며 직전 제안 수락 또는
-    작업 계속/재정리 요청인 경우에만 True를 반환한다.
-    독립적인 신규 법률 질문이나 사실관계 추가/정정인 경우는 제외한다.
-
-    Args:
-        q: 현재 사용자의 질문 원문.
-        conv_ctx: 대화 맥락 딕셔너리 또는 ConversationContext 객체.
-
-    Returns:
-        bool: 단문 후속 질의 여부.
-    """
-    if not q or not isinstance(q, str):
-        return False
-    q_clean = q.strip()
-    if not q_clean or len(q_clean) > 35:
-        return False
-
-    # 이전 대화 기록이 없으면 절대 후속 질문이 아님 (첫 질문 단문 보호)
-    if not conv_ctx:
-        return False
-    prev_turns = (
-        getattr(conv_ctx, "previous_turns", None)
-        or (conv_ctx.get("previous_turns") if isinstance(conv_ctx, dict) else None)
-    )
-    last_ans = (
-        getattr(conv_ctx, "last_answer", None)
-        or (conv_ctx.get("last_answer") if isinstance(conv_ctx, dict) else None)
-    )
-    if not prev_turns and not last_ans:
-        return False
-
-    # 인사말 제외
-    if re.search(r"^(?:안녕|반갑|수고|고마|감사)", q_clean):
-        return False
-
-    # 새로운 독립 질문이나 사실 추가 제외 (물음표 또는 독립 법률 쟁점 단어 포함)
-    if any(k in q_clean for k in ("파산", "경매", "소송", "비용", "얼마", "언제까지", "누가", "어디서")):
-        return False
-
-    if q_clean in _AFFIRMATIVE_WORDS:
-        return True
-
-    return bool(_AFFIRMATIVE_RE.match(q_clean))
-
-
-def _extract_proposal_from_answer(last_answer: Optional[str]) -> Optional[str]:
-    """직전 AI 답변 원문의 말미에서 제안 문구(따옴표 또는 주요 키워드)를 추출한다.
-
-    Args:
-        last_answer: 직전 턴 AI 답변 원문 텍스트.
-
-    Returns:
-        Optional[str]: 추출된 제안 작업 명칭 (없으면 None).
-    """
-    if not last_answer or not isinstance(last_answer, str):
-        return None
-    text = last_answer.strip()
-    tail = text[-400:] if len(text) > 400 else text
-
-    # 1. 말미 400자 내 따옴표로 감싸진 제안 문구 탐지: “...체크리스트...” 또는 '...신고...'
-    m_quote = re.search(
-        r'[\u201c\u201d"\'\u300c\u300e]([^\u201c\u201d"\'\u300d\u300f\n]{2,60}?(?:체크\s*리스트|신고|요약|가이드|서식|목록|항목)[^\u201c\u201d"\'\u300d\u300f\n]{0,30}?)[\u201c\u201d"\'\u300d\u300f]',
-        tail,
-    )
-    if m_quote:
-        return m_quote.group(1).strip()
-
-    # 1-B. 따옴표 일반 매칭 (말미 따옴표 블록)
-    m_quote_general = re.search(
-        r'[\u201c\u201d"\'\u300c\u300e]([^\u201c\u201d"\'\u300d\u300f\n]{3,60}?)[\u201c\u201d"\'\u300d\u300f]',
-        tail,
-    )
-    if m_quote_general:
-        candidate = m_quote_general.group(1).strip()
-        if len(candidate) >= 3 and not candidate.startswith("http"):
-            return candidate
-
-    # 2. 따옴표 없는 제안 문구 탐지 (원하시면 ... 요약/정리)
-    m_noquote = re.search(
-        r"원하시면[^\n]{0,40}?(?:이어서|바로)?\s*([가-힣0-9\s·\-\.]{4,40}?)\s*(?:형태로|로)?\s*(?:[^\n]{0,20}?(?:요약|정리|안내|작성|제공|도와))",
-        tail,
-    )
-    if m_noquote:
-        candidate = m_noquote.group(1).strip()
-        candidate = re.sub(r"^(?:제가|바로|이어서)\s*", "", candidate).strip()
-        if len(candidate) >= 3:
-            return candidate
-
-    # 3. 답변 끝 300자 내 '체크리스트' 명사구 탐지
-    m_chk = re.search(r"([가-힣0-9\s·\-\.]{2,30}체크\s*리스트)", tail)
-    if m_chk:
-        return m_chk.group(1).strip()
-
-    return None
-
-
-def _resolve_multi_turn_task(q: str, conv_ctx: Optional[Any]) -> tuple[str, Optional[str]]:
-    """단문 후속 질의를 직전 대화 맥락과 결합하여 구체적인 작업 목표(resolved_query)로 복원한다.
-
-    단문이 여러 턴 반복되는 경우 직전 단문만 보지 않고 대화 이력을 역추적하여
-    원래 본질적인 상담 질문(Root Question)과 결합한다.
-
-    Args:
-        q: 현재 사용자의 단문 질의 원문.
-        conv_ctx: 대화 맥락 딕셔너리 또는 ConversationContext 객체.
-
-    Returns:
-        Tuple[str, Optional[str]]: (복원된 작업 질의 resolved_query, 승계할 기준 날짜 event_date).
-    """
-    q_clean = q.strip()
-    prev_turns = (
-        getattr(conv_ctx, "previous_turns", None)
-        or (conv_ctx.get("previous_turns") if isinstance(conv_ctx, dict) else [])
-        or []
-    )
-    last_ans = (
-        getattr(conv_ctx, "last_answer", None)
-        or (conv_ctx.get("last_answer") if isinstance(conv_ctx, dict) else None)
-    )
-    if not last_ans and prev_turns:
-        last_turn = prev_turns[-1]
-        last_ans = (
-            getattr(last_turn, "answer", None)
-            or (last_turn.get("answer") if isinstance(last_turn, dict) else None)
-        )
-
-    # 1. 다중 턴을 거슬러 올라가 최초의 본질적 질문(Root Question) 탐색
-    root_q = ""
-    for t in reversed(prev_turns):
-        t_q = getattr(t, "question", None) or (t.get("question") if isinstance(t, dict) else "")
-        if t_q and not _AFFIRMATIVE_RE.match(t_q.strip()) and t_q.strip() not in _AFFIRMATIVE_WORDS:
-            root_q = t_q.strip()
-            break
-    if not root_q and prev_turns:
-        first_t = prev_turns[0]
-        root_q = getattr(first_t, "question", None) or (first_t.get("question") if isinstance(first_t, dict) else "")
-
-    # 2. 직전 답변에서 제안 문구 추출
-    proposed_item = _extract_proposal_from_answer(last_ans)
-
-    # 3. 날짜 추출 (루트 질문 또는 제안 문구에서)
-    date_match = re.search(r"(\d{4}[년\.\-]\s*\d{1,2}[월\.\-]\s*\d{1,2}일?)", root_q + " " + (proposed_item or ""))
-    event_date_str = None
-    if date_match:
-        raw_d = date_match.group(1)
-        dm = re.search(r"(\d{4})[.\-/년]\s*(\d{1,2})[.\-/월]\s*(\d{1,2})일?", raw_d)
-        if dm:
-            try:
-                y, m, d = int(dm.group(1)), int(dm.group(2)), int(dm.group(3))
-                event_date_str = f"{y:04d}-{m:02d}-{d:02d}"
-            except (ValueError, TypeError):
-                event_date_str = None
-
-    # 4. 사용자 발언에 따른 작업 동작 식별 (재정리 vs 신규 작성)
-    is_reorganize = any(k in q_clean for k in ("정리", "간결", "다시", "한눈에", "표로"))
-
-    if is_reorganize:
-        if proposed_item:
-            resolved = f"직전 작성된 {proposed_item}를 간결하게 재정리"
-        elif root_q:
-            resolved = f"직전 상담한 {root_q[:40]}에 대한 핵심 체크리스트 재정리"
-        else:
-            resolved = "직전 법률 상담 결과 핵심 체크리스트 재정리"
-    else:
-        if proposed_item:
-            resolved = f"{proposed_item} 작성"
-        elif root_q:
-            prefix = f"{event_date_str} 기준 " if event_date_str else ""
-            resolved = f"{prefix}직전 상담한 {root_q[:40]}에 대한 핵심 체크리스트 작성"
-        else:
-            resolved = "직전 상담 내용에 대한 핵심 체크리스트 및 실무 가이드 작성"
-
-    return resolved, event_date_str
-
-
 @trace
 def supervisor_initialize_node(state: LegalState) -> Dict:
     """1단계: 사건·맥락 확인 및 상담 준비 통합 노드.
@@ -527,135 +332,135 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
         or (conv_ctx.get("case_id") if isinstance(conv_ctx, dict) else getattr(conv_ctx, "case_id", None))
     )
     if case_id:
-        set_case_id(case_id)    # 2. 질문 내 의뢰인 행위 기준일 추출 (YYYY-MM-DD 정규식)
-    extracted_date = None
-    date_match = re.search(r"(\d{4})[.\-/년]\s*(\d{1,2})[.\-/월]\s*(\d{1,2})일?", q)
-    if date_match:
+        set_case_id(case_id)    # 2. 질문 원문은 변경하지 않고, 이전 대화의 의미만 별도의 내부 질의로 복원한다.
+    # '그래 해줘' 같은 표현 사전/제안 문구 정규식은 사용하지 않는다.
+    # 장기 기억의 사실은 승인 증거 DB가 기준이며 이전 AI 답변은 참조 대상일 뿐이다.
+    c_obj = None
+    if conv_ctx:
         try:
-            y, m, d = int(date_match.group(1)), int(date_match.group(2)), int(date_match.group(3))
-            extracted_date = f"{y:04d}-{m:02d}-{d:02d}"
-        except (ValueError, TypeError):
-            extracted_date = None
+            from ai_legal_helper.workflows.conversation_context import ConversationContext
+            c_obj = ConversationContext(**conv_ctx) if isinstance(conv_ctx, dict) else conv_ctx
+        except Exception as exc:
+            logger.warning("[SUPERVISOR_INIT] 대화 맥락 복원 실패: %s", type(exc).__name__)
 
-    # 3. 단문 후속 질의 감지 및 작업 복원 (P0-03 멀티턴 맥락 유지)
-    is_followup = _is_short_followup_request(q, conv_ctx)
-    followup_task_query = None
-    followup_event_date = None
-    if is_followup:
-        followup_task_query, followup_event_date = _resolve_multi_turn_task(q, conv_ctx)
-        logger.info(
-            f"[SUPERVISOR_INIT] 단문 후속 질의 감지: 원문='{q}' -> 복원 질의='{followup_task_query}', "
-            f"승계 날짜={followup_event_date}"
+    has_history = bool(c_obj and getattr(c_obj, "previous_turns", None))
+    decision = None
+    # 첫 턴은 기존 빠른 경로를 유지한다. 이전 대화가 있는 턴은
+    # 기존 Intent Analyzer LLM을 *한 번* 사용해 의도·분야·지시대상을 함께 판정한다.
+    # 별도 신규 그래프 노드를 추가하지 않으며, Router는 분류 결과를 재사용한다.
+    if has_history:
+        case_memory = getattr(c_obj, "case_memory", None) or {}
+        case_hint = (
+            f"사건명: {str(case_memory.get('title') or '')[:100]}, "
+            f"사건 분야: {str(case_memory.get('case_type') or '')[:40]}"
         )
-        if not extracted_date and followup_event_date:
-            extracted_date = followup_event_date
+        decision = analyze_consultation_intent(
+            q, conversation_context=c_obj, case_context=case_hint, use_llm=True,
+        )
+        intent = decision.intent.value
+        consultation_mode = decision.consultation_mode.value
+        # 사건이 연결되지 않은 상담에서 사건 증거 모드를 억지로 활성화하지 않는다.
+        if not case_id:
+            consultation_mode = ConsultationMode.GENERAL_LEGAL.value
+        effective_resolved_query = (decision.resolved_query or q).strip()
+        extracted_date = decision.event_date
+        event_type = decision.event_type
+        statute_mention_date = decision.statute_mention_date
+        pure_greeting = intent in (
+            ConsultationIntent.GENERAL_CONVERSATION.value,
+            ConsultationIntent.OUT_OF_SCOPE.value,
+        )
+    else:
+        # 이전 대화가 없는 턴에만 인사/감사 Fast-Exit을 적용한다.
+        # '네', '응' 같은 발화는 맥락 있는 턴에서 여기로 진입하지 않는다.
+        pure_greeting = bool(re.fullmatch(
+            r"(?:안녕하세요|안녕|감사합니다|고맙습니다|네|예|수고하세요|수고하셨습니다|응|알겠습니다|알겠어)[.!?~\\s]*",
+            q,
+        ))
+        intent = (
+            ConsultationIntent.GENERAL_CONVERSATION.value
+            if pure_greeting else ConsultationIntent.NEW_LEGAL_ANALYSIS.value
+        )
+        consultation_mode = (
+            ConsultationMode.GENERAL_LEGAL.value
+            if pure_greeting or not case_id else ConsultationMode.CASE_EVIDENCE.value
+        )
+        effective_resolved_query = q
+        # 기존 첫 턴 날짜 추출은 호환 유지. 날짜의 법률적 역할은 후속 분석에서 검증한다.
+        date_match = re.search(r"(\\d{4})[.\\-/년]\\s*(\\d{1,2})[.\\-/월]\\s*(\\d{1,2})일?", q)
+        extracted_date = None
+        if date_match:
+            try:
+                y, m, d = map(int, date_match.groups())
+                extracted_date = f"{y:04d}-{m:02d}-{d:02d}"
+            except (TypeError, ValueError):
+                pass
+        event_type = None
+        statute_mention_date = None
 
-    # 4. 단순 인사말·감사 표현 판별 (Fast-Exit 체크: 0.0001초 정규식)
-    # 후속 요청 맥락이 존재하는 단문은 인사말로 탈출하지 않도록 방어
-    pure_greeting = not is_followup and bool(re.fullmatch(
-        r"(?:안녕하세요|안녕|감사합니다|고맙습니다|네|예|수고하세요|수고하셨습니다|응|알겠습니다|알겠어)[.!?~\s]*",
-        q,
-    ))
-
+    # 3. 이전 턴의 인용 법령은 과거 답변에 사용된 참고 자료이다.
+    # 사건일/시행본/개정 부칙이 바뀌었을 수 있으므로, 신규 답변에 검증된 출처로
+    # 무조건 승계하지 않는다. 새 법령 검색은 현재 질문·최신 사건 사실에서 수행한다.
+    initial_sources: List[Dict[str, Any]] = []
     case_context = ""
     briefing_dict = None
     case_evidence_sources = []
     issue_tasks_dict = []
+    evidence_unavailable = False
+    ans_mode = None
 
-    # 4. 대화 맥락이 존재하는 경우 case_context 전두부에 컴팩트 결론 카드 결합
-    if conv_ctx:
+    # 4. 후속 질문도 최신 사건 증거를 조회한다. 후속 요청 분기에서
+    # briefing/issue_tasks/DOCUMENT_MODE를 생략하던 오류를 수정한다.
+    # 일반 법률 설명이나 인사/불명확 질문에서는 불필요한 사건 원문 로딩을 피한다.
+    needs_case_evidence = (
+        bool(case_id)
+        and consultation_mode == ConsultationMode.CASE_EVIDENCE.value
+        and intent not in (
+            ConsultationIntent.GENERAL_CONVERSATION.value,
+            ConsultationIntent.OUT_OF_SCOPE.value,
+            ConsultationIntent.NEEDS_CLARIFICATION.value,
+        )
+    )
+    if needs_case_evidence:
+        db = SessionLocal()
         try:
-            from ai_legal_helper.workflows.conversation_context import ConversationContext
-            c_obj = ConversationContext(**conv_ctx) if isinstance(conv_ctx, dict) else conv_ctx
-            conv_summary_text = c_obj.format_context_for_prompt(max_turns=2, max_chars_per_turn=250)
-            if conv_summary_text and "(이전 상담 대화 없음" not in conv_summary_text:
-                case_context = f"{conv_summary_text}\n\n{case_context}" if case_context else conv_summary_text
-        except Exception as e:
-            logger.warning(f"[INIT] 대화 맥락 포맷팅 중 예외: {e}")
+            if db.query(Case).filter(Case.id == case_id).first():
+                from ai_legal_helper.case_intelligence.case_briefing import build_case_evidence_briefing
+                from ai_legal_helper.workflows.issue_planner import plan_legal_issues
 
-    # 5. 연속 대화 맥락이 있는 경우 이전 턴에서 검증 인용된 법령 출처(previously_cited_sources 및 이전 턴 출처) 계승
-    initial_sources = []
-    if conv_ctx:
-        try:
-            from ai_legal_helper.workflows.conversation_context import ConversationContext
-            c_obj = ConversationContext(**conv_ctx) if isinstance(conv_ctx, dict) else conv_ctx
-            for src in getattr(c_obj, "previously_cited_sources", []) or []:
-                if isinstance(src, dict) and (src.get("source_type") == "STATUTE" or src.get("statute_name")):
-                    initial_sources.append(src)
-            # 직전 턴(previous_turns[-1])의 cited_sources도 함께 안전하게 승계
-            prev_turns = getattr(c_obj, "previous_turns", []) or []
-            if prev_turns:
-                last_turn = prev_turns[-1]
-                last_sources = (
-                    last_turn.get("cited_sources") if isinstance(last_turn, dict)
-                    else getattr(last_turn, "cited_sources", [])
-                ) or []
-                existing_sids = {s.get("source_id") for s in initial_sources if isinstance(s, dict) and s.get("source_id")}
-                for src in last_sources:
-                    if isinstance(src, dict) and (src.get("source_type") == "STATUTE" or src.get("statute_name")):
-                        sid = src.get("source_id")
-                        if sid and sid not in existing_sids:
-                            existing_sids.add(sid)
-                            initial_sources.append(src)
-            if initial_sources:
-                logger.info("[SUPERVISOR_INIT] 연속 대화 이전 턴 검증 법령 출처 %d건 계승 완료", len(initial_sources))
-        except Exception as e:
-            logger.warning(f"[INIT] 이전 인용 법령 출처 계승 중 예외: {e}")
+                # 원문 질문과 문맥 복원 질의를 모두 사용할 수 있도록 한다.
+                # 특히 단문 후속 질문은 resolved_query가 증거 검색/쟁점 생성의 입력이 된다.
+                briefing = build_case_evidence_briefing(db, case_id, effective_resolved_query)
+                tasks = plan_legal_issues(effective_resolved_query, briefing)
 
-    effective_resolved_query = followup_task_query if (is_followup and followup_task_query) else q
+                briefing_dict = briefing.model_dump()
+                issue_tasks_dict = [task.model_dump() for task in tasks]
+                case_evidence_sources = [
+                    {k: v for k, v in src.items() if k != "content"}
+                    for src in briefing.source_registry.values()
+                ]
+                case_context = briefing.formatted_summary or ""
+        except Exception as exc:
+            logger.warning("[SUPERVISOR_INIT] 사건 증거 브리핑 로딩 실패: %s", type(exc).__name__)
+        finally:
+            db.close()
 
-    # 6. 의도 판정 및 사건 증거 지연 로딩 (통합 실행)
-    if pure_greeting:
-        intent = ConsultationIntent.GENERAL_CONVERSATION.value
-        consultation_mode = ConsultationMode.GENERAL_LEGAL.value
-        ans_mode = None
-        evidence_unavailable = False
-    elif is_followup and followup_task_query:
-        intent = ConsultationIntent.FOLLOWUP_ACTION.value
-        consultation_mode = ConsultationMode.CASE_EVIDENCE.value if case_id else ConsultationMode.GENERAL_LEGAL.value
-        ans_mode = None
-        evidence_unavailable = False
-    else:
-        intent = ConsultationIntent.NEW_LEGAL_ANALYSIS.value
-        consultation_mode = ConsultationMode.CASE_EVIDENCE.value if case_id else ConsultationMode.GENERAL_LEGAL.value
-
-        # 사건이 지정되어 있으면 PostgreSQL 증거 브리핑 및 단위 쟁점 계획 로딩
-        if case_id:
-            db = SessionLocal()
-            try:
-                if db.query(Case).filter(Case.id == case_id).first():
-                    from ai_legal_helper.case_intelligence.case_briefing import build_case_evidence_briefing
-                    from ai_legal_helper.workflows.issue_planner import plan_legal_issues
-
-                    briefing = build_case_evidence_briefing(db, case_id, q)
-                    tasks = plan_legal_issues(q, briefing)
-
-                    briefing_dict = briefing.model_dump()
-                    issue_tasks_dict = [task.model_dump() for task in tasks]
-                    case_evidence_sources = [
-                        {k: v for k, v in src.items() if k != "content"}
-                        for src in briefing.source_registry.values()
-                    ]
-
-                    # 브리핑 요약 텍스트 결합
-                    if briefing.formatted_summary:
-                        if case_context and briefing.formatted_summary not in case_context:
-                            case_context = case_context + "\n\n" + briefing.formatted_summary
-                        elif not case_context:
-                            case_context = briefing.formatted_summary
-            except Exception as exc:
-                logger.warning("[SUPERVISOR_INIT] 사건 증거 브리핑 로딩 실패: %s", type(exc).__name__)
-            finally:
-                db.close()
-
-        # 승인된 원문 문서 존재 여부 확인 (스팬 내용이 있거나, 등록 문서 레코드 또는 source_registry가 존재)
         has_case_documents = any(
-            doc.get("review_status") == "APPROVED" and (bool(doc.get("content")) or bool(doc.get("document_name")))
+            doc.get("review_status") == "APPROVED"
+            and (bool(doc.get("content")) or bool(doc.get("document_name")))
             for doc in ((briefing_dict or {}).get("source_documents") or [])
         ) or bool(briefing_dict and briefing_dict.get("source_registry"))
-        needs_case_evidence = (consultation_mode == ConsultationMode.CASE_EVIDENCE.value)
-        evidence_unavailable = needs_case_evidence and not has_case_documents
-        ans_mode = DOCUMENT_MODE if (needs_case_evidence and has_case_documents) else None
+        evidence_unavailable = not has_case_documents
+        ans_mode = DOCUMENT_MODE if has_case_documents else None
+
+    # 상세 대화 이력은 conversation_context/messages가 보유한다.
+    # case_context에는 최신 사건 사실만 유지하여 RAG/검증 프롬프트의 중복을 줄인다.
+    logger.info(
+        "[SUPERVISOR_INIT] 문맥=%s 의도=%s 근거모드=%s 복원질의길이=%d 사건증거=%d 쟁점=%d",
+        "후속" if has_history else "신규",
+        intent, consultation_mode, len(effective_resolved_query),
+        len(case_evidence_sources), len(issue_tasks_dict),
+    )
 
     # GraphRAG 기본 객체
     graph_evidence: Dict[str, Any] = {
@@ -684,10 +489,23 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
         "question": q or "(질문 미확인)",
         "resolved_query": effective_resolved_query,
         "intent": intent,
-        "categories": [],  # 라우터(route_node)가 전담하도록 비워둠
+        "categories": decision.categories if decision else [],  # 의미 분석 결과를 Router Fast-Path로 전달
         "intent_decision": {
             "intent": intent,
             "consultation_mode": consultation_mode,
+            "categories": decision.categories if decision else [],
+            "resolved_query": effective_resolved_query,
+            "requires_specialist": decision.requires_specialist if decision else not pure_greeting,
+            "requires_retrieval": decision.requires_retrieval if decision else not pure_greeting,
+            "requires_verification": decision.requires_verification if decision else not pure_greeting,
+            "requires_full_analysis": decision.requires_full_analysis if decision else not pure_greeting,
+            "referenced_previous_turn_ids": decision.referenced_previous_turn_ids if decision else [],
+            "reason": decision.reason if decision else "첫 턴 기본 경로",
+            "event_date": extracted_date,
+            "event_type": event_type,
+            "statute_mention_date": statute_mention_date,
+        },
+        "consultation_mode": consultation_mode,
             "categories": [],
             "resolved_query": effective_resolved_query,
             "requires_specialist": not pure_greeting,
@@ -700,8 +518,8 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
         "answer_mode": ans_mode,
         "evidence_unavailable": evidence_unavailable,
         "event_date": extracted_date,
-        "event_type": None,  # 날짜 발견만으로 계약 체결일로 단정하지 않음 (2026-11-12)
-        "statute_mention_date": None,
+        "event_type": event_type,
+        "statute_mention_date": statute_mention_date,
         "answer_generation_error": None,
         "answer_source_manifest": None,
         "revision_count": 0,
