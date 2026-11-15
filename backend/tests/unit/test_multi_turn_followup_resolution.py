@@ -110,6 +110,48 @@ def test_resolution_context_keeps_actual_last_offer(turn1_context):
     assert len(prompt_ctx) <= 3200
 
 
+def test_three_turns_preserve_root_question_and_newest_offer(turn2_context):
+    """3턴에서도 최초 사건과 직전 턴에 실제 제안된 작업을 혼동하지 않는다."""
+    ctx = ConversationContext(**turn2_context)
+    prompt_ctx = ctx.format_context_for_resolution()
+    assert "2026년 11월 1일에 새로운 임대차계약" in prompt_ctx
+    assert "임대사업자용 임대차계약 신고 체크리스트" in prompt_ctx
+    assert "턴 2" in prompt_ctx
+    assert len(prompt_ctx) <= 3200
+
+
+def test_unresolved_short_followup_fails_closed(turn1_context):
+    """LLM 장애/불명확 출력 시 존재하지 않는 체크리스트를 임의로 만들지 않는다."""
+    turn1_context["current_question"] = "그래 해줘"
+    ctx = ConversationContext(**turn1_context)
+    with patch("ai_legal_helper.agents.intent_analyzer.get_llm") as llm:
+        llm.return_value.invoke.side_effect = RuntimeError("model unavailable")
+        decision = analyze_consultation_intent("그래 해줘", ctx, use_llm=True)
+    assert decision.intent == ConsultationIntent.NEEDS_CLARIFICATION
+    assert decision.resolved_query == "그래 해줘"
+    assert decision.requires_retrieval is False
+
+
+def test_unresolved_llm_output_does_not_fabricate_task(turn1_context):
+    turn1_context["current_question"] = "그래 해줘"
+    ctx = ConversationContext(**turn1_context)
+    response = AIMessage(content='''{
+      "intent": "FOLLOWUP_ACTION",
+      "consultation_mode": "GENERAL_LEGAL",
+      "categories": ["행정"],
+      "resolved_query": "그래 해줘",
+      "requires_specialist": false,
+      "requires_retrieval": false,
+      "requires_verification": true,
+      "requires_full_analysis": false
+    }''')
+    with patch("ai_legal_helper.agents.intent_analyzer.get_llm") as llm:
+        llm.return_value.invoke.return_value = response
+        decision = analyze_consultation_intent("그래 해줘", ctx, use_llm=True)
+    assert decision.intent == ConsultationIntent.NEEDS_CLARIFICATION
+    assert decision.categories == []
+
+
 def test_resolution_context_preserves_withheld_state(turn1_context):
     turn1_context["current_question"] = "그다음은?"
     turn1_context["previous_turns"][-1]["answer_status"] = "WITHHELD"
