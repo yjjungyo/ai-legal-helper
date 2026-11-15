@@ -76,7 +76,8 @@ def test_sc012_semantic_followup_never_converts_inheritance_partition_to_install
     assert "공동상속인" in issues[0].legal_questions[0]
     assert "fact-heirs" in issues[0].relevant_fact_ids
     assert "E03" in issues[0].relevant_evidence_labels
-    assert issues[0].required_statutes == []  # 의미 윤곽의 후보 조문은 아직 검증된 법령이 아니다
+    assert "민법 제411조" in issues[0].required_statutes  # 실제 원문 검증 *대상*
+    assert issues[0].verified_statutes == []  # 공식 출처 확보 전이므로 검증 성공 아님
     assert "민법 제411조" in issues[0].candidate_statutes
 
 
