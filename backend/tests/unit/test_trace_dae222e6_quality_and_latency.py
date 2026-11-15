@@ -103,6 +103,19 @@ def test_consultation_stipulated_facts_and_user_statement_pass(sample_dae222e6_s
         "[E01_주택임대차계약서.txt], (주택임대차보호법 제3조의2)"
     )
 
+    # [SUBSUMPTION-09 / Gemini] 현재의 우선변제권 존속은 2022년
+    # 최초 전입·확정일자만으로 자동 증명되지 않는다. 사용자 진술을
+    # 보존하되 현재 점유의 실증 자료를 별도로 포함한다.
+    confirmed_occupancy = {
+        "source_id": "E03_현재거주확인.txt",
+        "source_type": "CASE_EVIDENCE",
+        "filename": "E03_현재거주확인.txt",
+        "document_name": "E03_현재거주확인.txt",
+        "review_status": "APPROVED",
+        "content": "2026년 11월 1일 현재 주택을 점유하며 전입신고를 유지하고 있다.",
+    }
+    grounded_sources = sample_dae222e6_sources + [confirmed_occupancy]
+
     mock_llm_reply = {
         "status": "REVISE",
         "reason_code": "ANSWER_REVISION_REQUIRED",
@@ -119,11 +132,33 @@ def test_consultation_stipulated_facts_and_user_statement_pass(sample_dae222e6_s
                 "claim": "2022년 갖춘 대항요건과 확정일자에 따라 보증금 3억 원의 우선변제권이 유지됩니다.",
                 "claim_type": "LEGAL_APPLICATION",
                 "fact_status": "VERIFIED_FACT",
-                "source_ids": ["E01_주택임대차계약서.txt", "STATUTE:주택임대차보호법_제3조의2"],
+                "source_ids": ["E01_주택임대차계약서.txt", "E03_현재거주확인.txt",
+                               "STATUTE:주택임대차보호법_제3조의2"],
                 "grounding_status": "SUPPORTED",
                 "reason": "계약서 및 법 제3조의2로 뒷받침됨",
             },
         ],
+        # 같은 검증 모델의 기존 1회 출력에서 요건·예외를 구조화해 제공.
+        "application_checks": [{
+            "claim": "2022년 갖춘 대항요건과 확정일자에 따라 보증금 3억 원의 우선변제권이 유지됩니다.",
+            "legal_effect": "우선변제권의 현재 유지",
+            "rule_source_ids": ["STATUTE:주택임대차보호법_제3조의2"],
+            "requirements": [
+                {"requirement": "주택 인도 및 주민등록",
+                 "status": "MET", "fact_source_ids": ["E01_주택임대차계약서.txt"],
+                 "fact_quote": "인도 및 전입 2022.03.03", "reason": "2022년 대항요건 확인"},
+                {"requirement": "계약증서 확정일자",
+                 "status": "MET", "fact_source_ids": ["E01_주택임대차계약서.txt"],
+                 "fact_quote": "확정일자 2022.04.01", "reason": "계약원문에 확정일자가 기록됨"},
+                {"requirement": "현재 점유 및 주민등록 유지",
+                 "status": "MET", "fact_source_ids": ["E03_현재거주확인.txt"],
+                 "fact_quote": "2026년 11월 1일 현재 주택을 점유하며 전입신고를 유지하고 있다.",
+                 "reason": "현재 상태가 별도로 확인됨"},
+            ],
+            "exception_analysis": "선순위 권리·경매 시 예외와 실제 회수 가능성은 별도로 분석한다.",
+            "precedent_analyses": [],
+            "conclusion_status": "SUPPORTED",
+        }],
         "question_coverage": [{"question": "가압류 발견과 보증금 반환 영향", "answered": True, "reason": "설명함"}],
         "consistency_checks": {
             "opening_conclusion": {"passed": True, "reason": "첫 결론 일치", "source_ids": ["E01_주택임대차계약서.txt"]},
@@ -146,7 +181,7 @@ def test_consultation_stipulated_facts_and_user_statement_pass(sample_dae222e6_s
         result = run_verification(
             question=question,
             draft_answer=draft,
-            retrieved_sources=sample_dae222e6_sources,
+            retrieved_sources=grounded_sources,
             require_question_coverage=True,
         )
 

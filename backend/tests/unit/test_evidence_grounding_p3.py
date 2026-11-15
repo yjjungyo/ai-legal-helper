@@ -118,6 +118,10 @@ def test_claim_level_adaptive_scope_recommendation_not_blocked():
         "실무상 주민센터를 방문하여 확정일자 부여현황을 확인하시고, 내용증명을 우체국에서 발송하시기 바랍니다."
     )
 
+    # [SUBSUMPTION-11 / Gemini] 이 테스트는 개별 사건의 종료·미반환
+    # 요건을 충족했다고 단정하는 LEGAL_APPLICATION이 아니라 일반
+    # LEGAL_RULE과 실무 권고의 독립 grounding에 관한 회귀이다.
+    # 설명 주석은 JSON 출력 문자열 *밖*에 있어야 한다.
     mock_llm = MagicMock()
     # 핵심 법리는 SUPPORTED, 실무 권고는 NOT_APPLICABLE (출처 없음)
     mock_llm.invoke.return_value = SimpleNamespace(
@@ -127,7 +131,7 @@ def test_claim_level_adaptive_scope_recommendation_not_blocked():
             "claims": [
                 {
                     "claim": "임차권등기명령 신청 가능",
-                    "claim_type": "LEGAL_APPLICATION",
+                    "claim_type": "LEGAL_RULE",
                     "fact_status": "VERIFIED_FACT",
                     "source_ids": ["주택임대차보호법_제3조의3"],
                     "grounding_status": "SUPPORTED",

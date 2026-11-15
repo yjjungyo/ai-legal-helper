@@ -1,0 +1,62 @@
+name: Legal Subsumption Regression
+
+on:
+  pull_request:
+    paths:
+      - "backend/src/ai_legal_helper/agents/subsumption_audit.py"
+      - "backend/src/ai_legal_helper/agents/verification.py"
+      - "backend/src/ai_legal_helper/agents/issue_verifier.py"
+      - "backend/src/ai_legal_helper/agents/document_answer.py"
+      - "backend/src/ai_legal_helper/agents/document_verification_prompt.py"
+      - "backend/src/ai_legal_helper/rag/grounding_context.py"
+      - "backend/tests/unit/test_legal_subsumption_audit.py"
+      - "backend/tests/unit/test_trace_dae222e6_quality_and_latency.py"
+      - ".github/workflows/legal-subsumption-regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  legal-subsumption:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TESTING: "1"
+      LANGFUSE_ENABLED: "false"
+      CHECKPOINTER_TYPE: memory
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - name: Install backend and test dependencies
+        run: python -m pip install -e './backend[dev]'
+      - name: Compile edited files and tests
+        run: |
+          python -m py_compile \
+            backend/src/ai_legal_helper/agents/subsumption_audit.py \
+            backend/src/ai_legal_helper/agents/document_answer.py \
+            backend/src/ai_legal_helper/agents/document_verification_prompt.py \
+            backend/src/ai_legal_helper/agents/verification.py \
+            backend/src/ai_legal_helper/agents/issue_verifier.py \
+            backend/src/ai_legal_helper/rag/grounding_context.py \
+            backend/tests/unit/test_legal_subsumption_audit.py \
+            backend/tests/unit/test_trace_dae222e6_quality_and_latency.py
+      - name: Law-fact subsumption and related verification regressions
+        run: |
+          # [REGRESSION-FIX / Gemini] 기존 3건은 소스가 아닌 테스트만
+          # 현재 동반 부칙·부수증거 축약 문구·로컬 인덱스 mock 계약에
+          # 맞추어 수정했다. 이제 3건도 제외 없이 모두 실행한다.
+          PYTHONPATH=backend/src python -m pytest -q \
+            backend/tests/unit/test_legal_subsumption_audit.py \
+            backend/tests/unit/test_verification_prompt_diet.py \
+            backend/tests/unit/test_document_consultation.py \
+            backend/tests/unit/test_legal_source_grounding_pipeline.py \
+            backend/tests/unit/test_rag_citation_standard.py \
+            backend/tests/unit/test_official_precedent_search.py \
+            backend/tests/unit/test_stage1_issue_formulation.py \
+            backend/tests/unit/test_stage2_statute_retrieval.py \
+            backend/tests/unit/test_step3_statute_search.py

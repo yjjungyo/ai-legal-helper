@@ -1,0 +1,53 @@
+name: Verification Progress Regression
+
+on:
+  pull_request:
+    paths:
+      - "backend/src/ai_legal_helper/workflows/verification_progress.py"
+      - "backend/src/ai_legal_helper/workflows/document_consultation.py"
+      - "backend/src/ai_legal_helper/workflows/legal_workflow.py"
+      - "backend/src/ai_legal_helper/workflows/state.py"
+      - "backend/tests/unit/test_step5_verification_progress.py"
+      - ".github/workflows/verification-progress-regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  progress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TESTING: "1"
+      LANGFUSE_ENABLED: "false"
+      CHECKPOINTER_TYPE: memory
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - name: Install backend/test dependencies
+        run: python -m pip install -e './backend[dev]'
+      - name: Compile modified source and regression tests
+        run: |
+          python -m py_compile \
+            backend/src/ai_legal_helper/workflows/verification_progress.py \
+            backend/src/ai_legal_helper/workflows/document_consultation.py \
+            backend/src/ai_legal_helper/workflows/legal_workflow.py \
+            backend/src/ai_legal_helper/workflows/state.py \
+            backend/tests/unit/test_step5_verification_progress.py
+      - name: Search, case-law, subsumption, temporal and document regression
+        run: |
+          PYTHONPATH=backend/src python -m pytest -q \
+            backend/tests/unit/test_step5_verification_progress.py \
+            backend/tests/unit/test_legal_subsumption_audit.py \
+            backend/tests/unit/test_document_consultation.py \
+            backend/tests/unit/test_official_precedent_search.py \
+            backend/tests/unit/test_official_statute_versions_p4.py \
+            backend/tests/unit/test_verification_prompt_diet.py \
+            backend/tests/unit/test_stage2_statute_retrieval.py \
+            backend/tests/unit/test_step3_statute_search.py \
+            backend/tests/unit/test_trace_dae222e6_quality_and_latency.py

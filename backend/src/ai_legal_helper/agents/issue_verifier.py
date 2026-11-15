@@ -972,11 +972,18 @@ def verify_issue(
             "실효적인 보증금 회수를 위해서는 임차권등기명령 및 보증금반환청구소송 등 정당한 민사 절차를 진행해야 합니다."
         )
 
-    # (O) 일반 기타 쟁점
+    # (O) 일반 기타 쟁점 — 도메인 비종속 안전 보수화
     else:
         if has_supported_facts and law_verified:
-            status = "VERIFIED"
-            reason_codes.append("GENERAL_FACTS_AND_LAW_SUPPORTED")
+            # [SUBSUMPTION-08 / Gemini 인계] 기존에는 '사건 사실 하나 +
+            # 법령 출처 하나 존재'만으로 새로운 ISSUE_SEMANTIC_*도
+            # VERIFIED가 되었다. 두 출처가 특정 법률효과의 요건·예외를
+            # 충족하는지는 아직 검증되지 않았으므로 이 자동 승격 금지.
+            # Document/General Answer Verifier의 법률요건 포섭 검증이
+            # 최종 결론을 심사한다. IssueVerifier의 CONDITIONAL은
+            # 출처 *확보*를 의미하며 정답 불허/정답 승인 자체가 아니다.
+            status = "CONDITIONAL"
+            reason_codes.append("GENERAL_SOURCES_PRESENT_SUBSUMPTION_UNCHECKED")
         elif has_supported_facts:
             status = "CONDITIONAL"
             reason_codes.append("GENERAL_FACTS_SUPPORTED_LAW_INSUFFICIENT")

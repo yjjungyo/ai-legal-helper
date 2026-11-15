@@ -14,7 +14,10 @@ from langchain_core.messages import AIMessage, HumanMessage
 from ai_legal_helper.agents.document_answer import write_document_answer
 from ai_legal_helper.observability.logging_config import get_logger
 from ai_legal_helper.rag.grounding_context import format_grounding_sources
-from ai_legal_helper.workflows.document_search import pending_searches, search_is_approved
+from ai_legal_helper.workflows.document_search import (
+    pending_searches, search_is_approved,
+    pending_precedent_searches, precedent_search_is_approved,
+)
 
 logger = get_logger(__name__)
 DOCUMENT_MODE = "DOCUMENT_GROUNDED"
@@ -225,6 +228,22 @@ def generate_answer(
                           answer_generation_error=None)
         else:
             result.update(draft_answer="", answer_generation_error=type(exc).__name__)
+    # [STEP5-PROGRESS-03 / Gemini] 수정 LLM이 동일 초안을 돌려줬고
+    # Writer가 확인한 Source Manifest도 동일하다면 법률효과를 검증할
+    # 새로운 정보가 없다. 다음 verification_node가 기존의 유효한
+    # 검증 스냅샷을 재사용할 수 있도록 신호만 기록한다.
+    # 출처가 1개라도 늘거나 같은 질문이라도 본문이 변경되면 False:
+    # 새로운 판례·부칙을 이전 검증 결과로 덮어쓰지 않도록 한다.
+    previous_draft = str(state.get("draft_answer") or "")
+    prior_sha = (state.get("answer_source_manifest") or {}).get("content_sha256")
+    current_sha = (result.get("answer_source_manifest") or {}).get("content_sha256")
+    no_progress = bool(
+        repair and previous_draft and result.get("draft_answer") == previous_draft
+        and prior_sha and current_sha and prior_sha == current_sha
+    )
+    result["revision_no_progress"] = no_progress
+    if no_progress:
+        logger.info("[STEP5_REWRITE] 수정된 답변/근거 원문 불변; 검증 재사용 가능성 평가 예정")
     return result
 
 
@@ -276,6 +295,10 @@ def verify_answer(state: Dict[str, Any]) -> Dict[str, Any]:
         len(draft),
         len(sources),
     )
+    reused_verifier = False
+    # [STEP5-FINAL-02 / Gemini] 검증 단계에서 실제 적용한 질문 Coverage
+    # 강도를 검증 결과에 보존. 예외 시에도 안전 기본값은 Full Coverage.
+    require_coverage = True
     try:
         if state.get("answer_generation_error") or not draft.strip():
             raise ValueError("ANSWER_GENERATION_FAILED")
@@ -294,16 +317,82 @@ def verify_answer(state: Dict[str, Any]) -> Dict[str, Any]:
             or (state.get("intent_decision") or {}).get("requires_full_analysis") is False
         )
         require_coverage = not is_followup
-        # 검증 함수의 반환값은 추적 SDK가 비동기로 직렬화한다. 추적 중인 딕셔너리에
-        # 해시·명세를 추가하면 순회 중 변경 오류로 관측값이 유실될 수 있어 새 객체를 만든다.
-        result = {**run_verification(consultation_question(state), draft, sources, context,
-                                     require_question_coverage=require_coverage), "source_manifest": manifest}
+        # [STEP5-PROGRESS-04 / Gemini] 재작성에서 초안/근거가 바뀌지
+        # 않았다면, 직전의 *완료된* 검증을 동일 입력 계약 아래에서만 재사용.
+        # 초안 해시 한 개만으로는 부족하다. 질문·검토일·출처 본문/건수·
+        # 질문 전체 검증 여부가 모두 일치하고 승인 문서 스냅샷도
+        # validate_document_snapshot()으로 다시 확인한 뒤 재사용한다.
+        # 법률 사실의 요건 충족 판정과 Temporal Gate는 재사용 결정에
+        # 끼워 넣지 않는다. Timestamp/시행일 모호 검토는 캐시 금지.
+        from ai_legal_helper.workflows.verification_progress import (
+            can_reuse_verification,
+            verification_input_hash,
+            verification_defect_signature,
+        )
+        question = consultation_question(state)
+        input_hash = verification_input_hash(
+            question=question,
+            draft_answer=draft,
+            manifest=manifest,
+            as_of_date=as_of,
+            require_question_coverage=require_coverage,
+        )
+        previous = state.get("verification_result") or {}
+        reusable = bool(
+            state.get("revision_no_progress") and can_reuse_verification(
+                previous=previous,
+                expected_input_hash=input_hash,
+                current_draft=draft,
+                current_manifest=manifest,
+            )
+        )
+        if reusable:
+            reused_verifier = True
+            # 이미 독립 LLM 검증을 거친 결과만 복사한다. 실패 결론을
+            # PASS로 승격하거나 검증되지 않은 추가 법률효과를 인정하지 않는다.
+            result = {**previous, "source_manifest": manifest}
+            logger.info("[STEP5_VERIFY] 답변·질문·원문 불변: LLM 검증 호출 1회 생략")
+        else:
+            # 검증 함수의 반환값은 추적 SDK가 비동기로 직렬화한다.
+            # 해시·명세를 추가할 때는 원본을 수정하지 않고 새 객체를 만든다.
+            result = {**run_verification(question, draft, sources, context,
+                                         require_question_coverage=require_coverage),
+                      "source_manifest": manifest}
+        result["verification_input_hash"] = input_hash
     except Exception as exc:
         logger.warning("문서 원문 검증 실패: %s (%s)", type(exc).__name__, exc)
         result = {"status": "INSUFFICIENT", "reason_code": "VERIFICATION_ERROR",
                   "claims": [], "warnings": ["등록 자료와 답변의 대조를 완료하지 못했습니다."],
                   "missing_issues": [], "revision_instructions": []}
     result["verified_answer_sha256"] = hashlib.sha256(draft.encode("utf-8")).hexdigest()
+    result["required_question_coverage"] = require_coverage
+    # [STEP5-PROGRESS-05] 구조화 결함 fingerprint는 출처가 달라지거나
+    # 질문 충족·법령/판례 포섭 결과가 개선되면 바뀐다. 모델이 답변의
+    # 표현만 다르게 쓰고 동일 결함을 반복하면 그 사실만 표시한다.
+    # 이 함수는 법률적 참/거짓을 검사하지 않으며, 종료 정책은
+    # next_verification_step()과 기존 finish_answer()가 결정한다.
+    progress_history = list(state.get("verification_progress_history") or [])
+
+    if result.get("status") == "PASS":
+        progress_history = []
+        no_progress = False
+    elif result.get("reason_code") == "VERIFICATION_ERROR":
+        no_progress = False
+    else:
+        from ai_legal_helper.workflows.verification_progress import verification_defect_signature
+        issue_hash = verification_defect_signature(
+            result, question=consultation_question(state),
+            sources_sha256=(result.get("source_manifest") or {}).get("content_sha256") or "",
+        )
+        no_progress = issue_hash in progress_history or reused_verifier
+        if issue_hash not in progress_history:
+            progress_history = (progress_history + [issue_hash])[-5:]
+    if no_progress:
+        logger.info(
+            "[STEP5_VERIFY] 재검증 후 동일 결함 재발 또는 동일 검증 재사용 "
+            "(revision_count=%d, source_delta_count=%s)",
+            state.get("revision_count") or 0, state.get("search_delta_count"),
+        )
     preserved = list(state.get("preserved_points") or [])
     for pt in result.get("preserved_points") or []:
         if isinstance(pt, str) and pt.strip() and pt.strip() not in preserved:
@@ -327,6 +416,11 @@ def verify_answer(state: Dict[str, Any]) -> Dict[str, Any]:
     )
     return {"verification_result": result, "retrieved_sources": sources, "issue_results": [],
             "preserved_points": preserved,
+            # 비교용 SHA256만 체크포인트에 저장하여 사건 원문/법률 초안을
+            # 별도의 progress 로그/상태에 복제하지 않는다.
+            "verification_progress_history": progress_history,
+            "verification_no_progress": no_progress,
+            "verification_reused": reused_verifier,
             "verified_sources": result.get("citation_audit", {}).get("verified_sources", [])}
 
 
@@ -351,21 +445,39 @@ def next_verification_step(state: Dict[str, Any]) -> str:
         route_reason = "검증 통과(PASS)"
     else:
         requests = pending_searches(state)
+        precedents = pending_precedent_searches(state)
         search_count = state.get("statute_search_count") or 0
         branched_statute = False
-        if requests and search_count < 2:
-            if search_is_approved(state, requests):
+        if (requests or precedents) and search_count < 2:
+            # [PRECEDENT-06 / Gemini 인계] 판례 단독 요청은 법령명이 없다는
+            # 이유로 승인/검색 루프에서 사라지면 안 된다. 동시에 승인되지 않은
+            # 공식 판례 API 호출이 발생하지 않도록 유형별로 HITL을 검사한다.
+            statutes_ok = not requests or search_is_approved(state, requests)
+            precedents_ok = not precedents or precedent_search_is_approved(state, precedents)
+            if statutes_ok and precedents_ok:
                 target_node = "execute_statute_search"
-                route_reason = f"승인된 신규 법령 요청({len(requests)}건) 즉시 검색"
+                route_reason = f"승인된 법령 {len(requests)}건·판례 {len(precedents)}건 검색"
                 branched_statute = True
             else:
-                # 과거 HITL 실행 여부가 아니라 이번 신규 검색 범위의 승인 여부로 판단한다.
                 target_node = "statute_search_approval"
-                route_reason = f"신규 법령({len(requests)}건) 사용자 승인(HITL) 요청"
+                route_reason = f"법령 {len(requests)}건·판례 {len(precedents)}건 승인 요청"
                 branched_statute = True
 
         if not branched_statute:
-            if result.get("status") in ("REVISE", "INSUFFICIENT") and (state.get("revision_count") or 0) < 3:
+            # [STEP5-PROGRESS-06 / Gemini] 첫 검증 실패는 고칠 기회를
+            # 주되, 동일한 원문·같은 법률요건/인용 결함이 재발했거나
+            # 재작성 모델이 실제로 동일 초안을 되돌려 줬다면
+            # 세 번을 기계적으로 소비하지 않는다. 먼저 *새로운 판례·
+            # 법령 검색 요청*을 검사한 뒤에만 무진전 종료를 적용하므로
+            # 필요한 공식 검색을 생략하지 않는다.
+            if state.get("verification_no_progress"):
+                if state.get("draft_answer") and result.get("claims"):
+                    target_node = "finalize"
+                    route_reason = "동일한 검증 결함 재발: 최종 안전검사로 종료"
+                else:
+                    target_node = "insufficient"
+                    route_reason = "동일한 검증 결함 재발: 확보된 답변 근거 없음"
+            elif result.get("status") in ("REVISE", "INSUFFICIENT") and (state.get("revision_count") or 0) < 3:
                 target_node = "revise"
                 route_reason = f"답변 보강 재작성 ({state.get('revision_count', 0) + 1}/3회)"
             else:
@@ -485,11 +597,61 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
             )
         )
 
+        # [STEP5-FINAL-01 / Gemini] 재작성 무진전으로 조기 finalize되어도
+        # 일부 주장만 SUPPORTED라는 이유로 질문 미응답·일관성 결함·
+        # 4단계 요건 포섭/인용 실패를 PASS로 바꾸지 않는다.
+        # 실제 답변에 한계가 명시된 조건부 설명은 허용한다.
+        coverage_items = result.get("question_coverage") or []
+        # 완전한 질문 답변 검증을 요구한 상담에서 coverage 배열이
+        # 없는데도 일부 사건 사실만 SUPPORTED인 이유로 PASS할 수 없다.
+        required_coverage = result.get("required_question_coverage") is True
+        has_undisclosed_question_gap = (required_coverage and not coverage_items) or any(
+            isinstance(item, dict)
+            and item.get("answered") is not True
+            and not (
+                item.get("answerable") is False
+                and item.get("limitation_disclosed") is True
+                and isinstance(item.get("limitation_statement"), str)
+                and bool(item["limitation_statement"].strip())
+                and item["limitation_statement"].strip() in draft
+            )
+            for item in coverage_items
+        )
+        consistency_items = result.get("consistency_checks") or {}
+        has_consistency_failure = (
+            required_coverage
+            and not all(
+                isinstance(consistency_items.get(name), dict)
+                and consistency_items[name].get("passed") is True
+                for name in ("opening_conclusion", "timeline", "expressed_intent", "provenance")
+            )
+        ) or any(
+            isinstance(check, dict) and check.get("passed") is not True
+            for check in consistency_items.values()
+        )
+        application_audit = result.get("application_audit") or {}
+        has_subsumption_failure = bool(
+            application_audit.get("failed_claims") or application_audit.get("findings")
+        )
+        citation_audit = result.get("citation_audit") or {}
+        has_citation_failure = bool(
+            citation_audit.get("unverified_citations") or citation_audit.get("unsupported_citations")
+        )
+        has_unsupported_case_fact = any(
+            c.get("claim_type") in ("CASE_FACT", "CASE_INFERENCE")
+            and c.get("grounding_status") == "UNSUPPORTED"
+            for c in result.get("claims", [])
+        )
         has_fatal_legal_error = (
             has_unsupported_or_uncertain_legal_claim
             or unverified_legal_effects_present
             or has_statute_defects
             or bool(result.get("contradictions"))
+            or has_undisclosed_question_gap
+            or has_consistency_failure
+            or has_subsumption_failure
+            or has_citation_failure
+            or has_unsupported_case_fact
             or result.get("reason_code") in ("LEGAL_SOURCE_MISSING", "LEGAL_SOURCE_INSUFFICIENT", "CITATION_INVALID")
         )
 

@@ -106,6 +106,9 @@ export interface StatuteSearchApprovalRequest {
   missing_issue: string;
   missing_legal_issues: string[];
   candidate_laws: string[];
+  // PRECEDENT-10: 법령과 판례 검색 승인 범위를 화면에 각각 표시한다.
+  requested_source_types?: ('STATUTE' | 'PRECEDENT')[];
+  precedent_queries?: string[];
   search_scope: string;
   approval_required: boolean;
 }

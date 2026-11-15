@@ -80,6 +80,13 @@ class IntentDecision(BaseModel):
         description="질문과 관련된 8대 법률 분야(민법, 형법, 노동, 상법, 행정, 조세, 헌법, 국제) 목록 (최대 3개). 라우터 LLM 중복 호출을 제거하기 위해 단일 패스에서 동시 도출한다.",
     )
     resolved_query: str = Field(description="이전 대화 맥락이 연결되어 명확해진 내부 검색/작업 질의")
+    # [ISSUE-SEMANTIC-01 / Gemini 인계] 같은 Intent Analyzer 호출에서 쟁점 윤곽도 추출한다.
+    # 결과는 검색 계획 후보에만 쓰이며, 법적 사실/판례/조문을 검증한 결과가 아니다.
+    # 구형 LLM JSON 및 단문·폴백에선 []이며 추가 LLM 호출을 절대 하지 않는다.
+    legal_issue_outlines: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="현재 질문의 독립적·중립적인 법률 검토 질문, 필요한 요건사실 키, 후보 법령. 최대 4건",
+    )
     requires_specialist: bool = Field(default=True, description="법률 Specialist 에이전트 실행 필요 여부")
     requires_retrieval: bool = Field(default=True, description="새로운 법령/판례 RAG 검색 실행 필요 여부")
     requires_verification: bool = Field(default=True, description="답변 검증(Verifier) 실행 필요 여부")
@@ -172,12 +179,27 @@ INTENT_PROMPT = PromptTemplate.from_template(
 #### [현재 사용자 질문]
 {question}
 
+#### [법률 쟁점 윤곽 추출: 추가 LLM 호출 없이 이 JSON 안에서 수행]
+- 현 질문과 복원된 대상을 바탕으로 독립적으로 검토할 실제 법률 질문 1~4개를 legal_issue_outlines에 작성하세요.
+- 법률 분야(상속/노동/민사/형사 등)에 따라 특정 예외 규칙을 적용하지 말고, 문장에서 누가 누구에게 어떤 권리/의무를 묻는지 의미적으로 구분하세요.
+- 동일한 명칭·부분 단어가 등장해도 실제 행위의 주체·객체·법률 관계·질문 목적이 다르면 서로 다른 쟁점으로 구분하세요.
+- 현재 질문에 없는 계약 종료, 금액 분할 제안, 경매, 권리 순위 등을 임의로 끌어오지 마세요.
+- 질문/사건명/기존 AI 답변에 결론이 있더라도 맞다고 확정하거나 그 결론을 쟁점 제목에 쓰지 마세요.
+- question에는 결론이 아닌 검토 의문형(예: "A와 B 중 어떤 법률 효과가 적용되는가?")을 작성합니다.
+- required_fact_keys는 해당 의문을 판단하는 데 필요한 확인 사실(계약 당사자·시점·원문 등)의 짧은 이름입니다.
+- candidate_statutes는 실제 확인해야 할 *후보* 법령만 기입하며 잘 모르면 []로 둡니다. 판례번호, 판결 결론을 만들지 마세요.
+- GENERAL_CONVERSATION / OUT_OF_SCOPE / NEEDS_CLARIFICATION이면 legal_issue_outlines=[].
+- 원질문을 완전히 복원하지 못했다면 없는 사실을 만들지 말고 빈 배열([])을 반환하세요.
+
 #### [출력 형식 (반드시 유효한 JSON 하나만 출력)]
 {{
   "intent": "FOLLOWUP_ACTION | FOLLOWUP_QUESTION | FACT_CLARIFICATION | NEW_LEGAL_ANALYSIS | DOCUMENT_REQUEST | GENERAL_CONVERSATION | NEEDS_CLARIFICATION | OUT_OF_SCOPE",
   "consultation_mode": "GENERAL_LEGAL | CASE_EVIDENCE",
   "categories": ["선택된 법률분야(예: 민법) - 최대 3개 배열, 해당없으면 []"],
   "resolved_query": "문맥이 연결되어 명확해진 내부 작업용 구체적 질의문",
+  "legal_issue_outlines": [
+    {{"question": "현 질문을 그대로 반영한 중립적 검토 질문?", "required_fact_keys": ["판단에 필요한 사실 키"], "candidate_statutes": ["검토할 후보 법령·조문"]}}
+  ],
   "requires_specialist": true/false,
   "requires_retrieval": true/false,
   "requires_verification": true/false,
@@ -416,11 +438,47 @@ def analyze_consultation_intent(
                 event_t = parsed.get("event_type")
                 statute_d = parsed.get("statute_mention_date")
 
+                # [ISSUE-SEMANTIC-02] 신필드에 대한 신뢰경계: LLM 자유 텍스트를
+                # 법적 결론이나 출처로 승격하지 않으며, 구조/길이/중복만 검증한다.
+                # 구 버전 JSON에는 필드가 없어도 완전 호환된다.
+                normalized_outlines: List[Dict[str, Any]] = []
+                raw_outlines = parsed.get("legal_issue_outlines")
+                seen_questions = set()
+                if isinstance(raw_outlines, list) and intent_enum not in (
+                    ConsultationIntent.GENERAL_CONVERSATION,
+                    ConsultationIntent.OUT_OF_SCOPE,
+                    ConsultationIntent.NEEDS_CLARIFICATION,
+                ):
+                    for item in raw_outlines[:8]:
+                        if not isinstance(item, dict) or not isinstance(item.get("question"), str):
+                            continue
+                        outline_question = " ".join(item["question"].strip().split())[:350]
+                        key = outline_question.replace(" ", "").lower()
+                        if len(outline_question) < 8 or key in seen_questions:
+                            continue
+                        seen_questions.add(key)
+                        fact_keys = item.get("required_fact_keys") or []
+                        candidate = item.get("candidate_statutes") or []
+                        normalized_outlines.append({
+                            "question": outline_question,
+                            "required_fact_keys": [
+                                x.strip()[:70] for x in (fact_keys[:8] if isinstance(fact_keys, list) else [])
+                                if isinstance(x, str) and x.strip()
+                            ],
+                            "candidate_statutes": [
+                                x.strip()[:100] for x in (candidate[:6] if isinstance(candidate, list) else [])
+                                if isinstance(x, str) and x.strip()
+                            ],
+                        })
+                        if len(normalized_outlines) >= 4:
+                            break
+
                 decision = IntentDecision(
                     intent=intent_enum,
                     consultation_mode=consultation_mode,
                     categories=valid_cats,
                     resolved_query=resolved_q,
+                    legal_issue_outlines=normalized_outlines,
                     requires_specialist=requires_spec,
                     requires_retrieval=requires_ret,
                     requires_verification=requires_ver,

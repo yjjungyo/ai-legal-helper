@@ -126,6 +126,10 @@ def pending_searches(state: dict[str, Any]) -> list[dict[str, Any]]:
         if not isinstance(request, dict):
             continue
         part, issue = request.get("question_part"), request.get("issue")
+        # 판례 단독 구조화 검색 요청은 법령 이름이 없어도 유효하다.
+        # pending_searches는 기존 법령 요청만 유지하고 별도 검색기에 전달한다.
+        if str(request.get("source_type") or "STATUTE").upper() == "PRECEDENT":
+            continue
         names = law_names([request.get("law_name", "")])
         articles_raw = request.get("articles", [])
         norm_part = " ".join(str(part or "").split()) if isinstance(part, str) else ""
@@ -149,6 +153,78 @@ def pending_searches(state: dict[str, Any]) -> list[dict[str, Any]]:
             pending.append({"law_name": names[0], "articles": [article] if article else [],
                             "issue": issue.strip(), "question_part": part.strip(), "key": key})
     return pending[:6]
+
+
+def pending_precedent_searches(state: dict[str, Any]) -> list[dict[str, Any]]:
+    """Verifier가 *구조적으로* 요청한 판례만 검색한다 (SC 독립·동적 출처 유형).
+
+    [PRECEDENT-04 / Gemini 인계] 문장 중 '판례' 키워드가 있는지 검사해
+    법률 결론이나 검색 종류를 코드로 판정하지 않는다. 검증기가 LLM 1회
+    출력에서 source_type=PRECEDENT/BOTH와 일반 법리 precedent_query를 준다.
+    사용자 원질문에 연결되지 않거나 개인정보 없는 검색어가 불명확하면
+    외부로 발송하지 않고, 법률 근거 부족 상태를 보존한다.
+    """
+    from ai_legal_helper.tools.official_precedent_search import normalize_precedent_query
+
+    review = state.get("verification_result") or {}
+    history = set(state.get("precedent_search_history") or [])
+    question = str(state.get("question") or "")
+    resolved = str(state.get("resolved_query") or "")
+    pending: list[dict[str, Any]] = []
+    for item in review.get("legal_search_requests") or []:
+        if not isinstance(item, dict):
+            continue
+        stype = str(item.get("source_type") or "STATUTE").strip().upper()
+        if stype not in ("PRECEDENT", "BOTH"):
+            continue
+        part = str(item.get("question_part") or "").strip()
+        issue = str(item.get("issue") or "").strip()
+        query = normalize_precedent_query(item.get("precedent_query") or "")
+        # [PRECEDENT-04B] PII 중앙 마스커는 자유형식 한글 인명을 전부 식별할
+        # 수 없다. 현재 사건 당사자 이름이 판례 검색어에 섞였다면 요청을
+        # 거부한다. 구조화된 법률 개념 검색어를 다시 얻기 전에는 API 전송 금지.
+        parties = (state.get("case_evidence_briefing") or {}).get("parties") or []
+        party_names = [
+            str(p.get("name") or "").strip()
+            for p in parties if isinstance(p, dict) and len(str(p.get("name") or "").strip()) >= 2
+        ]
+        if any(name in query for name in party_names):
+            logger.warning("[PRECEDENT] 개인 식별명이 검색어에 포함되어 공식 API 조회 차단")
+            continue
+        if not (part and issue and query and _is_safe_question_match(part, question, resolved)):
+            continue
+        key = hashlib.sha256(json.dumps(
+            ["PRECEDENT", query], ensure_ascii=False
+        ).encode("utf-8")).hexdigest()
+        if key in history:
+            continue
+        history.add(key)
+        pending.append({
+            "source_type": "PRECEDENT",
+            "issue": issue,
+            "question_part": part,
+            "precedent_query": query,
+            "key": key,
+        })
+    return pending[:3]
+
+
+def precedent_search_is_approved(state: dict[str, Any], requests: list[dict[str, Any]]) -> bool:
+    """HITL이 판례 검색까지 허용했을 때만 공식 API를 실행한다."""
+    if not requests or state.get("approval_status") in ("DENIED", "REJECTED"):
+        return False
+    if state.get("auto_approve_statute_search") is not False and (
+        state.get("auto_approve_statute_search")
+        or os.getenv("AUTO_APPROVE_STATUTE_SEARCH", "").lower() in ("true", "1", "yes")
+    ):
+        return True
+    approved_queries = set(state.get("approved_precedent_queries") or [])
+    return (
+        state.get("approval_status") == "APPROVED"
+        and state.get("approved_precedent_search") is True
+        and all(r["precedent_query"] in approved_queries for r in requests)
+    )
+
 
 
 def search_is_approved(state: dict[str, Any], requests: list[dict[str, Any]]) -> bool:
@@ -508,7 +584,9 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
     from ai_legal_helper.tools.official_statute_search import search_official_statutes
 
     requests = pending_searches(state)
+    precedent_requests = pending_precedent_searches(state)
     approved = search_is_approved(state, requests)
+    precedent_approved = precedent_search_is_approved(state, precedent_requests)
     curr_count = state.get("statute_search_count") or 0
     logger.info(
         "[DOCUMENT_SEARCH] 법령 검색 계획 평가 (대기 요청: %d건 | 사용자 승인: %s | 이전 검색횟수: %d회)",
@@ -523,10 +601,11 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
             "statute_search_status": "MAX_COUNT_REACHED",
             "statute_search_count": curr_count + 1,
         }
-    if not requests:
+    if not requests and not precedent_requests:
         return {
             "statute_search_results": [],
-            "statute_search_status": "NOT_APPROVED" if not approved else "NO_PENDING",
+            "precedent_search_results": [],
+            "statute_search_status": "NO_PENDING",
             "statute_search_count": curr_count + 1,
         }
     grouped: dict[str, list[dict]] = {}
@@ -619,6 +698,27 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
             diagnostic["api_error"] = True
             logger.warning("[DOCUMENT_SEARCH] 공식 검색 실패 law=%s error=%s", name, type(exc).__name__)
         diagnostics.append(diagnostic)
+    # [PRECEDENT-05] 판례 조회는 법령 조회/Temporal Resolver와 독립한다.
+    # 법령 API가 사용된 조문을 찾았더라도 PRECEDENT/BOTH 요청이 있으면
+    # 판례를 별도로 검색한다. 과거 SC-012의 '민법만 재조회' 실패를 방지.
+    precedent_sources: list[dict[str, Any]] = []
+    precedent_diagnostic: dict[str, Any] = {}
+    if precedent_requests and precedent_approved:
+        from ai_legal_helper.tools.official_precedent_search import search_official_precedents
+        try:
+            precedent_sources = search_official_precedents(
+                [r["precedent_query"] for r in precedent_requests],
+                max_results=3,
+                diagnostic=precedent_diagnostic,
+            )
+            if precedent_diagnostic.get("request_count", 0):
+                channels_used.add("OPENLAW_PRECEDENT_API")
+        except Exception as exc:
+            precedent_diagnostic["status"] = "API_ERROR"
+            logger.warning("[DOCUMENT_SEARCH] 판례 공식 조회 실패 type=%s", type(exc).__name__)
+    elif precedent_requests:
+        logger.warning("[DOCUMENT_SEARCH] 판례 조회가 승인되지 않아 원격 검색을 생략합니다.")
+
     fallback = []
     api_error = any(d.get("api_error") or any(
         entry.get("reason_code") not in ("", "LAW_NOT_FOUND", "NO_MATCH", "NO_VERSIONS", "MAINTENANCE_UNAVAILABLE")
@@ -641,12 +741,15 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
             return True
         return all(any(src.get("article") == article for src in matches) for article in articles)
 
-    partial = bool(found) and not all(_request_fulfilled(r) for r in requests)
+    partial = bool(found or precedent_sources) and (
+        not all(_request_fulfilled(r) for r in requests)
+        or (bool(precedent_requests) and not bool(precedent_sources))
+    )
     if partial:
         logger.warning("[DOCUMENT_SEARCH] 일부 법령만 확보: %d/%d", len(found_laws & requested_laws), len(requested_laws))
     merged = list(state.get("retrieved_sources") or [])
     seen = {s.get("source_id") for s in merged}
-    for source in found:
+    for source in found + precedent_sources:
         if source.get("source_id") not in seen:
             merged.append(source)
             seen.add(source.get("source_id"))
@@ -666,6 +769,9 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
         except Exception as exc:
             logger.warning("[OFFICIAL_INDEX] document_search 백그라운드 인덱스 등록 예외: %s", exc)
 
+    if "OPENLAW_PRECEDENT_API" in channels_used:
+        # 판례 조회는 공식 API지만 법령 조문 인덱싱이나 시행일 검증과 다르다.
+        channels_used.add("OPENLAW_API")
     if "VECTOR_DB" in channels_used and "OPENLAW_API" in channels_used:
         channel_mode = "HYBRID"
     elif "VECTOR_DB" in channels_used:
@@ -677,28 +783,43 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
 
     is_auto = bool(state.get("auto_approve_statute_search") or os.getenv("AUTO_APPROVE_STATUTE_SEARCH", "").lower() in ("true", "1", "yes"))
     prefix = "[자동승인] " if is_auto else ""
-    items_str = " · ".join(item["display"] for item in statute_search_items)
+    precedent_displays = [
+        " ".join(filter(None, [p.get("court"), p.get("case_number")]))
+        for p in precedent_sources
+    ]
+    items_str = " · ".join([item["display"] for item in statute_search_items] + precedent_displays)
     if channel_mode == "HYBRID":
         completion_desc = f"{prefix}로컬 벡터DB 및 OpenLaw API 병행 확보 | {items_str}"
     elif channel_mode == "VECTOR_DB":
         completion_desc = f"{prefix}로컬 벡터DB에서 {len(found)}건 확보 | {items_str}"
     elif channel_mode == "OPENLAW_API":
-        completion_desc = f"{prefix}OpenLaw 공식 API에서 {len(found)}건 확보 | {items_str}"
+        completion_desc = f"{prefix}OpenLaw 공식 API에서 법령 {len(found)}건·판례 {len(precedent_sources)}건 확보 | {items_str}"
     else:
         completion_desc = f"{prefix}법령을 찾지 못했습니다."
 
     return {
         "statute_search_results": found or fallback,
+        "precedent_search_results": precedent_sources,
+        "precedent_search_status": (
+            precedent_diagnostic.get("status")
+            if precedent_requests and precedent_approved
+            else "NOT_APPROVED" if precedent_requests else "NOT_REQUESTED"
+        ),
         "retrieved_sources": merged,
         "statute_search_status": (
-            "API_ERROR" if api_error else
+            "API_ERROR" if api_error and not (found or precedent_sources) else
             "PARTIAL_SUCCESS" if partial else
-            "OFFICIAL_SUCCESS" if found else
+            "OFFICIAL_SUCCESS" if (found or precedent_sources) else
             "VERIFIED_LOCAL_FALLBACK" if fallback else "NOT_FOUND"
         ),
         "statute_search_count": (state.get("statute_search_count") or 0) + 1,
         "statute_search_history": list(dict.fromkeys(
             (state.get("statute_search_history") or []) + [r["key"] for r in requests]
+        )),
+        # 재시도 무한반복 방지: 승인된 요청을 시도했을 때만 기록한다.
+        "precedent_search_history": list(dict.fromkeys(
+            (state.get("precedent_search_history") or [])
+            + ([r["key"] for r in precedent_requests] if precedent_approved else [])
         )),
         "statute_search_channels": sorted(list(channels_used)),
         "statute_search_channel_mode": channel_mode,
@@ -709,4 +830,12 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
             "total_count": len(found),
         },
         "statute_search_items": statute_search_items,
+        "precedent_search_items": [
+            {
+                "source_id": p.get("source_id"),
+                "display": " ".join(filter(None, [p.get("court"), p.get("case_number")])),
+                "channel": "OPENLAW_PRECEDENT_API",
+            }
+            for p in precedent_sources
+        ],
     }

@@ -1,0 +1,56 @@
+name: Official Precedent Search Regression
+
+on:
+  pull_request:
+    paths:
+      - "backend/src/ai_legal_helper/tools/official_precedent_search.py"
+      - "backend/src/ai_legal_helper/workflows/document_search.py"
+      - "backend/src/ai_legal_helper/workflows/document_consultation.py"
+      - "backend/src/ai_legal_helper/workflows/legal_workflow.py"
+      - "backend/src/ai_legal_helper/workflows/state.py"
+      - "backend/src/ai_legal_helper/agents/document_verification_prompt.py"
+      - "backend/src/ai_legal_helper/agents/verification.py"
+      - "backend/tests/unit/test_official_precedent_search.py"
+      - ".github/workflows/official-precedent-regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  official-precedent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TESTING: "1"
+      LANGFUSE_ENABLED: "false"
+      CHECKPOINTER_TYPE: memory
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - name: Install backend test dependencies
+        run: python -m pip install -e './backend[dev]'
+      - name: Compile source and new tests
+        run: |
+          python -m py_compile \
+            backend/src/ai_legal_helper/tools/official_precedent_search.py \
+            backend/src/ai_legal_helper/workflows/document_search.py \
+            backend/src/ai_legal_helper/workflows/document_consultation.py \
+            backend/src/ai_legal_helper/workflows/legal_workflow.py \
+            backend/src/ai_legal_helper/workflows/state.py \
+            backend/src/ai_legal_helper/agents/document_verification_prompt.py \
+            backend/src/ai_legal_helper/agents/verification.py \
+            backend/tests/unit/test_official_precedent_search.py
+      - name: Precedent and statute request regressions
+        run: |
+          PYTHONPATH=backend/src python -m pytest -q \
+            backend/tests/unit/test_official_precedent_search.py \
+            backend/tests/unit/test_step3_statute_search.py \
+            backend/tests/unit/test_semantic_issue_planner_sc012.py \
+            backend/tests/unit/test_document_consultation.py \
+            backend/tests/unit/test_rag_citation_standard.py \
+            backend/tests/unit/test_legal_source_grounding_pipeline.py

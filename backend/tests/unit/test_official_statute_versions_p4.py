@@ -386,8 +386,17 @@ def test_undated_legacy_official_xml_no_longer_fabricates_pdf_page(monkeypatch):
     out = search_official_statutes(
         query="법령의 조문을 알려줘", candidate_laws=[f"{NAME} 제36조"],
     )
-    assert len(out) == 1
-    article = out[0]
+    # [REGRESSION-COMPANION-01 / Gemini] 검색 소스는 같은 MST 조문의
+    # 부칙을 시행일·적용례의 필수 동반 근거로 항상 인출한다.
+    # 낡은 'len(out)==1' 기대를 고집하면 올바른 동반 부칙을 버리게 된다.
+    # 본 테스트의 핵심인 '가짜 PDF/page 생성 금지'는 양쪽 출처에서 검사.
+    articles = [src for src in out if src.get("article") == "제36조"]
+    addenda = [src for src in out if src.get("article") == "부칙"]
+    assert len(articles) == 1
+    assert len(addenda) == 1
+    article = articles[0]
+    assert addenda[0]["addendum_id"]
+    assert all(src.get("filename") is None and src.get("page") is None for src in out)
     assert article["article"] == "제36조"
     assert article["filename"] is None
     assert article["file_name"] is None

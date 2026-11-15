@@ -352,10 +352,11 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
     # 별도 신규 그래프 노드를 추가하지 않으며, Router는 분류 결과를 재사용한다.
     if has_history:
         case_memory = getattr(c_obj, "case_memory", None) or {}
-        case_hint = (
-            f"사건명: {str(case_memory.get('title') or '')[:100]}, "
-            f"사건 분야: {str(case_memory.get('case_type') or '')[:40]}"
-        )
+        # [ISSUE-SEMANTIC-04 / Gemini 인계] 사건명에는 평가용 정답 단어, 사용자 주장,
+        # 과거 AI 판단이 포함될 수 있다. Intent Analyzer의 중립적 쟁점 추출을
+        # 편향시키지 않도록 제목은 전달하지 않고 분야 메타데이터만 사용한다.
+        # 실제 사건 사실은 이후 case_evidence_briefing의 승인 증거가 권위 기준이다.
+        case_hint = f"사건 분야: {str(case_memory.get('case_type') or '')[:40]}"
         decision = analyze_consultation_intent(
             q, conversation_context=c_obj, case_context=case_hint, use_llm=True,
         )
@@ -433,7 +434,16 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
                 # 원문 질문과 문맥 복원 질의를 모두 사용할 수 있도록 한다.
                 # 특히 단문 후속 질문은 resolved_query가 증거 검색/쟁점 생성의 입력이 된다.
                 briefing = build_case_evidence_briefing(db, case_id, effective_resolved_query)
-                tasks = plan_legal_issues(effective_resolved_query, briefing)
+                # 기존 Intent Analyzer가 후속 질문에 대해 이미 의미를 복원한
+                # 결과를 Issue Planner로 직접 전달한다. 두 번째 LLM 호출이 없고,
+                # 사용자가 현재 묻는 쟁점 외의 레거시 키워드 분기 생성을 방지한다.
+                tasks = plan_legal_issues(
+                    effective_resolved_query,
+                    briefing,
+                    semantic_outlines=decision.legal_issue_outlines if decision else None,
+                    focus_current_question=has_history,
+                    original_question=q,
+                )
 
                 briefing_dict = briefing.model_dump()
                 issue_tasks_dict = [task.model_dump() for task in tasks]
@@ -497,6 +507,8 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
             "consultation_mode": consultation_mode,
             "categories": decision.categories if decision else [],
             "resolved_query": effective_resolved_query,
+            # 추적용 의미 쟁점 윤곽(확정 법적 판단이나 공식 출처 아님).
+            "legal_issue_outlines": decision.legal_issue_outlines if decision else [],
             "requires_specialist": decision.requires_specialist if decision else not pure_greeting,
             "requires_retrieval": decision.requires_retrieval if decision else not pure_greeting,
             "requires_verification": decision.requires_verification if decision else not pure_greeting,
@@ -516,6 +528,15 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
         "answer_generation_error": None,
         "answer_source_manifest": None,
         "revision_count": 0,
+        # [STEP5-PROGRESS-02 / Gemini] 하나의 법률 상담 안에서만 적용되는
+        # 검증 진행 해시/검색 신규 출처/무변경 상태. 같은 LangGraph thread의
+        # 과거 턴과 혼합하면 이번 질문의 정상 검증을 조기 종료할 위험이 있다.
+        "verification_progress_history": [],
+        "verification_no_progress": False,
+        "verification_reused": False,
+        "revision_no_progress": False,
+        "search_delta_count": None,
+        "search_added_source_ids": [],
         "warnings": [],
         "retrieved_sources": initial_sources,
         "case_context": case_context,
@@ -533,6 +554,12 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
         "statute_search_status": None,
         "statute_search_count": 0,
         "statute_search_history": [],
+        # [PRECEDENT-07] 판례는 법령 연혁/부칙 판단과 별도 상태로 저장.
+        "precedent_search_results": [],
+        "precedent_search_status": None,
+        "precedent_search_history": [],
+        "approved_precedent_search": False,
+        "approved_precedent_queries": [],
         "synthesis_law_gate": None,
         "hitl_executed": False,
         "preserved_points": [],
@@ -1198,21 +1225,25 @@ async def run_agents_node(state: LegalState) -> Dict:
             # 분야 분류가 지정되지 않은 경우 전체 컬렉션(category=None)을 1회 검색
             categories_to_query = [None]
 
-        # [SC-013 2단계 검색 쿼리 정밀화]
-        # 사용자 질문에만 의존하지 않고, 쟁점 계획의 핵심 법률 질문을 간결하게 결합하여 법률적 요건사실 기반 검색 수행.
-        # (특정 법령명/조문을 강제로 하드코딩하지 않고, 도출된 쟁점 질문의 법률적 핵심 취지를 반영)
-        user_raw_q = state.get("resolved_query") or state.get("question", "")
+        # [ISSUE-SEMANTIC-05 / Gemini 인계] RAG 검색 입력 SSOT:
+        # (1) 사용자 원문 (2) 문맥 복원 질의 (3) 관련된 중립 법률 쟁점.
+        # 사건명/시나리오 ID에는 '불가분채무', '선순위' 같은 기대 결론이
+        # 섞일 수 있어 벡터 검색어로 사용하지 않는다(정답 누출 방지).
+        # 원문을 복원 질의로 덮어쓰지 않고, 의미가 같은 반복 내용은 생략한다.
+        # 법적 요건/시점은 원문+복원 질의에 보존하고, 모델이 만든 '정답'은
+        # 검색과 검증의 출처가 될 수 없다.
+        user_raw_q = str(state.get("question") or "").strip()
+        resolved_q = str(state.get("resolved_query") or "").strip()
         query_parts = [user_raw_q] if user_raw_q else []
-        case_title = str((state.get("case_evidence_briefing") or {}).get("title") or "").strip()
-        if case_title and case_title not in query_parts:
-            query_parts.append(case_title)
+        if resolved_q and resolved_q != user_raw_q:
+            query_parts.append(resolved_q)
         issue_tasks = state.get("issue_tasks") or []
         for task in issue_tasks[:3]:
             if isinstance(task, dict):
                 lqs = task.get("legal_questions") or []
-                if lqs and lqs[0] not in query_parts:
-                    query_parts.append(lqs[0])
-        retrieval_query = " \n".join(query_parts) if query_parts else user_raw_q
+                if lqs and isinstance(lqs[0], str) and lqs[0].strip() not in query_parts:
+                    query_parts.append(lqs[0].strip())
+        retrieval_query = " \n".join(query_parts) if query_parts else resolved_q
 
         for category in categories_to_query:
             try:
@@ -3932,11 +3963,13 @@ def statute_search_approval_node(state: LegalState) -> Dict:
 
     candidate_laws = list(plan.get("candidate_laws") or []) if preflight else ver_res.get("candidate_laws", [])
 
+    precedent_requests = []
     if state.get("answer_mode") == DOCUMENT_MODE and not preflight and state.get("draft_answer"):
 
-        from ai_legal_helper.workflows.document_search import pending_searches
+        from ai_legal_helper.workflows.document_search import pending_searches, pending_precedent_searches
 
         candidate_laws = list(dict.fromkeys(r["law_name"] for r in pending_searches(state)))
+        precedent_requests = pending_precedent_searches(state)
 
     missing_issues = (
 
@@ -3996,8 +4029,17 @@ def statute_search_approval_node(state: LegalState) -> Dict:
 
         "search_phase": "PRE_ANALYSIS" if preflight else "POST_VERIFICATION",
 
-        "search_scope": "공식 법령 원문 (국가법령정보공동활용 open.law.go.kr)",
-
+        "search_scope": (
+            "공식 법령·판례 원문 (국가법령정보공동활용 open.law.go.kr)"
+            if precedent_requests else "공식 법령 원문 (국가법령정보공동활용 open.law.go.kr)"
+        ),
+        # [PRECEDENT-08] 기존 HITL 팝업/타입은 유지한다. 다만 판례 요청이
+        # 있을 때 검색 종류와 개별 일반법리 검색어를 반드시 사용자에게 보여
+        # 승인되지 않은 별개 쟁점을 몰래 조회하지 않는다.
+        "requested_source_types": (
+            (["STATUTE"] if candidate_laws else []) + (["PRECEDENT"] if precedent_requests else [])
+        ),
+        "precedent_queries": [r["precedent_query"] for r in precedent_requests],
         "approval_required": True,
 
     }
@@ -4087,6 +4129,15 @@ def statute_search_approval_node(state: LegalState) -> Dict:
         "approval_status": "APPROVED" if approved else "REJECTED",
 
         "approved_statute_laws": approved_laws,
+        # 승인 범위는 이번 요청에 표시한 검색어 및 기존에 승인된 쿼리뿐.
+        # 재검색 시 source_type=PRECEDENT 새 키가 추가되면 재승인을 요청한다.
+        "approved_precedent_search": bool(approved and precedent_requests),
+        "approved_precedent_queries": (
+            list(dict.fromkeys(
+                (state.get("approved_precedent_queries") or [])
+                + [r["precedent_query"] for r in precedent_requests]
+            )) if approved else []
+        ),
 
         "hitl_executed": True,
 
@@ -4251,11 +4302,11 @@ def execute_statute_search_node(state: LegalState) -> Dict:
 
         local_extra = []
         openlaw_found = []
-        for item in (doc_search_out.get("statute_search_items") or []):
+        for item in (doc_search_out.get("statute_search_items") or []) + (doc_search_out.get("precedent_search_items") or []):
             disp = item.get("display")
             if not disp:
                 continue
-            if item.get("channel") == "OPENLAW_API":
+            if item.get("channel") in ("OPENLAW_API", "OPENLAW_PRECEDENT_API"):
                 if disp not in openlaw_found:
                     openlaw_found.append(disp)
             else:
@@ -4285,11 +4336,30 @@ def execute_statute_search_node(state: LegalState) -> Dict:
 
         warnings = list(state.get("warnings", []) or [])
 
-        if not doc_search_out.get("statute_search_results"):
+        if not (doc_search_out.get("statute_search_results")
+                or doc_search_out.get("precedent_search_results")):
 
-            warnings.append("공식 법령 원문 검색 시스템에서 요청하신 법령의 해당 조문을 찾지 못했습니다.")
+            warnings.append("공식 법령·판례 원문 검색에서 필요한 법률 근거를 확보하지 못했습니다.")
 
-        out_payload = {**doc_search_out, "warnings": warnings}
+        # [STEP5-PROGRESS-07 / Gemini] 검색 API에서 3건을 '찾았다'
+        # 는 값과 Source Registry에 신규 근거 3건이 *실제 추가됐다*는
+        # 값은 다르다. 기존 조문/판례가 재반환된 경우 ReAnalyze LLM을
+        # 다시 돌지 않도록 검색 이전과 병합 이후의 출처 ID를 비교한다.
+        # 출처 내용이 없는 가짜 ID/미승인 사건 문서는 새 근거로 세지 않음.
+        from ai_legal_helper.workflows.verification_progress import added_legal_source_ids
+        added_sids = added_legal_source_ids(
+            state.get("retrieved_sources") or [],
+            doc_search_out.get("retrieved_sources") or [],
+        )
+        out_payload = {
+            **doc_search_out, "warnings": warnings,
+            "search_delta_count": len(added_sids),
+            "search_added_source_ids": added_sids,
+        }
+        logger.info(
+            "[STEP5_SEARCH] 검색 신규 법령·판례 출처=%d (API 반환과 무관)",
+            len(added_sids),
+        )
         if auto_approve and state.get("approval_status") != "APPROVED":
             out_payload["approval_status"] = "APPROVED"
             if search_state.get("approved_statute_laws"):
@@ -4562,6 +4632,21 @@ def statute_search_result_condition(state: LegalState) -> str:
 
         return "insufficient"
 
+    # [STEP5-PROGRESS-08 / Gemini] POST_VERIFICATION 이후 새 출처가
+    # 0개면 같은 법령/판례를 다시 받아도 새로운 법률 지식은 없다.
+    # 법률 근거 부족 상태에서 대답 표현만 고치는 LLM 재분석을 생략.
+    # 이전에 작성·검증한 스냅샷은 finish_answer의 동일 원문/Temporal/
+    # 인용/미지지 법률효과 안전 검사를 통과할 때만 조건부 반환 가능.
+    # 그래프가 과거 저장 상태나 mock 데이터로 실행되는 경우
+    # delta key=None이면 기존 분기를 유지하여 호환성을 보장한다.
+    if (state.get("answer_mode") == DOCUMENT_MODE
+            and state.get("search_delta_count") == 0
+            and state.get("draft_answer")):
+        logger.info(
+            "[STEP5_SEARCH] 새 법률 출처 0건: 재분석 LLM 생략; 기존 초안 안전 종료"
+        )
+        return "finalize" if (state.get("verification_result") or {}).get("claims") else "insufficient"
+
     # POST_VERIFICATION 단계:
 
     # 1. 추가 조문을 확보한 경우 re_analyze 로 재작성
@@ -4570,9 +4655,12 @@ def statute_search_result_condition(state: LegalState) -> str:
 
     #    기존 답변을 폐기(insufficient)하지 않고 re_analyze 로 분기하여 기존 확인된 법률·증거 범위 내에서 최종 답변을 보존한다.
 
-    results = state.get("statute_search_results") or []
+    # [PRECEDENT-09] 판례만 추가 확보한 경우도 검증 재진입.
+    # 이를 누락하면 공식 판례 3건을 찾아도 statute_results=[] 때문에
+    # re_analyze에 도달하지 못해 SC-012가 계속 WITHHELD된다.
+    results = (state.get("statute_search_results") or []) + (state.get("precedent_search_results") or [])
 
-    # 1. 추가 조문을 확보한 경우 re_analyze 로 재작성
+    # 1. 추가 조문·판례를 확보한 경우 re_analyze 로 재작성
     if results:
 
         return "re_analyze"
@@ -5567,6 +5655,11 @@ def build_legal_graph(checkpointer: Optional[Any] = None):
         "run_agents": "run_agents",
 
         "re_analyze": "re_analyze",
+
+        # [STEP5-PROGRESS-09] 중복/실패 검색 후에도 기존 검증된 주장만
+        # 있는 경우 안전한 CAUTIONARY를 받을 수 있게 finish_answer로
+        # 연결. 미지원 법리·Temporal BLOCK은 여기서 절대 PASS 안 함.
+        "finalize": "finalize",
 
         "insufficient": "insufficient"
 

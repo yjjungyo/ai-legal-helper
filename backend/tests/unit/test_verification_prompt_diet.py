@@ -108,7 +108,7 @@ def test_prune_sources_preserves_cited_and_condenses_uncited():
     # E02는 축약됨
     assert pruned[1]["filename"] == "E02_무관한_영수증.txt"
     assert len(pruned[1]["content"]) < 150
-    assert "초안 미인용 증거: 상세 본문 생략" in pruned[1]["content"]
+    assert "초안 미인용 부수 증거: 상세 본문 생략" in pruned[1]["content"]
 
 
 def test_prune_case_context_compresses_multi_turn_history():
@@ -187,7 +187,7 @@ def test_run_verification_integrates_diet_pruning():
         invoked_prompt = mock_llm.invoke.call_args[0][0]
 
         # LLM에 주입된 프롬프트에 미인용 증거 본문 생략 표기가 반영되었는지 검증
-        assert "초안 미인용 증거: 상세 본문 생략" in invoked_prompt
+        assert "초안 미인용 부수 증거: 상세 본문 생략" in invoked_prompt
         # source_manifest는 전체 3개 출처를 모두 인지하고 있는지 검증
         assert out["source_manifest"]["source_count"] == 3
 
