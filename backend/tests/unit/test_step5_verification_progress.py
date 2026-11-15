@@ -467,3 +467,88 @@ def test_real_document_search_executor_tracks_actual_source_delta(
     merged = {**state, **out}
     expected_route = "re_analyze" if expected_count else "finalize"
     assert workflow.statute_search_result_condition(merged) == expected_route
+
+
+def fallback_state(document_state, **changes):
+    """같은 원문을 검증한 정상 스냅샷으로 Finalize 경로를 재현한다."""
+    draft = document_state["draft_answer"]
+    result = {
+        "status": "REVISE", "reason_code": "ANSWER_REVISION_REQUIRED",
+        "verified_answer_sha256": hashlib.sha256(draft.encode("utf-8")).hexdigest(),
+        "source_manifest": document_state["answer_source_manifest"],
+        "claims": [{
+            "claim": "원문 계약이 등록되어 있습니다.", "claim_type": "CASE_FACT",
+            "fact_status": "VERIFIED_FACT", "grounding_status": "SUPPORTED",
+            "source_ids": ["E01_계약서.txt"],
+        }],
+        "missing_legal_issues": [], "missing_issues": [],
+        "contradictions": [],
+        **changes,
+    }
+    return {**document_state, "verification_result": result,
+            "verification_no_progress": True, "revision_count": 1}
+
+
+def finish_without_external_dependencies(state):
+    with patch.object(dc, "validate_document_snapshot"), \
+         patch("ai_legal_helper.utils.text_formatter.expand_evidence_citations",
+               side_effect=lambda draft, _sources: draft), \
+         patch("ai_legal_helper.utils.text_formatter.extract_all_registered_evidence_sources",
+               return_value=[]):
+        return dc.finish_answer(state)
+
+
+def test_early_finalize_does_not_promote_unanswered_core_question(document_state):
+    """지원되는 사례사실 하나로 질문 핵심 미답변을 PASS 승격하면 안 된다."""
+    state = fallback_state(document_state, question_coverage=[
+        {"question": "반환 청구", "answered": False, "answerable": True},
+    ])
+    out = finish_without_external_dependencies(state)
+    assert out["final_disposition"] == "WITHHELD"
+    assert out["verification_result"]["status"] == "INSUFFICIENT"
+
+
+def test_early_finalize_preserves_actual_disclosed_partial_answer(document_state):
+    """정확하게 한계가 고지된 근거 있는 부분 답변은 기존 CAUTIONARY를 유지."""
+    state = fallback_state(document_state, question_coverage=[
+        {"question": "반환 청구", "answered": False, "answerable": False,
+         "limitation_disclosed": True,
+         "limitation_statement": "추가 법률요건의 확인이 필요합니다."},
+    ])
+    out = finish_without_external_dependencies(state)
+    assert out["final_disposition"] == "CAUTIONARY"
+    assert out["verification_result"]["status"] == "PASS"
+    assert out["final_answer"] == document_state["draft_answer"]
+
+
+def test_early_finalize_bans_failed_law_subsumption(document_state):
+    """4단계 요건 검증의 명시적 결함을 다른 정상 사건 사실로 감추지 않는다."""
+    state = fallback_state(document_state, application_audit={
+        "failed_claims": 1,
+        "findings": [{"claim_index": 1, "reason_codes": ["FACT_PREMISE_UNGROUNDED"]}],
+    })
+    assert finish_without_external_dependencies(state)["final_disposition"] == "WITHHELD"
+
+
+def test_early_finalize_bans_failed_timeline_consistency(document_state):
+    state = fallback_state(document_state, consistency_checks={
+        "timeline": {"passed": False, "reason": "선후 검토 불일치"},
+    })
+    assert finish_without_external_dependencies(state)["final_disposition"] == "WITHHELD"
+
+
+def test_early_finalize_bans_invalid_citation(document_state):
+    state = fallback_state(document_state, citation_audit={
+        "unverified_citations": ["PRECEDENT:FAKE"],
+    })
+    assert finish_without_external_dependencies(state)["final_disposition"] == "WITHHELD"
+
+
+def test_early_finalize_bans_unsupported_case_fact(document_state):
+    state = fallback_state(document_state)
+    state["verification_result"]["claims"].append({
+        "claim": "입증되지 않은 지급사실", "claim_type": "CASE_FACT",
+        "fact_status": "VERIFIED_FACT", "grounding_status": "UNSUPPORTED",
+        "source_ids": [],
+    })
+    assert finish_without_external_dependencies(state)["final_disposition"] == "WITHHELD"
