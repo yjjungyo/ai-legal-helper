@@ -545,6 +545,12 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
         "statute_search_status": None,
         "statute_search_count": 0,
         "statute_search_history": [],
+        # [PRECEDENT-07] 판례는 법령 연혁/부칙 판단과 별도 상태로 저장.
+        "precedent_search_results": [],
+        "precedent_search_status": None,
+        "precedent_search_history": [],
+        "approved_precedent_search": False,
+        "approved_precedent_queries": [],
         "synthesis_law_gate": None,
         "hitl_executed": False,
         "preserved_points": [],
@@ -3948,11 +3954,13 @@ def statute_search_approval_node(state: LegalState) -> Dict:
 
     candidate_laws = list(plan.get("candidate_laws") or []) if preflight else ver_res.get("candidate_laws", [])
 
+    precedent_requests = []
     if state.get("answer_mode") == DOCUMENT_MODE and not preflight and state.get("draft_answer"):
 
-        from ai_legal_helper.workflows.document_search import pending_searches
+        from ai_legal_helper.workflows.document_search import pending_searches, pending_precedent_searches
 
         candidate_laws = list(dict.fromkeys(r["law_name"] for r in pending_searches(state)))
+        precedent_requests = pending_precedent_searches(state)
 
     missing_issues = (
 
@@ -4012,8 +4020,17 @@ def statute_search_approval_node(state: LegalState) -> Dict:
 
         "search_phase": "PRE_ANALYSIS" if preflight else "POST_VERIFICATION",
 
-        "search_scope": "공식 법령 원문 (국가법령정보공동활용 open.law.go.kr)",
-
+        "search_scope": (
+            "공식 법령·판례 원문 (국가법령정보공동활용 open.law.go.kr)"
+            if precedent_requests else "공식 법령 원문 (국가법령정보공동활용 open.law.go.kr)"
+        ),
+        # [PRECEDENT-08] 기존 HITL 팝업/타입은 유지한다. 다만 판례 요청이
+        # 있을 때 검색 종류와 개별 일반법리 검색어를 반드시 사용자에게 보여
+        # 승인되지 않은 별개 쟁점을 몰래 조회하지 않는다.
+        "requested_source_types": (
+            (["STATUTE"] if candidate_laws else []) + (["PRECEDENT"] if precedent_requests else [])
+        ),
+        "precedent_queries": [r["precedent_query"] for r in precedent_requests],
         "approval_required": True,
 
     }
@@ -4103,6 +4120,15 @@ def statute_search_approval_node(state: LegalState) -> Dict:
         "approval_status": "APPROVED" if approved else "REJECTED",
 
         "approved_statute_laws": approved_laws,
+        # 승인 범위는 이번 요청에 표시한 검색어 및 기존에 승인된 쿼리뿐.
+        # 재검색 시 source_type=PRECEDENT 새 키가 추가되면 재승인을 요청한다.
+        "approved_precedent_search": bool(approved and precedent_requests),
+        "approved_precedent_queries": (
+            list(dict.fromkeys(
+                (state.get("approved_precedent_queries") or [])
+                + [r["precedent_query"] for r in precedent_requests]
+            )) if approved else []
+        ),
 
         "hitl_executed": True,
 
@@ -4267,11 +4293,11 @@ def execute_statute_search_node(state: LegalState) -> Dict:
 
         local_extra = []
         openlaw_found = []
-        for item in (doc_search_out.get("statute_search_items") or []):
+        for item in (doc_search_out.get("statute_search_items") or []) + (doc_search_out.get("precedent_search_items") or []):
             disp = item.get("display")
             if not disp:
                 continue
-            if item.get("channel") == "OPENLAW_API":
+            if item.get("channel") in ("OPENLAW_API", "OPENLAW_PRECEDENT_API"):
                 if disp not in openlaw_found:
                     openlaw_found.append(disp)
             else:
@@ -4301,9 +4327,10 @@ def execute_statute_search_node(state: LegalState) -> Dict:
 
         warnings = list(state.get("warnings", []) or [])
 
-        if not doc_search_out.get("statute_search_results"):
+        if not (doc_search_out.get("statute_search_results")
+                or doc_search_out.get("precedent_search_results")):
 
-            warnings.append("공식 법령 원문 검색 시스템에서 요청하신 법령의 해당 조문을 찾지 못했습니다.")
+            warnings.append("공식 법령·판례 원문 검색에서 필요한 법률 근거를 확보하지 못했습니다.")
 
         out_payload = {**doc_search_out, "warnings": warnings}
         if auto_approve and state.get("approval_status") != "APPROVED":
@@ -4586,9 +4613,12 @@ def statute_search_result_condition(state: LegalState) -> str:
 
     #    기존 답변을 폐기(insufficient)하지 않고 re_analyze 로 분기하여 기존 확인된 법률·증거 범위 내에서 최종 답변을 보존한다.
 
-    results = state.get("statute_search_results") or []
+    # [PRECEDENT-09] 판례만 추가 확보한 경우도 검증 재진입.
+    # 이를 누락하면 공식 판례 3건을 찾아도 statute_results=[] 때문에
+    # re_analyze에 도달하지 못해 SC-012가 계속 WITHHELD된다.
+    results = (state.get("statute_search_results") or []) + (state.get("precedent_search_results") or [])
 
-    # 1. 추가 조문을 확보한 경우 re_analyze 로 재작성
+    # 1. 추가 조문·판례를 확보한 경우 re_analyze 로 재작성
     if results:
 
         return "re_analyze"
