@@ -1341,3 +1341,88 @@ def test_execute_document_search_approves_compound_and_subset_laws(document_stat
     result = execute_document_search(state)
     assert result["statute_search_status"] in ("OFFICIAL_SUCCESS", "VERIFIED_LOCAL_FALLBACK"),         f"복합 승인 법령 내의 '소액사건심판법'이 정상 검색되어야 함: {result['statute_search_status']}"
     assert len(result["statute_search_results"]) > 0, "로컬 인덱스 또는 공식 API에서 소액사건심판법 조문이 확보되어야 함"
+
+
+
+def test_next_verification_step_terminates_temporal_recheck_when_revised():
+    """초안 미수정 재검증 플래그가 설정되었으나 이미 1회 이상 재작성을 거친 경우 finalize로 조기 보존 종료한다.
+
+    Description:
+        시점 게이트가 미확인 상태에서 초안 미수정 재검증(temporal_recheck_only) 플래그가 켜졌을 때,
+        이미 1회 이상 재작성(revision_count >= 1)을 수행한 상태라면 동일 초안으로 거대 LLM 검증기를
+        공회전(50초 낭비)하지 않고 finalize로 직행하여 안전하게 답변을 보존하는지 검증한다.
+    """
+    from ai_legal_helper.workflows.document_consultation import next_verification_step
+
+    state = {
+        "answer_mode": "DOCUMENT",
+        "question": "임대차 종료 후 보증금 반환 절차를 알려주세요.",
+        "draft_answer": "임대차가 종료되었으므로 보증금 반환을 청구할 수 있습니다.",
+        "revision_count": 2,
+        "statute_search_count": 1,
+        "verification_result": {
+            "status": "REVISE",
+            "reason_code": "TEMPORAL_SEMANTIC_REVIEW_REQUIRED",
+            "temporal_recheck_only": True,
+            "claims": [
+                {
+                    "claim": "임대차 종료 후 보증금 반환을 청구할 수 있습니다.",
+                    "claim_type": "LEGAL_APPLICATION",
+                    "grounding_status": "SUPPORTED",
+                    "source_ids": ["STATUTE:1"],
+                }
+            ],
+        },
+    }
+
+    target = next_verification_step(state)
+    assert target == "finalize", f"temporal_recheck_only 상태에서 revision_count >= 1이면 finalize로 직행해야 함: {target}"
+
+
+def test_apply_temporal_gate_caution_does_not_downgrade_pass_when_official_statute_supported():
+    """시점 게이트 CAUTION 상태에서 공식 법령 뒷받침이 있고 긍정 단정 위반이 없으면 PASS를 유지한다.
+
+    Description:
+        LLM 검증기와 결정론적 정책에 의해 핵심 주장이 뒷받침되어 PASS 판정을 받은 상태에서,
+        시점 게이트 판정이 CAUTION이더라도 법률 주장 중 공식 법령 지지가 존재하고 미시행 조문에 대한
+        적극적 긍정 단정(has_positive_unconfirmed_claim)이 없다면 PASS를 REVISE로 강제 번복하지 않고
+        진단 경고(AUTOMATED_SEMANTIC_REVIEW_INCOMPLETE)와 함께 보존하는지 검증한다.
+    """
+    from ai_legal_helper.legal_knowledge.temporal_verification import apply_temporal_gate_to_verification
+    from unittest.mock import MagicMock
+
+    gate = MagicMock()
+    gate.status = "CAUTION"
+    gate.decisions = [
+        {"source_id": "STATUTE:UNCONFIRMED_ADDENDUM", "status": "UNCONFIRMED"}
+    ]
+
+    verification_result = {
+        "status": "PASS",
+        "reason_code": "NONE",
+        "claims": [
+            {
+                "claim": "임차인은 주택임대차보호법 제3조에 따라 대항력을 행사할 수 있습니다.",
+                "claim_type": "LEGAL_APPLICATION",
+                "grounding_status": "SUPPORTED",
+                "source_ids": ["STATUTE:HOUSING_LEASE_3"],
+            },
+            {
+                "claim": "개정 조항의 적용 여부는 향후 시행 시점에 따라 달라질 수 있으므로 주의가 필요합니다.",
+                "claim_type": "LEGAL_RULE",
+                "grounding_status": "UNCERTAIN",
+                "source_ids": ["STATUTE:UNCONFIRMED_ADDENDUM"],
+            },
+        ],
+    }
+
+    out = apply_temporal_gate_to_verification(
+        verification_result,
+        gate,
+        official_sources_present=True,
+        official_source_ids=["STATUTE:HOUSING_LEASE_3"],
+    )
+
+    assert out["status"] == "PASS", f"PASS 판정이 유지되어야 함: {out['status']}"
+    assert out.get("temporal_review_diagnostic") == "AUTOMATED_SEMANTIC_REVIEW_INCOMPLETE"
+    assert not out.get("temporal_recheck_only"), "불필요한 동일 초안 재검증 플래그가 켜지지 않아야 함"

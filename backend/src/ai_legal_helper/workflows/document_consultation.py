@@ -481,6 +481,16 @@ def next_verification_step(state: Dict[str, Any]) -> str:
                 else:
                     target_node = "insufficient"
                     route_reason = "동일한 검증 결함 재발: 확보된 답변 근거 없음"
+            elif result.get("temporal_recheck_only") and (state.get("revision_count") or 0) >= 1:
+                # [TEMPORAL-NO-LOOP] 초안 미수정 재검증 플래그(temporal_recheck_only)는
+                # 이미 1회 이상 재작성을 거친 상태에서는 동일 초안으로 거대 LLM 검증을 공회전하지 않고
+                # 기존 확보된 초안을 안전하게 보존 최종화한다.
+                if state.get("draft_answer") and result.get("claims"):
+                    target_node = "finalize"
+                    route_reason = "적용시점 미확인 주의 초안 보존 최종화 (temporal_recheck 한도 도달)"
+                else:
+                    target_node = "insufficient"
+                    route_reason = "적용시점 근거 부재 보류 종료"
             elif result.get("status") in ("REVISE", "INSUFFICIENT") and (state.get("revision_count") or 0) < 3:
                 target_node = "revise"
                 route_reason = f"답변 보강 재작성 ({state.get('revision_count', 0) + 1}/3회)"

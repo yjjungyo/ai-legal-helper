@@ -403,14 +403,23 @@ def apply_temporal_gate_to_verification(
             {str(x) for x in official_source_ids}
             if official_source_ids is not None else None
         )
-        verified = bool(legal_claims) and all(
-            c.get("grounding_status") == "SUPPORTED"
-            and c.get("source_ids")
-            and (verified_official_ids is None
-                 or any(str(sid) in verified_official_ids
-                        for sid in c.get("source_ids") or []))
+        # 공식 법령 출처가 있는 경우: 적어도 하나의 법률 주장이 공식 법령에 뒷받침되고,
+        # 법률 주장 중 UNSUPPORTED(근거 없음)로 기각된 주장이 없어야 한다.
+        # 비핵심·주의적 문구의 UNCERTAIN이나 사건 증빙(계약서 등) 인용 주장이
+        # 공식 법령 ID 부재를 이유로 전체 검증 PASS를 REVISE로 강제 번복하지 않도록 한다.
+        has_official_support = (
+            verified_official_ids is None
+            or any(
+                c.get("grounding_status") == "SUPPORTED"
+                and any(str(sid) in verified_official_ids for sid in (c.get("source_ids") or []))
+                for c in legal_claims
+            )
+        )
+        has_unsupported_legal = any(
+            c.get("grounding_status") == "UNSUPPORTED"
             for c in legal_claims
         )
+        verified = bool(legal_claims) and has_official_support and not has_unsupported_legal
 
         # [Universal Temporal Verification]
         # CAUTION 상태에서 법률 적용 주장(LEGAL_APPLICATION)이 미시행 또는 미확인 조문을 근거로

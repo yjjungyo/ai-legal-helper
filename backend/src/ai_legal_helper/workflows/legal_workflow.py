@@ -2896,6 +2896,8 @@ def revise_node(state: LegalState) -> Dict:
 
             "revision_method": "TEMPORAL_RECHECK_NO_REWRITE",
 
+            "revision_no_progress": True,
+
         }
 
     if state.get("answer_mode") == DOCUMENT_MODE:
