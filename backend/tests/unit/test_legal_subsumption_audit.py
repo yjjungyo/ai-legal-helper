@@ -340,3 +340,34 @@ def test_document_verification_prompt_renders_all_subsumption_json_examples():
     )
     assert "application_checks" in rendered
     assert '{"requirement"' in rendered
+
+
+def test_semantic_issue_with_fact_and_statute_is_not_auto_verified():
+    """새 범용 Issue가 출처 1+1만으로 법률요건 포섭 VERIFIED가 되지 않는다."""
+    from ai_legal_helper.agents.issue_verifier import verify_issue
+    from ai_legal_helper.workflows.issue_planner import LegalIssueTask
+    from ai_legal_helper.case_intelligence.case_briefing import CaseEvidenceBriefing, FactItemBrief
+    task = LegalIssueTask(
+        issue_id="ISSUE_SEMANTIC_01",
+        issue_title="공동상속인의 반환의무 법적 성질",
+        legal_questions=["공동상속인의 반환채무 대외적 책임 범위는?"],
+        relevant_fact_ids=["f1"],
+        required_statutes=["민법 제411조"],
+    )
+    case = CaseEvidenceBriefing(
+        case_id="generic-fact-and-law", title="사건",
+        facts=[FactItemBrief(
+            fact_id="f1", statement="임대인이 사망했다",
+            adjudication_status="EVIDENCE_SUPPORTED", evidence_label="E03",
+        )],
+        source_registry={"E03": {"file": "E03_상속관계.txt"}},
+    )
+    sources = [{
+        "source_id": "OFFICIAL:CIVIL:411", "source_type": "STATUTE",
+        "title": "민법 제411조", "statute_name": "민법", "article": "제411조",
+        "content": "민법 제411조 불가분채무의 법률 요건이 규정되어 있다.",
+    }]
+    result = verify_issue(task, SC012_EFFECT, case, sources)
+    assert result.status == "CONDITIONAL"
+    assert "GENERAL_SOURCES_PRESENT_SUBSUMPTION_UNCHECKED" in result.reason_codes
+    assert "민법 제411조" in result.supported_statute_ids
