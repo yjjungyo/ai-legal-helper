@@ -51,9 +51,21 @@
 - 첫 CI `https://github.com/yjjungyo/ai-legal-helper/actions/runs/43675277212`: 포섭 신규 검사 자체는 통과했으나, 검증 프롬프트에 도입한 JSON 샘플의 단일 `{`와 `}`가 LangChain 템플릿 변수로 해석되어 여러 기존 문서 상담 검증이 INSUFFICIENT로 종료하는 오류 발견. `8902ab66`에서 템플릿 escape 수정, 별도 렌더링 단위 테스트 추가.
 - 템플릿 수정 후 `https://github.com/yjjungyo/ai-legal-helper/actions/runs/43675368546`: **125 passed, 3 failed**. 실패 3개는 변경되지 않은 기존 함수의 안내문구 기대값 2개(`test_verification_prompt_diet.py`)와 Github hosted runner에 필요한 로컬 ChromaDB 민사집행법 인덱스가 없는 환경 의존 테스트 1개(`test_stage2_statute_retrieval.py::test_stage2_local_first_prefetch_civil_execution_act`). 포섭 변경과 별도로 기술적으로 구분한다.
 - 일반 IssueVerifier 자동 VERIFIED 승격을 추가 보완한 뒤 `7a04b9c6` CI `https://github.com/yjjungyo/ai-legal-helper/actions/runs/43675613882`: **127 passed, 3 failed** (동일한 기존/환경 문제만 잔존). 모든 신규 포섭 테스트와 기존 문서 상담·판례 검색 연동 테스트는 통과.
-- GitHub 워크플로우의 `--deselect=backend/...::testname`은 pytest rootdir 차이로 테스트가 실제 제외되지 않아, `6e21e76c` 이후 함수명 기준 `-k` 제외로 변경. **제외 3건은 결과보고서에 분명히 남기며 자체 작업의 PASS로 계산하지 않는다.**
-- 이전 3단계부터 존재하는 광범위 `Semantic Judgment Safety Regression`의 법령 조문+부칙 검색 건수 기대값 불일치 1건(`test_official_statute_versions_p4.py`)은 미해결. 본 PR에서는 해당 공식 법령 코드·테스트를 수정하지 않았다.
-- 최종 HEAD의 표적 CI 결과는 GitHub Actions 실제 완료 로그로 확인한 후 기재할 것. 실측 확인 전 성공이라고 단정 금지.
+- `test_trace_dae222e6_quality_and_latency.py` 과거 PASS 테스트는 가압류를 발견했다는 사용자 진술과 **현재 우선변제권 존속 판단에 필요한 요건 사실**을 구별하도록 보완했다. 현재 점유/주민등록 유지 확인 자료와 `application_checks`를 연결한 조건을 검증했다.
+- `test_issue_verification.py`: 일반 `ISSUE_GENERAL_LEGAL`이 출처만으로 `VERIFIED`가 되면 요건 포섭 안전성 위반이다. 실제 규칙에 맞게 CONDITIONAL 기대값을 수정했다.
+- `test_evidence_grounding_p3.py`: 개인 사건 사실을 확인하지 않은 임차권등기명령 일반 조문 설명은 `LEGAL_RULE`로 분류. 테스트용 JSON 문자열 안으로 Python 주석이 실수로 포함되어 파싱 오류를 유발했으나 `e7c76bc9`에서 제거해 재검증했다.
+- `test_document_answer_prompt_no_case_hardcoding.py`: 근저당이 임차인보다 앞선 질문을 매수인 인수 확정으로 잘못 답한 가짜 PASS 테스트는 정당한 REVISE 판정으로 변경했다. 반면 2023 전입·거주/2025 근저당 사례에는 관련 법령과 실제 선후 사실, 예외를 명시한 포섭 자료를 제공해 PASS가 유지되는지 검증했다.
+- 광범위 CI에 이전부터 존재하던 **법령 1건 기대값 오류**를 `test_official_statute_versions_p4.py`에서 정정(`REGRESSION-COMPANION-01`). 현재 공식 법령 소스는 조문에 같은 MST의 부칙을 1+1 동반 검색하므로, 조문과 부칙을 모두 허용하는 것이 정확하며 두 출처 모두 가짜 PDF/페이지를 생성하지 않는지 검사한다. **법령 조회 로직은 변경하지 않았다**.
+- 표적 CI 최초의 3가지 기존/환경 실패도 원인별 **테스트 계약만** 정비했다.
+  - `test_verification_prompt_diet.py` 2개: 실제 경량화 안내문구인 '초안 미인용 부수 증거'로 기대값 수정. 생산 데이터 축약 로직 변경 없음.
+  - `test_stage2_statute_retrieval.py` 1개: 로컬 ChromaDB 설치를 전제하지 않고 모의 Local-First 인덱스를 주입하여 핵심 법령·조문 조회/병합 계약을 검증. 실제 인덱스 연결은 사용자 통합 테스트에서 확인.
+- **현재 최종 코드의 CI 결과** (코드 HEAD `ca1f6ee0`, 보고서 갱신 전):
+  - <https://github.com/yjjungyo/ai-legal-helper/actions/runs/43676792733> **Legal Subsumption Regression: 130 passed, 2 warnings, 0 deselected** (Python 3.11, 3.30초).
+  - <https://github.com/yjjungyo/ai-legal-helper/actions/runs/43676792765> **Official Precedent Search Regression: 107 passed, 2 warnings**.
+  - <https://github.com/yjjungyo/ai-legal-helper/actions/runs/43676792696> **Semantic Judgment Safety Regression: 첫 잡 176 passed, 최종 광범위 잡 299 passed / 3 skipped / 2 warnings**.
+  - **3개 관련 CI 모두 성공**. 순수 테스트 숫자의 중복은 있으므로 130+107+299를 '총 고유 테스트 수'라고 해석해서는 안 된다.
+- 이전 여러 CI 실패는 수정 전 중간 커밋의 실제 결과다. 테스트 성공을 얻기 위해 판례 검색·부칙·법률요건 검증의 보호 장치를 우회하지 않았으며, 모든 보완 내역을 별도 커밋으로 남겼다.
+- 실제 법제처 `prec` 운영 API+등록 사건 DB+LLM 통합 상담은 실행하지 않았으므로 **SC-012의 법률 최종 답변 PASS/정답률·호출시간 감소는 미검증**이다.
 
 ## 5. 사용자 수동 E2E 검증 항목
 
