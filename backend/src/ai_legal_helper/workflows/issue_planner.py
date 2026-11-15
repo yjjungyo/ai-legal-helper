@@ -286,7 +286,7 @@ def plan_legal_issues(
                 relevant_fact_ids=fact_ids,
                 relevant_evidence_ids=[],
                 relevant_evidence_labels=evidence_labels,
-                required_statutes=[],
+                required_statutes=list(dict.fromkeys(candidate_laws)),
                 candidate_statutes=list(dict.fromkeys(candidate_laws)),
                 missing_evidence=[],
                 priority="HIGH",
