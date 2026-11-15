@@ -462,7 +462,11 @@ def test_c14_legal_verifier_matches_statutes():
 
     res = verify_issue(task, draft_answer, briefing, retrieved_sources=sources)
     assert any("제3조의3" in s for s in res.supported_statute_ids)
-    assert res.status == "VERIFIED"
+    # [SUBSUMPTION-10 / Gemini] 원문 법령과 사건 사실 1건이 모두 있다는
+    # 것은 규범의 존재 증거일 뿐 법률요건의 실제 포섭까지 검증한 증거가
+    # 아니다. 범용 Issue는 의미 검증 전 VERIFIED로 자동 승격하지 않는다.
+    assert res.status == "CONDITIONAL"
+    assert "GENERAL_SOURCES_PRESENT_SUBSUMPTION_UNCHECKED" in res.reason_codes
 
 
 def test_c15_citation_audit_requires_labels():
