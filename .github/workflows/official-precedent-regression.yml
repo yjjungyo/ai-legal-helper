@@ -9,6 +9,7 @@ on:
       - "backend/src/ai_legal_helper/workflows/legal_workflow.py"
       - "backend/src/ai_legal_helper/workflows/state.py"
       - "backend/src/ai_legal_helper/agents/document_verification_prompt.py"
+      - "backend/src/ai_legal_helper/agents/verification.py"
       - "backend/tests/unit/test_official_precedent_search.py"
       - ".github/workflows/official-precedent-regression.yml"
   workflow_dispatch:
@@ -42,6 +43,7 @@ jobs:
             backend/src/ai_legal_helper/workflows/legal_workflow.py \
             backend/src/ai_legal_helper/workflows/state.py \
             backend/src/ai_legal_helper/agents/document_verification_prompt.py \
+            backend/src/ai_legal_helper/agents/verification.py \
             backend/tests/unit/test_official_precedent_search.py
       - name: Precedent and statute request regressions
         run: |
@@ -49,4 +51,6 @@ jobs:
             backend/tests/unit/test_official_precedent_search.py \
             backend/tests/unit/test_step3_statute_search.py \
             backend/tests/unit/test_semantic_issue_planner_sc012.py \
-            backend/tests/unit/test_document_consultation.py
+            backend/tests/unit/test_document_consultation.py \
+            backend/tests/unit/test_rag_citation_standard.py \
+            backend/tests/unit/test_legal_source_grounding_pipeline.py
