@@ -326,6 +326,9 @@ export const ConsultationProgress: React.FC<ConsultationProgressProps> = ({
   }
 
   const isApprovalWaiting = status === 'APPROVAL_REQUIRED';
+  // PRECEDENT-10 / Gemini: 사용자는 실제로 조회할 판례 검색어를 확인한
+  // 뒤 동의해야 한다. 기존 법령-only HITL UI는 그대로 유지한다.
+  const precedentApproval = Boolean(approvalRequest?.precedent_queries?.length);
   const hasReportedSteps = Boolean(progress?.steps?.length);
 
   // 최종 완료된 상담: 간결한 감사 기록으로 변환
@@ -401,7 +404,7 @@ export const ConsultationProgress: React.FC<ConsultationProgressProps> = ({
             {completedMode
               ? '사건 증거 기반 AI 법률 상담 분석 및 6단계 검증 완료'
               : isApprovalWaiting
-              ? '법률 조문 추가 검색 승인 대기 중'
+              ? '법령·판례 추가 검색 승인 대기 중'
               : 'AI 법률 상담 처리 중...'}
           </span>
         </div>
@@ -554,7 +557,9 @@ export const ConsultationProgress: React.FC<ConsultationProgressProps> = ({
         <div className="chat-approval-box">
           <div className="chat-approval-desc">
             {approvalRequest?.explanation ||
-              '현재 등록된 사건 자료만으로는 의뢰인의 쟁점을 검증할 수 없습니다. 국가법령정보공동활용 공식 API에서 원문 조문을 직접 검색하여 법률 재분석을 진행하시겠습니까?'}
+              precedentApproval
+              ? '법률 근거를 보강하기 위해 국가법령정보센터에서 공식 판례 원문을 검색하려 합니다. 아래 조회 검색어를 확인하시고 승인 여부를 선택해 주세요.'
+              : '현재 등록된 사건 자료만으로는 의뢰인의 쟁점을 검증할 수 없습니다. 국가법령정보공동활용 공식 API에서 원문 조문을 직접 검색하여 법률 재분석을 진행하시겠습니까?'}
           </div>
 
           {approvalRequest?.candidate_laws && approvalRequest.candidate_laws.length > 0 && (
@@ -567,6 +572,19 @@ export const ConsultationProgress: React.FC<ConsultationProgressProps> = ({
                   <span key={idx} className="chat-approval-law-tag">
                     {law}
                   </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {precedentApproval && (
+            <div>
+              <div style={{ fontSize: '0.8em', color: '#78350f', fontWeight: 600, marginBottom: '4px' }}>
+                조회 예정 공식 판례 검색어:
+              </div>
+              <div className="chat-approval-laws">
+                {approvalRequest?.precedent_queries?.map((query: string, idx: number) => (
+                  <span key={idx} className="chat-approval-law-tag">{query}</span>
                 ))}
               </div>
             </div>
@@ -593,7 +611,7 @@ export const ConsultationProgress: React.FC<ConsultationProgressProps> = ({
                 fontWeight: 600,
               }}
             >
-              ✓ 공식 법령 검색 승인 및 재분석
+              {precedentApproval ? '✓ 공식 법령·판례 검색 승인 및 재분석' : '✓ 공식 법령 검색 승인 및 재분석'}
             </button>
           </div>
         </div>
