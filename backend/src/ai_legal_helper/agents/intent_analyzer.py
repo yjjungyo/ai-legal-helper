@@ -497,13 +497,14 @@ def analyze_consultation_intent(
     if decision.intent == ConsultationIntent.FOLLOWUP_ACTION:
         decision.requires_verification = True
 
-        # [안전 폴백] 장문의 사건 연계 요청을 LLM이 단순 조치 요청으로 잘못
-        # 축약한 경우 검증된 사건 사실·법령을 생략하지 않는다. 특정 법령·금액·
-        # 표현의 단어목록을 만들지 않고, 짧은 제안 수락과 독립 서술형 요청을
-        # 구분하는 최소 보수적 게이트이다. 실제 의도 판정은 LLM에 맡긴다.
-        # 형식 변경만 요청한 짧은 수락은 FOLLOWUP_ACTION으로 그대로 유지.
+        # [안전 폴백] LLM이 원질문을 구체화하는 대신 짧게 축약해 놓고
+        # '순수 후속 행동'으로 분류하면, 원질문의 복합 사건요건이 누락될 수 있다.
+        # 특정 단어/사건유형/글자 수 문턱 없이 원문 대비 복원 질의의
+        # 정보 확장 방향을 점검한다: 대명사 수락 등은 원문보다 구체적인
+        # 작업 목표로 확장되는 반면, 복합 질문을 축약한 경우 전면 재검토.
+        # 이 보수적 가드는 문맥 의미 판단을 대체하지 않고 검색 생략만 방지한다.
         if (decision.consultation_mode == ConsultationMode.CASE_EVIDENCE
-                and len(question.strip()) >= 50):
+                and len((decision.resolved_query or "").strip()) <= len(question.strip())):
             decision.intent = ConsultationIntent.NEW_LEGAL_ANALYSIS
             decision.requires_specialist = True
             decision.requires_retrieval = True
