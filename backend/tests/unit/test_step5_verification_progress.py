@@ -39,18 +39,30 @@ def sources():
 
 @pytest.fixture
 def document_state(sources):
-    _, manifest = format_grounding_sources(sources)
-    return {
+    # [STEP5-TEST-01 / Gemini] CASE_EVIDENCE 원문은 검색 결과 리스트가
+    # 아니라 승인된 사건 브리핑 문서를 통해 document_sources()에
+    # 결합된다. Writer의 manifest도 반드시 그 동일한 공용 함수로
+    # 산출해야 캐시 테스트가 허위 SOURCE_MISMATCH로 종료되지 않는다.
+    state = {
         "question": "현재 보증금 반환이 가능한가요?",
         "draft_answer": "추가 법률요건의 확인이 필요합니다.",
         "answer_mode": dc.DOCUMENT_MODE,
-        "answer_source_manifest": manifest,
-        "case_evidence_briefing": {"as_of_date": "2026-11-15", "source_documents": []},
-        "retrieved_sources": sources,
+        "case_evidence_briefing": {
+            "as_of_date": "2026-11-15",
+            "source_documents": [{
+                "document_name": sources[0]["source_id"],
+                "evidence_id": "ev1",
+                "content": sources[0]["content"],
+                "review_status": "APPROVED",
+            }],
+        },
+        "retrieved_sources": [sources[1]],
         "revision_count": 0,
         "statute_search_count": 0,
         "verification_progress_history": [],
     }
+    _, state["answer_source_manifest"] = format_grounding_sources(dc.document_sources(state))
+    return state
 
 
 def base_verification(status="REVISE"):
