@@ -295,6 +295,7 @@ def verify_answer(state: Dict[str, Any]) -> Dict[str, Any]:
         len(draft),
         len(sources),
     )
+    reused_verifier = False
     try:
         if state.get("answer_generation_error") or not draft.strip():
             raise ValueError("ANSWER_GENERATION_FAILED")
@@ -343,6 +344,7 @@ def verify_answer(state: Dict[str, Any]) -> Dict[str, Any]:
             )
         )
         if reusable:
+            reused_verifier = True
             # 이미 독립 LLM 검증을 거친 결과만 복사한다. 실패 결론을
             # PASS로 승격하거나 검증되지 않은 추가 법률효과를 인정하지 않는다.
             result = {**previous, "source_manifest": manifest}
@@ -366,17 +368,7 @@ def verify_answer(state: Dict[str, Any]) -> Dict[str, Any]:
     # 이 함수는 법률적 참/거짓을 검사하지 않으며, 종료 정책은
     # next_verification_step()과 기존 finish_answer()가 결정한다.
     progress_history = list(state.get("verification_progress_history") or [])
-    reusable = bool(
-        result.get("verification_input_hash")
-        and state.get("revision_no_progress")
-        and result.get("verification_input_hash") ==
-            (state.get("verification_result") or {}).get("verification_input_hash")
-        and result.get("reason_code") not in (
-            "VERIFICATION_ERROR", "TEMPORAL_SEMANTIC_CONTRADICTION"
-        )
-        and not result.get("temporal_recheck_only")
-        and (result.get("temporal_gate") or {}).get("status") != "BLOCK"
-    )
+
     if result.get("status") == "PASS":
         progress_history = []
         no_progress = False
@@ -388,7 +380,7 @@ def verify_answer(state: Dict[str, Any]) -> Dict[str, Any]:
             result, question=consultation_question(state),
             sources_sha256=(result.get("source_manifest") or {}).get("content_sha256") or "",
         )
-        no_progress = issue_hash in progress_history or reusable
+        no_progress = issue_hash in progress_history or reused_verifier
         if issue_hash not in progress_history:
             progress_history = (progress_history + [issue_hash])[-5:]
     if no_progress:
@@ -424,7 +416,7 @@ def verify_answer(state: Dict[str, Any]) -> Dict[str, Any]:
             # 별도의 progress 로그/상태에 복제하지 않는다.
             "verification_progress_history": progress_history,
             "verification_no_progress": no_progress,
-            "verification_reused": bool(reusable),
+            "verification_reused": reused_verifier,
             "verified_sources": result.get("citation_audit", {}).get("verified_sources", [])}
 
 
