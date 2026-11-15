@@ -556,11 +556,15 @@ def audit_citations_and_claims(
             clean_art = re.sub(r"\s+", "", s_art_match.group(0)) if s_art_match else re.sub(r"\s+", "", parts[1])
             by_statute_article.setdefault((parts[0].strip(), clean_art), []).append(src)
 
-        if src.get("case_number"):
-            known_case_numbers.add(re.sub(r"\s+", "", str(src["case_number"])))
-        for cn in CASE_NUMBER_PATTERN.findall(str(src.get("content") or "")):
-            known_case_numbers.add(re.sub(r"\s+", "", cn))
+        # [PRECEDENT-11 / Gemini 인계] '검색 출처에 사건번호가 있었다'와
+        # '해당 판결문이 공식 검색되어 검증되었다'는 서로 다르다.
+        # 종전에는 CASE_EVIDENCE 본문·법령 조문·과거 사건 요약의 판례번호까지
+        # 진짜 판결 인용으로 PASS시켜 허위 판례 방어가 무력화될 수 있었다.
+        # Source Registry에 실제 PRECEDENT 자료 + 사건번호 + 판결 내용이 있을
+        # 때만 판례 인용 존재성을 인정한다. 사건번호만 존재하는 인용은 불가.
         stype = str(src.get("source_type") or "").upper()
+        if stype == "PRECEDENT" and src.get("case_number") and src.get("content"):
+            known_case_numbers.add(re.sub(r"\s+", "", str(src["case_number"])))
         if stype == "CASE_EVIDENCE" or sid.startswith("EVIDENCE:") or "evidence" in sid.lower():
             known_evidence_ids.add(sid.lower())
             for fn in (src.get("filename"), src.get("file_name"), src.get("file")):
@@ -569,8 +573,8 @@ def audit_citations_and_claims(
                     known_evidence_ids.add(os.path.basename(str(fn)).lower())
 
     if case_context:
-        for cn in CASE_NUMBER_PATTERN.findall(case_context):
-            known_case_numbers.add(re.sub(r"\s+", "", cn))
+        # 사건 기록에 언급된 판례번호는 참고 정보이지 검증된 공식 판례가
+        # 아니다. 공적 판례 PRECEDENT Source 없이 인용을 허용하지 않는다.
         for ev_match in re.findall(r"EVIDENCE:([A-Za-z0-9_\-]+)", case_context, re.IGNORECASE):
             known_evidence_ids.add(f"evidence:{ev_match.lower()}")
             known_evidence_ids.add(ev_match.lower())
