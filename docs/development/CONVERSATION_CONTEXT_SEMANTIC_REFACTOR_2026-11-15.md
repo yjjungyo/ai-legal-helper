@@ -53,7 +53,13 @@
 - **토큰:** 사건 맥락에 대화 답변을 이중 주입하지 않고, 의미 복원 입력을 3,200자로 제한. 전체 토큰 절감률은 별도 측정 필요.
 - **유효성:** `event_date`는 후속 턴의 LLM 의미 판단 결과를 사용하고 법령 공포일/계약일 혼동을 금지. 실제 시행본 적용 판단은 기존 검증 단계 유지.
 - **추가 확인:** 현재는 답변 말미를 의미 복원용으로 전송한다. 향후 제안 자체를 구조화해 저장하면 더 안전하나, DB 스키마 변경은 이번 PR에 포함하지 않는다.
-- **자동 테스트:** PR CI 결과에 따라 상태 갱신. 현재 연결된 실제 Azure LLM/법제처 API/DB 환경 E2E는 수행하지 않음.
+- **전용 CI:** Conversation Context Regression의 Python 문법 검사 및 대화맥락·적응형 그래프·의도분석 테스트 통과(검증 커밋 `1956a16a`). 후속 커밋에도 동일 자동검증을 연결함.
+- **관련 CI:** Temporal RAG P6/P7/P8 실행 PASS(검증 커밋 `1956a16a`).
+- **전체 Safety CI:** 변경 전 초기 PR 실행에서 4건 실패 중 의도 분석기 `test_followup_action_promoted_when_evidence_synthesis_requested` 1건은 후속 안전 가드로 해결. 검증 커밋 `1956a16a` 기준 296 passed, 3 skipped, **3 failed**. 아래 3건은 본 PR에서 수정하지 않은 법령/문서 검증 경로에서 발생했으며 별도 원인 확인이 필요하다(기존 main의 동일 테스트 실패 여부는 미확인).
+  1. `test_official_statute_versions_p4.py::test_undated_legacy_official_xml_no_longer_fabricates_pdf_page` — 예상 출처 수 1건, 실제 2건(부칙 포함)
+  2. `test_document_answer_prompt_no_case_hardcoding.py::test_verification_demotes_llm_pass_when_qa_check_fails` — 예상 REVISE, 실제 PASS
+  3. `test_document_answer_prompt_no_case_hardcoding.py::test_grounding_context_preserves_deep_counter_evidence_beyond_1500_chars_and_arbitrary_filename` — 장문 반대증거 구간 발췌 누락
+- **실제 E2E:** 연결된 Azure LLM·법제처 API·사건 PostgreSQL·Langfuse 환경에서의 실통합 검증은 수행하지 않음. 통과로 기록하지 말 것.
 
 ## 6. 병합 기준
 
