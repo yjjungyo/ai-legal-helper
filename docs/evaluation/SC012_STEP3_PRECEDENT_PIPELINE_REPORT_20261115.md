@@ -46,7 +46,9 @@ SC-012 2차는 '공동상속인이 승계한 임대차보증금 반환채무를 
 - 추가 감사: 사건 자료 또는 법령 문장에 특정 판례번호가 있다는 사실만으로 `audit_citations_and_claims()`가 판례 출처 존재성 PASS를 인정하던 경로를 제거함. **공식 PRECEDENT Source에 의존하도록 수정**. 이를 검증하기 위한 신규 회귀 테스트 3개 추가.
 - 이전 UI CI: `Frontend UI regression` 성공 (프론트 TypeScript build, lint 포함).
 - 기존 광범위 `Semantic Judgment Safety Regression`에서는 이전 단계에서도 동일하게 발생한 **법령 조문+부칙 2건 반환 / legacy 테스트 1건 기대** 문제가 확인됨. 이번 판례 검색 코드와 무관한 항목으로 별도 관리. 전체 CI를 PASS로 오인하지 않음.
-- **최종 commit의 CI 결과는 GitHub Actions 실행 결과를 기준으로만 추가 갱신**한다. 미실행/미확인 수치를 임의 기록하지 않는다.
+- **최종 코드 HEAD + 보고서 커밋 `61743961` 실제 Actions**: Official Precedent Search Regression **107 passed, 2 warnings (2.53초)**. 실행 https://github.com/yjjungyo/ai-legal-helper/actions/runs/43674092160
+- 동일 HEAD의 **Frontend UI regression, Conversation Context Regression, Semantic Issue Planner Regression** 모두 성공 확인.
+- `Semantic Judgment Safety Regression` 전체 단계는 여전히 기존 법령 조문/부칙 기대수 오류가 남아 있음(직전 실행 `5960e4e4`: 298 passed, 1 failed, 3 skipped). 이번 코드 변경과 구별해야 하며 5/5 성공을 주장하지 않는다.
 
 ## 5. 기능·안전 검증 체크리스트
 
