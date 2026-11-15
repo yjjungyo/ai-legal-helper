@@ -24,8 +24,15 @@ import asyncio
 import json
 import logging
 import uuid
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+# 직접 실행(python scripts/evaluation/replay_case_turn_v6.py)도 -m 실행과 동일하게 동작.
+# 이 코드가 없다면 Python이 scripts/evaluation 폴더만 탐색해 프로젝트 패키지를 못 찾을 수 있다.
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
 from scripts.evaluation.create_complex_10cases_testset import TEST_CASES
 from scripts.evaluation.run_complex_10cases_e2ev6_hitl_auto import (
