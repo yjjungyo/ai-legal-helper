@@ -1,0 +1,142 @@
+{
+  "gold_version": "KPI5-GOLD-v1.0",
+  "parent_gold_sha256": "3a5c873c34984f993a8d466bd3a68c6c5f30cdfa515595c27ea3b9e578e43676",
+  "review_status": "PROVISIONAL_AI_AUTHORED_OFFICIAL_SOURCE_CHECKED",
+  "case": {
+    "id": "SC-022",
+    "title": "비연속 2기 차임 연체와 사후 완납의 갱신요구",
+    "answer": "주택임대차보호법 제6조의3 제1항 제1호는 2기의 차임액에 달하도록 연체한 사실을 예외로 둔다. 6월·8월 미납이 동시에 남아 160만원이 된 이력이 있으며 비연속이라는 이유만으로 제외하지 않는다. 사후 완납만으로 과거 연체 사실이 사라진다고 판단하지 않는다. 갱신거절 가능성을 검토하되, 별도 해지 통지가 없으므로 갱신거절만으로 이미 중도해지되었다거나 당장 퇴거해야 한다고 단정하지 않는다.",
+    "laws": [
+      "주택임대차보호법 제6조의3 제1항 제1호",
+      "민법 제640조"
+    ],
+    "sources": [
+      "LEASE",
+      "RENEW"
+    ],
+    "required_precedent": null,
+    "question": "월세를 두 번 밀렸지만 연속된 달도 아니고 갱신요구 전에 전부 갚았습니다. 집주인의 갱신거절이 가능한지, 이미 계약이 해지된 것인지, 지금 당장 나가야 하는지 제출한 지급내역으로 구분해 주세요. 적용 조문을 정확히 제시해주세요.",
+    "forbidden": [
+      "차임 연체는 반드시 연속 2개월이어야 한다고 단정",
+      "사후 완납으로 갱신거절 사유가 무조건 소멸한다고 단정",
+      "갱신거절을 즉시 해지와 동일시"
+    ],
+    "gold_facts": [
+      {
+        "id": "SC-022-F01",
+        "statement": "주거용 빌라 임차인은 가상임차인 다온이고 임대인은 가상임대인 라온이다.",
+        "evidence": "E01",
+        "essential": true
+      },
+      {
+        "id": "SC-022-F02",
+        "statement": "임대차기간은 2024-12-01부터 2026-11-30까지이다.",
+        "evidence": "E01",
+        "essential": true
+      },
+      {
+        "id": "SC-022-F03",
+        "statement": "보증금은 20,000,000원이며 월차임은 800,000원이다.",
+        "evidence": "E01",
+        "essential": true
+      },
+      {
+        "id": "SC-022-F04",
+        "statement": "각 월차임 지급일은 매월 5일이다.",
+        "evidence": "E01",
+        "essential": true
+      },
+      {
+        "id": "SC-022-F05",
+        "statement": "2026년 6월분 차임 800,000원은 2026-06-05 지급되지 않았다.",
+        "evidence": "E02",
+        "essential": true
+      },
+      {
+        "id": "SC-022-F06",
+        "statement": "2026년 7월분 차임 800,000원은 2026-07-05 정상 지급되었다.",
+        "evidence": "E02",
+        "essential": true
+      },
+      {
+        "id": "SC-022-F07",
+        "statement": "2026년 8월분 차임 800,000원은 2026-08-05 지급되지 않았다.",
+        "evidence": "E02",
+        "essential": true
+      },
+      {
+        "id": "SC-022-F08",
+        "statement": "2026-08-06 기준 미납 차임 합계는 1,600,000원이었다.",
+        "evidence": "E02",
+        "essential": true
+      },
+      {
+        "id": "SC-022-F09",
+        "statement": "임차인은 2026-08-20 미납 차임 1,600,000원을 모두 납부했다.",
+        "evidence": "E03",
+        "essential": true
+      },
+      {
+        "id": "SC-022-F10",
+        "statement": "임차인의 최초 계약갱신요구는 2026-09-01 임대인에게 도달했다.",
+        "evidence": "E03",
+        "essential": true
+      },
+      {
+        "id": "SC-022-F11",
+        "statement": "임대인은 2026-09-02 과거 2기 차임 연체를 이유로 갱신을 거절했다.",
+        "evidence": "E03",
+        "essential": true
+      },
+      {
+        "id": "SC-022-F12",
+        "statement": "임대인은 별도의 계약해지 통지를 보내지 않았으며 다른 위반 사유는 주장하지 않았다.",
+        "evidence": "E03",
+        "essential": true
+      }
+    ],
+    "gold_issues": [
+      {
+        "id": "SC-022-I01",
+        "statement": "2기 차임액의 의미와 비연속 미납액 합산"
+      },
+      {
+        "id": "SC-022-I02",
+        "statement": "과거 2기 연체 사실 및 사후 완납이 갱신거절 사유에 미치는 영향"
+      },
+      {
+        "id": "SC-022-I03",
+        "statement": "기간 내 갱신요구와 주택임대차보호법 제6조의3 제1항 제1호 예외"
+      },
+      {
+        "id": "SC-022-I04",
+        "statement": "갱신거절과 별도 중도해지의 구별 및 만료일까지의 계약관계"
+      }
+    ]
+  },
+  "scoring_rules": {
+    "fact_precision": "원자화·의미 중복 제거 후 Gold에 의해 지지되는 추출 사실 수/전체 추출 사실 수. 복합 진술은 전 요소 충족 필요. 자료의 주장 여부를 보존해야 함.",
+    "fact_recall": "추출 결과로 완전히 재현된 필수 Gold 사실 수/전체 필수 Gold 사실 수",
+    "issue_recall": "실제 Planner에서 식별된 필수 쟁점 수/전체 필수 쟁점 수. 답변 내 쟁점 커버리지는 별도 보조지표.",
+    "legal_accuracy": "실제 답변의 법령·판례 인용-주장 단위 중 존재·내용·관련성·시점·적용타당성 5개 항목 모두 충족한 수/전체 인용-주장 수. 확인 불가는 보수적으로 미충족.",
+    "empty_denominator": "N/A, PASS 금지",
+    "thresholds": {
+      "fact_precision": 0.9,
+      "fact_recall": 0.9,
+      "issue_recall": 0.9,
+      "legal_accuracy": 0.95
+    }
+  },
+  "official_sources": {
+    "LEASE": {
+      "url": "https://www.law.go.kr/LSW/lsInfoP.do?ancYnChk=0&joNo=000307&lsId=001248",
+      "title": "주택임대차보호법",
+      "effective": "2026-01-02"
+    },
+    "RENEW": {
+      "url": "https://www.law.go.kr/lsLinkCommonInfo.do?chrClsCd=010202&lsJoLnkSeq=1031475533",
+      "title": "주택임대차보호법 제6조의3",
+      "effective": "2026-01-02"
+    }
+  }
+}

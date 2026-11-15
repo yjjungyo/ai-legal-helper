@@ -88,4 +88,4 @@ def coverage_next(state: dict) -> str:
             and result.get("reason_code") == "LEGAL_SOURCE_MISSING"
             and result.get("candidate_laws") and not state.get("hitl_executed")):
         return "statute_search_approval"
-    return "legal_evidence_bundle"
+    return "synthesize"

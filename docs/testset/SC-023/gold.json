@@ -1,0 +1,142 @@
+{
+  "gold_version": "KPI5-GOLD-v1.0",
+  "parent_gold_sha256": "3a5c873c34984f993a8d466bd3a68c6c5f30cdfa515595c27ea3b9e578e43676",
+  "review_status": "PROVISIONAL_AI_AUTHORED_OFFICIAL_SOURCE_CHECKED",
+  "case": {
+    "id": "SC-023",
+    "title": "임차권등기 완료 후 이사와 미반환 보증금",
+    "answer": "미반환액은 2억5천만원−5천만원=2억원이다. 신청일이 아니라 9월18일 등기 기입 완료와 기존 대항요건 유지가 핵심이다. 제3조의3 제5항에 따라 등기 후 이사·전출만으로 보존된 대항력·우선변제권이 소멸하지 않는다. 이미 인도했다는 사실을 반영하여 반환청구 및 제8항 비용청구를 검토하되 다른 선순위 권리나 회수 가능성까지 확정하지 않는다.",
+    "laws": [
+      "주택임대차보호법 제3조의3 제5항",
+      "주택임대차보호법 제3조의3 제8항"
+    ],
+    "sources": [
+      "LEASE",
+      "REGISTER"
+    ],
+    "required_precedent": null,
+    "question": "등기명령을 신청한 뒤 실제 등기 기입까지 확인하고 이사했습니다. 전출 때문에 권리를 잃었다는 집주인 말이 맞나요? 실제 남은 보증금, 권리 유지 여부, 청구할 수 있는 조치를 신청일과 완료일을 구분해 설명해주세요.",
+    "forbidden": [
+      "등기 완료 전후를 구별하지 않고 전출로 모든 권리 상실 단정",
+      "남은 보증금 2억5천만원으로 과다 산정",
+      "전액 회수 보장"
+    ],
+    "gold_facts": [
+      {
+        "id": "SC-023-F01",
+        "statement": "주거용 다세대주택 임차인은 가상임차인 마루이고 임대인은 가상임대인 바다이다.",
+        "evidence": "E01",
+        "essential": true
+      },
+      {
+        "id": "SC-023-F02",
+        "statement": "계약기간은 2024-09-01부터 2026-08-31까지이다.",
+        "evidence": "E01",
+        "essential": true
+      },
+      {
+        "id": "SC-023-F03",
+        "statement": "보증금은 250,000,000원이고 계약 초기에 전액 지급되었다.",
+        "evidence": "E01",
+        "essential": true
+      },
+      {
+        "id": "SC-023-F04",
+        "statement": "임차인은 2024-09-01 인도·전입신고·확정일자를 갖추었다.",
+        "evidence": "E01",
+        "essential": true
+      },
+      {
+        "id": "SC-023-F05",
+        "statement": "갱신하지 않겠다는 임차인 통지가 2026-05-01 도달했고 쌍방이 2026-08-31 종료에 합의했다.",
+        "evidence": "E02",
+        "essential": true
+      },
+      {
+        "id": "SC-023-F06",
+        "statement": "임대인은 2026-09-03 보증금 중 50,000,000원만 계좌 반환했다.",
+        "evidence": "E02",
+        "essential": true
+      },
+      {
+        "id": "SC-023-F07",
+        "statement": "2026-11-10까지 위 반환 외 추가 반환은 없다.",
+        "evidence": "E02",
+        "essential": true
+      },
+      {
+        "id": "SC-023-F08",
+        "statement": "임차권등기명령 신청은 2026-09-07 접수되었다.",
+        "evidence": "E02",
+        "essential": true
+      },
+      {
+        "id": "SC-023-F09",
+        "statement": "2026-09-18 등기사항전부증명서에 임차권등기가 기입 완료되어 있다.",
+        "evidence": "E03",
+        "essential": true
+      },
+      {
+        "id": "SC-023-F10",
+        "statement": "임차인은 등기 완료 때까지 점유와 주민등록을 계속 유지했다.",
+        "evidence": "E03",
+        "essential": true
+      },
+      {
+        "id": "SC-023-F11",
+        "statement": "임차인은 2026-09-21 이사·전출하고 같은 날 열쇠를 반환했다.",
+        "evidence": "E03",
+        "essential": true
+      },
+      {
+        "id": "SC-023-F12",
+        "statement": "임대인은 전출했으므로 임차인의 기존 우선변제권은 모두 없어졌다고 주장한다.",
+        "evidence": "E03",
+        "essential": true
+      }
+    ],
+    "gold_issues": [
+      {
+        "id": "SC-023-I01",
+        "statement": "원보증금·일부 반환액에 따른 미반환액 2억원 산정"
+      },
+      {
+        "id": "SC-023-I02",
+        "statement": "신청 접수와 등기 기입 완료 시점의 구별"
+      },
+      {
+        "id": "SC-023-I03",
+        "statement": "기존 대항력·우선변제권 유지 및 등기 완료 후 전출 효과"
+      },
+      {
+        "id": "SC-023-I04",
+        "statement": "미반환 보증금 반환청구와 임차권등기 비용 청구"
+      }
+    ]
+  },
+  "scoring_rules": {
+    "fact_precision": "원자화·의미 중복 제거 후 Gold에 의해 지지되는 추출 사실 수/전체 추출 사실 수. 복합 진술은 전 요소 충족 필요. 자료의 주장 여부를 보존해야 함.",
+    "fact_recall": "추출 결과로 완전히 재현된 필수 Gold 사실 수/전체 필수 Gold 사실 수",
+    "issue_recall": "실제 Planner에서 식별된 필수 쟁점 수/전체 필수 쟁점 수. 답변 내 쟁점 커버리지는 별도 보조지표.",
+    "legal_accuracy": "실제 답변의 법령·판례 인용-주장 단위 중 존재·내용·관련성·시점·적용타당성 5개 항목 모두 충족한 수/전체 인용-주장 수. 확인 불가는 보수적으로 미충족.",
+    "empty_denominator": "N/A, PASS 금지",
+    "thresholds": {
+      "fact_precision": 0.9,
+      "fact_recall": 0.9,
+      "issue_recall": 0.9,
+      "legal_accuracy": 0.95
+    }
+  },
+  "official_sources": {
+    "LEASE": {
+      "url": "https://www.law.go.kr/LSW/lsInfoP.do?ancYnChk=0&joNo=000307&lsId=001248",
+      "title": "주택임대차보호법",
+      "effective": "2026-01-02"
+    },
+    "REGISTER": {
+      "url": "https://www.law.go.kr/lsLawLinkInfo.do?chrClsCd=010202&lsJoLnkSeq=900566884",
+      "title": "주택임대차보호법 제3조의3",
+      "effective": "2026-01-02"
+    }
+  }
+}

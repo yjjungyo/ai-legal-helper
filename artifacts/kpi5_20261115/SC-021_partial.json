@@ -1,0 +1,23 @@
+{
+  "id": "SC-021",
+  "case_id": "kpi5_sc-021_13e152bbbc",
+  "title": "갱신요구 후 새 기간 개시 전 해지통지 20261115_E2E_V6_KPI5",
+  "ingestion_trace_id": "50ce816c-5030-40e3-991c-c4d8c146ec84",
+  "ingestion": [
+    {
+      "evidence_id": "e5cc432a-0993-4f1f-b0b4-f3bd696cb92c",
+      "filename": "E01_synthetic_record.txt",
+      "claims": 10
+    },
+    {
+      "evidence_id": "7a6e681b-33fc-4c46-b3af-790e29e659e6",
+      "filename": "E02_synthetic_record.txt",
+      "claims": 10
+    },
+    {
+      "evidence_id": "da713fd6-b159-49bb-8db1-8070aaacbd8a",
+      "filename": "E03_synthetic_record.txt",
+      "claims": 8
+    }
+  ]
+}

@@ -1248,7 +1248,7 @@ async def run_agents_node(state: LegalState) -> Dict:
         for category in categories_to_query:
             try:
                 retrieved = await asyncio.to_thread(
-                    retrieve_with_status, query=retrieval_query, category=category, k=7,
+                    retrieve_with_status, query=retrieval_query, category=category, k=10,
                 )
                 sources.extend(build_source_from_chroma_doc(
                     doc, category=category or "전체", retrieval_method="CHROMA_VECTOR",
@@ -2510,22 +2510,18 @@ def supervisor_verification_decision(state: LegalState) -> str:
 
             )
 
+            temporal_gate_status = (ver_res.get("temporal_gate") or {}).get("status")
+            temporal_ok = temporal_gate_status in (None, "PASS", "NOT_REQUIRED")
+
             is_legally_sound = (
-
-                status == "PASS" or (
-
+                (status == "PASS" and temporal_ok) or (
                     has_supported_core
-
                     and not has_unsupported_core
-
+                    and temporal_ok
                     and not audit.get("unverified_citations")
-
                     and not audit.get("unsupported_citations")
-
                     and reason_code not in ("LEGAL_SOURCE_MISSING", "CITATION_INVALID", "EVIDENCE_CONFLICT", "VERIFICATION_ERROR")
-
                 )
-
             )
 
             if is_legally_sound:
@@ -2903,14 +2899,10 @@ def revise_node(state: LegalState) -> Dict:
         }
 
     if state.get("answer_mode") == DOCUMENT_MODE:
-        if (state.get("intent") == "FOLLOWUP_ACTION"
-                or (state.get("intent_decision") or {}).get("intent") == "FOLLOWUP_ACTION"
-                or (state.get("intent_decision") or {}).get("requires_full_analysis") is False):
-            # 후속 실무 행동 가이드(FOLLOWUP_ACTION)는 5단계 정밀 의견서 재작성 대신 행동 플랜 맥락을 재보정한다.
-            res = followup_action_node(state)
-            res["revision_count"] = (state.get("revision_count") or 0) + 1
-            return res
-
+        # 문서 기반 상담(DOCUMENT_MODE)에서는 의도(intent)와 무관하게 4단계에서 생성된 정밀 의견서 초안을
+        # 5단계 검증 피드백(repair_notes, revision_instructions, contradictions 등)을 반영하여
+        # 일관된 법률 의견서 형태로 재작성(repair)한다. FOLLOWUP_ACTION 분기로 가로채면
+        # 검증 피드백이 누락되어 반복 검증 실패(WITHHELD)가 발생하는 문제를 방지한다.
         return generate_answer(state, repair=True)
 
     from ai_legal_helper.llm.gateway import get_llm
@@ -3009,7 +3001,7 @@ def revise_node(state: LegalState) -> Dict:
 
             try:
 
-                docs = retrieve(query=re_query[:300], category=cat, k=7)
+                docs = retrieve(query=re_query[:300], category=cat, k=10)
 
                 for doc in docs or []:
 
@@ -3037,17 +3029,28 @@ def revise_node(state: LegalState) -> Dict:
 
 
 
-    # 2. 실제 검색된 출처 포맷팅
+    # 2. 실제 검색된 출처 포맷팅 (부칙 및 시점 핵심 조문 우선 선별)
+    addenda_sources = [
+        s for s in merged_sources
+        if s.get("article") == "부칙" or "부칙" in str(s.get("title") or "") or s.get("part") == "부칙"
+    ]
+    other_sources = [s for s in merged_sources if s not in addenda_sources]
+    selected_sources = (addenda_sources + other_sources)[:25]
 
     sources_text = ""
-
-    for s in merged_sources[:15]:
-
+    for s in selected_sources:
         fname = s.get("filename") or s.get("file_name") or s.get("source_id") or "UNKNOWN"
-
         page = s.get("page") or "1"
-
-        sources_text += f"- ({fname}, p.{page}): {str(s.get('content', ''))[:300]}\n"
+        meta = s.get("meta") if isinstance(s.get("meta"), dict) else s
+        prom = s.get("promulgation_date") or meta.get("promulgation_date")
+        eff = s.get("effective_date") or s.get("article_effective_date") or meta.get("effective_date")
+        eff_basis = s.get("effective_date_basis") or meta.get("effective_date_basis")
+        date_info = ""
+        if prom or eff:
+            basis_str = f" ({eff_basis})" if eff_basis else ""
+            date_info = f" [공포일: {prom or '-'}, 시행일: {eff or '-'}{basis_str}]"
+        content_limit = 1000 if s.get("source_type") == "STATUTE" or s.get("article") == "부칙" else 400
+        sources_text += f"- ({fname}, p.{page}{date_info}): {str(s.get('content', ''))[:content_limit]}\n"
 
     if not sources_text.strip():
 
@@ -3606,45 +3609,29 @@ def finalize_node(state: LegalState) -> Dict:
 
 
 
-        # STEP 4: assemble_grounded_answer()로 사용자 답변을 덮어쓰지 않고,
-
-        # Synthesizer가 작성하고 검증(Verification)을 통과한 원본 초안(draft_answer)을 그대로 보존한다.
-
-        if not draft and "issue_res_objs" in locals():
-
+        # [State-Answer Consistency]
+        # final_disp == "WITHHELD"인 경우, 검증되지 않은 단정적 초안(draft)을 그대로 방출하지 않고
+        # 쟁점별 보류 상태가 반영된 보류형 답변(assemble_grounded_answer)을 생성하거나 보류 안내로 대체한다.
+        if (not draft or final_disp == "WITHHELD") and "issue_res_objs" in locals():
             from ai_legal_helper.workflows.final_disposition import assemble_grounded_answer
-
             final = assemble_grounded_answer(
-
                 issue_res_objs,
-
                 briefing_obj,
-
-                "",
-
+                draft if final_disp != "WITHHELD" else "",
                 final_disp,
-
                 conv_context=state.get("conversation_context"),
-
                 current_question=state.get("question", ""),
-
                 case_delta=case_delta,
-
             )
-
         else:
-
             sanitized = sanitize_unverified_citations(
-
                 draft,
-
                 state.get("retrieved_sources", []),
-
                 case_context=state.get("case_context", ""),
-
             )
-
             final = clean_markdown_formatting(sanitized)
+            if final_disp == "WITHHELD" and (final.startswith("예.") or final.startswith("네.")):
+                final = "현재 확인된 법령 시행 시점 및 자료상 단정적인 법률 의무를 확정하기 어렵습니다(판단 유보).\n\n" + final
 
     else:
 
@@ -3660,9 +3647,12 @@ def finalize_node(state: LegalState) -> Dict:
 
         final = clean_markdown_formatting(sanitized)
 
-    # [Option B] 최종 확정 답변 내 증거 인용 표기 전체 파일명 복원 (최종 관문 방어선)
+    # [Option B] 최종 확정 답변 내 증거 인용 표기 전체 파일명 및 공식 판례명 복원 (최종 관문 방어선)
     from ai_legal_helper.utils.text_formatter import expand_evidence_citations, extract_all_registered_evidence_sources
-    all_ev_sources = extract_all_registered_evidence_sources(state)
+    all_ev_sources = list(extract_all_registered_evidence_sources(state) or [])
+    for src in (state.get("retrieved_sources") or []):
+        if src not in all_ev_sources:
+            all_ev_sources.append(src)
     final = expand_evidence_citations(final, all_ev_sources)
 
     # [P0-03] 최종 확정된 답변(final)에 기반하여 실제 인용·검증된 출처(cited_sources)를 최종 산출
@@ -4793,6 +4783,7 @@ def re_analyze_node(state: LegalState) -> Dict:
         "- 법령 조문 인용 시 가상의 PDF 파일명을 쓰지 마시고, 반드시 `(법령명 제O조)` 형태(예: `(주택임대차보호법 제6조의2)`, `(민법 제598조)`)로 정확하게 인용하세요.\n"
         "- 증거 파일명·페이지·조문·URL은 실제 제공된 값만 인용하세요. 예시의 출처를 복사하지 마세요.\n"
         "- 공식 검색 성공만으로 적용을 확정하지 말고 시행일·적용례·개별 요건을 확인하세요.\n"
+        "- 법령 또는 특정 조문의 시행일이 의뢰인의 사건일(계약체결일 등)보다 미래이거나 부칙 적용례에 따라 시행 후 체결된 계약부터 적용되는 경우, 질의 시점의 계약에는 해당 규정이 적용되지 않아 법적 의무(신고사항 등)가 없음을 결론에서 명확하고 단정적으로 제시하세요.\n"
         "- 답변 끝에 불필요한 후속 제안 문구를 작성하지 마세요."
     )
 
@@ -5556,7 +5547,9 @@ def build_legal_graph(checkpointer: Optional[Any] = None):
 
     graph.add_node("run_agents", run_agents_node)
 
-    graph.add_node("legal_evidence_bundle", legal_evidence_bundle_node)
+    # [그래프 토폴로지 정리] legal_evidence_bundle_node는 문서 상담(DOCUMENT_MODE) 및 증거 기반 상담 체계에서
+    # 불필요한 Pass-through(0.001s, None 반환) 노드이므로 그래프 노드에서 제외하고 run_agents -> synthesize로 직결한다.
+    # (단위 테스트 및 하위 호환성을 위해 함수 정의는 유지)
 
     graph.add_node("synthesize", synthesize_node)
 
@@ -5606,11 +5599,9 @@ def build_legal_graph(checkpointer: Optional[Any] = None):
 
     graph.add_edge("routing_exit", END)
 
-    # [그래프 토폴로지 정리] route -> run_agents 직결 완료 (statute_search_plan 조건부 엣지 제거)
+    # [그래프 토폴로지 정리] route -> run_agents 직결 완료 및 run_agents -> synthesize 직결 (legal_evidence_bundle 생략)
 
-    graph.add_edge("run_agents", "legal_evidence_bundle")
-
-    graph.add_edge("legal_evidence_bundle", "synthesize")
+    graph.add_edge("run_agents", "synthesize")
 
     graph.add_conditional_edges("synthesize", synthesis_law_gate_condition, {
 

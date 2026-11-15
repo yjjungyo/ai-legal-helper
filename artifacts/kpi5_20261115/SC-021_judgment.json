@@ -1,0 +1,429 @@
+{
+  "fact_reviews": [
+    {
+      "index": 0,
+      "supported": true,
+      "gold_ids": [],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "주거용 아파트 임대차라는 사실은 Gold F01의 일부 및 사건 전제와 일치한다."
+    },
+    {
+      "index": 1,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F01"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "임차인이 가상임차인 가람이라는 점이 Gold F01과 일치한다."
+    },
+    {
+      "index": 2,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F03"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "월차임이 없다는 점이 Gold F03과 일치한다."
+    },
+    {
+      "index": 3,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F01"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "임대인이 가상임대인 나래라는 점이 Gold F01과 일치한다."
+    },
+    {
+      "index": 4,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F02"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "임대차기간 시작일 2024-10-01은 Gold F02의 일부와 일치한다."
+    },
+    {
+      "index": 5,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F02"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "임대차기간 종료일 2026-09-30은 Gold F02의 일부와 일치한다."
+    },
+    {
+      "index": 6,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F03"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "약정 보증금 180,000,000원은 Gold F03과 일치한다."
+    },
+    {
+      "index": 7,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F04"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "보증금 180,000,000원이 2024-10-01 전액 지급되었다는 취지로 Gold F04를 지지한다."
+    },
+    {
+      "index": 8,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F04"
+      ],
+      "duplicate_of": 7,
+      "excluded": false,
+      "reason": "Gold F04 중 지급일 부분의 중복 진술이다."
+    },
+    {
+      "index": 9,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F05"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "임차인이 2024-10-01 인도·전입신고·확정일자를 갖추었다는 Gold F05와 일치한다."
+    },
+    {
+      "index": 10,
+      "supported": false,
+      "gold_ids": [],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "대항력 및 확정일자 관련 요건이라는 법적 평가를 포함한 AI 추론으로, Gold 사실문 자체는 인도·전입신고·확정일자 구비만을 말한다."
+    },
+    {
+      "index": 11,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F06"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "최초 계약갱신요구가 2026-05-10 임대인에게 도달했다는 Gold F06과 일치한다."
+    },
+    {
+      "index": 12,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F06"
+      ],
+      "duplicate_of": 11,
+      "excluded": false,
+      "reason": "Gold F06 중 도달일 부분의 중복 진술이다."
+    },
+    {
+      "index": 13,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F07"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "임대인이 2026-05-11 수령 확인 및 거절 사유 미제시라는 Gold F07과 일치한다."
+    },
+    {
+      "index": 14,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F07"
+      ],
+      "duplicate_of": 13,
+      "excluded": false,
+      "reason": "Gold F07 중 수령 확인일 부분의 중복 진술이다."
+    },
+    {
+      "index": 15,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F07"
+      ],
+      "duplicate_of": 13,
+      "excluded": false,
+      "reason": "Gold F07 중 거절 사유 미제시 부분의 중복 진술이다."
+    },
+    {
+      "index": 16,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F08"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "별도 계약해지 통지가 2026-06-15 임대인에게 도달했다는 Gold F08과 일치한다."
+    },
+    {
+      "index": 17,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F08"
+      ],
+      "duplicate_of": 16,
+      "excluded": false,
+      "reason": "Gold F08 중 도달일 부분의 중복 진술이다."
+    },
+    {
+      "index": 18,
+      "supported": false,
+      "gold_ids": [],
+      "duplicate_of": null,
+      "excluded": true,
+      "reason": "문서 제목에 관한 메타데이터일 뿐 핵심 사실이 아니다."
+    },
+    {
+      "index": 19,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F09"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "해지 통지에 새 갱신기간 시작 전이라도 해지한다는 뜻이 명시되었다는 Gold F09와 일치한다."
+    },
+    {
+      "index": 20,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F09"
+      ],
+      "duplicate_of": 19,
+      "excluded": false,
+      "reason": "Gold F09와 실질적으로 동일한 의사표시 내용의 중복 진술이다."
+    },
+    {
+      "index": 21,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F10"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "2026-11-10 현재 보증금을 전혀 반환하지 않았다는 Gold F10과 일치한다."
+    },
+    {
+      "index": 22,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F10"
+      ],
+      "duplicate_of": 21,
+      "excluded": false,
+      "reason": "Gold F10 중 기준 시점 부분의 중복 진술이다."
+    },
+    {
+      "index": 23,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F11"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "2026-11-10 현재 점유와 주민등록을 유지하고 있다는 Gold F11과 일치한다."
+    },
+    {
+      "index": 24,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F11"
+      ],
+      "duplicate_of": 23,
+      "excluded": false,
+      "reason": "Gold F11 중 기준 시점 부분의 중복 진술이다."
+    },
+    {
+      "index": 25,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F12"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "임대인이 2026-10-01부터 다시 3개월을 세어야 한다고 주장한다는 Gold F12와 일치한다."
+    }
+  ],
+  "gold_fact_reviews": [
+    {
+      "gold_id": "SC-021-F01",
+      "covered": true,
+      "indices": [
+        1,
+        3
+      ],
+      "reason": "임차인 가람과 임대인 나래가 각각 명시되어 완전 재현된다."
+    },
+    {
+      "gold_id": "SC-021-F02",
+      "covered": true,
+      "indices": [
+        4,
+        5
+      ],
+      "reason": "임대차기간 시작일과 종료일이 모두 제시되어 완전 재현된다."
+    },
+    {
+      "gold_id": "SC-021-F03",
+      "covered": true,
+      "indices": [
+        6,
+        2
+      ],
+      "reason": "보증금 180,000,000원과 월차임 없음이 모두 제시된다."
+    },
+    {
+      "gold_id": "SC-021-F04",
+      "covered": true,
+      "indices": [
+        7
+      ],
+      "reason": "보증금 180,000,000원이 2024-10-01 전액 지급되었다는 사실이 하나의 문장으로 재현된다."
+    },
+    {
+      "gold_id": "SC-021-F05",
+      "covered": true,
+      "indices": [
+        9
+      ],
+      "reason": "2024-10-01 인도·전입신고·확정일자 구비가 모두 제시된다."
+    },
+    {
+      "gold_id": "SC-021-F06",
+      "covered": true,
+      "indices": [
+        11
+      ],
+      "reason": "최초 계약갱신요구가 2026-05-10 임대인에게 도달했다는 사실이 재현된다."
+    },
+    {
+      "gold_id": "SC-021-F07",
+      "covered": true,
+      "indices": [
+        13
+      ],
+      "reason": "2026-05-11 수령 확인과 거절 사유 미제시가 함께 제시된다."
+    },
+    {
+      "gold_id": "SC-021-F08",
+      "covered": true,
+      "indices": [
+        16
+      ],
+      "reason": "별도 계약해지 통지가 2026-06-15 임대인에게 도달했다는 사실이 재현된다."
+    },
+    {
+      "gold_id": "SC-021-F09",
+      "covered": true,
+      "indices": [
+        19
+      ],
+      "reason": "해지 통지에 새 갱신기간 시작 전이라도 해지한다는 뜻이 명시되었다는 사실이 재현된다."
+    },
+    {
+      "gold_id": "SC-021-F10",
+      "covered": true,
+      "indices": [
+        21
+      ],
+      "reason": "2026-11-10 현재 보증금을 전혀 반환하지 않았다는 사실이 재현된다."
+    },
+    {
+      "gold_id": "SC-021-F11",
+      "covered": true,
+      "indices": [
+        23
+      ],
+      "reason": "2026-11-10 현재 점유와 주민등록 유지 사실이 재현된다."
+    },
+    {
+      "gold_id": "SC-021-F12",
+      "covered": true,
+      "indices": [
+        25
+      ],
+      "reason": "임대인이 2026-10-01부터 다시 3개월을 세어야 한다고 주장한다는 사실이 재현된다."
+    }
+  ],
+  "issue_reviews": [
+    {
+      "gold_id": "SC-021-I01",
+      "planner_detected": false,
+      "planner_quote": "",
+      "answer_detected": false,
+      "answer_quote": "",
+      "reason": "Planner는 '임대차계약 종료 시점 및 보증금 반환의무 발생'만 제시하고 갱신요구 도달과 갱신 효력 발생을 실질적으로 특정하지 않았다. WITHHELD 최종답변에도 해당 쟁점 언급이 없다."
+    },
+    {
+      "gold_id": "SC-021-I02",
+      "planner_detected": false,
+      "planner_quote": "",
+      "answer_detected": false,
+      "answer_quote": "",
+      "reason": "Planner는 해지 통지 도달과 종료 여부를 일반적으로만 적시했을 뿐, 갱신기간 개시 전 해지통지에도 도달 후 3개월 기준이 적용된다는 세부 쟁점을 명시하지 않았다. 최종답변에도 없다."
+    },
+    {
+      "gold_id": "SC-021-I03",
+      "planner_detected": true,
+      "planner_quote": "임대차계약 종료 시점 및 보증금 반환의무 발생",
+      "answer_detected": false,
+      "answer_quote": "",
+      "reason": "Planner 제목과 질문에 보증금 반환의무 발생이 명시되어 동시이행 및 미반환액 쟁점의 일부 핵심을 포괄하나, 최종답변은 WITHHELD로 실질 판단이 없다."
+    },
+    {
+      "gold_id": "SC-021-I04",
+      "planner_detected": true,
+      "planner_quote": "이사 전 대항력 유지 및 임차권등기명령 등 권리보전 조치",
+      "answer_detected": false,
+      "answer_quote": "",
+      "reason": "Planner가 점유·전입 유지와 임차권등기명령을 명시했다. 최종답변에는 해당 조치 안내가 없다."
+    },
+    {
+      "gold_id": "SC-021-I05",
+      "planner_detected": false,
+      "planner_quote": "",
+      "answer_detected": false,
+      "answer_quote": "",
+      "reason": "Planner 어디에도 2023다258672 또는 그 법리 대응이 명시되지 않았다. 최종답변에도 판례 언급이 없다."
+    }
+  ],
+  "citation_reviews": [],
+  "missing_required_precedent": true,
+  "limitations": [
+    "Gold answer는 주택임대차보호법 제6조의2 및 제6조의3 제4항, 2023다258672을 핵심 근거로 삼지만 actual_final_answer는 WITHHELD 상태의 짧은 보류문구만 존재하여 Gold와 직접 비교 가능한 법률 판단 내용이 없다.",
+    "공식 원문 중 LEASE와 NOTICE는 본문 조문 확인에 부적합한 페이지가 포함되어 있어, 조문 내용 확인은 RENEW, REGISTER, LEASE_BODY, CIVIL536, CIVIL_BODY, P2023를 주로 대조하였다.",
+    "issue I03의 planner_detected 평가는 Planner가 '동시이행'을 명시하지는 않았으나 '보증금 반환의무 발생'을 제목으로 제시한 점만 제한적으로 반영하였다."
+  ],
+  "critical_findings": [
+    "최종 전달 답변은 WITHHELD로서 실질 법률 판단, 판례 제시, 권리보전 안내가 전혀 없어 Gold의 핵심 쟁점 대부분이 답변 단계에서 미재현되었다.",
+    "필수 판례 2023다258672가 최종답변에 전혀 제시되지 않았고, 찾지 못했다는 설명조차 없다.",
+    "actual_facts에는 Gold 핵심 사실 12개를 모두 재현할 수 있을 정도의 사실이 존재하지만, 최종답변은 이를 활용하지 않았다."
+  ],
+  "judge_trace_id": "c60f3392-f512-4786-8fe7-197fe8fd33bf",
+  "judge_model": "gpt-5.4-2026-03-05",
+  "judge_usage": {
+    "input_tokens": 68088,
+    "output_tokens": 2704,
+    "total_tokens": 70792,
+    "input_token_details": {
+      "audio": 0,
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "audio": 0,
+      "reasoning": 0
+    }
+  },
+  "method": "LLM semantic adjudication + deterministic coverage checks; provisional, expert review pending"
+}

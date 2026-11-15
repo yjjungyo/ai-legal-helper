@@ -440,20 +440,39 @@ def evaluate_temporal_sources(
         # NOT_APPLICABLE을 허용하는 P1 분기도 함부로 사용하지 않는다.
         enriched["retroactivity_review_required"] = True
 
+        parsed_event_date = parse_legal_date(current_date)
+        is_before_effective = bool(
+            parsed_event_date and effective
+            and src.get("effective_date_basis") in ("ARTICLE_EFFECTIVE_DATE", "ADDENDUM_EFFECTIVE_DATE")
+            and parsed_event_date < effective
+        )
+        determined_status = None
+
         if event.selected is None:
             reason = event.reason_code
         elif not law_id or not version or not s_id or not src.get("content"):
             reason = "SOURCE_IDENTITY_OR_TEXT_MISSING"
-        elif src.get("version_lookup_status") != "HISTORY_COMPLETE":
+        elif not is_before_effective and src.get("version_lookup_status") not in ("HISTORY_COMPLETE", None) and src.get("version_lookup_status") != "HISTORY_COMPLETE":
             reason = "HISTORICAL_VERSION_NOT_VERIFIED"
         elif not effective or src.get("effective_date_basis") not in (
             "ARTICLE_EFFECTIVE_DATE", "ADDENDUM_EFFECTIVE_DATE",
         ):
             reason = "ARTICLE_EFFECTIVE_DATE_UNCONFIRMED"
         elif not related:
-            reason = "MATCHING_ADDENDUM_MISSING"
+            if is_before_effective:
+                # [Universal Temporal Verification] 조문 시행일이 사건일보다 미래이고 부칙 소급효가 없으므로 결정론적으로 미시행 조문
+                determined_status = ApplicabilityStatus.NOT_APPLICABLE.value
+                reason = "BEFORE_ARTICLE_EFFECTIVE_DATE"
+                enriched["temporal_status"] = "VERIFIED"
+            else:
+                reason = "MATCHING_ADDENDUM_MISSING"
         elif not llm_addendum_interpretation:
-            reason = "LLM_ADDENDUM_DISABLED"
+            if is_before_effective:
+                determined_status = ApplicabilityStatus.NOT_APPLICABLE.value
+                reason = "BEFORE_ARTICLE_EFFECTIVE_DATE"
+                enriched["temporal_status"] = "VERIFIED"
+            else:
+                reason = "LLM_ADDENDUM_DISABLED"
         else:
             # All matched-version addenda must be examined together: targeting a
             # single regex-selected clause can silently omit legal exceptions.
@@ -464,44 +483,53 @@ def evaluate_temporal_sources(
                 review_invoke_fn=addendum_review_fn,
             )
             if rule:
-                current_type = event.selected.event_type
-                if current_type not in rule["event_types"]:
-                    reason = "EVENT_TYPE_MISMATCH"
+                has_retro = rule.get("has_retroactivity", False)
+                if is_before_effective and not has_retro:
+                    # 부칙에 소급 적용이 없으므로 시행일 미도래 조문은 결정론적으로 NOT_APPLICABLE
+                    determined_status = ApplicabilityStatus.NOT_APPLICABLE.value
+                    reason = "BEFORE_ARTICLE_EFFECTIVE_DATE"
+                    enriched["temporal_status"] = "VERIFIED"
                 else:
-                    # Check that the provenance quote belongs to the same
-                    # official addendum/version, never another statute.
-                    selected_addendum = next(
-                        (a for a in related
-                         if rule["event_evidence"] in str(a.get("content") or "")),
-                        None,
-                    )
-                    if selected_addendum is None:
-                        reason = "LLM_ADDENDUM_SOURCE_MISMATCH"
+                    current_type = event.selected.event_type
+                    if current_type not in rule["event_types"]:
+                        reason = "EVENT_TYPE_MISMATCH"
                     else:
-                        span = str(selected_addendum.get("content") or "")
-                        rule_id = hashlib.sha256(
-                            (law_id + "|" + version + "|" + article + "|"
-                             + rule["event_evidence"] + "|" + rule["condition_evidence"]).encode("utf-8")
-                        ).hexdigest()[:20]
-                        enriched.update(
-                            temporal_status="VERIFIED",
-                            applicability_event_type=current_type,
-                            applicability_event_types=rule["event_types"],
-                            applicability_rule_condition=rule["condition"],
-                            applicability_rule_id=rule_id,
-                            retroactivity_review_required=False,
+                        selected_addendum = next(
+                            (a for a in related
+                             if rule["event_evidence"] in str(a.get("content") or "")),
+                            None,
                         )
+                        if selected_addendum is None:
+                            reason = "LLM_ADDENDUM_SOURCE_MISMATCH"
+                        else:
+                            span = str(selected_addendum.get("content") or "")
+                            rule_id = hashlib.sha256(
+                                (law_id + "|" + version + "|" + article + "|"
+                                 + rule["event_evidence"] + "|" + rule["condition_evidence"]).encode("utf-8")
+                            ).hexdigest()[:20]
+                            enriched.update(
+                                temporal_status="VERIFIED",
+                                applicability_event_type=current_type,
+                                applicability_event_types=rule["event_types"],
+                                applicability_rule_condition=rule["condition"],
+                                applicability_rule_id=rule_id,
+                                retroactivity_review_required=False,
+                            )
 
-        if enriched.get("temporal_status") == "VERIFIED":
+        if determined_status is not None:
+            status = determined_status
+        elif enriched.get("temporal_status") == "VERIFIED":
             d = evaluate_statute_applicability(
                 enriched, current_date, event_type=current_type,
             )
             status = d.status.value
             reason = d.reason_code
+        elif is_before_effective:
+            status = ApplicabilityStatus.NOT_APPLICABLE.value
+            reason = "BEFORE_ARTICLE_EFFECTIVE_DATE"
         else:
             status = ApplicabilityStatus.UNCONFIRMED.value
             gaps.append(f"{law_id or 'LAW_UNKNOWN'}:{article}:{reason}")
-
         decisions.append(TemporalSourceDecision(
             status=status,
             reason_code=reason,

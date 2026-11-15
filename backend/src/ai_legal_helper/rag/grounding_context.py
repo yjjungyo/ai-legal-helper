@@ -56,9 +56,19 @@ def format_grounding_sources(
             meta["source_type"] = stype
 
         # 법령 특화 메타데이터 (조문 번호, 시행일, 공포번호 등)
+        eff_date = (
+            source.get("article_effective_date")
+            or source.get("effective_date")
+            or source.get("law_effective_date")
+        )
+        if eff_date:
+            meta["effective_date"] = eff_date
+            meta["article_effective_date"] = source.get("article_effective_date") or eff_date
+
         for law_key in (
-            "statute_name", "article", "article_title", "effective_date", "promulgation_date",
+            "statute_name", "article", "article_title", "promulgation_date",
             "version_date", "paragraph_no", "source_url",
+            "law_effective_date", "effective_date_basis", "temporal_status",
         ):
             if source.get(law_key) is not None:
                 meta[law_key] = source[law_key]
@@ -106,7 +116,20 @@ def format_grounding_sources(
             else:
                 effective_content = "(원문 본문 미확보)"
 
-        blocks.append(json.dumps(meta, ensure_ascii=False) + guide_section + "\n본문:\n" + effective_content)
+        statute_date_header = ""
+        if stype == "STATUTE":
+            prom = source.get("promulgation_date")
+            basis = source.get("effective_date_basis") or ""
+            parts = []
+            if prom:
+                parts.append(f"공포일: {prom}")
+            if eff_date:
+                basis_sfx = f" (근거: {basis})" if basis else ""
+                parts.append(f"시행일: {eff_date}{basis_sfx}")
+            if parts:
+                statute_date_header = f"\n[법령 효력 일자: {', '.join(parts)}]"
+
+        blocks.append(json.dumps(meta, ensure_ascii=False) + guide_section + statute_date_header + "\n본문:\n" + effective_content)
     rendered = "\n\n".join(blocks) or "(검색된 출처 없음)"
     if len(rendered) > max_chars:
         raise ValueError("GROUNDING_CONTEXT_LIMIT_EXCEEDED")

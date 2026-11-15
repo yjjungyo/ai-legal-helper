@@ -1,0 +1,603 @@
+{
+  "fact_reviews": [
+    {
+      "index": 0,
+      "supported": true,
+      "gold_ids": [],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "주거용 아파트 임대차라는 사실은 Gold F01의 일부 및 사건 전제와 일치한다."
+    },
+    {
+      "index": 1,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F01"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "임차인이 가상임차인 가람이라는 점이 Gold F01과 일치한다."
+    },
+    {
+      "index": 2,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F03"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "월차임이 없다는 점이 Gold F03과 일치한다."
+    },
+    {
+      "index": 3,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F01"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "임대인이 가상임대인 나래라는 점이 Gold F01과 일치한다."
+    },
+    {
+      "index": 4,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F02"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "임대차기간 시작일 2024-10-01은 Gold F02의 일부와 일치한다."
+    },
+    {
+      "index": 5,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F02"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "임대차기간 종료일 2026-09-30은 Gold F02의 일부와 일치한다."
+    },
+    {
+      "index": 6,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F03"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "약정 보증금 180,000,000원은 Gold F03과 일치한다."
+    },
+    {
+      "index": 7,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F04"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "보증금 180,000,000원이 2024-10-01 전액 지급되었다는 취지로 Gold F04를 지지한다."
+    },
+    {
+      "index": 8,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F04"
+      ],
+      "duplicate_of": 7,
+      "excluded": false,
+      "reason": "Gold F04 중 지급일 부분의 중복 진술이다."
+    },
+    {
+      "index": 9,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F05"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "임차인이 2024-10-01 인도·전입신고·확정일자를 갖추었다는 Gold F05와 일치한다."
+    },
+    {
+      "index": 10,
+      "supported": false,
+      "gold_ids": [],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "대항력 및 확정일자 관련 요건이라는 법적 평가를 포함한 AI 추론으로, Gold 사실문 자체는 인도·전입신고·확정일자 구비만을 말한다."
+    },
+    {
+      "index": 11,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F06"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "최초 계약갱신요구가 2026-05-10 임대인에게 도달했다는 Gold F06과 일치한다."
+    },
+    {
+      "index": 12,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F06"
+      ],
+      "duplicate_of": 11,
+      "excluded": false,
+      "reason": "Gold F06 중 도달일 부분의 중복 진술이다."
+    },
+    {
+      "index": 13,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F07"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "임대인이 2026-05-11 수령 확인 및 거절 사유 미제시라는 Gold F07과 일치한다."
+    },
+    {
+      "index": 14,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F07"
+      ],
+      "duplicate_of": 13,
+      "excluded": false,
+      "reason": "Gold F07 중 수령 확인일 부분의 중복 진술이다."
+    },
+    {
+      "index": 15,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F07"
+      ],
+      "duplicate_of": 13,
+      "excluded": false,
+      "reason": "Gold F07 중 거절 사유 미제시 부분의 중복 진술이다."
+    },
+    {
+      "index": 16,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F08"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "별도 계약해지 통지가 2026-06-15 임대인에게 도달했다는 Gold F08과 일치한다."
+    },
+    {
+      "index": 17,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F08"
+      ],
+      "duplicate_of": 16,
+      "excluded": false,
+      "reason": "Gold F08 중 도달일 부분의 중복 진술이다."
+    },
+    {
+      "index": 18,
+      "supported": false,
+      "gold_ids": [],
+      "duplicate_of": null,
+      "excluded": true,
+      "reason": "문서 제목에 관한 메타데이터일 뿐 핵심 사실이 아니다."
+    },
+    {
+      "index": 19,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F09"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "해지 통지에 새 갱신기간 시작 전이라도 해지한다는 뜻이 명시되었다는 Gold F09와 일치한다."
+    },
+    {
+      "index": 20,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F09"
+      ],
+      "duplicate_of": 19,
+      "excluded": false,
+      "reason": "Gold F09와 실질적으로 동일한 의사표시 내용의 중복 진술이다."
+    },
+    {
+      "index": 21,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F10"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "2026-11-10 현재 보증금을 전혀 반환하지 않았다는 Gold F10과 일치한다."
+    },
+    {
+      "index": 22,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F10"
+      ],
+      "duplicate_of": 21,
+      "excluded": false,
+      "reason": "Gold F10 중 기준 시점 부분의 중복 진술이다."
+    },
+    {
+      "index": 23,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F11"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "2026-11-10 현재 점유와 주민등록을 유지하고 있다는 Gold F11과 일치한다."
+    },
+    {
+      "index": 24,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F11"
+      ],
+      "duplicate_of": 23,
+      "excluded": false,
+      "reason": "Gold F11 중 기준 시점 부분의 중복 진술이다."
+    },
+    {
+      "index": 25,
+      "supported": true,
+      "gold_ids": [
+        "SC-021-F12"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "임대인이 2026-10-01부터 다시 3개월을 세어야 한다고 주장한다는 Gold F12와 일치한다."
+    }
+  ],
+  "gold_fact_reviews": [
+    {
+      "gold_id": "SC-021-F01",
+      "covered": true,
+      "indices": [
+        1,
+        3
+      ],
+      "reason": "임차인 가람과 임대인 나래가 각각 명시되어 완전 재현된다."
+    },
+    {
+      "gold_id": "SC-021-F02",
+      "covered": true,
+      "indices": [
+        4,
+        5
+      ],
+      "reason": "임대차기간 시작일과 종료일이 모두 제시되어 완전 재현된다."
+    },
+    {
+      "gold_id": "SC-021-F03",
+      "covered": true,
+      "indices": [
+        6,
+        2
+      ],
+      "reason": "보증금 180,000,000원과 월차임 없음이 모두 제시된다."
+    },
+    {
+      "gold_id": "SC-021-F04",
+      "covered": true,
+      "indices": [
+        7
+      ],
+      "reason": "보증금 180,000,000원이 2024-10-01 전액 지급되었다는 사실이 하나의 문장으로 재현된다."
+    },
+    {
+      "gold_id": "SC-021-F05",
+      "covered": true,
+      "indices": [
+        9
+      ],
+      "reason": "2024-10-01 인도·전입신고·확정일자 구비가 모두 제시된다."
+    },
+    {
+      "gold_id": "SC-021-F06",
+      "covered": true,
+      "indices": [
+        11
+      ],
+      "reason": "최초 계약갱신요구가 2026-05-10 임대인에게 도달했다는 사실이 재현된다."
+    },
+    {
+      "gold_id": "SC-021-F07",
+      "covered": true,
+      "indices": [
+        13
+      ],
+      "reason": "2026-05-11 수령 확인과 거절 사유 미제시가 함께 제시된다."
+    },
+    {
+      "gold_id": "SC-021-F08",
+      "covered": true,
+      "indices": [
+        16
+      ],
+      "reason": "별도 계약해지 통지가 2026-06-15 임대인에게 도달했다는 사실이 재현된다."
+    },
+    {
+      "gold_id": "SC-021-F09",
+      "covered": true,
+      "indices": [
+        19
+      ],
+      "reason": "해지 통지에 새 갱신기간 시작 전이라도 해지한다는 뜻이 명시되었다는 사실이 재현된다."
+    },
+    {
+      "gold_id": "SC-021-F10",
+      "covered": true,
+      "indices": [
+        21
+      ],
+      "reason": "2026-11-10 현재 보증금을 전혀 반환하지 않았다는 사실이 재현된다."
+    },
+    {
+      "gold_id": "SC-021-F11",
+      "covered": true,
+      "indices": [
+        23
+      ],
+      "reason": "2026-11-10 현재 점유와 주민등록 유지 사실이 재현된다."
+    },
+    {
+      "gold_id": "SC-021-F12",
+      "covered": true,
+      "indices": [
+        25
+      ],
+      "reason": "임대인이 2026-10-01부터 다시 3개월을 세어야 한다고 주장한다는 사실이 재현된다."
+    }
+  ],
+  "issue_reviews": [
+    {
+      "gold_id": "SC-021-I01",
+      "planner_detected": false,
+      "planner_quote": "",
+      "answer_detected": true,
+      "answer_quote": "임차인의 **최초 계약갱신요구**는 **2026-05-10 임대인에게 도달**했고, 임대인은 **2026-05-11 수령 확인** 후 거절사유를 제시하지 않았습니다",
+      "reason": "답변에는 갱신요구 도달 사실과 효력 전제가 드러나나, Planner에는 '기간 내 최초 갱신요구의 도달과 갱신 효력 발생'이 실질적으로 특정되어 있지 않고 종료시점 일반 쟁점으로만 다뤄졌다. [실제 Planner 의미 구조가 이전과 동일하여 Planner 판정 유지; 답변 커버리지는 재심사]"
+    },
+    {
+      "gold_id": "SC-021-I02",
+      "planner_detected": false,
+      "planner_quote": "",
+      "answer_detected": true,
+      "answer_quote": "**3개월은 새 갱신기간 시작일이 아니라 임대인이 해지 통지를 받은 날부터** 계산하는 것이 맞습니다.",
+      "reason": "답변은 핵심 쟁점을 직접 다뤘으나 Planner는 갱신기간 개시 전 해지통지에도 도달 후 3개월 기준이 적용된다는 세부 쟁점을 명시하지 않았다. [실제 Planner 의미 구조가 이전과 동일하여 Planner 판정 유지; 답변 커버리지는 재심사]"
+    },
+    {
+      "gold_id": "SC-021-I03",
+      "planner_detected": false,
+      "planner_quote": "임대차계약 종료 시점 및 보증금 반환의무 발생",
+      "answer_detected": false,
+      "answer_quote": "",
+      "reason": "Planner는 보증금 반환의무 발생과 미반환액은 다루지만 동시이행 관계를 명시하지 않았다. 답변도 미반환액은 제시했으나 인도와 반환의 동시이행 관계를 설명하지 않았다. [실제 Planner 의미 구조가 이전과 동일하여 Planner 판정 유지; 답변 커버리지는 재심사]"
+    },
+    {
+      "gold_id": "SC-021-I04",
+      "planner_detected": true,
+      "planner_quote": "이사 전 대항력 유지 및 임차권등기명령 등 권리보전 조치",
+      "answer_detected": true,
+      "answer_quote": "그래서 **임차권등기가 완료되기 전까지는 점유·전입을 유지**하는 것이 안전합니다",
+      "reason": "Planner와 답변 모두 등기 전 점유·전입 유지 및 임차권등기명령에 의한 권리보전을 실질적으로 다뤘다. [실제 Planner 의미 구조가 이전과 동일하여 Planner 판정 유지; 답변 커버리지는 재심사]"
+    },
+    {
+      "gold_id": "SC-021-I05",
+      "planner_detected": false,
+      "planner_quote": "",
+      "answer_detected": true,
+      "answer_quote": "**가장 직접적으로 유사한 대법원 판례**는 **대법원 2023다258672 (2024. 1. 11.)**입니다.",
+      "reason": "답변은 2023다258672의 법리와 본건 대응관계를 상세히 설명했으나 Planner에는 해당 판례나 유사 판례 탐색 쟁점이 명시되지 않았다. [실제 Planner 의미 구조가 이전과 동일하여 Planner 판정 유지; 답변 커버리지는 재심사]"
+    }
+  ],
+  "citation_reviews": [
+    {
+      "reference": "주택임대차보호법 제6조의3 제4항",
+      "kind": "statute",
+      "quote": "주택임대차보호법 **제6조의3 제4항**은 갱신요구로 갱신되는 임대차의 해지에 관하여 **제6조의2를 준용**한다고 정합니다.",
+      "exists": true,
+      "content_correct": true,
+      "relevant": true,
+      "temporal_valid": true,
+      "application_valid": true,
+      "source_key": "RENEW",
+      "source_quote": "④ 제1항에 따라 갱신되는 임대차의 해지에 관하여는 제6조의2를 준용한다.",
+      "reason": "공식 조문과 일치하고 본 사안의 갱신 후 해지 문제에 직접 관련된다."
+    },
+    {
+      "reference": "주택임대차보호법 제6조의2 제2항",
+      "kind": "statute",
+      "quote": "그리고 **제6조의2 제2항**은 임차인의 해지가 **임대인이 통지를 받은 날부터 3개월이 지나면 효력 발생**한다고 규정합니다.",
+      "exists": true,
+      "content_correct": true,
+      "relevant": true,
+      "temporal_valid": true,
+      "application_valid": true,
+      "source_key": "LEASE_BODY",
+      "source_quote": "② 제1항에 따른 해지는 임대인이 그 통지를 받은 날부터 3개월이 지나면 그 효력이 발생한다.",
+      "reason": "조문 내용과 정확히 부합하며 본건 기산점 판단에 직접 적용되었다."
+    },
+    {
+      "reference": "주택임대차보호법 제6조의3",
+      "kind": "statute",
+      "quote": "갱신요구가 적법하게 도달함 → **충족** [E02_synthetic_record.txt], 주택임대차보호법 제6조의3",
+      "exists": true,
+      "content_correct": true,
+      "relevant": true,
+      "temporal_valid": true,
+      "application_valid": true,
+      "source_key": "RENEW",
+      "source_quote": "임대인은 임차인이 제6조 제1항 전단의 기간 이내에 계약갱신을 요구할 경우 정당한 사유 없이 거절하지 못한다.",
+      "reason": "조문 자체는 존재하고 관련성도 있으나 답변은 항 번호 없이 일반 인용하였다. 적법 도달과 갱신요구권의 법적 근거로는 적절하다."
+    },
+    {
+      "reference": "주택임대차보호법 제6조의2 제2항",
+      "kind": "statute",
+      "quote": "법문상 기산점이 '갱신기간 시작일'인지 여부 → **아님**. 조문은 명확히 '**통지를 받은 날부터 3개월**'이라고 정합니다 (주택임대차보호법 제6조의2 제2항).",
+      "exists": true,
+      "content_correct": true,
+      "relevant": true,
+      "temporal_valid": true,
+      "application_valid": true,
+      "source_key": "LEASE_BODY",
+      "source_quote": "임대인이 그 통지를 받은 날부터 3개월이 지나면 그 효력이 발생한다.",
+      "reason": "조문 문언을 정확히 반영한 적용이다."
+    },
+    {
+      "reference": "주택임대차보호법 제3조",
+      "kind": "statute",
+      "quote": "임차인은 이미 **인도와 주민등록**을 마쳐 대항력을 취득했고, **2026-11-10 현재도 점유와 주민등록을 유지**하고 있습니다 [E02_synthetic_record.txt], [E03_synthetic_record.txt], 주택임대차보호법 제3조.",
+      "exists": true,
+      "content_correct": true,
+      "relevant": true,
+      "temporal_valid": true,
+      "application_valid": true,
+      "source_key": "LEASE_BODY",
+      "source_quote": "임차인(賃借人)이 주택의 인도(引渡)와 주민등록을 마친 때에는 그 다음 날부터 제삼자에 대하여 효력이 생긴다.",
+      "reason": "제3조의 대항력 요건 설명으로 적절하다."
+    },
+    {
+      "reference": "주택임대차보호법 제3조, 제3조의3 제5항",
+      "kind": "statute",
+      "quote": "그래서 **임차권등기가 완료되기 전까지는 점유·전입을 유지**하는 것이 안전합니다 (주택임대차보호법 제3조, 제3조의3 제5항).",
+      "exists": true,
+      "content_correct": true,
+      "relevant": true,
+      "temporal_valid": true,
+      "application_valid": true,
+      "source_key": "LEASE_BODY",
+      "source_quote": "임차권등기 이후에는 제3조 제1항ㆍ제2항 또는 제3항의 대항요건을 상실하더라도 이미 취득한 대항력이나 우선변제권을 상실하지 아니한다.",
+      "reason": "등기 전에는 대항요건 상실 위험이 있고 등기 후 유지된다는 취지를 설명하는 적용으로 타당하다."
+    },
+    {
+      "reference": "주택임대차보호법 제3조의3 제1항",
+      "kind": "statute",
+      "quote": "**결론**: 현재 자료만으로도 **임차권등기명령 신청 요건은 충족**된다고 볼 수 있습니다 (주택임대차보호법 제3조의3 제1항).",
+      "exists": null,
+      "content_correct": true,
+      "relevant": true,
+      "temporal_valid": true,
+      "application_valid": true,
+      "source_key": "REGISTER",
+      "source_quote": "임대차가 끝난 후 보증금이 반환되지 아니한 경우 임차인은 ... 임차권등기명령을 신청할 수 있다.",
+      "reason": "계약 종료와 미반환 사실을 전제로 한 적용으로 적절하다. [공식 원문 발췌 확인 불가]"
+    },
+    {
+      "reference": "대법원 2023다258672",
+      "kind": "precedent",
+      "quote": "**가장 직접적으로 유사한 대법원 판례**는 **대법원 2023다258672 (2024. 1. 11.)**입니다.",
+      "exists": true,
+      "content_correct": true,
+      "relevant": true,
+      "temporal_valid": true,
+      "application_valid": true,
+      "source_key": "P2023",
+      "source_quote": "[대법원 2024. 1. 11. 선고 2023다258672 판결]",
+      "reason": "사건번호와 선고일이 공식 원문과 일치한다."
+    },
+    {
+      "reference": "대법원 2023다258672",
+      "kind": "precedent",
+      "quote": "이 판례의 핵심은, **임차인이 주택임대차보호법 제6조의3 제1항에 따라 갱신요구를 하면 갱신의 효력은 임대인에게 갱신요구가 도달한 때 발생**하고, 그 뒤 **갱신된 임대차기간이 시작되기 전에 해지 통지가 도달했더라도 해지 효력은 통지 도달 후 3개월이 지나면 발생한다**는 점입니다 [대법원 2023다258672].",
+      "exists": null,
+      "content_correct": true,
+      "relevant": true,
+      "temporal_valid": true,
+      "application_valid": true,
+      "source_key": "P2023",
+      "source_quote": "갱신의 효력이 발생하는 시점(=임대인에게 갱신요구가 도달한 때) / ... 해지통지 후 3개월이 지난 때",
+      "reason": "판시사항과 판결요지를 정확히 요약하였다. [공식 원문 발췌 확인 불가]"
+    },
+    {
+      "reference": "대법원 2023다258672",
+      "kind": "precedent",
+      "quote": "대법원은 원심이 '**갱신기간 시작일부터 3개월**'이라고 본 것을 잘못이라고 판단했습니다. 즉, **갱신된 기간의 개시를 기다릴 필요가 없고**, **해지통지를 받은 날부터 3개월**을 계산해야 한다고 명확히 판시했습니다 [대법원 2023다258672].",
+      "exists": null,
+      "content_correct": true,
+      "relevant": true,
+      "temporal_valid": true,
+      "application_valid": true,
+      "source_key": "P2023",
+      "source_quote": "갱신된 임대차계약 기간이 개시되기를 기다려 그때부터 3개월이 지나야 ... 아니다.",
+      "reason": "공식 판결 이유와 부합한다. [공식 원문 발췌 확인 불가]"
+    },
+    {
+      "reference": "주택임대차보호법 제6조의3, 주택임대차보호법 제6조의2",
+      "kind": "statute",
+      "quote": "따라서 이 사건에도 같은 법리가 그대로 적용될 가능성이 높습니다. 즉, **2026-06-15 도달한 해지 통지의 효력은 3개월 후인 2026-09-15 발생**하고, **2026-10-01부터 다시 3개월을 계산해야 한다는 임대인 주장은 받아들여지기 어렵습니다** [E02_synthetic_record.txt], 주택임대차보호법 제6조의3, 주택임대차보호법 제6조의2, [대법원 2023다258672].",
+      "exists": null,
+      "content_correct": true,
+      "relevant": true,
+      "temporal_valid": true,
+      "application_valid": true,
+      "source_key": "LEASE_BODY",
+      "source_quote": "제6조의3 ... ④ 제1항에 따라 갱신되는 임대차의 해지에 관하여는 제6조의2를 준용한다. / 제6조의2 ... 임대인이 그 통지를 받은 날부터 3개월",
+      "reason": "법령과 판례를 결합한 본건 포섭으로 타당하다. [공식 원문 발췌 확인 불가]"
+    },
+    {
+      "reference": "대법원 2023다307024",
+      "kind": "precedent",
+      "quote": "- **보충적으로 참고할 판례**는 **대법원 2023다307024 (2024. 6. 27.)**입니다.",
+      "exists": true,
+      "content_correct": true,
+      "relevant": false,
+      "temporal_valid": true,
+      "application_valid": true,
+      "source_key": "P307024",
+      "source_quote": "[대법원 2024. 6. 27. 선고 2023다307024 판결]",
+      "reason": "사건번호와 선고일은 정확하나 상가임대차 사안으로 본건 직접 관련성은 낮다."
+    },
+    {
+      "reference": "대법원 2023다307024",
+      "kind": "precedent",
+      "quote": "이 판례는 주택이 아니라 **상가임대차** 사안이어서 직접 동일 사안은 아니지만, **임차인이 기간만료 전에 명확한 반대 의사를 표시했는데도 그 의사에 반하여 갱신을 강제해서는 안 된다**는 점을 문언과 제도 취지에 따라 해석했습니다 [대법원 2023다307024].",
+      "exists": null,
+      "content_correct": true,
+      "relevant": false,
+      "temporal_valid": true,
+      "application_valid": true,
+      "source_key": "P307024",
+      "source_quote": "임차인의 의사에 반하여 ... 묵시적 갱신을 강제하는 결과가 되고",
+      "reason": "판결 취지 요약은 대체로 정확하나 상가임대차법 해석 사건이라 본건 직접 적용성은 제한적이다. [공식 원문 발췌 확인 불가]"
+    }
+  ],
+  "missing_required_precedent": false,
+  "limitations": [
+    "Gold answer에는 '민법 제536조'와 '인도와 반환의 동시이행'이 포함되나 실제 최종 답변은 동시이행 관계를 설명하지 않았고 민법 제536조를 인용하지 않았다.",
+    "Gold answer의 '일 단위 종료 시각은 기간계산을 별도 확인하되 2027년까지 기다려야 한다고 단정하면 안 된다' 부분은 실제 최종 답변에 재현되지 않았다.",
+    "Gold laws에는 주택임대차보호법 제3조의3, 민법 제536조가 포함되지만 실제 답변 인용은 제3조의3 제1항·제5항 취지와 제3조 중심이며 민법 제536조는 누락되었다.",
+    "공식 원문 제공 범위에서 주택임대차보호법 제6조의3 제1항의 '기간 내' 요건 문언은 확인 가능하나 Planner는 이를 별도 쟁점으로 명시하지 않았다.",
+    "사실 추출은 재실행하지 않았다. 사실 ID·내용·순서가 동일함을 검증하여 최초 사실 판정을 유지했다."
+  ],
+  "critical_findings": [
+    "필수 쟁점인 '보증금 반환과 주택 인도의 동시이행 관계'가 최종 답변에서 누락되었다.",
+    "필수 쟁점인 required_precedent 2023다258672는 최종 답변에서 정확히 인용·적용되었다.",
+    "추가 판례 2023다307024는 존재는 확인되나 상가임대차 사안으로 본건 직접 관련성은 낮다.",
+    "메타데이터 사실(index 18)은 excluded 처리하였다."
+  ],
+  "judge_trace_id": "57073c5c-c57f-4c21-8dbe-7bc801b207a0",
+  "judge_model": "gpt-5.4-2026-03-05",
+  "judge_usage": {
+    "input_tokens": 78472,
+    "output_tokens": 5201,
+    "total_tokens": 83673,
+    "input_token_details": {
+      "audio": 0,
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "audio": 0,
+      "reasoning": 0
+    }
+  },
+  "method": "LLM semantic adjudication + deterministic coverage checks; provisional, expert review pending",
+  "same_planner_signature": true
+}

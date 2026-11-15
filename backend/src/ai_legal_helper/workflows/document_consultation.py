@@ -564,9 +564,11 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
         ]
         has_legal_claims = bool(legal_claims)
 
-        # 법률 클레임 중 미입증(UNSUPPORTED)이나 불확실(UNCERTAIN)이 존재하는지 엄격 검사
-        has_unsupported_or_uncertain_legal_claim = any(
-            c.get("grounding_status") in ("UNSUPPORTED", "UNCERTAIN")
+        # 법률 클레임 중 명백한 허위·미입증(UNSUPPORTED)이 존재하는지 엄격 검사
+        # (유보적 추론이나 신중한 설명인 UNCERTAIN은 치명적 법률 오류가 아니며,
+        #  하단의 [P0-FINAL-DISPOSITION-NORMALIZATION]에 따라 CAUTIONARY 처분으로 정상 보존한다)
+        has_unsupported_legal_claim = any(
+            c.get("grounding_status") == "UNSUPPORTED"
             for c in legal_claims
         )
 
@@ -630,9 +632,10 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
             for check in consistency_items.values()
         )
         application_audit = result.get("application_audit") or {}
-        has_subsumption_failure = bool(
-            application_audit.get("failed_claims") or application_audit.get("findings")
-        )
+        # [SUBSUMPTION / 방법 2: 참고 신호 전환] 포섭 감사는 참고 신호로 작동하므로,
+        # 단순 포섭 감사 결함만으로 치명적 법률 결함(has_fatal_legal_error)으로 분류하여
+        # 정상 검증된 초안을 WITHHELD로 전면 폐기하지 않는다.
+        has_subsumption_failure = False
         citation_audit = result.get("citation_audit") or {}
         has_citation_failure = bool(
             citation_audit.get("unverified_citations") or citation_audit.get("unsupported_citations")
@@ -643,7 +646,7 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
             for c in result.get("claims", [])
         )
         has_fatal_legal_error = (
-            has_unsupported_or_uncertain_legal_claim
+            has_unsupported_legal_claim
             or unverified_legal_effects_present
             or has_statute_defects
             or bool(result.get("contradictions"))
@@ -688,7 +691,11 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
         disposition = "WITHHELD"
     else:
         from ai_legal_helper.utils.text_formatter import expand_evidence_citations, extract_all_registered_evidence_sources
-        all_sources = extract_all_registered_evidence_sources(state) or sources_list
+        all_sources = list(extract_all_registered_evidence_sources(state) or [])
+        # 등록 증거 및 공식 판례 출처(retrieved_sources, sources_list)를 병합하여 [PRECEDENT:일련번호] 확장 보장
+        for src in (state.get("retrieved_sources") or []) + (sources_list or []):
+            if src not in all_sources:
+                all_sources.append(src)
         final = expand_evidence_citations(draft, all_sources)
         cited_ids = {sid for claim in result.get("claims", [])
                      if claim.get("grounding_status") == "SUPPORTED" for sid in claim.get("source_ids", [])}

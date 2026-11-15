@@ -191,11 +191,32 @@ def build_source_from_chroma_doc(
     chapter = str(meta.get("chapter") or "").strip() or None
     section = str(meta.get("section") or "").strip() or None
     promulgation_number = str(meta.get("promulgation_number") or "").strip() or None
-    effective_date = _format_yyyymmdd(meta.get("effective_date"))
-    # 최신 공식 메타데이터는 별도 필드에 기록하고, 기존 effective_date는 호환을 위해 유지한다.
+    # [시행일 단일화 및 계층적 매핑]
+    # 조문별 시행일(article_effective_date) > 법령 기본시행일(law_effective_date) > 파일명 힌트 순으로 effective_date를 결정론적 통합한다.
+    # 부칙 자체는 시행일/적용례 규정들의 원문이므로 단일 시행일을 부여하지 않는다.
     law_effective_date = _format_yyyymmdd(meta.get("law_effective_date"))
     article_effective_date = _format_yyyymmdd(meta.get("article_effective_date"))
     filename_date_hint = _format_yyyymmdd(meta.get("filename_date_hint"))
+    if article == "부칙":
+        effective_date = None
+        effective_date_basis = None
+    else:
+        effective_date = (
+            _format_yyyymmdd(meta.get("effective_date"))
+            or article_effective_date
+            or law_effective_date
+            or filename_date_hint
+        )
+        effective_date_basis = meta.get("effective_date_basis")
+        if not effective_date_basis and explicit_type in ("STATUTE", ""):
+            if article_effective_date:
+                effective_date_basis = "ARTICLE_EFFECTIVE_DATE"
+            elif law_effective_date:
+                effective_date_basis = "LAW_EFFECTIVE_DATE"
+            elif filename_date_hint:
+                effective_date_basis = "FILENAME_INFERRED"
+            elif effective_date:
+                effective_date_basis = "LEGACY_UNVERIFIED"
 
     court = meta.get("court")
     case_number = meta.get("case_number")
@@ -549,19 +570,9 @@ def normalize_source_dict(raw: Any) -> Dict[str, Any]:
     statute_name = raw.get("statute_name") or raw.get("law_name")
     promulgation_number = str(raw.get("promulgation_number") or "").strip() or None
     version_date = _format_yyyymmdd(raw.get("version_date"))
-    effective_date = _format_yyyymmdd(raw.get("effective_date"))
+    article_effective_date_raw = _format_yyyymmdd(raw.get("article_effective_date"))
+    law_effective_date_raw = _format_yyyymmdd(raw.get("law_effective_date"))
     filename_date_hint = _format_yyyymmdd(raw.get("filename_date_hint"))
-    if filename and source_type == "STATUTE":
-        m_stat = _STATUTE_FILENAME_RE.match(filename)
-        if m_stat:
-            statute_name = statute_name or m_stat.group(1).strip()
-            if m_stat.group(3) and not promulgation_number:
-                promulgation_number = m_stat.group(3).strip()
-            if m_stat.group(4):
-                parsed_dt = _format_yyyymmdd(m_stat.group(4))
-                version_date = version_date or parsed_dt
-                # 날짜가 파일명에서만 유추되면 시행일로 채우지 않고 힌트로만 보관한다.
-                filename_date_hint = filename_date_hint or parsed_dt
 
     content = raw.get("content")
     article = raw.get("article")
@@ -573,6 +584,28 @@ def normalize_source_dict(raw: Any) -> Dict[str, Any]:
                 if m_art:
                     article = re.sub(r"\s+", "", m_art.group(1))
                     break
+
+    if article == "부칙":
+        effective_date = None
+    else:
+        effective_date = (
+            _format_yyyymmdd(raw.get("effective_date"))
+            or article_effective_date_raw
+            or law_effective_date_raw
+            or filename_date_hint
+        )
+
+    if filename and source_type == "STATUTE":
+        m_stat = _STATUTE_FILENAME_RE.match(filename)
+        if m_stat:
+            statute_name = statute_name or m_stat.group(1).strip()
+            if m_stat.group(3) and not promulgation_number:
+                promulgation_number = m_stat.group(3).strip()
+            if m_stat.group(4):
+                parsed_dt = _format_yyyymmdd(m_stat.group(4))
+                version_date = version_date or parsed_dt
+                # 날짜가 파일명에서만 유추되면 시행일로 채우지 않고 힌트로만 보관한다.
+                filename_date_hint = filename_date_hint or parsed_dt
 
     article_title = str(raw.get("article_title") or "").strip() or None
     if not article_title and source_type == "STATUTE":
@@ -638,9 +671,15 @@ def normalize_source_dict(raw: Any) -> Dict[str, Any]:
         effective_date=effective_date if source_type == "STATUTE" else None,
         version_id=str(raw.get("version_id")).strip() if raw.get("version_id") else None,
         law_type=raw.get("law_type") if source_type == "STATUTE" else None,
-        law_effective_date=_format_yyyymmdd(raw.get("law_effective_date")) if source_type == "STATUTE" else None,
-        article_effective_date=_format_yyyymmdd(raw.get("article_effective_date")) if source_type == "STATUTE" else None,
-        effective_date_basis=(raw.get("effective_date_basis") or ("LEGACY_UNVERIFIED" if effective_date else None)) if source_type == "STATUTE" else None,
+        law_effective_date=law_effective_date_raw if source_type == "STATUTE" else None,
+        article_effective_date=article_effective_date_raw if source_type == "STATUTE" else None,
+        effective_date_basis=(
+            raw.get("effective_date_basis")
+            or ("ARTICLE_EFFECTIVE_DATE" if article_effective_date_raw
+                else "LAW_EFFECTIVE_DATE" if law_effective_date_raw
+                else "FILENAME_INFERRED" if filename_date_hint
+                else ("LEGACY_UNVERIFIED" if effective_date else None))
+        ) if source_type == "STATUTE" else None,
         effective_to=_format_yyyymmdd(raw.get("effective_to")) if source_type == "STATUTE" else None,
         filename_date_hint=filename_date_hint if source_type == "STATUTE" else None,
         addendum_id=raw.get("addendum_id") if source_type == "STATUTE" else None,

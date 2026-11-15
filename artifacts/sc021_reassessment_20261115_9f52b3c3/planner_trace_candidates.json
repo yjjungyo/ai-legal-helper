@@ -1,0 +1,319 @@
+[
+  {
+    "observation_id": "15bcff0a-4a08-4811-8868-b95095b42c5f",
+    "output": {
+      "intent": "NEW_LEGAL_ANALYSIS",
+      "question": "갱신을 요구한 뒤 새 계약기간이 시작되기 전에 해지했는데 집주인은 갱신기간이 시작돼야 3개월을 센다고 합니다. 제출 증거로 해지 효력, 미반환액, 이사 전 조치를 판단하고 유사한 대법원 판례를 찾아 사건번호와 적용 이유를 설명해주세요.",
+      "trace_id": "8db718a6-0dec-4d38-b9e8-3ebffa09d8c8",
+      "warnings": [],
+      "categories": [],
+      "event_date": null,
+      "event_type": null,
+      "request_id": "9f52b3c3-8913-4e0d-b830-c3f28db5d5c8",
+      "turn_index": 1,
+      "answer_mode": "DOCUMENT_GROUNDED",
+      "issue_tasks": [
+        {
+          "issue_id": "ISSUE_FAKE_CITATION",
+          "priority": "HIGH",
+          "issue_title": "가공의 증거 라벨 식별 및 존재 부인",
+          "cited_statutes": [],
+          "legal_questions": [
+            "의뢰인이 언급한 증거('증거로')가 현재 사건에 공적으로 등록되어 있는지 여부",
+            "존재하지 않는 가공 증거에 기재됐다고 주장된 사실의 효력 배제 및 등록 증거 대조"
+          ],
+          "missing_evidence": [
+            "현재 사건에 공식 등록된 정식 증거 목록 확인 (증거로 부존재)"
+          ],
+          "relevant_fact_ids": [],
+          "required_statutes": [],
+          "verified_statutes": [],
+          "candidate_statutes": [],
+          "required_fact_keys": [
+            "등록증거목록",
+            "가공증거부인"
+          ],
+          "retrieved_statutes": [],
+          "applicable_statutes": [],
+          "relevant_evidence_ids": [],
+          "relevant_evidence_labels": [
+            "E01",
+            "E02",
+            "E03"
+          ]
+        },
+        {
+          "issue_id": "ISSUE_LEASE_TERMINATION",
+          "priority": "HIGH",
+          "issue_title": "임대차계약 종료 시점 및 보증금 반환의무 발생",
+          "cited_statutes": [],
+          "legal_questions": [
+            "임대차계약의 당초 만료일은 언제인가?",
+            "임차인의 해지 및 반환 통고가 임대인에게 적법하게 도달하여 계약이 종료되었는가?",
+            "계약 종료에 따른 임대인의 보증금 반환 채무가 이행기에 도달하였는가?"
+          ],
+          "missing_evidence": [],
+          "relevant_fact_ids": [
+            "da966d41-bd90-4cea-a34b-a79c5b161e7e",
+            "0db37152-0a3c-48e2-96c9-abab5f784af1",
+            "9d92edae-0866-4221-b4ec-5e01e37edc02",
+            "ba6d6c40-5a50-40f8-bd1c-2bcd1dffafc7",
+            "f881a425-92d8-49e2-8316-060a0bc4d40d",
+            "58955123-87a2-4a61-9214-b9a579d5045e",
+            "db631474-653e-46f6-ba54-32d5e9f615ef",
+            "c5724af6-41ed-4c65-89bb-0d3937f24bff"
+          ],
+          "required_statutes": [
+            "주택임대차보호법 제6조",
+            "주택임대차보호법 제6조의2",
+            "민법 제544조",
+            "민법 제623조"
+          ],
+          "verified_statutes": [],
+          "candidate_statutes": [
+            "주택임대차보호법 제6조",
+            "주택임대차보호법 제6조의2",
+            "민법 제544조",
+            "민법 제623조"
+          ],
+          "required_fact_keys": [
+            "임대차기간",
+            "만료일",
+            "퇴거요청일",
+            "통지도달",
+            "보증금액"
+          ],
+          "retrieved_statutes": [],
+          "applicable_statutes": [],
+          "relevant_evidence_ids": [],
+          "relevant_evidence_labels": [
+            "E01",
+            "E02",
+            "E03"
+          ]
+        },
+        {
+          "issue_id": "ISSUE_RIGHT_PRESERVATION",
+          "priority": "HIGH",
+          "issue_title": "이사 전 대항력 유지 및 임차권등기명령 등 권리보전 조치",
+          "cited_statutes": [],
+          "legal_questions": [
+            "보증금을 반환받지 못한 상태에서 다른 곳으로 이사하거나 주민등록을 이전할 때 발생하는 위험은 무엇인가?",
+            "주택임대차보호법상 임차권등기명령 신청 요건(계약종료+미반환)이 충족되었는가?",
+            "임차권등기가 등기부에 기재되기 전까지 점유와 전입을 유지해야 하는 법적 이유는 무엇인가?"
+          ],
+          "missing_evidence": [],
+          "relevant_fact_ids": [
+            "5ac14526-0293-49f2-8f02-c06c1d85d082",
+            "ff5b8692-b4de-47eb-b997-8571522e85c8",
+            "31783d50-d2c5-4c1f-b087-12d65acd3aca"
+          ],
+          "required_statutes": [
+            "주택임대차보호법 제3조의3",
+            "주택임대차보호법 제3조 제1항"
+          ],
+          "verified_statutes": [],
+          "candidate_statutes": [
+            "주택임대차보호법 제3조의3",
+            "주택임대차보호법 제3조 제1항"
+          ],
+          "required_fact_keys": [
+            "계약종료사실",
+            "미반환사실",
+            "전입유지상태",
+            "점유상태"
+          ],
+          "retrieved_statutes": [],
+          "applicable_statutes": [],
+          "relevant_evidence_ids": [],
+          "relevant_evidence_labels": [
+            "E02",
+            "E03"
+          ]
+        },
+        {
+          "issue_id": "ISSUE_NEXT_ACTIONS",
+          "priority": "HIGH",
+          "issue_title": "입증 보완이 필요한 증거 목록 및 안전한 실무적 다음 행동",
+          "cited_statutes": [],
+          "legal_questions": [
+            "향후 지급명령, 임차권등기명령, 반환소송을 진행하기 위해 보완해야 할 필수 증빙은 무엇인가?",
+            "권리 상실을 방지하기 위해 임차인이 취해야 할 단계별 실무 조치는 무엇인가?"
+          ],
+          "missing_evidence": [],
+          "relevant_fact_ids": [],
+          "required_statutes": [
+            "주택임대차보호법 제3조",
+            "주택임대차보호법 제3조의3"
+          ],
+          "verified_statutes": [],
+          "candidate_statutes": [
+            "주택임대차보호법 제3조",
+            "주택임대차보호법 제3조의3"
+          ],
+          "required_fact_keys": [
+            "증거공백목록",
+            "등기부열람",
+            "내용증명도달",
+            "보증보험가입증명"
+          ],
+          "retrieved_statutes": [],
+          "applicable_statutes": [],
+          "relevant_evidence_ids": [],
+          "relevant_evidence_labels": [
+            "E01",
+            "E02",
+            "E03"
+          ]
+        }
+      ],
+      "case_context": "### [사건 기본 브리핑: 갱신요구 후 새 기간 개시 전 해지통지 20261115_E2E_V6_KPI5 (ID: kpi5_sc-)]\n- 사건 유형: HOUSING_LEASE (상태: ACTIVE)\n\n#### 1. 등록된 사건 증거 목록 (Source Registry)\n- [E01_synthetic_record.txt] (GENERAL, 사실검토: 전체 사실 승인, 총 10건 [승인 10/반려 0/대기 0])\n- [E02_synthetic_record.txt] (GENERAL, 사실검토: 전체 사실 승인, 총 10건 [승인 10/반... [총 3188자 원문 축약]",
+      "hitl_executed": false,
+      "issue_results": [],
+      "graph_evidence": {
+        "available": false,
+        "search_mode": "DISABLED_FOR_CONSULTATION",
+        "valid_paths_count": 0,
+        "evidence_gaps_count": 0,
+        "contradictions_count": 0
+      },
+      "resolved_query": "갱신을 요구한 뒤 새 계약기간이 시작되기 전에 해지했는데 집주인은 갱신기간이 시작돼야 3개월을 센다고 합니다. 제출 증거로 해지 효력, 미반환액, 이사 전 조치를 판단하고 유사한 대법원 판례를 찾아 사건번호와 적용 이유를 설명해주세요.",
+      "revision_count": 0,
+      "approval_status": "NONE",
+      "conversation_id": "conv_kpi5_sc-021_13e152bbbc",
+      "intent_decision": {
+        "intent": "NEW_LEGAL_ANALYSIS",
+        "reason": "첫 턴 기본 경로",
+        "categories": [],
+        "event_date": null,
+        "event_type": null,
+        "resolved_query": "갱신을 요구한 뒤 새 계약기간이 시작되기 전에 해지했는데 집주인은 갱신기간이 시작돼야 3개월을 센다고 합니다. 제출 증거로 해지 효력, 미반환액, 이사 전 조치를 판단하고 유사한 대법원 판례를 찾아 사건번호와 적용 이유를 설명해주세요.",
+        "consultation_mode": "CASE_EVIDENCE",
+        "requires_retrieval": true,
+        "requires_specialist": true,
+        "legal_issue_outlines": [],
+        "statute_mention_date": null,
+        "requires_verification": true,
+        "requires_full_analysis": true,
+        "referenced_previous_turn_ids": []
+      },
+      "approval_request": null,
+      "preserved_points": [],
+      "consultation_mode": "CASE_EVIDENCE",
+      "retrieved_sources": {
+        "items": [],
+        "total_count": 0
+      },
+      "search_delta_count": null,
+      "synthesis_law_gate": null,
+      "verification_reused": false,
+      "conversation_context": {
+        "case_id": "kpi5_sc-021_13e152bbbc",
+        "user_id": "f83a07d3-7c9b-45fe-bf30-57efc0e9299d",
+        "turn_index": 1,
+        "case_memory": {
+          "title": "갱신요구 후 새 기간 개시 전 해지통지 20261115_E2E_V6_KPI5",
+          "status": "ACTIVE",
+          "case_type": "HOUSING_LEASE",
+          "evidences_count": 3,
+          "confirmed_facts_count": 26
+        },
+        "last_answer": null,
+        "previous_turns": [],
+        "conversation_id": "conv_kpi5_sc-021_13e152bbbc",
+        "current_question": "갱신을 요구한 뒤 새 계약기간이 시작되기 전에 해지했는데 집주인은 갱신기간이 시작돼야 3개월을 센다고 합니다. 제출 증거로 해지 효력, 미반환액, 이사 전 조치를 판단하고 유사한 대법원 판례를 찾아 사건번호와 적용 이유를 설명해주세요.",
+        "total_turns_count": 0,
+        "last_answer_status": null,
+        "conversation_summary": "",
+        "previously_cited_sources": []
+      },
+      "evidence_unavailable": false,
+      "revision_no_progress": false,
+      "statute_mention_date": null,
+      "statute_search_count": 0,
+      "approved_statute_laws": [],
+      "case_evidence_sources": {
+        "items": [
+          {
+            "label": "E01",
+            "source_type": "CASE_EVIDENCE",
+            "document_name": "E01_synthetic_record.txt",
+            "review_status": "APPROVED"
+          },
+          {
+            "label": "E01",
+            "source_type": "CASE_EVIDENCE",
+            "document_name": "E01_synthetic_record.txt",
+            "review_status": "APPROVED"
+          },
+          {
+            "label": "E01",
+            "source_type": "CASE_EVIDENCE",
+            "document_name": "E01_synthetic_record.txt",
+            "review_status": "APPROVED"
+          },
+          {
+            "label": "E02",
+            "source_type": "CASE_EVIDENCE",
+            "document_name": "E02_synthetic_record.txt",
+            "review_status": "APPROVED"
+          },
+          {
+            "label": "E02",
+            "source_type": "CASE_EVIDENCE",
+            "document_name": "E02_synthetic_record.txt",
+            "review_status": "APPROVED"
+          },
+          {
+            "label": "E02",
+            "source_type": "CASE_EVIDENCE",
+            "document_name": "E02_synthetic_record.txt",
+            "review_status": "APPROVED"
+          },
+          {
+            "label": "E03",
+            "source_type": "CASE_EVIDENCE",
+            "document_name": "E03_synthetic_record.txt",
+            "review_status": "APPROVED"
+          },
+          {
+            "label": "E03",
+            "source_type": "CASE_EVIDENCE",
+            "document_name": "E03_synthetic_record.txt",
+            "review_status": "APPROVED"
+          },
+          {
+            "label": "E03",
+            "source_type": "CASE_EVIDENCE",
+            "document_name": "E03_synthetic_record.txt",
+            "review_status": "APPROVED"
+          }
+        ],
+        "total_count": 9
+      },
+      "statute_search_status": null,
+      "answer_source_manifest": null,
+      "case_evidence_briefing": {
+        "title": "갱신요구 후 새 기간 개시 전 해지통지 20261115_E2E_V6_KPI5",
+        "case_id": "kpi5_sc-021_13e152bbbc",
+        "case_type": "HOUSING_LEASE",
+        "facts_count": 26,
+        "timeline_count": 17,
+        "documents_count": 3,
+        "summary_preview": "### [사건 기본 브리핑: 갱신요구 후 새 기간 개시 전 해지통지 20261115_E2E_V6_KPI5 (ID: kpi5_sc-)]\n- 사건 유형: HOUSING_LEASE (상태: ACTIVE)\n\n#### 1. 등록된 사건 증거 목록 (Source Registry)\n- [E01_synthetic_record.txt] (GENERAL, 사실검토: 전체 사실 승인, 총 10건 [승인 10/반려 0/대기 0])\n- [E02_synthetic_re...",
+        "source_registry_count": 9
+      },
+      "statute_search_history": [],
+      "statute_search_results": [],
+      "answer_generation_error": null,
+      "precedent_search_status": null,
+      "search_added_source_ids": [],
+      "precedent_search_history": [],
+      "precedent_search_results": [],
+      "verification_no_progress": false,
+      "approved_precedent_search": false,
+      "approved_precedent_queries": [],
+      "verification_progress_history": []
+    }
+  }
+]

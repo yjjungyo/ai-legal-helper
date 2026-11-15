@@ -1,0 +1,23 @@
+{
+  "id": "SC-022",
+  "case_id": "kpi5_sc-022_98dbaba642",
+  "title": "비연속 2기 차임 연체와 사후 완납의 갱신요구 20261115_E2E_V6_KPI5",
+  "ingestion_trace_id": "7a5f3fe7-3bc3-4973-b50c-636b4d365468",
+  "ingestion": [
+    {
+      "evidence_id": "2d47fe03-d92d-48e6-ae82-9b943dbef55d",
+      "filename": "E01_synthetic_record.txt",
+      "claims": 8
+    },
+    {
+      "evidence_id": "9cbdc353-619b-47e5-83db-e043d62ee7cd",
+      "filename": "E02_synthetic_record.txt",
+      "claims": 12
+    },
+    {
+      "evidence_id": "424c0ebe-7c4c-4db6-b22d-3e9909024b47",
+      "filename": "E03_synthetic_record.txt",
+      "claims": 11
+    }
+  ]
+}

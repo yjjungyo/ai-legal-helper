@@ -196,3 +196,57 @@ def test_extract_all_registered_evidence_sources_from_state():
     assert "04_최초보증금_임차인송금내역.txt" in names
     assert "05_1차반환_이체확인내용_20260920.txt" in names
     assert "06_은행거래내역_반환2건_20261010.txt" in names
+
+
+def test_expand_precedent_citation_from_precseq_and_case_number():
+    """판례 ID([PRECEDENT:241383])가 공식 판례 명칭([대법원 2023다318857])으로 확장되는지 검증."""
+    sources = [
+        {
+            "source_id": "PRECEDENT:241383",
+            "source_type": "PRECEDENT",
+            "court": "대법원",
+            "case_number": "2023다318857",
+            "title": "대법원 2024. 5. 30. 선고 2023다318857 판결",
+            "source_url": "https://www.law.go.kr/LSW/precInfoP.do?precSeq=241383",
+        },
+        "01_임대차_주요내용.txt",
+    ]
+    # 사용자가 제시한 실제 발췌문
+    input_text = (
+        "그 근거로, 대법원은 임대인 지위를 공동으로 승계한 상속인들의 임차보증금 반환채무는 성질상 불가분채무라고 보았고, "
+        "그중 1인이 변제하여 공동면책이 되면 다른 상속인들에게 법정상속분에 따라 구상할 수 있다고 판시했습니다[PRECEDENT:241383]."
+    )
+    expected = (
+        "그 근거로, 대법원은 임대인 지위를 공동으로 승계한 상속인들의 임차보증금 반환채무는 성질상 불가분채무라고 보았고, "
+        "그중 1인이 변제하여 공동면책이 되면 다른 상속인들에게 법정상속분에 따라 구상할 수 있다고 판시했습니다[대법원 2023다318857]."
+    )
+    result = expand_evidence_citations(input_text, sources)
+    assert result == expected
+
+
+def test_expand_precedent_citation_variations():
+    """사건번호 표기, 대괄호 없는 노출, 복합 인용 등 판례 인용 변형 형태 확장 검증."""
+    sources = [
+        {
+            "source_id": "PRECEDENT:241383",
+            "source_type": "PRECEDENT",
+            "court": "대법원",
+            "case_number": "2023다318857",
+            "title": "대법원 2024. 5. 30. 선고 2023다318857 판결",
+            "source_url": "https://www.law.go.kr/LSW/precInfoP.do?precSeq=241383",
+        },
+        "01_임대차_주요내용.txt",
+    ]
+    # 1. 사건번호 형태 [2023다318857] -> [대법원 2023다318857]
+    assert expand_evidence_citations("판결 [2023다318857] 참조", sources) == "판결 [대법원 2023다318857] 참조"
+
+    # 2. 이미 공식 표기된 형태 [대법원 2023다318857] 보존
+    assert expand_evidence_citations("판결 [대법원 2023다318857] 참조", sources) == "판결 [대법원 2023다318857] 참조"
+
+    # 3. 대괄호 없는 PRECEDENT:241383 표기 확장
+    assert expand_evidence_citations("판례 PRECEDENT:241383 확인 필요", sources) == "판례 [대법원 2023다318857] 확인 필요"
+
+    # 4. 증거와 판례 복합 인용
+    compound = "계약서 [01] 및 관련 판례 [PRECEDENT:241383] 검토"
+    expected_compound = "계약서 [01_임대차_주요내용.txt] 및 관련 판례 [대법원 2023다318857] 검토"
+    assert expand_evidence_citations(compound, sources) == expected_compound

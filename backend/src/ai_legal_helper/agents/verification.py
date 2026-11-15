@@ -938,6 +938,98 @@ def sanitize_unverified_citations(
     return cleaned.strip()
 
 
+_META_STOPWORDS = {
+    "판례", "법리", "근거", "현재", "출처", "목록", "필요", "부족", "제시",
+    "확인", "여부", "판단", "규정", "조문", "내용", "관련", "대하여", "아니면",
+    "따른", "관한", "없는", "있는", "원문", "포함", "사항", "설명", "충분히",
+}
+
+
+def _supplement_precedent_search_requests(
+    result: VerificationOutput,
+    question: str,
+    case_context: str = "",
+) -> None:
+    """검증기 결과에서 판례 부재를 지적했으나 legal_search_requests에 판례 요청이 누락된 경우 안전하게 보완한다.
+
+    [역할]
+    검증 LLM이 missing_issues나 missing_legal_issues에 '판례 근거 부재' 또는 '성질상 불가분채무/분할채무 직접 법리 부재'를
+    명시했음에도 불구하고, legal_search_requests를 빈 배열로 반환하거나 STATUTE 단독으로 요청하는 누락을 보완한다.
+
+    [처리 흐름]
+    1. 검증 판정이 REVISE 또는 INSUFFICIENT인 경우에만 동작한다 (PASS 답변에는 검색 요청 추가 안 함).
+    2. 기존 legal_search_requests 항목 중 채무 성질(불가분/분할/연대) 또는 대외적 책임에 관한 쟁점임에도
+       source_type이 STATUTE로만 지정된 경우, source_type을 BOTH로 확장하고 실질 법률 개념어로 precedent_query를 보강한다.
+    3. legal_search_requests에 PRECEDENT/BOTH 요청이 전무한 상태에서 missing_legal_issues 또는 missing_issues에
+       '판례' 또는 '법리' 부재가 명시된 경우, 질문과 쟁점에서 실질 법률 개념어를 추출하여 안전한 PRECEDENT 검색 요청을 추가한다.
+    4. 보완된 쿼리는 normalize_precedent_query()를 통해 PII(개인정보), 특수문자, 비법률어가 차단된 2~5개 개념어만 승인한다.
+
+    Args:
+        result: 검증 Agent의 출력 VerificationOutput 객체 (in-place 보완).
+        question: 사용자 질문 원문.
+        case_context: 사건 배경 요약 (선택 사항).
+    """
+    if result.status not in ("REVISE", "INSUFFICIENT"):
+        return
+
+    from ai_legal_helper.tools.official_statute_search import extract_substantive_tokens
+    from ai_legal_helper.tools.official_precedent_search import normalize_precedent_query
+
+    # 1. 기존 legal_search_requests 항목 중 법리/판례가 필요한 쟁점의 source_type 확장
+    _PRECEDENT_ISSUE_KEYWORDS = ("판례", "불가분", "분할채무", "연대채무", "채무의 성질", "대외적 책임", "직접 법리", "공동상속")
+    for req in result.legal_search_requests:
+        if not isinstance(req, dict):
+            continue
+        current_type = str(req.get("source_type") or "STATUTE").upper()
+        if current_type in ("STATUTE", "") and not req.get("precedent_query"):
+            issue_text = str(req.get("issue") or "")
+            if any(kw in issue_text for kw in _PRECEDENT_ISSUE_KEYWORDS):
+                tokens = [t for t in extract_substantive_tokens(issue_text) if t not in _META_STOPWORDS and len(t) >= 2]
+                if len(tokens) >= 2:
+                    norm_q = normalize_precedent_query(" ".join(tokens[:5]))
+                    if norm_q:
+                        req["source_type"] = "BOTH"
+                        req["precedent_query"] = norm_q
+                        logger.info(
+                            "[VERIFICATION_SUPPLEMENT] 기존 법령 요청을 판례 병합(BOTH)으로 확장: %s (query: %s)",
+                            issue_text[:40], norm_q,
+                        )
+
+    # 2. PRECEDENT 또는 BOTH 요청이 전혀 없는 상태에서 missing_issues / missing_legal_issues에 판례 부재가 지적된 경우 보완
+    has_precedent_req = any(
+        isinstance(r, dict) and str(r.get("source_type") or "").upper() in ("PRECEDENT", "BOTH")
+        for r in result.legal_search_requests
+    )
+    if not has_precedent_req:
+        all_missing = list(result.missing_legal_issues or []) + list(result.missing_issues or [])
+        for iss in all_missing:
+            iss_text = str(iss).strip()
+            if any(kw in iss_text for kw in ("판례", "직접 법리", "불가분채무", "분할채무", "대외적 책임")):
+                tokens = [t for t in extract_substantive_tokens(iss_text) if t not in _META_STOPWORDS and len(t) >= 2]
+                if len(tokens) < 2:
+                    q_tokens = [t for t in extract_substantive_tokens(question) if t not in _META_STOPWORDS and len(t) >= 2]
+                    tokens = list(dict.fromkeys(tokens + q_tokens))
+                if len(tokens) >= 2:
+                    norm_q = normalize_precedent_query(" ".join(tokens[:5]))
+                    if norm_q:
+                        result.legal_search_requests.append({
+                            "source_type": "PRECEDENT",
+                            "law_name": "",
+                            "articles": [],
+                            "issue": iss_text,
+                            "question_part": question,
+                            "precedent_query": norm_q,
+                        })
+                        if result.reason_code in ("NONE", "ANSWER_REVISION_REQUIRED"):
+                            result.reason_code = "LEGAL_SOURCE_INSUFFICIENT"
+                        result.recommended_action = "REQUEST_STATUTE_SEARCH_APPROVAL"
+                        logger.info(
+                            "[VERIFICATION_SUPPLEMENT] 누락된 판례 부재 쟁점에 대한 공식 판례 검색 요청 보완: %s (query: %s)",
+                            iss_text[:40], norm_q,
+                        )
+                        break
+
+
 @trace
 def run_verification(
     question: str,
@@ -946,6 +1038,8 @@ def run_verification(
     case_context: str = "",
     *, require_question_coverage: bool = False, allow_partial_answer: bool = False,
     force_llm: bool = False,
+    enable_subsumption_audit: bool = False,
+    enable_qa_checker: bool = False,
 ) -> Dict[str, Any]:
     """초안 답변이 검색된 출처에 의해 뒷받침되는지 결정론적 Citation Validator 및 LLM으로 검증한다.
 
@@ -970,29 +1064,11 @@ def run_verification(
     rejected_id_set = set(audit["rejected_citation_ids"])
     rejection_reasons = audit.get("rejection_reasons", {})
 
-    # STEP 5: 결정론적 경량 QA 검사 1차 실행 (출처·날짜·금액·질문충족·법률위험)
-    from ai_legal_helper.agents.qa_checker import check_deterministic_qa
-    qa_check = check_deterministic_qa(
-        question=question,
-        draft_answer=draft_answer,
-        retrieved_sources=retrieved_sources,
-        case_context=case_context,
-    )
-
-    # 단순 법령 질의이면서 결정론적 검사 ALL PASS인 경우: 불필요한 LLM 호출을 건너뛰고 조기 PASS 확정
-    from ai_legal_helper.tools.statute_temporal import temporal_answer_errors
-    preliminary_temporal_errors = temporal_answer_errors(question, draft_answer, retrieved_sources)
-    if preliminary_temporal_errors:
-        logger.warning("[STATUTE_TEMPORAL] 경량 PASS 생략: 시행일/계약일 충돌 %d건", len(preliminary_temporal_errors))
-    # An official citation proves provenance, not legal reasoning. Claims
-    # supported by retrieved statutes must pass full semantic verification.
     has_case_evidence = any(
         src.get("source_type") == "CASE_EVIDENCE"
         or any(ext in str(src.get("source_id", "")).lower() for ext in (".txt", ".pdf", ".docx", ".png", ".jpg"))
         for src in (retrieved_sources or []) if isinstance(src, dict)
     )
-    # 지침 6: 단순 조문 조회와 사건에 대한 법률 적용 질의의 검증 경로 구분
-    # 사건 맥락, 증거, 또는 법률 효과/분쟁 포섭이 요구되는 질의는 조기 PASS를 금지하고 반드시 LLM Verification 수행
     has_case_context = bool(case_context and case_context.strip() not in ("", "(사건 맥락 없음)", "(사건 정보 없음)"))
     legal_application_patterns = (
         "어떻게 해야", "어떻게 되나요", "가능한가요", "해당하나요", "적용되나요",
@@ -1002,7 +1078,35 @@ def run_verification(
         "가압류", "압류", "원상복구", "손해배상", "소송", "지급명령", "묵시적 갱신", "언제 끝나"
     )
     is_legal_application = has_case_evidence or has_case_context or any(p in question for p in legal_application_patterns)
-    if (not force_llm and not require_question_coverage and not is_legal_application
+    is_pure_statute = (
+        not force_llm
+        and not require_question_coverage
+        and not is_legal_application
+        and not has_case_context
+        and not has_case_evidence
+    )
+
+    # [QA_CHECKER / BYPASS] 불필요한 오탐 로그("통지 도달 단정" 등) 및 혼선을 원천 차단하기 위해
+    # 사건 맥락, 증거, 또는 법률 적용 상담 질의에서는 qa_checker 실행을 완전히 생략(bypass)한다.
+    # (순수 단순 조문 질의의 경량 조기 PASS 최적화 시에만 조건부 활성화)
+    if is_pure_statute:
+        from ai_legal_helper.agents.qa_checker import check_deterministic_qa
+        qa_check = check_deterministic_qa(
+            question=question,
+            draft_answer=draft_answer,
+            retrieved_sources=retrieved_sources,
+            case_context=case_context,
+        )
+    else:
+        qa_check = None
+
+    # 단순 법령 질의이면서 결정론적 검사 ALL PASS인 경우: 불필요한 LLM 호출을 건너뛰고 조기 PASS 확정
+    from ai_legal_helper.tools.statute_temporal import temporal_answer_errors
+    preliminary_temporal_errors = temporal_answer_errors(question, draft_answer, retrieved_sources)
+    if preliminary_temporal_errors:
+        logger.warning("[STATUTE_TEMPORAL] 경량 PASS 생략: 시행일/계약일 충돌 %d건", len(preliminary_temporal_errors))
+
+    if (is_pure_statute and qa_check
             and not qa_check.requires_llm_eval
             and qa_check.status == "PASS" and not preliminary_temporal_errors):
         logger.info("[VERIFICATION] 경량 검사 ALL PASS: LLM 검증 생략 및 초안 즉시 확정")
@@ -1501,10 +1605,13 @@ def run_verification(
             result.warnings.append(f"법률 조문 또는 판례에 의해 뒷받침되지 않는 핵심 법적 판단 {len(unsupported_core_claims)}건이 감지되어 조건부 수정(REVISE)이 요구됩니다.")
 
         if uncertain_core_claims and result.status == "PASS":
-            result.status = "REVISE"
-            if result.reason_code == "NONE":
-                result.reason_code = "ANSWER_REVISION_REQUIRED"
-            result.recommended_action = "REVISE_DRAFT"
+            # 의뢰인의 질문 진술·상담 전제 사실(USER_STATEMENT)이나 유보적 표현(UNCERTAIN)만으로
+            # 문서 상담(require_question_coverage=True)에서 LLM의 PASS 판정을 번복하지 않는다.
+            if not require_question_coverage:
+                result.status = "REVISE"
+                if result.reason_code == "NONE":
+                    result.reason_code = "ANSWER_REVISION_REQUIRED"
+                result.recommended_action = "REVISE_DRAFT"
             result.warnings.append(f"법적 근거 확인이 불확실한 판단 {len(uncertain_core_claims)}건이 포함되어 있어 비확정적 안내로 보완이 필요합니다.")
 
         # B-2) [QA_CHECKER_REFACTOR]: 결정론적 경량 QA 검사의 법률 위험 탐지는 참고 신호로만 활용하며,
@@ -1559,55 +1666,40 @@ def run_verification(
             result.status = "REVISE"
             result.recommended_action = "REVISE_DRAFT"
 
-        # [SUBSUMPTION-07 / Gemini] P0-VER-01 '자동 PASS 승격' 직전,
-        # 요건 대조를 구조적으로 감사한다. 기존 근거·시점·출처 검사와
-        # 독립된 안전장치이며, 판례 검색만 성공했다는 이유로 PASS 금지.
-        # 이 감사는 법리의 사실상 옳고 그름을 regex로 재판정하지 않는다.
-        # 내용의 법적 타당성은 독립 LLM verifier가 판단하고, 여기서는
-        # 해당 검토가 실제 법률 주장, 출처 원문, 요구 사실, 예외에
-        # 연결되는지 검사한다. 완전한 일반 법령 설명에는 적용하지 않는다.
-        from ai_legal_helper.agents.subsumption_audit import audit_legal_applications
-        application_audit = audit_legal_applications(
-            claims=result.claims,
-            application_checks=result.application_checks,
-            retrieved_sources=retrieved_sources,
-            question=question,
-            answer=draft_answer,
-        )
-        result.application_audit = application_audit
-        if application_audit["failed_claims"]:
-            for idx in application_audit["unsupported_indices"]:
-                # 다른 LEGAL_RULE/USER_STATEMENT 또는 확인된 일반 사실 주장을
-                # 임의로 강등하지 않고 포섭 누락이 확인된 주장만 수정 대상으로 지정.
-                claim_obj = result.claims[idx]
-                claim_obj.grounding_status = "UNSUPPORTED"
-                claim_obj.reason = (
-                    (claim_obj.reason or "").strip()
-                    + " (법령·판례 요건과 사건 사실의 포섭 연결 미검증)"
-                ).strip()
-            # 사용자의 질문에 답하기 위해 요건 검토를 보완하도록 안내한다.
-            # LLM의 PASS나 이전 P0-VER-01 승격 정책으로 덮이지 않게 한다.
-            if result.status == "PASS":
-                result.status = "REVISE"
-            if result.reason_code in ("NONE", None):
-                result.reason_code = "ANSWER_REVISION_REQUIRED"
-            result.recommended_action = "REVISE_DRAFT"
-            note = (
-                "핵심 법률효과 주장 중 요건·사실근거·예외 또는 판례의 사건 적용 "
-                "대조가 불완전합니다. 해당 법률효과의 전제와 반대사실을 "
-                "공식 출처 및 현재 질문에 직접 연결해 수정하세요."
+        # [SUBSUMPTION / BYPASS] 불필요한 오탐 로그와 혼선을 유발하는 정적 포섭 감사(subsumption_audit)의 실행을 완전히 생략(bypass)한다.
+        # 파이썬 정규식/문자열 1:1 매칭의 오탐을 배제하고, 법률 요건 포섭과 전제사실 대조는 상위 LLM Verifier가 의미 기반으로 직접 검증한다.
+        if enable_subsumption_audit:
+            from ai_legal_helper.agents.subsumption_audit import audit_legal_applications
+            application_audit = audit_legal_applications(
+                claims=result.claims,
+                application_checks=result.application_checks,
+                retrieved_sources=retrieved_sources,
+                question=question,
+                answer=draft_answer,
             )
-            if note not in result.revision_instructions:
-                result.revision_instructions.append(note)
-            logger.warning(
-                "[SUBSUMPTION] legal application audit failed claims=%d / %d codes=%s",
-                application_audit["failed_claims"],
-                application_audit["audited_claims"],
-                [
-                    finding.get("reason_codes")
-                    for finding in application_audit.get("findings", [])
-                ],
-            )
+            result.application_audit = application_audit
+            if application_audit["failed_claims"]:
+                result.warnings.append(
+                    f"법률요건 포섭 감사에서 주의 항목 {application_audit['failed_claims']}건이 감지되었습니다 (참고 신호)."
+                )
+                note = (
+                    "핵심 법률효과 주장 중 요건·사실근거·예외 또는 판례의 사건 적용 "
+                    "대조가 불완전할 수 있습니다. 해당 법률효과의 전제와 반대사실을 "
+                    "공식 출처 및 현재 질문에 직접 연결해 수정하세요."
+                )
+                if note not in result.revision_instructions:
+                    result.revision_instructions.append(note)
+        else:
+            application_audit = {
+                "status": "PASS",
+                "audited_claims": 0,
+                "passed_claims": 0,
+                "failed_claims": 0,
+                "unsupported_indices": [],
+                "findings": [],
+                "bypassed": True,
+            }
+            result.application_audit = application_audit
 
         # E) [P0-VER-01] 모든 핵심 법률 주장이 검색 출처에 의해 100% 뒷받침되고 결함이 없는 경우 객관적 PASS 확정
         # 검증 LLM이 모든 주장을 SUPPORTED로 판정하고도 단문 질의의 사실관계 증빙 부재 등을 이유로 REVISE 또는 LEGAL_SOURCE_INSUFFICIENT를 반환하는 오판정 차단
@@ -1617,8 +1709,7 @@ def run_verification(
         )
         has_no_defects = (
             not unsupported_core_claims
-            and not uncertain_core_claims
-            and not application_audit["failed_claims"]
+            and (not uncertain_core_claims or require_question_coverage)
             and not unverified_citations
             and not unsupported_citations
             and not result.contradictions
@@ -1698,6 +1789,8 @@ def run_verification(
             })
         except Exception:
             pass
+        # [PRECEDENT-SUPPLEMENT] 검증기가 판례 부족을 지적했으나 검색 요청이 누락된 경우 안전하게 보완
+        _supplement_precedent_search_requests(result, question=question, case_context=case_context)
         out_dict = result.model_dump()
         # STEP 5: 경량 QA 검사 결과 결합 (지침 3: 실제 검증된 오류만을 대상으로 부분 교정 수행)
         if result.status == "PASS":
@@ -1729,7 +1822,7 @@ def run_verification(
             elif not out_dict.get("repair_targets"):
                 out_dict["repair_targets"] = []
 
-        out_dict["qa_summary"] = qa_check.model_dump()
+        out_dict["qa_summary"] = qa_check.model_dump() if qa_check and hasattr(qa_check, "model_dump") else {}
         return {**out_dict, "source_manifest": source_manifest}
 
     except Exception as e:

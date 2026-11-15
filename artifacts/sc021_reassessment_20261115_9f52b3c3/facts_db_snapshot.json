@@ -1,0 +1,1998 @@
+[
+  {
+    "id": "f0106ed3-d056-4158-8604-dff12cfdfb9b",
+    "case_id": "kpi5_sc-021_13e152bbbc",
+    "statement": "문서 제목은 '합성 테스트 자료 (실존 인물·사건 아님)'로 기재되어 있다.",
+    "fact_type": "DOC_INFO",
+    "confidence": 0.99,
+    "source_type": "DOCUMENT_SUPPORTED",
+    "source_ref": "e5cc432a-0993-4f1f-b0b4-f3bd696cb92c",
+    "occurred_at": null,
+    "verification_status": "DOCUMENT_VERIFIED",
+    "created_at": "2026-11-15 20:40:19.704581",
+    "subject_key": "문서자체",
+    "predicate_key": "문서제목",
+    "scope": "DOCUMENT_LOCAL",
+    "temporal_context": null,
+    "structured_slots": {
+      "statement": "문서 제목은 '합성 테스트 자료 (실존 인물·사건 아님)'로 기재되어 있다.",
+      "claim_type": "DOC_INFO",
+      "scope": "DOCUMENT_LOCAL",
+      "subject_key": "문서자체",
+      "predicate_key": "문서제목",
+      "temporal_context": null,
+      "value_dimension": "TEXT",
+      "normalized_amounts": [],
+      "amount_roles": {},
+      "installment_stage": null,
+      "normalized_dates": [],
+      "invalid_dates": [],
+      "date_roles": {},
+      "polarity": "NEGATIVE",
+      "core_predicate": "문서제목",
+      "negated_predicate": "문서제목",
+      "content_tokens": [
+        "합성",
+        "테스트",
+        "자료",
+        "실존",
+        "인물",
+        "사건",
+        "아님"
+      ],
+      "evidence_id": "da713fd6-b159-49bb-8db1-8070aaacbd8a",
+      "document_name": "E03_synthetic_record.txt",
+      "source_span_ids": [
+        "78d04783-a55b-4943-b65e-2962cecdb7eb"
+      ],
+      "semantic_fact": {
+        "statement": "문서 제목은 '합성 테스트 자료 (실존 인물·사건 아님)'로 기재되어 있다.",
+        "subject_key": "문서자체",
+        "object_key": null,
+        "predicate": "문서제목",
+        "semantic_category": "METADATA",
+        "event_type": "DOCUMENT_METADATA",
+        "event_subtype": "DOCUMENT_TITLE",
+        "temporal_type": "NONE",
+        "temporal_value": null,
+        "temporal_qualifier": null,
+        "occurrence_status": "ACTUAL",
+        "polarity": "AFFIRMATIVE",
+        "is_repeatable_event": false,
+        "value": null,
+        "condition": null,
+        "assertion_status": null,
+        "confidence": 1.0,
+        "provenance": {
+          "document_name": "E03_synthetic_record.txt",
+          "evidence_id": "da713fd6-b159-49bb-8db1-8070aaacbd8a"
+        }
+      },
+      "semantic_category": "METADATA",
+      "event_type": "DOCUMENT_METADATA",
+      "event_subtype": "DOCUMENT_TITLE",
+      "temporal_type": "NONE"
+    }
+  },
+  {
+    "id": "ccd8b4ce-a95a-476e-b628-da7447fe33bc",
+    "case_id": "kpi5_sc-021_13e152bbbc",
+    "statement": "분쟁 목적물은 주거용 아파트 임대차이다.",
+    "fact_type": "PROPERTY",
+    "confidence": 0.93,
+    "source_type": "DOCUMENT_SUPPORTED",
+    "source_ref": "e5cc432a-0993-4f1f-b0b4-f3bd696cb92c",
+    "occurred_at": null,
+    "verification_status": "DOCUMENT_VERIFIED",
+    "created_at": "2026-11-15 20:40:19.775435",
+    "subject_key": "임대차계약",
+    "predicate_key": "목적물",
+    "scope": "CASE_GLOBAL",
+    "temporal_context": "INITIAL_CONTRACT",
+    "structured_slots": {
+      "statement": "분쟁 목적물은 주거용 아파트 임대차이다.",
+      "claim_type": "PROPERTY",
+      "scope": "CASE_GLOBAL",
+      "subject_key": "임대차계약",
+      "predicate_key": "목적물",
+      "temporal_context": "INITIAL_CONTRACT",
+      "value_dimension": "TEXT",
+      "normalized_amounts": [],
+      "amount_roles": {},
+      "installment_stage": null,
+      "normalized_dates": [],
+      "invalid_dates": [],
+      "date_roles": {},
+      "polarity": "AFFIRMATIVE",
+      "core_predicate": "목적물",
+      "negated_predicate": null,
+      "content_tokens": [
+        "분쟁",
+        "목적물",
+        "주거용",
+        "아파트",
+        "임대차이다"
+      ],
+      "evidence_id": "e5cc432a-0993-4f1f-b0b4-f3bd696cb92c",
+      "document_name": "E01_synthetic_record.txt",
+      "source_span_ids": [
+        "8df014d6-71a4-461e-8473-24eb626da69c"
+      ],
+      "semantic_fact": {
+        "statement": "분쟁 목적물은 주거용 아파트 임대차이다.",
+        "subject_key": "임대차계약",
+        "object_key": null,
+        "predicate": "목적물",
+        "semantic_category": "UNKNOWN",
+        "event_type": "GENERAL_FACT",
+        "event_subtype": null,
+        "temporal_type": "NONE",
+        "temporal_value": null,
+        "temporal_qualifier": null,
+        "occurrence_status": "ACTUAL",
+        "polarity": "AFFIRMATIVE",
+        "is_repeatable_event": false,
+        "value": null,
+        "condition": null,
+        "assertion_status": null,
+        "confidence": 1.0,
+        "provenance": {
+          "document_name": "E01_synthetic_record.txt",
+          "evidence_id": "e5cc432a-0993-4f1f-b0b4-f3bd696cb92c"
+        }
+      },
+      "semantic_category": "UNKNOWN",
+      "event_type": "GENERAL_FACT",
+      "event_subtype": null,
+      "temporal_type": "NONE"
+    }
+  },
+  {
+    "id": "c1571ca3-e9a7-4976-9646-92946134043a",
+    "case_id": "kpi5_sc-021_13e152bbbc",
+    "statement": "임차인은 가상임차인 가람이다.",
+    "fact_type": "PARTY_INFO",
+    "confidence": 0.98,
+    "source_type": "DOCUMENT_SUPPORTED",
+    "source_ref": "e5cc432a-0993-4f1f-b0b4-f3bd696cb92c",
+    "occurred_at": null,
+    "verification_status": "DOCUMENT_VERIFIED",
+    "created_at": "2026-11-15 20:40:19.835832",
+    "subject_key": "임대차계약",
+    "predicate_key": "임차인",
+    "scope": "CASE_GLOBAL",
+    "temporal_context": "INITIAL_CONTRACT",
+    "structured_slots": {
+      "statement": "임차인은 가상임차인 가람이다.",
+      "claim_type": "PARTY_INFO",
+      "scope": "CASE_GLOBAL",
+      "subject_key": "임대차계약",
+      "predicate_key": "임차인",
+      "temporal_context": "INITIAL_CONTRACT",
+      "value_dimension": "TEXT",
+      "normalized_amounts": [],
+      "amount_roles": {},
+      "installment_stage": null,
+      "normalized_dates": [],
+      "invalid_dates": [],
+      "date_roles": {},
+      "polarity": "AFFIRMATIVE",
+      "core_predicate": "임차인",
+      "negated_predicate": null,
+      "content_tokens": [
+        "임차인",
+        "가상임차인",
+        "가람이다"
+      ],
+      "evidence_id": "e5cc432a-0993-4f1f-b0b4-f3bd696cb92c",
+      "document_name": "E01_synthetic_record.txt",
+      "source_span_ids": [
+        "8df014d6-71a4-461e-8473-24eb626da69c"
+      ],
+      "semantic_fact": {
+        "statement": "임차인은 가상임차인 가람이다.",
+        "subject_key": "임대차계약",
+        "object_key": null,
+        "predicate": "임차인",
+        "semantic_category": "IDENTITY",
+        "event_type": "IDENTITY",
+        "event_subtype": null,
+        "temporal_type": "NONE",
+        "temporal_value": null,
+        "temporal_qualifier": null,
+        "occurrence_status": "ACTUAL",
+        "polarity": "AFFIRMATIVE",
+        "is_repeatable_event": false,
+        "value": null,
+        "condition": null,
+        "assertion_status": null,
+        "confidence": 1.0,
+        "provenance": {
+          "document_name": "E01_synthetic_record.txt",
+          "evidence_id": "e5cc432a-0993-4f1f-b0b4-f3bd696cb92c"
+        }
+      },
+      "semantic_category": "IDENTITY",
+      "event_type": "IDENTITY",
+      "event_subtype": null,
+      "temporal_type": "NONE"
+    }
+  },
+  {
+    "id": "d6419c30-e865-4620-8074-ac0b667d609f",
+    "case_id": "kpi5_sc-021_13e152bbbc",
+    "statement": "월차임은 없다.",
+    "fact_type": "AMOUNT",
+    "confidence": 0.97,
+    "source_type": "DOCUMENT_SUPPORTED",
+    "source_ref": "e5cc432a-0993-4f1f-b0b4-f3bd696cb92c",
+    "occurred_at": null,
+    "verification_status": "DOCUMENT_VERIFIED",
+    "created_at": "2026-11-15 20:40:19.892518",
+    "subject_key": "임대차계약",
+    "predicate_key": "월차임",
+    "scope": "CASE_GLOBAL",
+    "temporal_context": "INITIAL_CONTRACT",
+    "structured_slots": {
+      "statement": "월차임은 없다.",
+      "claim_type": "AMOUNT",
+      "scope": "CASE_GLOBAL",
+      "subject_key": "임대차계약",
+      "predicate_key": "월차임",
+      "temporal_context": "INITIAL_CONTRACT",
+      "value_dimension": "TEXT",
+      "normalized_amounts": [],
+      "amount_roles": {},
+      "installment_stage": null,
+      "normalized_dates": [],
+      "invalid_dates": [],
+      "date_roles": {},
+      "polarity": "NEGATIVE",
+      "core_predicate": "월차임",
+      "negated_predicate": "월차임",
+      "content_tokens": [
+        "월차임"
+      ],
+      "evidence_id": "e5cc432a-0993-4f1f-b0b4-f3bd696cb92c",
+      "document_name": "E01_synthetic_record.txt",
+      "source_span_ids": [
+        "1bb52f16-a0ee-435f-91d7-543a504bf67e"
+      ],
+      "semantic_fact": {
+        "statement": "월차임은 없다.",
+        "subject_key": "임대차계약",
+        "object_key": null,
+        "predicate": "월차임",
+        "semantic_category": "EVENT",
+        "event_type": "PAYMENT",
+        "event_subtype": "RENT",
+        "temporal_type": "NONE",
+        "temporal_value": null,
+        "temporal_qualifier": null,
+        "occurrence_status": "ACTUAL",
+        "polarity": "NEGATIVE",
+        "is_repeatable_event": false,
+        "value": null,
+        "condition": null,
+        "assertion_status": null,
+        "confidence": 1.0,
+        "provenance": {
+          "document_name": "E01_synthetic_record.txt",
+          "evidence_id": "e5cc432a-0993-4f1f-b0b4-f3bd696cb92c"
+        }
+      },
+      "semantic_category": "EVENT",
+      "event_type": "PAYMENT",
+      "event_subtype": "RENT",
+      "temporal_type": "NONE"
+    }
+  },
+  {
+    "id": "8834f433-4c8d-48fb-89a8-0470e15af8d3",
+    "case_id": "kpi5_sc-021_13e152bbbc",
+    "statement": "임대인은 가상임대인 나래이다.",
+    "fact_type": "PARTY_INFO",
+    "confidence": 0.98,
+    "source_type": "DOCUMENT_SUPPORTED",
+    "source_ref": "e5cc432a-0993-4f1f-b0b4-f3bd696cb92c",
+    "occurred_at": null,
+    "verification_status": "DOCUMENT_VERIFIED",
+    "created_at": "2026-11-15 20:40:19.948536",
+    "subject_key": "임대차계약",
+    "predicate_key": "임대인",
+    "scope": "CASE_GLOBAL",
+    "temporal_context": "INITIAL_CONTRACT",
+    "structured_slots": {
+      "statement": "임대인은 가상임대인 나래이다.",
+      "claim_type": "PARTY_INFO",
+      "scope": "CASE_GLOBAL",
+      "subject_key": "임대차계약",
+      "predicate_key": "임대인",
+      "temporal_context": "INITIAL_CONTRACT",
+      "value_dimension": "TEXT",
+      "normalized_amounts": [],
+      "amount_roles": {},
+      "installment_stage": null,
+      "normalized_dates": [],
+      "invalid_dates": [],
+      "date_roles": {},
+      "polarity": "AFFIRMATIVE",
+      "core_predicate": "임대인",
+      "negated_predicate": null,
+      "content_tokens": [
+        "임대인",
+        "가상임대인",
+        "나래이다"
+      ],
+      "evidence_id": "e5cc432a-0993-4f1f-b0b4-f3bd696cb92c",
+      "document_name": "E01_synthetic_record.txt",
+      "source_span_ids": [
+        "8df014d6-71a4-461e-8473-24eb626da69c"
+      ],
+      "semantic_fact": {
+        "statement": "임대인은 가상임대인 나래이다.",
+        "subject_key": "임대차계약",
+        "object_key": null,
+        "predicate": "임대인",
+        "semantic_category": "IDENTITY",
+        "event_type": "IDENTITY",
+        "event_subtype": null,
+        "temporal_type": "NONE",
+        "temporal_value": null,
+        "temporal_qualifier": null,
+        "occurrence_status": "ACTUAL",
+        "polarity": "AFFIRMATIVE",
+        "is_repeatable_event": false,
+        "value": null,
+        "condition": null,
+        "assertion_status": null,
+        "confidence": 1.0,
+        "provenance": {
+          "document_name": "E01_synthetic_record.txt",
+          "evidence_id": "e5cc432a-0993-4f1f-b0b4-f3bd696cb92c"
+        }
+      },
+      "semantic_category": "IDENTITY",
+      "event_type": "IDENTITY",
+      "event_subtype": null,
+      "temporal_type": "NONE"
+    }
+  },
+  {
+    "id": "58955123-87a2-4a61-9214-b9a579d5045e",
+    "case_id": "kpi5_sc-021_13e152bbbc",
+    "statement": "임대차기간 시작일은 2024-10-01이다.",
+    "fact_type": "DATE",
+    "confidence": 0.98,
+    "source_type": "DOCUMENT_SUPPORTED",
+    "source_ref": "e5cc432a-0993-4f1f-b0b4-f3bd696cb92c",
+    "occurred_at": "2024-10-01",
+    "verification_status": "DOCUMENT_VERIFIED",
+    "created_at": "2026-11-15 20:40:20.012107",
+    "subject_key": "임대차계약",
+    "predicate_key": "계약기간시작일",
+    "scope": "CASE_GLOBAL",
+    "temporal_context": "INITIAL_CONTRACT",
+    "structured_slots": {
+      "statement": "임대차기간 시작일은 2024-10-01이다.",
+      "claim_type": "DATE",
+      "scope": "CASE_GLOBAL",
+      "subject_key": "임대차계약",
+      "predicate_key": "계약기간시작일",
+      "temporal_context": "INITIAL_CONTRACT",
+      "value_dimension": "DATE",
+      "normalized_amounts": [],
+      "amount_roles": {},
+      "installment_stage": null,
+      "normalized_dates": [
+        "2024-10-01"
+      ],
+      "invalid_dates": [],
+      "date_roles": {
+        "GENERAL_DATE": [
+          "2024-10-01"
+        ]
+      },
+      "polarity": "AFFIRMATIVE",
+      "core_predicate": "계약기간시작일",
+      "negated_predicate": null,
+      "content_tokens": [
+        "임대차기간",
+        "시작일"
+      ],
+      "evidence_id": "e5cc432a-0993-4f1f-b0b4-f3bd696cb92c",
+      "document_name": "E01_synthetic_record.txt",
+      "source_span_ids": [
+        "ba4a69bf-8b38-490d-947d-b6be186fe0b1"
+      ],
+      "semantic_fact": {
+        "statement": "임대차기간 시작일은 2024-10-01이다.",
+        "subject_key": "임대차계약",
+        "object_key": null,
+        "predicate": "계약기간시작일",
+        "semantic_category": "EVENT",
+        "event_type": "CONTRACT_PERIOD",
+        "event_subtype": "START_DATE",
+        "temporal_type": "OCCURRED_AT",
+        "temporal_value": "2024-10-01",
+        "temporal_qualifier": null,
+        "occurrence_status": "ACTUAL",
+        "polarity": "AFFIRMATIVE",
+        "is_repeatable_event": false,
+        "value": null,
+        "condition": null,
+        "assertion_status": null,
+        "confidence": 1.0,
+        "provenance": {
+          "document_name": "E01_synthetic_record.txt",
+          "evidence_id": "e5cc432a-0993-4f1f-b0b4-f3bd696cb92c"
+        }
+      },
+      "semantic_category": "EVENT",
+      "event_type": "CONTRACT_PERIOD",
+      "event_subtype": "START_DATE",
+      "temporal_type": "OCCURRED_AT"
+    }
+  },
+  {
+    "id": "f881a425-92d8-49e2-8316-060a0bc4d40d",
+    "case_id": "kpi5_sc-021_13e152bbbc",
+    "statement": "임대차기간 종료일은 2026-09-30이다.",
+    "fact_type": "DATE",
+    "confidence": 0.98,
+    "source_type": "DOCUMENT_SUPPORTED",
+    "source_ref": "e5cc432a-0993-4f1f-b0b4-f3bd696cb92c",
+    "occurred_at": "2026-09-30",
+    "verification_status": "DOCUMENT_VERIFIED",
+    "created_at": "2026-11-15 20:40:20.077580",
+    "subject_key": "임대차계약",
+    "predicate_key": "계약기간종료일",
+    "scope": "CASE_GLOBAL",
+    "temporal_context": "INITIAL_CONTRACT",
+    "structured_slots": {
+      "statement": "임대차기간 종료일은 2026-09-30이다.",
+      "claim_type": "DATE",
+      "scope": "CASE_GLOBAL",
+      "subject_key": "임대차계약",
+      "predicate_key": "계약기간종료일",
+      "temporal_context": "INITIAL_CONTRACT",
+      "value_dimension": "DATE",
+      "normalized_amounts": [],
+      "amount_roles": {},
+      "installment_stage": null,
+      "normalized_dates": [
+        "2026-09-30"
+      ],
+      "invalid_dates": [],
+      "date_roles": {
+        "GENERAL_DATE": [
+          "2026-09-30"
+        ]
+      },
+      "polarity": "AFFIRMATIVE",
+      "core_predicate": "계약기간종료일",
+      "negated_predicate": null,
+      "content_tokens": [
+        "임대차기간",
+        "종료일"
+      ],
+      "evidence_id": "e5cc432a-0993-4f1f-b0b4-f3bd696cb92c",
+      "document_name": "E01_synthetic_record.txt",
+      "source_span_ids": [
+        "ba4a69bf-8b38-490d-947d-b6be186fe0b1"
+      ],
+      "semantic_fact": {
+        "statement": "임대차기간 종료일은 2026-09-30이다.",
+        "subject_key": "임대차계약",
+        "object_key": null,
+        "predicate": "계약기간종료일",
+        "semantic_category": "EVENT",
+        "event_type": "CONTRACT_PERIOD",
+        "event_subtype": "END_DATE",
+        "temporal_type": "OCCURRED_AT",
+        "temporal_value": "2026-09-30",
+        "temporal_qualifier": null,
+        "occurrence_status": "ACTUAL",
+        "polarity": "AFFIRMATIVE",
+        "is_repeatable_event": false,
+        "value": null,
+        "condition": null,
+        "assertion_status": null,
+        "confidence": 1.0,
+        "provenance": {
+          "document_name": "E01_synthetic_record.txt",
+          "evidence_id": "e5cc432a-0993-4f1f-b0b4-f3bd696cb92c"
+        }
+      },
+      "semantic_category": "EVENT",
+      "event_type": "CONTRACT_PERIOD",
+      "event_subtype": "END_DATE",
+      "temporal_type": "OCCURRED_AT"
+    }
+  },
+  {
+    "id": "03ff5f0d-c4ed-4fc8-9685-314f0fe6bbdb",
+    "case_id": "kpi5_sc-021_13e152bbbc",
+    "statement": "약정 보증금은 180,000,000원이다.",
+    "fact_type": "AMOUNT",
+    "confidence": 0.99,
+    "source_type": "DOCUMENT_SUPPORTED",
+    "source_ref": "e5cc432a-0993-4f1f-b0b4-f3bd696cb92c",
+    "occurred_at": null,
+    "verification_status": "DOCUMENT_VERIFIED",
+    "created_at": "2026-11-15 20:40:20.136287",
+    "subject_key": "임대차계약",
+    "predicate_key": "약정보증금",
+    "scope": "CASE_GLOBAL",
+    "temporal_context": "INITIAL_CONTRACT",
+    "structured_slots": {
+      "statement": "약정 보증금은 180,000,000원이다.",
+      "claim_type": "AMOUNT",
+      "scope": "CASE_GLOBAL",
+      "subject_key": "임대차계약",
+      "predicate_key": "약정보증금",
+      "temporal_context": "INITIAL_CONTRACT",
+      "value_dimension": "AMOUNT",
+      "normalized_amounts": [
+        180000000
+      ],
+      "amount_roles": {
+        "PRINCIPAL_DEPOSIT": [
+          180000000
+        ]
+      },
+      "installment_stage": null,
+      "normalized_dates": [],
+      "invalid_dates": [],
+      "date_roles": {},
+      "polarity": "AFFIRMATIVE",
+      "core_predicate": "약정보증금",
+      "negated_predicate": null,
+      "content_tokens": [
+        "약정",
+        "보증금"
+      ],
+      "evidence_id": "e5cc432a-0993-4f1f-b0b4-f3bd696cb92c",
+      "document_name": "E01_synthetic_record.txt",
+      "source_span_ids": [
+        "1bb52f16-a0ee-435f-91d7-543a504bf67e"
+      ],
+      "semantic_fact": {
+        "statement": "약정 보증금은 180,000,000원이다.",
+        "subject_key": "임대차계약",
+        "object_key": null,
+        "predicate": "약정보증금",
+        "semantic_category": "OBLIGATION",
+        "event_type": "PAYMENT",
+        "event_subtype": "PRINCIPAL_DEPOSIT",
+        "temporal_type": "SCHEDULED_AT",
+        "temporal_value": null,
+        "temporal_qualifier": null,
+        "occurrence_status": "SCHEDULED",
+        "polarity": "AFFIRMATIVE",
+        "is_repeatable_event": false,
+        "value": 180000000,
+        "condition": null,
+        "assertion_status": null,
+        "confidence": 1.0,
+        "provenance": {
+          "document_name": "E01_synthetic_record.txt",
+          "evidence_id": "e5cc432a-0993-4f1f-b0b4-f3bd696cb92c"
+        }
+      },
+      "semantic_category": "OBLIGATION",
+      "event_type": "PAYMENT",
+      "event_subtype": "PRINCIPAL_DEPOSIT",
+      "temporal_type": "SCHEDULED_AT"
+    }
+  },
+  {
+    "id": "fc5031ba-f67c-4158-8253-7ca63356a9d2",
+    "case_id": "kpi5_sc-021_13e152bbbc",
+    "statement": "보증금 180,000,000원이 2024-10-01에 전액 지급되었다고 기재되어 있다.",
+    "fact_type": "ACTION",
+    "confidence": 0.95,
+    "source_type": "DOCUMENT_SUPPORTED",
+    "source_ref": "e5cc432a-0993-4f1f-b0b4-f3bd696cb92c",
+    "occurred_at": "2024-10-01",
+    "verification_status": "DOCUMENT_VERIFIED",
+    "created_at": "2026-11-15 20:40:20.198262",
+    "subject_key": "보증금",
+    "predicate_key": "전액지급",
+    "scope": "CASE_GLOBAL",
+    "temporal_context": "ACTUAL_PERFORMANCE",
+    "structured_slots": {
+      "statement": "보증금 180,000,000원이 2024-10-01에 전액 지급되었다고 기재되어 있다.",
+      "claim_type": "ACTION",
+      "scope": "CASE_GLOBAL",
+      "subject_key": "보증금",
+      "predicate_key": "전액지급",
+      "temporal_context": "ACTUAL_PERFORMANCE",
+      "value_dimension": "AMOUNT_AND_DATE",
+      "normalized_amounts": [
+        180000000
+      ],
+      "amount_roles": {
+        "PRINCIPAL_DEPOSIT": [
+          180000000
+        ]
+      },
+      "installment_stage": null,
+      "normalized_dates": [
+        "2024-10-01"
+      ],
+      "invalid_dates": [],
+      "date_roles": {
+        "GENERAL_DATE": [
+          "2024-10-01"
+        ]
+      },
+      "polarity": "AFFIRMATIVE",
+      "core_predicate": "전액지급",
+      "negated_predicate": null,
+      "content_tokens": [
+        "보증금",
+        "지급되었다고"
+      ],
+      "evidence_id": "e5cc432a-0993-4f1f-b0b4-f3bd696cb92c",
+      "document_name": "E01_synthetic_record.txt",
+      "source_span_ids": [
+        "6eb87fca-9e98-4320-aefd-b59fbc660af9"
+      ],
+      "semantic_fact": {
+        "statement": "보증금 180,000,000원이 2024-10-01에 전액 지급되었다고 기재되어 있다.",
+        "subject_key": "보증금",
+        "object_key": null,
+        "predicate": "전액지급",
+        "semantic_category": "EVENT",
+        "event_type": "PAYMENT",
+        "event_subtype": "PRINCIPAL_DEPOSIT",
+        "temporal_type": "OCCURRED_AT",
+        "temporal_value": "2024-10-01",
+        "temporal_qualifier": null,
+        "occurrence_status": "ACTUAL",
+        "polarity": "AFFIRMATIVE",
+        "is_repeatable_event": false,
+        "value": 180000000,
+        "condition": null,
+        "assertion_status": null,
+        "confidence": 1.0,
+        "provenance": {
+          "document_name": "E01_synthetic_record.txt",
+          "evidence_id": "e5cc432a-0993-4f1f-b0b4-f3bd696cb92c"
+        }
+      },
+      "semantic_category": "EVENT",
+      "event_type": "PAYMENT",
+      "event_subtype": "PRINCIPAL_DEPOSIT",
+      "temporal_type": "OCCURRED_AT"
+    }
+  },
+  {
+    "id": "c7b0a44d-2fc4-4868-8711-cab69b7ef763",
+    "case_id": "kpi5_sc-021_13e152bbbc",
+    "statement": "보증금 전액 지급일은 2024-10-01이다.",
+    "fact_type": "DATE",
+    "confidence": 0.94,
+    "source_type": "DOCUMENT_SUPPORTED",
+    "source_ref": "e5cc432a-0993-4f1f-b0b4-f3bd696cb92c",
+    "occurred_at": "2024-10-01",
+    "verification_status": "DOCUMENT_VERIFIED",
+    "created_at": "2026-11-15 20:40:20.258896",
+    "subject_key": "보증금",
+    "predicate_key": "전액지급일",
+    "scope": "CASE_GLOBAL",
+    "temporal_context": "ACTUAL_PERFORMANCE",
+    "structured_slots": {
+      "statement": "보증금 전액 지급일은 2024-10-01이다.",
+      "claim_type": "DATE",
+      "scope": "CASE_GLOBAL",
+      "subject_key": "보증금",
+      "predicate_key": "전액지급일",
+      "temporal_context": "ACTUAL_PERFORMANCE",
+      "value_dimension": "DATE",
+      "normalized_amounts": [],
+      "amount_roles": {},
+      "installment_stage": null,
+      "normalized_dates": [
+        "2024-10-01"
+      ],
+      "invalid_dates": [],
+      "date_roles": {
+        "GENERAL_DATE": [
+          "2024-10-01"
+        ]
+      },
+      "polarity": "AFFIRMATIVE",
+      "core_predicate": "전액지급일",
+      "negated_predicate": null,
+      "content_tokens": [
+        "보증금",
+        "지급일"
+      ],
+      "evidence_id": "e5cc432a-0993-4f1f-b0b4-f3bd696cb92c",
+      "document_name": "E01_synthetic_record.txt",
+      "source_span_ids": [
+        "6eb87fca-9e98-4320-aefd-b59fbc660af9"
+      ],
+      "semantic_fact": {
+        "statement": "보증금 전액 지급일은 2024-10-01이다.",
+        "subject_key": "보증금",
+        "object_key": null,
+        "predicate": "전액지급일",
+        "semantic_category": "EVENT",
+        "event_type": "PAYMENT",
+        "event_subtype": "PRINCIPAL_DEPOSIT",
+        "temporal_type": "OCCURRED_AT",
+        "temporal_value": "2024-10-01",
+        "temporal_qualifier": null,
+        "occurrence_status": "ACTUAL",
+        "polarity": "AFFIRMATIVE",
+        "is_repeatable_event": false,
+        "value": null,
+        "condition": null,
+        "assertion_status": null,
+        "confidence": 1.0,
+        "provenance": {
+          "document_name": "E01_synthetic_record.txt",
+          "evidence_id": "e5cc432a-0993-4f1f-b0b4-f3bd696cb92c"
+        }
+      },
+      "semantic_category": "EVENT",
+      "event_type": "PAYMENT",
+      "event_subtype": "PRINCIPAL_DEPOSIT",
+      "temporal_type": "OCCURRED_AT"
+    }
+  },
+  {
+    "id": "5ac14526-0293-49f2-8f02-c06c1d85d082",
+    "case_id": "kpi5_sc-021_13e152bbbc",
+    "statement": "임차인은 2024-10-01에 인도, 전입신고, 확정일자를 갖추었다고 기재되어 있다.",
+    "fact_type": "ACTION",
+    "confidence": 0.94,
+    "source_type": "DOCUMENT_SUPPORTED",
+    "source_ref": "7a6e681b-33fc-4c46-b3af-790e29e659e6",
+    "occurred_at": "2024-10-01",
+    "verification_status": "DOCUMENT_VERIFIED",
+    "created_at": "2026-11-15 20:40:29.579702",
+    "subject_key": "임차인",
+    "predicate_key": "인도·전입신고·확정일자 구비",
+    "scope": "CASE_GLOBAL",
+    "temporal_context": "ACTUAL_PERFORMANCE",
+    "structured_slots": {
+      "statement": "임차인은 2024-10-01에 인도, 전입신고, 확정일자를 갖추었다고 기재되어 있다.",
+      "claim_type": "ACTION",
+      "scope": "CASE_GLOBAL",
+      "subject_key": "임차인",
+      "predicate_key": "인도·전입신고·확정일자 구비",
+      "temporal_context": "ACTUAL_PERFORMANCE",
+      "value_dimension": "DATE",
+      "normalized_amounts": [],
+      "amount_roles": {},
+      "installment_stage": null,
+      "normalized_dates": [
+        "2024-10-01"
+      ],
+      "invalid_dates": [],
+      "date_roles": {
+        "START_OR_DELIVERY_DATE": [
+          "2024-10-01"
+        ]
+      },
+      "polarity": "AFFIRMATIVE",
+      "core_predicate": "인도·전입신고·확정일자 구비",
+      "negated_predicate": null,
+      "content_tokens": [
+        "임차인",
+        "전입신고",
+        "확정일자",
+        "갖추었다고"
+      ],
+      "evidence_id": "7a6e681b-33fc-4c46-b3af-790e29e659e6",
+      "document_name": "E02_synthetic_record.txt",
+      "source_span_ids": [
+        "1ef384eb-3816-49f2-b62c-ad3f3dee18cb"
+      ],
+      "semantic_fact": {
+        "statement": "임차인은 2024-10-01에 인도, 전입신고, 확정일자를 갖추었다고 기재되어 있다.",
+        "subject_key": "임차인",
+        "object_key": null,
+        "predicate": "인도·전입신고·확정일자 구비",
+        "semantic_category": "EVENT",
+        "event_type": "RESIDENCE_REGISTRATION",
+        "event_subtype": "INITIAL_REGISTRATION",
+        "temporal_type": "OCCURRED_AT",
+        "temporal_value": "2024-10-01",
+        "temporal_qualifier": null,
+        "occurrence_status": "ACTUAL",
+        "polarity": "AFFIRMATIVE",
+        "is_repeatable_event": false,
+        "value": null,
+        "condition": null,
+        "assertion_status": null,
+        "confidence": 1.0,
+        "provenance": {
+          "document_name": "E02_synthetic_record.txt",
+          "evidence_id": "7a6e681b-33fc-4c46-b3af-790e29e659e6"
+        }
+      },
+      "semantic_category": "EVENT",
+      "event_type": "RESIDENCE_REGISTRATION",
+      "event_subtype": "INITIAL_REGISTRATION",
+      "temporal_type": "OCCURRED_AT"
+    }
+  },
+  {
+    "id": "69b052cf-9da9-407e-9507-71d099c1efef",
+    "case_id": "kpi5_sc-021_13e152bbbc",
+    "statement": "임차인의 대항력 및 확정일자 관련 요건이 2024-10-01에 갖추어졌다고 기재되어 있다.",
+    "fact_type": "RIGHT_DUTY",
+    "confidence": 0.72,
+    "source_type": "AI_INFERENCE",
+    "source_ref": "7a6e681b-33fc-4c46-b3af-790e29e659e6",
+    "occurred_at": "2024-10-01",
+    "verification_status": "UNVERIFIED",
+    "created_at": "2026-11-15 20:40:29.643817",
+    "subject_key": "임차인",
+    "predicate_key": "대항력·우선변제권 관련 요건 구비",
+    "scope": "CASE_GLOBAL",
+    "temporal_context": "ACTUAL_PERFORMANCE",
+    "structured_slots": {
+      "statement": "임차인의 대항력 및 확정일자 관련 요건이 2024-10-01에 갖추어졌다고 기재되어 있다.",
+      "claim_type": "RIGHT_DUTY",
+      "scope": "CASE_GLOBAL",
+      "subject_key": "임차인",
+      "predicate_key": "대항력·우선변제권 관련 요건 구비",
+      "temporal_context": "ACTUAL_PERFORMANCE",
+      "value_dimension": "DATE",
+      "normalized_amounts": [],
+      "amount_roles": {},
+      "installment_stage": null,
+      "normalized_dates": [
+        "2024-10-01"
+      ],
+      "invalid_dates": [],
+      "date_roles": {
+        "GENERAL_DATE": [
+          "2024-10-01"
+        ]
+      },
+      "polarity": "AFFIRMATIVE",
+      "core_predicate": "대항력·우선변제권 관련 요건 구비",
+      "negated_predicate": null,
+      "content_tokens": [
+        "임차인",
+        "대항력",
+        "확정일자",
+        "요건",
+        "갖추어졌다고"
+      ],
+      "evidence_id": "7a6e681b-33fc-4c46-b3af-790e29e659e6",
+      "document_name": "E02_synthetic_record.txt",
+      "source_span_ids": [
+        "1ef384eb-3816-49f2-b62c-ad3f3dee18cb"
+      ],
+      "semantic_fact": {
+        "statement": "임차인의 대항력 및 확정일자 관련 요건이 2024-10-01에 갖추어졌다고 기재되어 있다.",
+        "subject_key": "임차인",
+        "object_key": null,
+        "predicate": "대항력·우선변제권 관련 요건 구비",
+        "semantic_category": "EVENT",
+        "event_type": "OCCUPANCY",
+        "event_subtype": null,
+        "temporal_type": "OCCURRED_AT",
+        "temporal_value": "2024-10-01",
+        "temporal_qualifier": null,
+        "occurrence_status": "ACTUAL",
+        "polarity": "AFFIRMATIVE",
+        "is_repeatable_event": false,
+        "value": null,
+        "condition": null,
+        "assertion_status": null,
+        "confidence": 1.0,
+        "provenance": {
+          "document_name": "E02_synthetic_record.txt",
+          "evidence_id": "7a6e681b-33fc-4c46-b3af-790e29e659e6"
+        }
+      },
+      "semantic_category": "EVENT",
+      "event_type": "OCCUPANCY",
+      "event_subtype": null,
+      "temporal_type": "OCCURRED_AT"
+    }
+  },
+  {
+    "id": "db631474-653e-46f6-ba54-32d5e9f615ef",
+    "case_id": "kpi5_sc-021_13e152bbbc",
+    "statement": "임차인의 최초 계약갱신요구가 2026-05-10에 임대인에게 도달했다고 기재되어 있다.",
+    "fact_type": "ACTION",
+    "confidence": 0.97,
+    "source_type": "DOCUMENT_SUPPORTED",
+    "source_ref": "7a6e681b-33fc-4c46-b3af-790e29e659e6",
+    "occurred_at": "2026-05-10",
+    "verification_status": "DOCUMENT_VERIFIED",
+    "created_at": "2026-11-15 20:40:29.708016",
+    "subject_key": "임차인",
+    "predicate_key": "최초 계약갱신요구 도달",
+    "scope": "CASE_GLOBAL",
+    "temporal_context": "MODIFICATION_OR_RENEWAL",
+    "structured_slots": {
+      "statement": "임차인의 최초 계약갱신요구가 2026-05-10에 임대인에게 도달했다고 기재되어 있다.",
+      "claim_type": "ACTION",
+      "scope": "CASE_GLOBAL",
+      "subject_key": "임차인",
+      "predicate_key": "최초 계약갱신요구 도달",
+      "temporal_context": "MODIFICATION_OR_RENEWAL",
+      "value_dimension": "DATE",
+      "normalized_amounts": [],
+      "amount_roles": {},
+      "installment_stage": null,
+      "normalized_dates": [
+        "2026-05-10"
+      ],
+      "invalid_dates": [],
+      "date_roles": {
+        "NOTICE_RECEIVED_DATE": [
+          "2026-05-10"
+        ]
+      },
+      "polarity": "AFFIRMATIVE",
+      "core_predicate": "최초 계약갱신요구 도달",
+      "negated_predicate": null,
+      "content_tokens": [
+        "임차인",
+        "최초",
+        "계약갱신요구",
+        "임대인",
+        "도달했다고"
+      ],
+      "evidence_id": "7a6e681b-33fc-4c46-b3af-790e29e659e6",
+      "document_name": "E02_synthetic_record.txt",
+      "source_span_ids": [
+        "c813d6ee-edb6-4fc7-8f31-1d43b2d9423a"
+      ],
+      "semantic_fact": {
+        "statement": "임차인의 최초 계약갱신요구가 2026-05-10에 임대인에게 도달했다고 기재되어 있다.",
+        "subject_key": "임차인",
+        "object_key": null,
+        "predicate": "최초 계약갱신요구 도달",
+        "semantic_category": "EVENT",
+        "event_type": "COMMUNICATION",
+        "event_subtype": "NOTICE_REACHED",
+        "temporal_type": "OCCURRED_AT",
+        "temporal_value": "2026-05-10",
+        "temporal_qualifier": null,
+        "occurrence_status": "ACTUAL",
+        "polarity": "AFFIRMATIVE",
+        "is_repeatable_event": true,
+        "value": null,
+        "condition": null,
+        "assertion_status": null,
+        "confidence": 1.0,
+        "provenance": {
+          "document_name": "E02_synthetic_record.txt",
+          "evidence_id": "7a6e681b-33fc-4c46-b3af-790e29e659e6"
+        }
+      },
+      "semantic_category": "EVENT",
+      "event_type": "COMMUNICATION",
+      "event_subtype": "NOTICE_REACHED",
+      "temporal_type": "OCCURRED_AT"
+    }
+  },
+  {
+    "id": "c5724af6-41ed-4c65-89bb-0d3937f24bff",
+    "case_id": "kpi5_sc-021_13e152bbbc",
+    "statement": "최초 계약갱신요구의 도달일은 2026-05-10이라고 기재되어 있다.",
+    "fact_type": "DATE",
+    "confidence": 0.97,
+    "source_type": "DOCUMENT_SUPPORTED",
+    "source_ref": "7a6e681b-33fc-4c46-b3af-790e29e659e6",
+    "occurred_at": "2026-05-10",
+    "verification_status": "DOCUMENT_VERIFIED",
+    "created_at": "2026-11-15 20:40:29.775586",
+    "subject_key": "최초 계약갱신요구",
+    "predicate_key": "도달일",
+    "scope": "CASE_GLOBAL",
+    "temporal_context": "MODIFICATION_OR_RENEWAL",
+    "structured_slots": {
+      "statement": "최초 계약갱신요구의 도달일은 2026-05-10이라고 기재되어 있다.",
+      "claim_type": "DATE",
+      "scope": "CASE_GLOBAL",
+      "subject_key": "최초 계약갱신요구",
+      "predicate_key": "도달일",
+      "temporal_context": "MODIFICATION_OR_RENEWAL",
+      "value_dimension": "DATE",
+      "normalized_amounts": [],
+      "amount_roles": {},
+      "installment_stage": null,
+      "normalized_dates": [
+        "2026-05-10"
+      ],
+      "invalid_dates": [],
+      "date_roles": {
+        "NOTICE_RECEIVED_DATE": [
+          "2026-05-10"
+        ]
+      },
+      "polarity": "AFFIRMATIVE",
+      "core_predicate": "도달일",
+      "negated_predicate": null,
+      "content_tokens": [
+        "최초",
+        "계약갱신요구",
+        "도달일"
+      ],
+      "evidence_id": "7a6e681b-33fc-4c46-b3af-790e29e659e6",
+      "document_name": "E02_synthetic_record.txt",
+      "source_span_ids": [
+        "c813d6ee-edb6-4fc7-8f31-1d43b2d9423a"
+      ],
+      "semantic_fact": {
+        "statement": "최초 계약갱신요구의 도달일은 2026-05-10이라고 기재되어 있다.",
+        "subject_key": "최초 계약갱신요구",
+        "object_key": null,
+        "predicate": "도달일",
+        "semantic_category": "EVENT",
+        "event_type": "COMMUNICATION",
+        "event_subtype": "NOTICE_REACHED",
+        "temporal_type": "OCCURRED_AT",
+        "temporal_value": "2026-05-10",
+        "temporal_qualifier": null,
+        "occurrence_status": "ACTUAL",
+        "polarity": "AFFIRMATIVE",
+        "is_repeatable_event": true,
+        "value": null,
+        "condition": null,
+        "assertion_status": null,
+        "confidence": 1.0,
+        "provenance": {
+          "document_name": "E02_synthetic_record.txt",
+          "evidence_id": "7a6e681b-33fc-4c46-b3af-790e29e659e6"
+        }
+      },
+      "semantic_category": "EVENT",
+      "event_type": "COMMUNICATION",
+      "event_subtype": "NOTICE_REACHED",
+      "temporal_type": "OCCURRED_AT"
+    }
+  },
+  {
+    "id": "5cd74e5f-91e2-45f2-b388-5f85a3a2774c",
+    "case_id": "kpi5_sc-021_13e152bbbc",
+    "statement": "임대인은 2026-05-11에 갱신요구 수령을 확인했고 거절 사유를 제시하지 않았다고 기재되어 있다.",
+    "fact_type": "ACTION",
+    "confidence": 0.95,
+    "source_type": "DOCUMENT_SUPPORTED",
+    "source_ref": "7a6e681b-33fc-4c46-b3af-790e29e659e6",
+    "occurred_at": "2026-05-11",
+    "verification_status": "DOCUMENT_VERIFIED",
+    "created_at": "2026-11-15 20:40:29.847285",
+    "subject_key": "임대인",
+    "predicate_key": "갱신요구 수령 확인 및 거절사유 미제시",
+    "scope": "CASE_GLOBAL",
+    "temporal_context": "MODIFICATION_OR_RENEWAL",
+    "structured_slots": {
+      "statement": "임대인은 2026-05-11에 갱신요구 수령을 확인했고 거절 사유를 제시하지 않았다고 기재되어 있다.",
+      "claim_type": "ACTION",
+      "scope": "CASE_GLOBAL",
+      "subject_key": "임대인",
+      "predicate_key": "갱신요구 수령 확인 및 거절사유 미제시",
+      "temporal_context": "MODIFICATION_OR_RENEWAL",
+      "value_dimension": "DATE",
+      "normalized_amounts": [],
+      "amount_roles": {},
+      "installment_stage": null,
+      "normalized_dates": [
+        "2026-05-11"
+      ],
+      "invalid_dates": [],
+      "date_roles": {
+        "NOTICE_RECEIVED_DATE": [
+          "2026-05-11"
+        ]
+      },
+      "polarity": "NEGATIVE",
+      "core_predicate": "갱신요구 수령 확인 및 거절사유 미제시",
+      "negated_predicate": "제시",
+      "content_tokens": [
+        "임대인",
+        "갱신요구",
+        "수령",
+        "확인했고",
+        "거절",
+        "사유",
+        "제시하지",
+        "않았다고"
+      ],
+      "evidence_id": "7a6e681b-33fc-4c46-b3af-790e29e659e6",
+      "document_name": "E02_synthetic_record.txt",
+      "source_span_ids": [
+        "6f5a1fe1-e82b-42f1-abc7-c2e54b934445"
+      ],
+      "semantic_fact": {
+        "statement": "임대인은 2026-05-11에 갱신요구 수령을 확인했고 거절 사유를 제시하지 않았다고 기재되어 있다.",
+        "subject_key": "임대인",
+        "object_key": null,
+        "predicate": "갱신요구 수령 확인 및 거절사유 미제시",
+        "semantic_category": "IDENTITY",
+        "event_type": "IDENTITY",
+        "event_subtype": null,
+        "temporal_type": "NONE",
+        "temporal_value": "2026-05-11",
+        "temporal_qualifier": null,
+        "occurrence_status": "ACTUAL",
+        "polarity": "NEGATIVE",
+        "is_repeatable_event": false,
+        "value": null,
+        "condition": null,
+        "assertion_status": null,
+        "confidence": 1.0,
+        "provenance": {
+          "document_name": "E02_synthetic_record.txt",
+          "evidence_id": "7a6e681b-33fc-4c46-b3af-790e29e659e6"
+        }
+      },
+      "semantic_category": "IDENTITY",
+      "event_type": "IDENTITY",
+      "event_subtype": null,
+      "temporal_type": "NONE"
+    }
+  },
+  {
+    "id": "6077e1e8-85bc-408c-b040-c00bd639c1e7",
+    "case_id": "kpi5_sc-021_13e152bbbc",
+    "statement": "임대인의 갱신요구 수령 확인일은 2026-05-11이라고 기재되어 있다.",
+    "fact_type": "DATE",
+    "confidence": 0.94,
+    "source_type": "DOCUMENT_SUPPORTED",
+    "source_ref": "7a6e681b-33fc-4c46-b3af-790e29e659e6",
+    "occurred_at": "2026-05-11",
+    "verification_status": "DOCUMENT_VERIFIED",
+    "created_at": "2026-11-15 20:40:29.913497",
+    "subject_key": "임대인 갱신요구 수령 확인",
+    "predicate_key": "확인일",
+    "scope": "CASE_GLOBAL",
+    "temporal_context": "MODIFICATION_OR_RENEWAL",
+    "structured_slots": {
+      "statement": "임대인의 갱신요구 수령 확인일은 2026-05-11이라고 기재되어 있다.",
+      "claim_type": "DATE",
+      "scope": "CASE_GLOBAL",
+      "subject_key": "임대인 갱신요구 수령 확인",
+      "predicate_key": "확인일",
+      "temporal_context": "MODIFICATION_OR_RENEWAL",
+      "value_dimension": "DATE",
+      "normalized_amounts": [],
+      "amount_roles": {},
+      "installment_stage": null,
+      "normalized_dates": [
+        "2026-05-11"
+      ],
+      "invalid_dates": [],
+      "date_roles": {
+        "NOTICE_RECEIVED_DATE": [
+          "2026-05-11"
+        ]
+      },
+      "polarity": "AFFIRMATIVE",
+      "core_predicate": "확인일",
+      "negated_predicate": null,
+      "content_tokens": [
+        "임대인",
+        "갱신요구",
+        "수령",
+        "확인일"
+      ],
+      "evidence_id": "7a6e681b-33fc-4c46-b3af-790e29e659e6",
+      "document_name": "E02_synthetic_record.txt",
+      "source_span_ids": [
+        "6f5a1fe1-e82b-42f1-abc7-c2e54b934445"
+      ],
+      "semantic_fact": {
+        "statement": "임대인의 갱신요구 수령 확인일은 2026-05-11이라고 기재되어 있다.",
+        "subject_key": "임대인 갱신요구 수령 확인",
+        "object_key": null,
+        "predicate": "확인일",
+        "semantic_category": "EVENT",
+        "event_type": "GENERAL_FACT",
+        "event_subtype": null,
+        "temporal_type": "OCCURRED_AT",
+        "temporal_value": "2026-05-11",
+        "temporal_qualifier": null,
+        "occurrence_status": "ACTUAL",
+        "polarity": "AFFIRMATIVE",
+        "is_repeatable_event": false,
+        "value": null,
+        "condition": null,
+        "assertion_status": null,
+        "confidence": 1.0,
+        "provenance": {
+          "document_name": "E02_synthetic_record.txt",
+          "evidence_id": "7a6e681b-33fc-4c46-b3af-790e29e659e6"
+        }
+      },
+      "semantic_category": "EVENT",
+      "event_type": "GENERAL_FACT",
+      "event_subtype": null,
+      "temporal_type": "OCCURRED_AT"
+    }
+  },
+  {
+    "id": "b08a106b-909c-4635-8e79-8a359cc6502f",
+    "case_id": "kpi5_sc-021_13e152bbbc",
+    "statement": "임대인은 갱신요구에 대해 거절 사유를 제시하지 않았다고 기재되어 있다.",
+    "fact_type": "GENERAL",
+    "confidence": 0.88,
+    "source_type": "DOCUMENT_SUPPORTED",
+    "source_ref": "7a6e681b-33fc-4c46-b3af-790e29e659e6",
+    "occurred_at": null,
+    "verification_status": "DOCUMENT_VERIFIED",
+    "created_at": "2026-11-15 20:40:29.983170",
+    "subject_key": "임대인",
+    "predicate_key": "갱신거절 사유 제시 여부",
+    "scope": "CASE_GLOBAL",
+    "temporal_context": "MODIFICATION_OR_RENEWAL",
+    "structured_slots": {
+      "statement": "임대인은 갱신요구에 대해 거절 사유를 제시하지 않았다고 기재되어 있다.",
+      "claim_type": "GENERAL",
+      "scope": "CASE_GLOBAL",
+      "subject_key": "임대인",
+      "predicate_key": "갱신거절 사유 제시 여부",
+      "temporal_context": "MODIFICATION_OR_RENEWAL",
+      "value_dimension": "TEXT",
+      "normalized_amounts": [],
+      "amount_roles": {},
+      "installment_stage": null,
+      "normalized_dates": [],
+      "invalid_dates": [],
+      "date_roles": {},
+      "polarity": "NEGATIVE",
+      "core_predicate": "갱신거절 사유 제시 여부",
+      "negated_predicate": "제시",
+      "content_tokens": [
+        "임대인",
+        "갱신요구",
+        "거절",
+        "사유",
+        "제시하지",
+        "않았다고"
+      ],
+      "evidence_id": "7a6e681b-33fc-4c46-b3af-790e29e659e6",
+      "document_name": "E02_synthetic_record.txt",
+      "source_span_ids": [
+        "6f5a1fe1-e82b-42f1-abc7-c2e54b934445"
+      ],
+      "semantic_fact": {
+        "statement": "임대인은 갱신요구에 대해 거절 사유를 제시하지 않았다고 기재되어 있다.",
+        "subject_key": "임대인",
+        "object_key": null,
+        "predicate": "갱신거절 사유 제시 여부",
+        "semantic_category": "IDENTITY",
+        "event_type": "IDENTITY",
+        "event_subtype": null,
+        "temporal_type": "NONE",
+        "temporal_value": null,
+        "temporal_qualifier": null,
+        "occurrence_status": "ACTUAL",
+        "polarity": "NEGATIVE",
+        "is_repeatable_event": false,
+        "value": null,
+        "condition": null,
+        "assertion_status": null,
+        "confidence": 1.0,
+        "provenance": {
+          "document_name": "E02_synthetic_record.txt",
+          "evidence_id": "7a6e681b-33fc-4c46-b3af-790e29e659e6"
+        }
+      },
+      "semantic_category": "IDENTITY",
+      "event_type": "IDENTITY",
+      "event_subtype": null,
+      "temporal_type": "NONE"
+    }
+  },
+  {
+    "id": "da966d41-bd90-4cea-a34b-a79c5b161e7e",
+    "case_id": "kpi5_sc-021_13e152bbbc",
+    "statement": "이후 임차인의 별도 계약해지 통지가 2026-06-15에 임대인에게 도달했다고 기재되어 있다.",
+    "fact_type": "ACTION",
+    "confidence": 0.97,
+    "source_type": "DOCUMENT_SUPPORTED",
+    "source_ref": "7a6e681b-33fc-4c46-b3af-790e29e659e6",
+    "occurred_at": "2026-06-15",
+    "verification_status": "DOCUMENT_VERIFIED",
+    "created_at": "2026-11-15 20:40:30.049866",
+    "subject_key": "임차인",
+    "predicate_key": "별도 계약해지 통지 도달",
+    "scope": "CASE_GLOBAL",
+    "temporal_context": "TERMINATION_NOTICE",
+    "structured_slots": {
+      "statement": "이후 임차인의 별도 계약해지 통지가 2026-06-15에 임대인에게 도달했다고 기재되어 있다.",
+      "claim_type": "ACTION",
+      "scope": "CASE_GLOBAL",
+      "subject_key": "임차인",
+      "predicate_key": "별도 계약해지 통지 도달",
+      "temporal_context": "TERMINATION_NOTICE",
+      "value_dimension": "DATE",
+      "normalized_amounts": [],
+      "amount_roles": {},
+      "installment_stage": null,
+      "normalized_dates": [
+        "2026-06-15"
+      ],
+      "invalid_dates": [],
+      "date_roles": {
+        "NOTICE_RECEIVED_DATE": [
+          "2026-06-15"
+        ]
+      },
+      "polarity": "AFFIRMATIVE",
+      "core_predicate": "별도 계약해지 통지 도달",
+      "negated_predicate": null,
+      "content_tokens": [
+        "이후",
+        "임차인",
+        "계약해지",
+        "통지",
+        "임대인",
+        "도달했다고"
+      ],
+      "evidence_id": "7a6e681b-33fc-4c46-b3af-790e29e659e6",
+      "document_name": "E02_synthetic_record.txt",
+      "source_span_ids": [
+        "b01c875e-75c8-4e63-96f2-f107dcc0de9f"
+      ],
+      "semantic_fact": {
+        "statement": "이후 임차인의 별도 계약해지 통지가 2026-06-15에 임대인에게 도달했다고 기재되어 있다.",
+        "subject_key": "임차인",
+        "object_key": null,
+        "predicate": "별도 계약해지 통지 도달",
+        "semantic_category": "EVENT",
+        "event_type": "COMMUNICATION",
+        "event_subtype": "NOTICE_REACHED",
+        "temporal_type": "OCCURRED_AT",
+        "temporal_value": "2026-06-15",
+        "temporal_qualifier": null,
+        "occurrence_status": "ACTUAL",
+        "polarity": "AFFIRMATIVE",
+        "is_repeatable_event": true,
+        "value": null,
+        "condition": null,
+        "assertion_status": null,
+        "confidence": 1.0,
+        "provenance": {
+          "document_name": "E02_synthetic_record.txt",
+          "evidence_id": "7a6e681b-33fc-4c46-b3af-790e29e659e6"
+        }
+      },
+      "semantic_category": "EVENT",
+      "event_type": "COMMUNICATION",
+      "event_subtype": "NOTICE_REACHED",
+      "temporal_type": "OCCURRED_AT"
+    }
+  },
+  {
+    "id": "0db37152-0a3c-48e2-96c9-abab5f784af1",
+    "case_id": "kpi5_sc-021_13e152bbbc",
+    "statement": "별도 계약해지 통지의 도달일은 2026-06-15라고 기재되어 있다.",
+    "fact_type": "DATE",
+    "confidence": 0.97,
+    "source_type": "DOCUMENT_SUPPORTED",
+    "source_ref": "7a6e681b-33fc-4c46-b3af-790e29e659e6",
+    "occurred_at": "2026-06-15",
+    "verification_status": "DOCUMENT_VERIFIED",
+    "created_at": "2026-11-15 20:40:30.118990",
+    "subject_key": "별도 계약해지 통지",
+    "predicate_key": "도달일",
+    "scope": "CASE_GLOBAL",
+    "temporal_context": "TERMINATION_NOTICE",
+    "structured_slots": {
+      "statement": "별도 계약해지 통지의 도달일은 2026-06-15라고 기재되어 있다.",
+      "claim_type": "DATE",
+      "scope": "CASE_GLOBAL",
+      "subject_key": "별도 계약해지 통지",
+      "predicate_key": "도달일",
+      "temporal_context": "TERMINATION_NOTICE",
+      "value_dimension": "DATE",
+      "normalized_amounts": [],
+      "amount_roles": {},
+      "installment_stage": null,
+      "normalized_dates": [
+        "2026-06-15"
+      ],
+      "invalid_dates": [],
+      "date_roles": {
+        "NOTICE_RECEIVED_DATE": [
+          "2026-06-15"
+        ]
+      },
+      "polarity": "AFFIRMATIVE",
+      "core_predicate": "도달일",
+      "negated_predicate": null,
+      "content_tokens": [
+        "계약해지",
+        "통지",
+        "도달일",
+        "라고"
+      ],
+      "evidence_id": "7a6e681b-33fc-4c46-b3af-790e29e659e6",
+      "document_name": "E02_synthetic_record.txt",
+      "source_span_ids": [
+        "b01c875e-75c8-4e63-96f2-f107dcc0de9f"
+      ],
+      "semantic_fact": {
+        "statement": "별도 계약해지 통지의 도달일은 2026-06-15라고 기재되어 있다.",
+        "subject_key": "별도 계약해지 통지",
+        "object_key": null,
+        "predicate": "도달일",
+        "semantic_category": "EVENT",
+        "event_type": "COMMUNICATION",
+        "event_subtype": "NOTICE_REACHED",
+        "temporal_type": "OCCURRED_AT",
+        "temporal_value": "2026-06-15",
+        "temporal_qualifier": null,
+        "occurrence_status": "ACTUAL",
+        "polarity": "AFFIRMATIVE",
+        "is_repeatable_event": true,
+        "value": null,
+        "condition": null,
+        "assertion_status": null,
+        "confidence": 1.0,
+        "provenance": {
+          "document_name": "E02_synthetic_record.txt",
+          "evidence_id": "7a6e681b-33fc-4c46-b3af-790e29e659e6"
+        }
+      },
+      "semantic_category": "EVENT",
+      "event_type": "COMMUNICATION",
+      "event_subtype": "NOTICE_REACHED",
+      "temporal_type": "OCCURRED_AT"
+    }
+  },
+  {
+    "id": "9d92edae-0866-4221-b4ec-5e01e37edc02",
+    "case_id": "kpi5_sc-021_13e152bbbc",
+    "statement": "해지 통지에는 새 갱신기간이 시작하기 전이라도 계약을 해지한다는 뜻이 명시되어 있다.",
+    "fact_type": "DOC_INFO",
+    "confidence": 0.9,
+    "source_type": "DOCUMENT_SUPPORTED",
+    "source_ref": "da713fd6-b159-49bb-8db1-8070aaacbd8a",
+    "occurred_at": null,
+    "verification_status": "DOCUMENT_VERIFIED",
+    "created_at": "2026-11-15 20:40:36.264086",
+    "subject_key": "해지 통지",
+    "predicate_key": "기재내용",
+    "scope": "DOCUMENT_LOCAL",
+    "temporal_context": "TERMINATION_NOTICE",
+    "structured_slots": {
+      "statement": "해지 통지에는 새 갱신기간이 시작하기 전이라도 계약을 해지한다는 뜻이 명시되어 있다.",
+      "claim_type": "DOC_INFO",
+      "scope": "DOCUMENT_LOCAL",
+      "subject_key": "해지 통지",
+      "predicate_key": "기재내용",
+      "temporal_context": "TERMINATION_NOTICE",
+      "value_dimension": "TEXT",
+      "normalized_amounts": [],
+      "amount_roles": {},
+      "installment_stage": null,
+      "normalized_dates": [],
+      "invalid_dates": [],
+      "date_roles": {},
+      "polarity": "AFFIRMATIVE",
+      "core_predicate": "기재내용",
+      "negated_predicate": null,
+      "content_tokens": [
+        "해지",
+        "통지에",
+        "갱신기간",
+        "시작하기",
+        "계약",
+        "해지한다",
+        "명시되어"
+      ],
+      "evidence_id": "da713fd6-b159-49bb-8db1-8070aaacbd8a",
+      "document_name": "E03_synthetic_record.txt",
+      "source_span_ids": [
+        "ad2c09c2-282d-4513-920c-50167e827bb6"
+      ],
+      "semantic_fact": {
+        "statement": "해지 통지에는 새 갱신기간이 시작하기 전이라도 계약을 해지한다는 뜻이 명시되어 있다.",
+        "subject_key": "해지 통지",
+        "object_key": null,
+        "predicate": "기재내용",
+        "semantic_category": "METADATA",
+        "event_type": "DOCUMENT_METADATA",
+        "event_subtype": "DOCUMENT_TITLE",
+        "temporal_type": "NONE",
+        "temporal_value": null,
+        "temporal_qualifier": null,
+        "occurrence_status": "ACTUAL",
+        "polarity": "AFFIRMATIVE",
+        "is_repeatable_event": false,
+        "value": null,
+        "condition": null,
+        "assertion_status": null,
+        "confidence": 1.0,
+        "provenance": {
+          "document_name": "E03_synthetic_record.txt",
+          "evidence_id": "da713fd6-b159-49bb-8db1-8070aaacbd8a"
+        }
+      },
+      "semantic_category": "METADATA",
+      "event_type": "DOCUMENT_METADATA",
+      "event_subtype": "DOCUMENT_TITLE",
+      "temporal_type": "NONE"
+    }
+  },
+  {
+    "id": "ba6d6c40-5a50-40f8-bd1c-2bcd1dffafc7",
+    "case_id": "kpi5_sc-021_13e152bbbc",
+    "statement": "해지 통지에는 새 갱신기간이 시작하기 전이라도 계약을 해지한다는 의사가 표시되어 있다.",
+    "fact_type": "ACTION",
+    "confidence": 0.82,
+    "source_type": "DOCUMENT_SUPPORTED",
+    "source_ref": "da713fd6-b159-49bb-8db1-8070aaacbd8a",
+    "occurred_at": null,
+    "verification_status": "DOCUMENT_VERIFIED",
+    "created_at": "2026-11-15 20:40:36.332804",
+    "subject_key": "임차인",
+    "predicate_key": "계약해지 의사표시",
+    "scope": "CASE_GLOBAL",
+    "temporal_context": "TERMINATION_NOTICE",
+    "structured_slots": {
+      "statement": "해지 통지에는 새 갱신기간이 시작하기 전이라도 계약을 해지한다는 의사가 표시되어 있다.",
+      "claim_type": "ACTION",
+      "scope": "CASE_GLOBAL",
+      "subject_key": "임차인",
+      "predicate_key": "계약해지 의사표시",
+      "temporal_context": "TERMINATION_NOTICE",
+      "value_dimension": "TEXT",
+      "normalized_amounts": [],
+      "amount_roles": {},
+      "installment_stage": null,
+      "normalized_dates": [],
+      "invalid_dates": [],
+      "date_roles": {},
+      "polarity": "AFFIRMATIVE",
+      "core_predicate": "계약해지 의사표시",
+      "negated_predicate": null,
+      "content_tokens": [
+        "해지",
+        "통지에",
+        "갱신기간",
+        "시작하기",
+        "계약",
+        "해지한다",
+        "의사"
+      ],
+      "evidence_id": "da713fd6-b159-49bb-8db1-8070aaacbd8a",
+      "document_name": "E03_synthetic_record.txt",
+      "source_span_ids": [
+        "ad2c09c2-282d-4513-920c-50167e827bb6"
+      ],
+      "semantic_fact": {
+        "statement": "해지 통지에는 새 갱신기간이 시작하기 전이라도 계약을 해지한다는 의사가 표시되어 있다.",
+        "subject_key": "임차인",
+        "object_key": null,
+        "predicate": "계약해지 의사표시",
+        "semantic_category": "EVENT",
+        "event_type": "COMMUNICATION",
+        "event_subtype": "NOTICE",
+        "temporal_type": "REPORTED_AT",
+        "temporal_value": null,
+        "temporal_qualifier": null,
+        "occurrence_status": "ACTUAL",
+        "polarity": "AFFIRMATIVE",
+        "is_repeatable_event": true,
+        "value": null,
+        "condition": null,
+        "assertion_status": null,
+        "confidence": 1.0,
+        "provenance": {
+          "document_name": "E03_synthetic_record.txt",
+          "evidence_id": "da713fd6-b159-49bb-8db1-8070aaacbd8a"
+        }
+      },
+      "semantic_category": "EVENT",
+      "event_type": "COMMUNICATION",
+      "event_subtype": "NOTICE",
+      "temporal_type": "REPORTED_AT"
+    }
+  },
+  {
+    "id": "4d1eb41e-9e2e-4c8b-8590-80348f0000f0",
+    "case_id": "kpi5_sc-021_13e152bbbc",
+    "statement": "임대인은 2026-11-10 현재 보증금을 전혀 반환하지 않았다고 기재되어 있다.",
+    "fact_type": "ACTION",
+    "confidence": 0.96,
+    "source_type": "DOCUMENT_SUPPORTED",
+    "source_ref": "da713fd6-b159-49bb-8db1-8070aaacbd8a",
+    "occurred_at": "2026-11-10",
+    "verification_status": "DOCUMENT_VERIFIED",
+    "created_at": "2026-11-15 20:40:36.413943",
+    "subject_key": "임대인",
+    "predicate_key": "보증금 반환 미이행",
+    "scope": "CASE_GLOBAL",
+    "temporal_context": "AS_OF_2026-11-10",
+    "structured_slots": {
+      "statement": "임대인은 2026-11-10 현재 보증금을 전혀 반환하지 않았다고 기재되어 있다.",
+      "claim_type": "ACTION",
+      "scope": "CASE_GLOBAL",
+      "subject_key": "임대인",
+      "predicate_key": "보증금 반환 미이행",
+      "temporal_context": "AS_OF_2026-11-10",
+      "value_dimension": "DATE",
+      "normalized_amounts": [],
+      "amount_roles": {},
+      "installment_stage": null,
+      "normalized_dates": [
+        "2026-11-10"
+      ],
+      "invalid_dates": [],
+      "date_roles": {
+        "ACTUAL_PAYMENT_OR_RETURN_DATE": [
+          "2026-11-10"
+        ]
+      },
+      "polarity": "NEGATIVE",
+      "core_predicate": "보증금 반환 미이행",
+      "negated_predicate": "반환",
+      "content_tokens": [
+        "임대인",
+        "현재",
+        "보증금",
+        "전혀",
+        "반환하지",
+        "않았다고"
+      ],
+      "evidence_id": "da713fd6-b159-49bb-8db1-8070aaacbd8a",
+      "document_name": "E03_synthetic_record.txt",
+      "source_span_ids": [
+        "62553388-d1df-42e6-9224-b5b85e6c7891"
+      ],
+      "semantic_fact": {
+        "statement": "임대인은 2026-11-10 현재 보증금을 전혀 반환하지 않았다고 기재되어 있다.",
+        "subject_key": "임대인",
+        "object_key": null,
+        "predicate": "보증금 반환 미이행",
+        "semantic_category": "STATE",
+        "event_type": "PAYMENT",
+        "event_subtype": "RETURN_AMOUNT",
+        "temporal_type": "VALID_AT",
+        "temporal_value": "2026-11-10",
+        "temporal_qualifier": null,
+        "occurrence_status": "ACTUAL",
+        "polarity": "NEGATIVE",
+        "is_repeatable_event": false,
+        "value": null,
+        "condition": null,
+        "assertion_status": null,
+        "confidence": 1.0,
+        "provenance": {
+          "document_name": "E03_synthetic_record.txt",
+          "evidence_id": "da713fd6-b159-49bb-8db1-8070aaacbd8a"
+        }
+      },
+      "semantic_category": "STATE",
+      "event_type": "PAYMENT",
+      "event_subtype": "RETURN_AMOUNT",
+      "temporal_type": "VALID_AT"
+    }
+  },
+  {
+    "id": "42517a61-bf11-4f39-9de8-e22d6b8d7bea",
+    "case_id": "kpi5_sc-021_13e152bbbc",
+    "statement": "보증금 반환 여부의 기준 시점은 2026-11-10이다.",
+    "fact_type": "DATE",
+    "confidence": 0.95,
+    "source_type": "DOCUMENT_SUPPORTED",
+    "source_ref": "da713fd6-b159-49bb-8db1-8070aaacbd8a",
+    "occurred_at": "2026-11-10",
+    "verification_status": "DOCUMENT_VERIFIED",
+    "created_at": "2026-11-15 20:40:36.510383",
+    "subject_key": "보증금 반환 미이행",
+    "predicate_key": "기준시점",
+    "scope": "CASE_GLOBAL",
+    "temporal_context": "AS_OF_2026-11-10",
+    "structured_slots": {
+      "statement": "보증금 반환 여부의 기준 시점은 2026-11-10이다.",
+      "claim_type": "DATE",
+      "scope": "CASE_GLOBAL",
+      "subject_key": "보증금 반환 미이행",
+      "predicate_key": "기준시점",
+      "temporal_context": "AS_OF_2026-11-10",
+      "value_dimension": "DATE",
+      "normalized_amounts": [],
+      "amount_roles": {},
+      "installment_stage": null,
+      "normalized_dates": [
+        "2026-11-10"
+      ],
+      "invalid_dates": [],
+      "date_roles": {
+        "GENERAL_DATE": [
+          "2026-11-10"
+        ]
+      },
+      "polarity": "AFFIRMATIVE",
+      "core_predicate": "기준시점",
+      "negated_predicate": null,
+      "content_tokens": [
+        "보증금",
+        "반환",
+        "여부",
+        "시점"
+      ],
+      "evidence_id": "da713fd6-b159-49bb-8db1-8070aaacbd8a",
+      "document_name": "E03_synthetic_record.txt",
+      "source_span_ids": [
+        "62553388-d1df-42e6-9224-b5b85e6c7891"
+      ],
+      "semantic_fact": {
+        "statement": "보증금 반환 여부의 기준 시점은 2026-11-10이다.",
+        "subject_key": "보증금 반환 미이행",
+        "object_key": null,
+        "predicate": "기준시점",
+        "semantic_category": "STATE",
+        "event_type": "PAYMENT",
+        "event_subtype": "RETURN_AMOUNT",
+        "temporal_type": "VALID_AT",
+        "temporal_value": "2026-11-10",
+        "temporal_qualifier": "기준",
+        "occurrence_status": "ACTUAL",
+        "polarity": "AFFIRMATIVE",
+        "is_repeatable_event": false,
+        "value": null,
+        "condition": null,
+        "assertion_status": null,
+        "confidence": 1.0,
+        "provenance": {
+          "document_name": "E03_synthetic_record.txt",
+          "evidence_id": "da713fd6-b159-49bb-8db1-8070aaacbd8a"
+        }
+      },
+      "semantic_category": "STATE",
+      "event_type": "PAYMENT",
+      "event_subtype": "RETURN_AMOUNT",
+      "temporal_type": "VALID_AT"
+    }
+  },
+  {
+    "id": "ff5b8692-b4de-47eb-b997-8571522e85c8",
+    "case_id": "kpi5_sc-021_13e152bbbc",
+    "statement": "임차인은 2026-11-10 현재 점유와 주민등록을 유지하고 있다고 기재되어 있다.",
+    "fact_type": "ACTION",
+    "confidence": 0.96,
+    "source_type": "DOCUMENT_SUPPORTED",
+    "source_ref": "da713fd6-b159-49bb-8db1-8070aaacbd8a",
+    "occurred_at": "2026-11-10",
+    "verification_status": "DOCUMENT_VERIFIED",
+    "created_at": "2026-11-15 20:40:36.595033",
+    "subject_key": "임차인",
+    "predicate_key": "점유 및 주민등록 유지",
+    "scope": "CASE_GLOBAL",
+    "temporal_context": "AS_OF_2026-11-10",
+    "structured_slots": {
+      "statement": "임차인은 2026-11-10 현재 점유와 주민등록을 유지하고 있다고 기재되어 있다.",
+      "claim_type": "ACTION",
+      "scope": "CASE_GLOBAL",
+      "subject_key": "임차인",
+      "predicate_key": "점유 및 주민등록 유지",
+      "temporal_context": "AS_OF_2026-11-10",
+      "value_dimension": "DATE",
+      "normalized_amounts": [],
+      "amount_roles": {},
+      "installment_stage": null,
+      "normalized_dates": [
+        "2026-11-10"
+      ],
+      "invalid_dates": [],
+      "date_roles": {
+        "GENERAL_DATE": [
+          "2026-11-10"
+        ]
+      },
+      "polarity": "AFFIRMATIVE",
+      "core_predicate": "점유 및 주민등록 유지",
+      "negated_predicate": null,
+      "content_tokens": [
+        "임차인",
+        "현재",
+        "점유",
+        "주민등록",
+        "유지하고",
+        "있다고"
+      ],
+      "evidence_id": "da713fd6-b159-49bb-8db1-8070aaacbd8a",
+      "document_name": "E03_synthetic_record.txt",
+      "source_span_ids": [
+        "e6f97625-a6a1-4461-b6b1-afcaeadb49fd"
+      ],
+      "semantic_fact": {
+        "statement": "임차인은 2026-11-10 현재 점유와 주민등록을 유지하고 있다고 기재되어 있다.",
+        "subject_key": "임차인",
+        "object_key": null,
+        "predicate": "점유 및 주민등록 유지",
+        "semantic_category": "EVENT",
+        "event_type": "OCCUPANCY",
+        "event_subtype": null,
+        "temporal_type": "OCCURRED_AT",
+        "temporal_value": "2026-11-10",
+        "temporal_qualifier": null,
+        "occurrence_status": "ACTUAL",
+        "polarity": "AFFIRMATIVE",
+        "is_repeatable_event": false,
+        "value": null,
+        "condition": null,
+        "assertion_status": null,
+        "confidence": 1.0,
+        "provenance": {
+          "document_name": "E03_synthetic_record.txt",
+          "evidence_id": "da713fd6-b159-49bb-8db1-8070aaacbd8a"
+        }
+      },
+      "semantic_category": "EVENT",
+      "event_type": "OCCUPANCY",
+      "event_subtype": null,
+      "temporal_type": "OCCURRED_AT"
+    }
+  },
+  {
+    "id": "31783d50-d2c5-4c1f-b087-12d65acd3aca",
+    "case_id": "kpi5_sc-021_13e152bbbc",
+    "statement": "점유와 주민등록 유지의 기준 시점은 2026-11-10이다.",
+    "fact_type": "DATE",
+    "confidence": 0.94,
+    "source_type": "DOCUMENT_SUPPORTED",
+    "source_ref": "da713fd6-b159-49bb-8db1-8070aaacbd8a",
+    "occurred_at": "2026-11-10",
+    "verification_status": "DOCUMENT_VERIFIED",
+    "created_at": "2026-11-15 20:40:36.678373",
+    "subject_key": "임차인의 점유 및 주민등록 유지",
+    "predicate_key": "기준시점",
+    "scope": "CASE_GLOBAL",
+    "temporal_context": "AS_OF_2026-11-10",
+    "structured_slots": {
+      "statement": "점유와 주민등록 유지의 기준 시점은 2026-11-10이다.",
+      "claim_type": "DATE",
+      "scope": "CASE_GLOBAL",
+      "subject_key": "임차인의 점유 및 주민등록 유지",
+      "predicate_key": "기준시점",
+      "temporal_context": "AS_OF_2026-11-10",
+      "value_dimension": "DATE",
+      "normalized_amounts": [],
+      "amount_roles": {},
+      "installment_stage": null,
+      "normalized_dates": [
+        "2026-11-10"
+      ],
+      "invalid_dates": [],
+      "date_roles": {
+        "GENERAL_DATE": [
+          "2026-11-10"
+        ]
+      },
+      "polarity": "AFFIRMATIVE",
+      "core_predicate": "기준시점",
+      "negated_predicate": null,
+      "content_tokens": [
+        "점유",
+        "주민등록",
+        "유지",
+        "시점"
+      ],
+      "evidence_id": "da713fd6-b159-49bb-8db1-8070aaacbd8a",
+      "document_name": "E03_synthetic_record.txt",
+      "source_span_ids": [
+        "e6f97625-a6a1-4461-b6b1-afcaeadb49fd"
+      ],
+      "semantic_fact": {
+        "statement": "점유와 주민등록 유지의 기준 시점은 2026-11-10이다.",
+        "subject_key": "임차인의 점유 및 주민등록 유지",
+        "object_key": null,
+        "predicate": "기준시점",
+        "semantic_category": "STATE",
+        "event_type": "OCCUPANCY",
+        "event_subtype": null,
+        "temporal_type": "VALID_AT",
+        "temporal_value": "2026-11-10",
+        "temporal_qualifier": "기준",
+        "occurrence_status": "ACTUAL",
+        "polarity": "AFFIRMATIVE",
+        "is_repeatable_event": false,
+        "value": null,
+        "condition": null,
+        "assertion_status": null,
+        "confidence": 1.0,
+        "provenance": {
+          "document_name": "E03_synthetic_record.txt",
+          "evidence_id": "da713fd6-b159-49bb-8db1-8070aaacbd8a"
+        }
+      },
+      "semantic_category": "STATE",
+      "event_type": "OCCUPANCY",
+      "event_subtype": null,
+      "temporal_type": "VALID_AT"
+    }
+  },
+  {
+    "id": "8c721a1c-af92-428b-934b-4327445f83ef",
+    "case_id": "kpi5_sc-021_13e152bbbc",
+    "statement": "임대인은 2026-10-01부터 다시 3개월을 세어야 한다고 주장한다.",
+    "fact_type": "PARTY_INFO",
+    "confidence": 0.9,
+    "source_type": "PARTY_ALLEGATION",
+    "source_ref": "da713fd6-b159-49bb-8db1-8070aaacbd8a",
+    "occurred_at": "2026-10-01",
+    "verification_status": "PARTY_ASSERTED",
+    "created_at": "2026-11-15 20:40:36.760365",
+    "subject_key": "임대인",
+    "predicate_key": "주장내용",
+    "scope": "CASE_GLOBAL",
+    "temporal_context": "DISPUTE_POSITION",
+    "structured_slots": {
+      "statement": "임대인은 2026-10-01부터 다시 3개월을 세어야 한다고 주장한다.",
+      "claim_type": "PARTY_INFO",
+      "scope": "CASE_GLOBAL",
+      "subject_key": "임대인",
+      "predicate_key": "주장내용",
+      "temporal_context": "DISPUTE_POSITION",
+      "value_dimension": "DATE",
+      "normalized_amounts": [],
+      "amount_roles": {},
+      "installment_stage": null,
+      "normalized_dates": [
+        "2026-10-01"
+      ],
+      "invalid_dates": [],
+      "date_roles": {
+        "GENERAL_DATE": [
+          "2026-10-01"
+        ]
+      },
+      "polarity": "AFFIRMATIVE",
+      "core_predicate": "주장내용",
+      "negated_predicate": null,
+      "content_tokens": [
+        "임대인",
+        "다시",
+        "개월",
+        "세어야",
+        "한다고",
+        "주장한다"
+      ],
+      "evidence_id": "da713fd6-b159-49bb-8db1-8070aaacbd8a",
+      "document_name": "E03_synthetic_record.txt",
+      "source_span_ids": [
+        "12dc9add-8eae-4f75-acaf-1d9e18d20f4e"
+      ],
+      "semantic_fact": {
+        "statement": "임대인은 2026-10-01부터 다시 3개월을 세어야 한다고 주장한다.",
+        "subject_key": "임대인",
+        "object_key": null,
+        "predicate": "주장내용",
+        "semantic_category": "IDENTITY",
+        "event_type": "IDENTITY",
+        "event_subtype": null,
+        "temporal_type": "NONE",
+        "temporal_value": "2026-10-01",
+        "temporal_qualifier": null,
+        "occurrence_status": "ACTUAL",
+        "polarity": "AFFIRMATIVE",
+        "is_repeatable_event": false,
+        "value": null,
+        "condition": null,
+        "assertion_status": null,
+        "confidence": 1.0,
+        "provenance": {
+          "document_name": "E03_synthetic_record.txt",
+          "evidence_id": "da713fd6-b159-49bb-8db1-8070aaacbd8a"
+        }
+      },
+      "semantic_category": "IDENTITY",
+      "event_type": "IDENTITY",
+      "event_subtype": null,
+      "temporal_type": "NONE"
+    }
+  }
+]

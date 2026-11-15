@@ -1038,3 +1038,93 @@ def test_execute_document_search_channel_hybrid():
     assert "주택임대차보호법 제3조 (대항력 등)" in result["statute_search_channel_desc"]
     assert "민법 제623조 (임대인의 의무)" in result["statute_search_channel_desc"]
     assert len(result["statute_search_items"]) == 2
+
+
+
+def test_finish_answer_preserves_draft_with_uncertain_legal_claims_as_cautionary(document_state):
+    """[P0-FINAL-DISPOSITION-NORMALIZATION] 법률 주장에 UNCERTAIN이 포함되어 있어도
+
+    명백한 UNSUPPORTED가 없다면 WITHHELD로 폐기하지 않고 DRAFT_PRESERVED 및 CAUTIONARY로 보존한다.
+    """
+    import hashlib
+    from unittest.mock import patch
+    from ai_legal_helper.rag.grounding_context import format_grounding_sources
+    import ai_legal_helper.workflows.document_consultation as consultation
+
+    draft = "임차인은 상속인 전원을 상대로 보증금 전액 반환을 청구할 수 있으나, 단정하기는 어렵습니다."
+    draft_sha = hashlib.sha256(draft.encode("utf-8")).hexdigest()
+    sources = consultation.document_sources(document_state)
+    _, manifest = format_grounding_sources(sources)
+
+    ver = {
+        "status": "REVISE",
+        "reason_code": "ANSWER_REVISION_REQUIRED",
+        "verified_answer_sha256": draft_sha,
+        "source_manifest": manifest,
+        "claims": [
+            {
+                "claim_type": "LEGAL_RULE",
+                "grounding_status": "SUPPORTED",
+                "source_ids": ["E01_계약서.txt"],
+                "claim": "대항력 요건을 갖추면 임차주택의 양수인에게 대항할 수 있다.",
+            },
+            {
+                "claim_type": "LEGAL_APPLICATION",
+                "grounding_status": "UNCERTAIN",
+                "source_ids": ["E01_계약서.txt"],
+                "claim": "상속재산분할 소송 진행만으로 당연히 보증금 반환청구가 정지된다고 보기는 어렵다.",
+            },
+        ],
+        "question_coverage": [],
+        "consistency_checks": {},
+        "missing_legal_issues": [],
+        "missing_issues": ["상속인 전원 책임 범위 추가 확인 필요"],
+    }
+    state = {**document_state, "draft_answer": draft, "verification_result": ver}
+
+    with patch.object(consultation, "validate_document_snapshot"):
+        result = consultation.finish_answer(state)
+
+    assert result["final_disposition"] == "CAUTIONARY"
+    assert result["verification_result"]["status"] == "PASS"
+    assert "임차인은 상속인 전원을 상대로" in result["final_answer"]
+    assert "질문에 대한 답변을 확정할 만큼 근거 확인을 마치지 못했습니다" not in result["final_answer"]
+
+
+def test_finish_answer_withholds_draft_with_unsupported_legal_claim(document_state):
+    """법률 주장에 명백한 UNSUPPORTED가 포함된 경우 치명적 법률 결함으로 간주하여 WITHHELD로 차단한다."""
+    import hashlib
+    from unittest.mock import patch
+    from ai_legal_helper.rag.grounding_context import format_grounding_sources
+    import ai_legal_helper.workflows.document_consultation as consultation
+
+    draft = "임차인은 무조건 낙찰자에게 보증금 전액을 반환청구할 수 있습니다."
+    draft_sha = hashlib.sha256(draft.encode("utf-8")).hexdigest()
+    sources = consultation.document_sources(document_state)
+    _, manifest = format_grounding_sources(sources)
+
+    ver = {
+        "status": "REVISE",
+        "reason_code": "LEGAL_SOURCE_INSUFFICIENT",
+        "verified_answer_sha256": draft_sha,
+        "source_manifest": manifest,
+        "claims": [
+            {
+                "claim_type": "LEGAL_APPLICATION",
+                "grounding_status": "UNSUPPORTED",
+                "source_ids": [],
+                "claim": "임차인은 무조건 낙찰자에게 보증금 전액을 반환청구할 수 있다.",
+            }
+        ],
+        "question_coverage": [],
+        "consistency_checks": {},
+        "missing_legal_issues": ["낙찰자 인수 규정 부재"],
+    }
+    state = {**document_state, "draft_answer": draft, "verification_result": ver}
+
+    with patch.object(consultation, "validate_document_snapshot"):
+        result = consultation.finish_answer(state)
+
+    assert result["final_disposition"] == "WITHHELD"
+    assert result["verification_result"]["status"] == "INSUFFICIENT"
+    assert "질문에 대한 답변을 확정할 만큼 근거 확인을 마치지 못했습니다" in result["final_answer"]

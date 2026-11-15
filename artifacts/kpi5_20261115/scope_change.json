@@ -1,0 +1,17 @@
+{
+  "report_scope": [
+    "SC-021"
+  ],
+  "all_evaluation_processes_stopped": true,
+  "prior_completed_out_of_scope": [
+    "SC-022",
+    "SC-023"
+  ],
+  "interrupted": [
+    "SC-024"
+  ],
+  "not_started": [
+    "SC-025"
+  ],
+  "prior_artifacts_preserved": true
+}

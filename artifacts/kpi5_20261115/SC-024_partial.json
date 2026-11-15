@@ -1,0 +1,23 @@
+{
+  "id": "SC-024",
+  "case_id": "kpi5_sc-024_fb1a918a7c",
+  "title": "실거주 이유 갱신거절 후 제3자 재임대 손해액 20261115_E2E_V6_KPI5",
+  "ingestion_trace_id": "35427d1a-a55c-4e9e-86ca-3b2348cb9ed6",
+  "ingestion": [
+    {
+      "evidence_id": "58632eeb-aa6b-4fc7-bd86-447a1d3a7dbd",
+      "filename": "E01_synthetic_record.txt",
+      "claims": 10
+    },
+    {
+      "evidence_id": "794b235d-3cc6-4ac9-88f4-abc55d772fc8",
+      "filename": "E02_synthetic_record.txt",
+      "claims": 13
+    },
+    {
+      "evidence_id": "6219e033-64c9-478f-acd7-42a8eeb30ee8",
+      "filename": "E03_synthetic_record.txt",
+      "claims": 8
+    }
+  ]
+}

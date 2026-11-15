@@ -358,7 +358,7 @@ def _retrieve_from_domain_collections(
                 if require_all and not target_articles.issubset(found_articles):
                     continue
                 if matched:
-                    return matched
+                    return _append_companion_addenda(matched, client, target_law)
             else:
                 from ai_legal_helper.llm.gateway import get_embeddings
                 emb = get_embeddings()
@@ -402,11 +402,68 @@ def _retrieve_from_domain_collections(
                     if len(matched) >= limit:
                         break
                 if matched:
-                    return matched
+                    return _append_companion_addenda(matched, client, target_law)
         except Exception as _ex:
             logger.debug("[DOMAIN_COLLECTION] 도메인 컬렉션(%s) 조회 예외: %s", cname, _ex)
             continue
     return []
+
+
+def _append_companion_addenda(
+    matched: list[dict[str, Any]], client: Any, law_name: str
+) -> list[dict[str, Any]]:
+    """로컬 검색된 법령 조문들에 대해 동일 법령의 부칙(Addenda)을 동반 조회하여 추가한다."""
+    if not matched:
+        return matched
+    has_addendum = any(
+        s.get("article") == "부칙" or "부칙" in str(s.get("title") or "") or s.get("part") == "부칙"
+        for s in matched
+    )
+    if has_addendum:
+        return matched
+    from langchain_core.documents import Document
+    from ai_legal_helper.rag.source_schema import build_source_from_chroma_doc
+    from ai_legal_helper.legal_knowledge.law_catalog import normalize_law_name
+
+    norm_name = normalize_law_name(law_name)
+    candidate_names = list(dict.fromkeys([
+        law_name,
+        norm_name,
+        *(s.get("statute_name") for s in matched if s.get("statute_name")),
+        *(s.get("law_name") for s in matched if s.get("law_name")),
+        " ".join(law_name.split()) if law_name else "",
+        "".join(law_name.split()) if law_name else "",
+    ]))
+    candidate_names = [c for c in candidate_names if c and isinstance(c, str)]
+
+    try:
+        col_names = [getattr(c, "name", str(c)) for c in client.list_collections()]
+        target_cols = [
+            "law_docs_administrative", "law_docs_civil", "law_docs_commercial",
+            "law_docs_criminal", "law_docs_labor", "law_docs_tax",
+            "law_docs_constitution", "law_docs_global", "law_docs_international",
+        ]
+        for cname in target_cols:
+            if cname not in col_names:
+                continue
+            col = client.get_collection(cname)
+            for cand in candidate_names:
+                for field in ("statute_name", "law_name"):
+                    res = col.get(where={field: cand}, include=["documents", "metadatas"])
+                    for doc_id, text, meta in zip(res.get("ids") or [], res.get("documents") or [], res.get("metadatas") or []):
+                        m = dict(meta or {})
+                        if m.get("article") == "부칙" or m.get("part") == "부칙" or "부칙" in str(m.get("title") or ""):
+                            doc = Document(id=doc_id, page_content=text, metadata=m)
+                            add_src = build_source_from_chroma_doc(
+                                doc,
+                                category=cname.replace("law_docs_", ""),
+                                retrieval_method="CHROMA_COMPANION_ADDENDA",
+                            )
+                            matched.append(add_src)
+                            return matched
+    except Exception as _ex:
+        logger.debug("[LOCAL_SEARCH] 부칙 동반 조회 예외: %s", _ex)
+    return matched
 
 
 def _retrieve_from_local_index(
@@ -500,7 +557,7 @@ def _retrieve_from_local_index(
                 return _retrieve_from_domain_collections(
                     client, col_names, norm_name, law_name, target_articles, query, limit, require_all
                 )
-            return matched
+            return _append_companion_addenda(matched, client, norm_name or law_name)
         else:
             # 조문 번호가 특정되지 않은 경우 질의 기반 벡터 유사도 검색으로 상위 조문 추출
             if not query or not query.strip():
@@ -534,7 +591,7 @@ def _retrieve_from_local_index(
                 return _retrieve_from_domain_collections(
                     client, col_names, norm_name, law_name, target_articles, query, limit, require_all
                 )
-            return matched
+            return _append_companion_addenda(matched, client, norm_name or law_name)
     except Exception as exc:
         logger.warning("[LOCAL_FIRST_SEARCH] 로컬 인덱스 조회 중 예외 발생: %s", exc)
         return []

@@ -1,0 +1,453 @@
+{
+  "fact_reviews": [
+    {
+      "index": 0,
+      "supported": true,
+      "gold_ids": [
+        "SC-022-F02"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "Gold F02와 문언이 일치한다."
+    },
+    {
+      "index": 1,
+      "supported": true,
+      "gold_ids": [
+        "SC-022-F12"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "Gold F12의 일부 사실인 '다른 위반 사유는 주장하지 않았다'를 정확히 뒷받침한다."
+    },
+    {
+      "index": 2,
+      "supported": true,
+      "gold_ids": [
+        "SC-022-F01"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "Gold F01의 일부 사실인 임차인 신원을 정확히 뒷받침한다."
+    },
+    {
+      "index": 3,
+      "supported": true,
+      "gold_ids": [
+        "SC-022-F01"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "Gold F01의 일부 사실인 임대인 신원을 정확히 뒷받침한다."
+    },
+    {
+      "index": 4,
+      "supported": false,
+      "gold_ids": [],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "Gold에는 목적물이 주거용 빌라 임대차라는 별도 사실문이 없다. F01의 '주거용 빌라 임차인/임대인' 표현만으로 이 문장을 직접 대응시키지 않는다."
+    },
+    {
+      "index": 5,
+      "supported": true,
+      "gold_ids": [
+        "SC-022-F03"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "Gold F03의 일부 사실인 보증금 액수를 정확히 뒷받침한다."
+    },
+    {
+      "index": 6,
+      "supported": true,
+      "gold_ids": [
+        "SC-022-F04"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "Gold F04와 문언이 일치한다."
+    },
+    {
+      "index": 7,
+      "supported": true,
+      "gold_ids": [
+        "SC-022-F06"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "Gold F06과 문언이 일치한다."
+    },
+    {
+      "index": 8,
+      "supported": true,
+      "gold_ids": [
+        "SC-022-F05"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "Gold F05와 문언이 일치한다."
+    },
+    {
+      "index": 9,
+      "supported": false,
+      "gold_ids": [],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "Gold에는 2026년 6월분 차임의 지급기일을 개별적으로 적시한 사실문이 없다. F04는 일반적 지급일 규정으로 별개다."
+    },
+    {
+      "index": 10,
+      "supported": true,
+      "gold_ids": [
+        "SC-022-F07"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "Gold F07과 문언이 일치한다."
+    },
+    {
+      "index": 11,
+      "supported": false,
+      "gold_ids": [],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "Gold에는 2026년 7월분 차임의 지급일을 개별적으로 적시한 사실문이 없다. F06은 지급 사실 전체를 말한다."
+    },
+    {
+      "index": 12,
+      "supported": true,
+      "gold_ids": [
+        "SC-022-F08"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "Gold F08과 문언이 일치한다."
+    },
+    {
+      "index": 13,
+      "supported": false,
+      "gold_ids": [],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "Gold에는 2026년 8월분 차임 액수만을 독립 사실로 적시하지 않았다. F07은 미지급 사실 전체다."
+    },
+    {
+      "index": 14,
+      "supported": false,
+      "gold_ids": [],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "Gold에는 2026년 8월분 차임의 지급기일을 개별적으로 적시한 사실문이 없다. F04는 일반적 지급일 규정으로 별개다."
+    },
+    {
+      "index": 15,
+      "supported": false,
+      "gold_ids": [],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "Gold에는 미납 차임 합계 산정 기준일만을 독립 사실로 적시하지 않았다. F08은 금액과 기준일을 함께 진술한다."
+    },
+    {
+      "index": 16,
+      "supported": false,
+      "gold_ids": [],
+      "duplicate_of": null,
+      "excluded": true,
+      "reason": "문서 메타데이터로서 사건 핵심 사실이 아니다."
+    },
+    {
+      "index": 17,
+      "supported": true,
+      "gold_ids": [
+        "SC-022-F10"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "Gold F10과 문언이 일치한다."
+    },
+    {
+      "index": 18,
+      "supported": true,
+      "gold_ids": [
+        "SC-022-F11"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "Gold F11과 문언이 일치한다."
+    },
+    {
+      "index": 19,
+      "supported": true,
+      "gold_ids": [
+        "SC-022-F11"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "Gold F11의 일부 사실인 갱신거절 사유를 정확히 뒷받침한다."
+    },
+    {
+      "index": 20,
+      "supported": false,
+      "gold_ids": [],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "Gold에는 2026년 7월분 차임 액수만을 독립 사실로 적시하지 않았다. F06은 지급 사실 전체다."
+    },
+    {
+      "index": 21,
+      "supported": false,
+      "gold_ids": [],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "Gold에는 2026년 6월분 차임 액수만을 독립 사실로 적시하지 않았다. F05는 미지급 사실 전체다."
+    },
+    {
+      "index": 22,
+      "supported": true,
+      "gold_ids": [
+        "SC-022-F03"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "Gold F03의 일부 사실인 월차임 액수를 정확히 뒷받침한다."
+    },
+    {
+      "index": 23,
+      "supported": true,
+      "gold_ids": [
+        "SC-022-F09"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "Gold F09와 문언이 일치한다."
+    },
+    {
+      "index": 24,
+      "supported": true,
+      "gold_ids": [
+        "SC-022-F09"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "Gold F09의 일부 사실인 2026-08-20 납부금액 1,600,000원을 정확히 뒷받침한다."
+    },
+    {
+      "index": 25,
+      "supported": true,
+      "gold_ids": [
+        "SC-022-F09"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "Gold F09의 일부 사실인 납부일 2026-08-20을 정확히 뒷받침한다."
+    },
+    {
+      "index": 26,
+      "supported": true,
+      "gold_ids": [
+        "SC-022-F10"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "Gold F10의 일부 사실인 최초 계약갱신요구 도달일을 정확히 뒷받침한다."
+    },
+    {
+      "index": 27,
+      "supported": true,
+      "gold_ids": [
+        "SC-022-F11"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "Gold F11의 일부 사실인 갱신거절일 2026-09-02를 정확히 뒷받침한다."
+    },
+    {
+      "index": 28,
+      "supported": true,
+      "gold_ids": [
+        "SC-022-F12"
+      ],
+      "duplicate_of": null,
+      "excluded": false,
+      "reason": "Gold F12의 일부 사실인 별도 계약해지 통지 부재를 정확히 뒷받침한다."
+    }
+  ],
+  "gold_fact_reviews": [
+    {
+      "gold_id": "SC-022-F01",
+      "covered": true,
+      "indices": [
+        2,
+        3
+      ],
+      "reason": "임차인 다온과 임대인 라온이 각각 확인된다."
+    },
+    {
+      "gold_id": "SC-022-F02",
+      "covered": true,
+      "indices": [
+        0
+      ],
+      "reason": "임대차기간이 동일하게 확인된다."
+    },
+    {
+      "gold_id": "SC-022-F03",
+      "covered": true,
+      "indices": [
+        5,
+        22
+      ],
+      "reason": "보증금 20,000,000원과 월차임 800,000원이 모두 확인된다."
+    },
+    {
+      "gold_id": "SC-022-F04",
+      "covered": true,
+      "indices": [
+        6
+      ],
+      "reason": "각 월차임 지급일이 매월 5일로 확인된다."
+    },
+    {
+      "gold_id": "SC-022-F05",
+      "covered": true,
+      "indices": [
+        8
+      ],
+      "reason": "2026년 6월분 차임 800,000원이 2026-06-05 지급되지 않았음이 확인된다."
+    },
+    {
+      "gold_id": "SC-022-F06",
+      "covered": true,
+      "indices": [
+        7
+      ],
+      "reason": "2026년 7월분 차임 800,000원이 2026-07-05 정상 지급되었음이 확인된다."
+    },
+    {
+      "gold_id": "SC-022-F07",
+      "covered": true,
+      "indices": [
+        10
+      ],
+      "reason": "2026년 8월분 차임 800,000원이 2026-08-05 지급되지 않았음이 확인된다."
+    },
+    {
+      "gold_id": "SC-022-F08",
+      "covered": true,
+      "indices": [
+        12
+      ],
+      "reason": "2026-08-06 기준 미납 차임 합계 1,600,000원이 확인된다."
+    },
+    {
+      "gold_id": "SC-022-F09",
+      "covered": true,
+      "indices": [
+        23
+      ],
+      "reason": "임차인이 2026-08-20 미납 차임 1,600,000원을 모두 납부한 사실이 완전하게 확인된다."
+    },
+    {
+      "gold_id": "SC-022-F10",
+      "covered": true,
+      "indices": [
+        17
+      ],
+      "reason": "최초 계약갱신요구가 2026-09-01 임대인에게 도달한 사실이 완전하게 확인된다."
+    },
+    {
+      "gold_id": "SC-022-F11",
+      "covered": true,
+      "indices": [
+        18
+      ],
+      "reason": "임대인이 2026-09-02 과거 2기 차임 연체를 이유로 갱신을 거절한 사실이 완전하게 확인된다."
+    },
+    {
+      "gold_id": "SC-022-F12",
+      "covered": true,
+      "indices": [
+        28,
+        1
+      ],
+      "reason": "별도 계약해지 통지 부재와 다른 위반 사유 미주장이 모두 확인된다."
+    }
+  ],
+  "issue_reviews": [
+    {
+      "gold_id": "SC-022-I01",
+      "planner_detected": false,
+      "planner_quote": "",
+      "answer_detected": false,
+      "answer_quote": "",
+      "reason": "Planner 호출에는 2기 차임액 의미나 비연속 미납액 합산 쟁점이 명시되지 않았고, WITHHELD 최종답변에도 해당 쟁점 판단이 없다."
+    },
+    {
+      "gold_id": "SC-022-I02",
+      "planner_detected": false,
+      "planner_quote": "",
+      "answer_detected": false,
+      "answer_quote": "",
+      "reason": "Planner 호출에는 과거 2기 연체 및 사후 완납의 갱신거절 영향이 명시되지 않았고, 최종답변에도 해당 판단이 없다."
+    },
+    {
+      "gold_id": "SC-022-I03",
+      "planner_detected": false,
+      "planner_quote": "",
+      "answer_detected": true,
+      "answer_quote": "- 주택임대차보호법 제6조 제1항의 2026-01-02 시행 개정본이 2024-12-01 체결 임대차에 적용되는지에 관한 부칙·적용례가 없어, 갱신요구 기간 충족 여부를 확정할 수 없습니다.",
+      "reason": "최종답변은 갱신요구 기간 충족 여부를 언급하나, Planner에는 계약갱신요구권/제6조의3 제1항 제1호 예외 쟁점이 실질적으로 명시되지 않았다."
+    },
+    {
+      "gold_id": "SC-022-I04",
+      "planner_detected": true,
+      "planner_quote": "임대차계약 종료 시점 및 보증금 반환의무 발생",
+      "answer_detected": false,
+      "answer_quote": "",
+      "reason": "Planner의 종료 시점 쟁점은 갱신거절과 별도 중도해지 및 계약관계 존속 문제와 일부 실질적으로 맞닿아 있으나, 최종답변은 이를 판단하지 않았다."
+    }
+  ],
+  "citation_reviews": [
+    {
+      "reference": "주택임대차보호법 제6조 제1항",
+      "kind": "statute",
+      "quote": "- 주택임대차보호법 제6조 제1항의 2026-01-02 시행 개정본이 2024-12-01 체결 임대차에 적용되는지에 관한 부칙·적용례가 없어, 갱신요구 기간 충족 여부를 확정할 수 없습니다.",
+      "exists": true,
+      "content_correct": true,
+      "relevant": true,
+      "temporal_valid": null,
+      "application_valid": null,
+      "source_key": "LEASE_BODY",
+      "source_quote": "제6조(계약의 갱신) ① 임대인이 임대차기간이 끝나기 6개월 전부터 2개월 전까지의 기간에",
+      "reason": "최종답변에서 실제 인용된 법령이다. 다만 '2026-01-02 시행 개정본의 적용 여부를 확정할 수 없다'는 적용례 판단은 제공 원문만으로 단정 평가가 어려워 temporal_valid와 application_valid는 null로 둔다."
+    }
+  ],
+  "missing_required_precedent": false,
+  "limitations": [
+    "Gold 정답은 주택임대차보호법 제6조의3 제1항 제1호 및 민법 제640조를 전제로 실체 판단을 제시하지만, 실제 최종답변은 WITHHELD 상태로 해당 판단을 하지 않았다.",
+    "공식 원문 중 LEASE/LEASE_FIXED 본문 추출은 잡음이 많고 부칙 전체 탐색이 불완전하여, 최종답변의 '부칙·적용례가 없어 확정할 수 없다'는 진술의 정확성은 제공 텍스트만으로 완전 검증하기 어렵다.",
+    "actual_facts에는 Gold보다 세분화된 파생 사실(개별 지급기일, 개별 차임액 등)이 포함되어 있으나, Gold에 동일 수준의 독립 사실문이 없는 경우 supported=false로 엄격 평가했다."
+  ],
+  "critical_findings": [
+    "최종답변은 Gold가 요구한 핵심 실체 판단(비연속 2기 연체의 합산, 사후 완납의 영향, 갱신거절 가능성과 해지 여부 구별)을 제공하지 않았다.",
+    "Planner 호출도 본 사건 핵심 쟁점과 불일치하며, 종료시점·보증금반환 및 권리보전 중심으로 잘못 설정되었다.",
+    "최종답변의 실제 인용은 주택임대차보호법 제6조 제1항 1건뿐이며, Gold가 중시한 주택임대차보호법 제6조의3 제1항 제1호와 민법 제640조는 최종답변에서 인용되지 않았다."
+  ],
+  "judge_trace_id": "a6783b97-28eb-4b95-8622-d97446091118",
+  "judge_model": "gpt-5.4-2026-03-05",
+  "judge_usage": {
+    "input_tokens": 68881,
+    "output_tokens": 3083,
+    "total_tokens": 71964,
+    "input_token_details": {
+      "audio": 0,
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "audio": 0,
+      "reasoning": 0
+    }
+  },
+  "method": "LLM semantic adjudication + deterministic coverage checks; provisional, expert review pending"
+}

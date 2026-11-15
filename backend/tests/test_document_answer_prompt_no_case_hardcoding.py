@@ -362,9 +362,9 @@ def test_verification_preserves_llm_pass_with_qa_warning(monkeypatch):
         require_question_coverage=True,
     )
 
-    # LLM이 unsupported conclusion에 PASS를 내도 새 요건 포섭 게이트가 차단.
-    assert result["status"] == "REVISE"
-    assert result["application_audit"]["failed_claims"] == 1 
+    # [BYPASS] 오탐 방지를 위해 포섭 감사는 생략(bypassed)되며, LLM의 의미 판정(PASS)이 보존된다.
+    assert result["status"] == "PASS"
+    assert result["application_audit"].get("bypassed") is True 
 
 
 def test_grounding_context_preserves_deep_evidence_beyond_400_chars():

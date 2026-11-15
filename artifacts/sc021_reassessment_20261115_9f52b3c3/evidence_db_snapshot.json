@@ -1,0 +1,50 @@
+[
+  {
+    "id": "e5cc432a-0993-4f1f-b0b4-f3bd696cb92c",
+    "case_id": "kpi5_sc-021_13e152bbbc",
+    "original_filename": "E01_synthetic_record.txt",
+    "safe_storage_key": "f147d09c88234f09806950ea97c70a41.txt",
+    "media_type": "text/plain",
+    "size_bytes": 351,
+    "sha256": "91dac45b80e3571318a94ca3421c1ee840cc467f066e14d5d4e0ad8b82718156",
+    "status": "APPROVED",
+    "source_kind": null,
+    "metadata_json": null,
+    "uploaded_at": "2026-11-15 20:40:11.426625",
+    "extracted_at": "2026-11-15 20:40:11.452287",
+    "extraction_version": "llm-v3-structured-conflict",
+    "error_code": null
+  },
+  {
+    "id": "7a6e681b-33fc-4c46-b3af-790e29e659e6",
+    "case_id": "kpi5_sc-021_13e152bbbc",
+    "original_filename": "E02_synthetic_record.txt",
+    "safe_storage_key": "2864acbe09364ba2abd732da19ac876c.txt",
+    "media_type": "text/plain",
+    "size_bytes": 396,
+    "sha256": "586056058a5bea67832bedc0e00d4fc923443cc8c74ea07a9c198cc1275f8963",
+    "status": "APPROVED",
+    "source_kind": null,
+    "metadata_json": null,
+    "uploaded_at": "2026-11-15 20:40:20.311444",
+    "extracted_at": "2026-11-15 20:40:20.327871",
+    "extraction_version": "llm-v3-structured-conflict",
+    "error_code": null
+  },
+  {
+    "id": "da713fd6-b159-49bb-8db1-8070aaacbd8a",
+    "case_id": "kpi5_sc-021_13e152bbbc",
+    "original_filename": "E03_synthetic_record.txt",
+    "safe_storage_key": "c42b225e4465452289196cf233f66e5a.txt",
+    "media_type": "text/plain",
+    "size_bytes": 413,
+    "sha256": "f499cdcd52c7dbd3760313275b7810857f221346fc2f3f20043bf4e279038fcb",
+    "status": "APPROVED",
+    "source_kind": null,
+    "metadata_json": null,
+    "uploaded_at": "2026-11-15 20:40:30.182205",
+    "extracted_at": "2026-11-15 20:40:30.198655",
+    "extraction_version": "llm-v3-structured-conflict",
+    "error_code": null
+  }
+]

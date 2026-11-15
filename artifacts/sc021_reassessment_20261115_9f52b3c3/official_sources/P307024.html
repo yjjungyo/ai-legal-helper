@@ -1,0 +1,1606 @@
+<!DOCTYPE html>
+<html lang="ko">
+ <head>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />  
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" /> 
+  <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />  
+  <script type="text/javascript">
+        /* 화면 디스플레이 설정 코드 전역변수 선언
+        * - 브라우저 JS는 서버 세션을 직접 읽을 수 없으므로 JSP에서 세션값을 렌더링해서 winodw 전역변수로 내려준다.
+        * - 이 코드는 common.js 보다 먼저 선언되어야 한다.
+        * */
+        window.APP_THEME_INFO = {
+            // 로그인 여부
+            isLogin : false,
+            // 사용자 화면 디스플레이 설정 코드 (300001:라이트모드, 300002:다크모드, 300003:시스템모드)
+            scrnStngCd : ''
+        };
+        var kakaoKey = '7d9effab87b9126df39695ca304bba41';
+
+
+
+    </script>  
+  <script type="text/javascript" src="/LSW/assets/js/jquery-3.7.1.min.js"></script> 
+  <script type="text/javascript" src="/LSW/assets/js/jquery-ui.min.js"></script> 
+  <script type="text/javascript" src="/LSW/assets/js/swiper.js"></script> 
+  <script type="text/javascript" src="/LSW/assets/js/common/common.js?Time=1794746179009"></script> 
+  <script type="text/javascript" src="/LSW/assets/js/common/CookieUtil.js"></script> 
+  <script type="text/javascript" src="/LSW/assets/js/common/jquery-custom.js?Time=1794746179009"></script> 
+  <script type="text/javascript" src="/LSW/assets/js/jquery/jquery-ui_2017.js"></script>  
+  <script type="text/javascript">
+    //링크 체크
+    var webRoot = '/LSW';
+    var isAsGubun = "IS";
+    var layerDiv = ".layerPop > .inner .cont .bodySideContent";
+
+    function isOutUrl(url){
+        if(!url) return false;
+        url = url.trim();
+        if(url.indexOf('/LSW') === 0) return false;
+        if(url.indexOf('blob')>-1) return false;
+        if(url.charAt(0) === '/') return false;
+        if(/^https?:\/\//i.test(url)) return false;
+        if(url.indexOf('www.') === 0) return false;
+        if(/^(javascript|#)/i.test(url)) return false;
+        return true;
+    }
+
+    function resolveUrl(url){
+        return isOutUrl(url) ? webRoot + '/' + url : url;
+    }
+
+    function checkP(url){
+        if(!url) return false;
+        return /Info|Proc/i.test(url);
+    }
+    
+    (function (){
+        let originalOpen = window.open;
+
+        //window.open
+        window.open = function(url,name,specs){
+            let resolved = resolveUrl(url);
+
+            if(checkP(resolved) && !specs){
+                specs ='width=1000px,height=800px';
+            }else if(checkP(resolved)){
+            }
+            if(url.includes('listShowYn=Y')){
+                resolved = resolved.replace('listShowYn=Y','listShowYn=N')
+            }
+            return originalOpen.call(window,resolved , name, specs);
+        };
+
+        let originalSubmit = HTMLFormElement.prototype.submit;
+
+        HTMLFormElement.prototype.submit = function(){
+
+            let action = this.getAttribute('action');
+            if(action && isOutUrl(action)){
+                this.setAttribute('action',resolveUrl(action))
+            }
+            return originalSubmit.call(this);
+        }
+
+        let originalXhrOpen = XMLHttpRequest.prototype.open;
+        XMLHttpRequest.prototype.open = function(method,url){
+            arguments[1] = resolveUrl(url);
+            return originalXhrOpen.apply(this,arguments);
+        }
+
+    })();
+
+    //ajax
+    $.ajaxPrefilter(function (options){
+        options.url = resolveUrl(options.url);
+    });
+
+    //a태그 herf
+    $(document).on('click','a[href]',function(e){
+        let href = $(this).attr('href');
+
+/*
+        //view가 infoP호출이면 가로챔
+        if(checkP(href)){
+            e.preventDefault();
+            window.open(setListShowYn(resolveUrl(href)),'_blank','width=1000px,height=800px');
+        }
+*/
+
+        if(isOutUrl(href)){
+            e.preventDefault();
+            let newHref = resolveUrl(href);
+            let target = $(this).attr('target');
+
+            if(target === '_blank'){
+                window.open(newHref,'_blank','width=1000px,height=800px');
+            }else{
+                window.location.href = newHref;
+            }
+        }
+    })
+
+    $(document).on('submit','form',function(e){
+       let $form = $(this);
+       let action  = $form.attr('action');
+
+       if(checkP(action) && $form.attr('target') ==='_blank'){
+           e.preventDefault();
+           let popupName = 'popup_'+Date.now();
+           window.open('',popupName,'width=1000px,height=800px');
+           $form.attr('action',resolveUrl(action));
+           $form.attr('target',popupName);
+
+           let $listShowYn = $('<input>', {type : 'hidden', name:'listShowYn',value:'N'});
+           $form.append($listShowYn);
+           $form[0].submit();
+           $listShowYn.remove();
+           return;
+       }
+
+       if(isOutUrl(action)){
+           $form.attr('action',resolveUrl(action));
+       }
+    })
+
+</script>
+  <link rel="shortcut icon" type="text/css" href="/LSW/assets/images/ico_favorites.ico" />
+  <link rel="stylesheet" type="text/css" href="/LSW/assets/css/style.css?Time=1794746179009" />
+  <style type="text/css">
+        form { display:contents }
+    </style>
+  <title>임대차보증금[상가건물 임대차계약의 묵시적 갱신이 문제된 사건] &gt; 판례 | 국가법령정보센터</title>
+ </head>  
+ <body> 
+  <!-- loading --> 
+  <div class="loading" role="status" aria-label="로딩 중" style="display:none;"> 
+   <span aria-hidden="true"></span> 
+   <span aria-hidden="true"></span> 
+   <span aria-hidden="true"></span> 
+  </div> 
+  <!-- // loading --> 
+  <!-- 2026-09-23 --> 
+  <!-- skipNav --> 
+  <dl id="skipNav"> 
+   <dt>
+    바로가기 메뉴
+   </dt> 
+   <dd>
+    <a href="javascript:void(0)" onclick="fn_skipToViewCont()">본문 바로가기</a>
+   </dd> 
+   <dd>
+    <a href="javascript:void(0)" onclick="fn_skipToViewAside()">목록 바로가기</a>
+   </dd> 
+  </dl> 
+  <!-- //skipNav -->    
+  <meta charset="UTF-8" /> 
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" /> 
+  <meta http-equiv="X-UA-Compatible" content="ie=edge" /> 
+  <meta name="format-detection" content="telephone=no, address=no, email=no" />  
+  <script src="/LSW/assets/js/jquery.ui.touch-punch.min.js"></script> 
+  <!-- 2026-06-17 js 추가 --> 
+  <script src="/LSW/assets/js/common.js"></script> 
+  <script src="/LSW/assets/js/emp/emp.js"></script> 
+  <script src="/LSW/assets/js/common/jquery-custom.js"></script> 
+  <script src="/LSW/assets/js/ls/lsLink.js"></script> 
+  <script src="/LSW/assets/js/prec/precOutPut.js"></script> 
+  <script src="/LSW/assets/js/common/xmlHttpUtil.js"></script> 
+  <script src="/LSW/assets/js/common/common-ex.js"></script> 
+  <script src="/LSW/assets/js/common/empInfoHistory.js"></script> 
+  <script src="/LSW/EDotXPressHtml/js/edotxpress-html.min.js"></script> 
+  <script src="/LSW/EDotXPressHtml/js/edotxpress-common.js"></script> 
+  <script src="/LSW/EDotXPressHtml/js/edotxpress-config-law.js"></script> 
+  <script type="text/javascript">
+        $(document).ready(function () {
+            if(false){
+                searchList('','');
+            }
+            lsEmpMenuIdxSet('0');
+            bdyHighlight('conScroll');
+
+            setDetailSelectCookie('010104', '240969');
+        })
+
+        // 현재 선택된 심급의 섹션으로 스크롤
+        function scrollToSection(sectionId) {
+            // 현재 선택된 precSeq 가져오기
+            var precSeqInput = document.getElementById('precSeq');
+            var currentPrecSeq = precSeqInput ? precSeqInput.value : '';
+
+            if (!currentPrecSeq) {
+                // precSeq가 없으면 기본 방식으로 이동
+                var target = document.getElementById(sectionId);
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+                return;
+            }
+
+            // 심급별 id로 이동 (예: sa-69597)
+            var targetId = sectionId + '-' + currentPrecSeq;
+            var target = document.getElementById(targetId);
+
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else {
+                // 해당 섹션이 없으면 기본 id로 시도
+                target = document.getElementById(sectionId);
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }
+        }
+
+        //목록검색
+        function searchList(pg,query3,cb){
+            $("#frm_pg").val(pg);
+            $("#frm_query3").val(query3);
+            layoutLoadMask();
+            hNavigating = false;
+            $.ajax({
+                url: false ? 'dtlSch.do' : 'precSc.do',
+                type:'POST',
+                data: $.param($("#infoFrm").serializeArray().filter(function(ele){ return ele.value !== ''})) ,
+                success : function(responseData) {
+                    $("#precSearchResult").html(responseData)
+                    //일치하는 검색결과가 없을때
+                    setTimeout(function (){
+                        if(!hNavigating && cb) cb();
+                    },0)
+                    requestAnimationFrame(function(){
+                        requestAnimationFrame(function(){
+                            layoutUnMask();
+                        })
+                    });
+                }
+            })
+        }
+
+        // 판례체계도 팝업 열기
+        function openPrecStmdPopup() {
+            let currentPrecSeq = $('#precSeq').val() ? $('#precSeq').val() : '';
+            if (currentPrecSeq) {
+                let url = "precStmdInfoP.do?precSeq=" + currentPrecSeq;
+                openScrollPop(url, "1024px");
+            } else {
+                alert('판례 정보를 찾을 수 없습니다.');
+            }
+        }
+
+        //관심법령추가
+        
+        function interestLaw(){
+            let pDivision = 'II';
+            let pApplicationId = 1;
+            let pListName = 'interest';
+            let pTitle    = $("#precNm").val();
+            let pLsId     = '';
+            let pAncNo    = '2023다307024';
+            let pLsiSeq   = '240969';
+            let pEfYd     = '20240627';
+            let pKndClsCd = '010104';
+            let pGourl = "http://" + location.host + "/판례/" + Space_All(pTitle)+"/("+Space_All(pAncNo)+")";
+            let pFolderName = '판례';
+
+            if(false){
+                interestLawSave(pDivision, pApplicationId, pListName, pTitle, pLsId, pAncNo, pLsiSeq, pEfYd, pKndClsCd, pGourl, pFolderName);
+            } else {
+                if(confirm("로그인이 필요한 서비스입니다.\n로그인 하시겠습니까?")){
+                    document.location.href = "/LSW/login.do?menuId=6";
+                }
+            }
+            return;
+        }
+
+
+        function infoPrintSavePrec(){
+            getJoOutPutList('outPutJoListDiv','99', '1',$("#precSeq").val(), 'N');
+            // 24.05.23 시각장애인협회 웹접근성 검토의견 조치 - 범위설정,용지/폰트설정 상위탭 선택 정보 인식
+            el("maClsBtn").focus();
+
+            fn_layer('precSaveLayer',this,'450');
+            // 다건 심급일 때만 심급별 콘텐츠 체크박스 생성
+            if (typeof linkedPrecData !== 'undefined' && linkedPrecData && linkedPrecData.length > 1) {
+                setTimeout(function() {
+                    initTrialContentCheckboxes();
+                }, 500);
+            }
+        }
+
+
+
+        // 법령/자치법규  조문 목록조회 요청
+        function getJoOutPutList(divId, mode, nwYn, precSeq, previewYn){
+            var url = "precJoListRInc.do";
+
+            if (precSeq != null && divId != ""){
+                if($('#'+divId).children().length == 0){
+                    procObj = makeOutPutJoTopTree;
+
+                    url += "?precSeq=" + precSeq
+                        + "&mode=" + mode
+                        + "&chapNo=1"
+                        + "&nwYn=" + nwYn
+                        + "&preview=" + previewYn;
+
+                    joListTreeValue.checkYn = 0;
+
+                    joListTreeValue.mode = 0;
+                    joListTreeValue.divId = divId;
+                    joListTreeValue.precSeq = precSeq;
+                    joListTreeValue.nwYn = nwYn;
+                    doRequestUsingPOST( url );
+                }
+            }
+        }
+
+        /**
+         * 범위설정 탭에 심급별 계층 구조 체크박스 생성
+         */
+        function initTrialContentCheckboxes() {
+            var outPutJoListDiv = document.getElementById('outPutJoListDiv');
+            if (!outPutJoListDiv) return;
+
+            var hasLinkedPrec = typeof linkedPrecData !== 'undefined' && linkedPrecData && linkedPrecData.length > 1;
+
+            if (!hasLinkedPrec) {
+                // 단일 판례는 기존 내용(조문 목록)을 유지하고 함수 종료
+                return;
+            }
+
+            var html = '';
+            var contentTypes = [
+                {id: 'judItm', label: '판시사항', hasKey: 'hasJudItm'},
+                {id: 'judGst', label: '판결요지', hasKey: 'hasJudGst'},
+                {id: 'conJo', label: '참조조문', hasKey: 'hasConJo'},
+                {id: 'conPrec', label: '참조판례', hasKey: 'hasConPrec'},
+                {id: 'precCts', label: '전문', hasKey: 'hasPrecCts'}
+            ];
+
+            linkedPrecData.forEach(function(prec) {
+                html += '<input type="checkbox" class="dep1 trialCheckbox" checked="checked" ';
+                html += 'id="trial_' + prec.precSeq + '" ';
+                html += 'data-prec-seq="' + prec.precSeq + '" ';
+                html += 'onclick="toggleTrialContents(' + prec.precSeq + ', this.checked);" />';
+                html += '<label for="trial_' + prec.precSeq + '">' + prec.tls + '심 (' + prec.evtNo + ')</label>';
+                html += '<ul class="trial-contents" id="contents_' + prec.precSeq + '" style="margin-left: 20px;">';
+
+                contentTypes.forEach(function(ct) {
+                    // 해당 심급에 실제로 데이터가 있는 항목만 표시
+                    if (prec[ct.hasKey]) {
+                        html += '<li>';
+                        html += '<input type="checkbox" class="dep2 contentCheckbox" checked="checked" ';
+                        html += 'id="content_' + prec.precSeq + '_' + ct.id + '" ';
+                        html += 'data-prec-seq="' + prec.precSeq + '" ';
+                        html += 'data-content-type="' + ct.id + '" />';
+                        html += '<label for="content_' + prec.precSeq + '_' + ct.id + '">' + ct.label + '</label>';
+                        html += '</li>';
+                    }
+                });
+
+                html += '</ul>';
+            });
+
+            outPutJoListDiv.innerHTML = html;
+        }
+
+    </script>   
+  <form id="infoFrm" name="infoFrm" action="precInfoP.do" method="get" onsubmit="removeEmptyParams(this);"> 
+   <input type="hidden" id="frm_query" name="query" value="" /> 
+   <input type="hidden" id="frm_query2" name="query2" value="" /> 
+   <input type="hidden" id="frm_query3" name="query3" value="" /> 
+   <input type="hidden" id="frm_bdyQuery" name="bdyQuery" value="" /> 
+   <input type="hidden" id="frm_pg" name="pg" value="" /> 
+   <input type="hidden" id="frm_subMenuId" name="subMenuId" value="" /> 
+   <input type="hidden" id="frm_tabMenuId" name="tabMenuId" value="" /> 
+   <input type="hidden" id="frm_tabMenuIdx" name="tabMenuIdx" value="" /> 
+   <input type="hidden" id="frm_precSeq" name="precSeq" value="240969" /> 
+   <input type="hidden" name="popYn" value="Y" /> 
+   <input type="hidden" id="frm_listShowYn" name="listShowYn" value="N" /> 
+   <input class="setDefault" type="hidden" id="frm_outmax" name="outmax" value="15" /> 
+   <input class="setDefault" type="hidden" id="frm_evtKnd" name="evtKnd" value="" /> 
+   <input class="setDefault" type="hidden" id="frm_caseGd" name="caseGd" value="" /> 
+   <input class="setDefault" type="hidden" id="frm_curtKnd" name="curtKnd" value="" /> 
+   <input class="setDefault" type="hidden" id="frm_lsBasicDts" name="lsBasicDts" value="" /> 
+   <input class="setDefault" type="hidden" id="frm_prncYdStart" name="prncYdStart" value="" /> 
+   <input class="setDefault" type="hidden" id="frm_prncYdEnd" name="prncYdEnd" value="" /> 
+   <input class="setDefault" type="hidden" id="curtNm" name="curtNm" value="" /> 
+   <input class="setDefault" type="hidden" id="frm_orgCls" name="orgCls" value="" /> 
+   <input class="setDefault" type="hidden" id="frm_selSort1" name="selSort1" value="" /> 
+   <input class="setDefault" type="hidden" id="frm_selSort2" name="selSort2" value="" /> 
+  </form> 
+  <!-- viewWrap --> 
+  <div id="viewWrap" class="contOff"> 
+   <!-- viewContainer --> 
+   <div id="viewContainer"> 
+    <!-- viewHeader --> 
+    <div class="viewHeader"> 
+     <button type="button" class="btnBack">이전 페이지</button> 
+    </div> 
+    <!--/ viewHeader --> 
+    <!-- 2026-06-23 뷰어 레이아웃 변경 --> 
+    <!-- viewTop --> 
+    <div class="viewTop"> 
+     <!-- tabWrap --> 
+     <div class="tabWrap sub"> 
+      <!-- tabBtn --> 
+      <div class="tabBtn"> 
+       <div class="swiper-wrapper"> 
+        <a href="javascript:void(0)" onclick="fconEmpDt('prec')" class="swiper-slide">관련자료</a> 
+        <a href="javascript:void(0)" onclick="openPrecStmdPopup()" class="swiper-slide">판례체계도</a> 
+        <a href="javascript:void(0)" onclick="attFlListView(this,'prec');" class="swiper-slide">첨부파일</a> 
+       </div> 
+      </div> 
+      <!--/ tabBtn --> 
+     </div> 
+     <!--/ tabWrap --> 
+     <!-- right --> 
+     <div class="right"> 
+      <!--/ mTopFix --> 
+      <div class="mTopFix"> 
+       <!-- screenControls --> 
+       <div class="screenControls"> 
+        <button type="button" class="btnMinus">글자 축소</button> 
+        <span>100%</span> 
+        <button type="button" class="btnPlus">글자 확대</button> 
+       </div> 
+       <!--/ screenControls --> 
+      </div> 
+      <!--/ mTopFix --> 
+      <!-- // 2026-06-29 mTopFix로 변경 (레이아웃 변경) --> 
+     </div> 
+     <!--/ right --> 
+    </div> 
+    <!-- viewTop --> 
+    <!-- // 2026-06-23 뷰어 레이아웃 변경 --> 
+    <!-- 2026-07-24 btnArea 위치변경  --> 
+    <button type="button" class="btnBotPop case" data-id="select">선택</button> 
+    <!-- topArea --> 
+    <div class="topArea mPop" pop-title="선택하세요" data-id="select"> 
+     <!-- 2026-06-23 뷰어 레이아웃 변경 --> 
+     <!-- inner --> 
+     <div class="inner"> 
+      <!-- searchArea (PC) --> 
+      <button type="button" class="btn btnSm btnSearch tNone" onclick="setBdyKeyVal(); fn_layer('bdySearchLayer',this,'450')"><span>화면내 검색</span></button> 
+      <!--/ searchArea --> 
+      <!-- btnArea --> 
+      <div class="btnArea"> 
+       <!-- 2026-07-24 button > a 태그 변경 --> 
+       <div class="share"> 
+        <a class="btn btnSm btnWhite" onclick="snsShareLayer(5)" title="공유"><img alt="공유" src="/LSW/assets/images/viewer/ico0106.svg" /><span class="blind">공유</span></a> 
+        <div class="shareBox"> 
+         <script src="/LSW/assets/js/oneview/kakao.js"></script> 
+         <input type="hidden" class="snsAddress" value="" /> 
+         <div class="inBox"> 
+          <ul> 
+           <li><a href="javascript:shareOnKakao();" title="카카오톡 새 창 열림"><img src="/LSW/assets/images/ico-sns01.svg" alt="카카오톡" />카카오톡</a></li> 
+           <li><a title="페이스북 새 창 열림" href="javascript:shareOnFacebook();"><img src="/LSW/assets/images/ico-sns02.svg" alt="페이스북" />페이스북</a></li> 
+           <li><a title="트위터 새 창 열림" href="javascript:shareOnTwitter();"><img src="/LSW/assets/images/ico-sns03.svg" alt="트위터" />트위터</a></li> 
+           <li><a title="라인 새 창 열림" href="javascript:shareOnLine();"><img src="/LSW/assets/images/ico-sns04.svg" alt="라인" />라인</a></li> 
+           <li><a href="javascript: shareUrl();"><img src="/LSW/assets/images/ico-sns05.svg" alt="주소링크" />주소복사</a></li> 
+          </ul> 
+          <button type="button" class="btnSnsClose">닫기</button> 
+         </div> 
+        </div> 
+       </div> 
+       <a href="javascript:void(0);" class="btn btnSm btnWhite" title="관심법령추가" onclick="interestLaw(); return false;"><img alt="" src="/LSW/assets/images/viewer/ico0107.svg" /><span class="blind">관심법령추가</span></a> 
+       <a href="javascript:void(0);" onclick="infoPrintSavePrec();" class="btn btnSm btnWhite" title="저장"><img alt="" src="/LSW/assets/images/viewer/ico0104.svg" /><span class="blind">저장</span></a> 
+       <a href="javascript:void(0);" onclick="printContents(lsEmpMenuIdx)" class="btn btnSm btnWhite" title="프린트"><img alt="" src="/LSW/assets/images/viewer/ico0105.svg" /><span class="blind">프린트</span></a> 
+       <a href="javascript:void(0);" class="btn btnSm btnWhite" id="eDotViewr" onclick="openBrlViewer('판례');" title="점자뷰어"><img alt="점자뷰어" src="/LSW/assets/images/ico-braille.svg" /><span class="blind">점자뷰어</span></a> 
+       <!-- // 2026-06-30 버튼 title 추가 --> 
+       <!-- // 2026-07-24 button > a 태그 변경 --> 
+      </div> 
+      <!--/ btnArea --> 
+     </div> 
+     <!--/ inner --> 
+     <!-- // 2026-06-23 뷰어 레이아웃 변경 --> 
+    </div> 
+    <!--/ topArea --> 
+    <!-- // 2026-07-24 btnArea 위치변경  --> 
+    <!-- viewContents --> 
+    <div class="viewContents"> 
+     <!-- aside --> 
+     <div class="aside mPop" data-id="aside"> 
+      <div class="inner"> 
+       <!-- 2026-06-24 aside 타이틀 변경 --> 
+       <h3 id="asideTitle">임대차보증금[상가건물 임대차계약의 묵시적 갱신이 문제된 사건]</h3> 
+       <!-- // 2026-06-24 aside 타이틀 변경 --> 
+       <div class="inBox"> 
+        <!-- 2026-07-08 AS-IS 형태로 수정 --> 
+        <div class="list_bx_in"> 
+         <ul class="inner"> 
+          <li> 
+           <ul> 
+            <li> <a id="btn_sa-240969" href="javascript:void(0)" onclick="scrollToSection('sa-240969'); return false;" class="tabBtns" style="display: none;">판시사항</a> <a id="btn_yo-240969" href="javascript:void(0)" onclick="scrollToSection('yo-240969'); return false;" class="tabBtns" style="display: none;">판결요지</a> <a id="btn_conLsJo-240969" href="javascript:void(0)" onclick="scrollToSection('conLsJo-240969'); return false;" class="tabBtns" style="display: none;">참조조문</a> <a id="btn_conPrec-240969" href="javascript:void(0)" onclick="scrollToSection('conPrec-240969'); return false;" class="tabBtns" style="display: none;">참조판례</a> <a id="btn_jun-240969" href="javascript:void(0)" onclick="scrollToSection('jun-240969'); return false;" class="tabBtns" style="display: none;">전문</a> </li> 
+           </ul> </li> 
+         </ul> 
+        </div> 
+        <!-- // 2026-07-08 AS-IS 형태로 수정 --> 
+       </div> 
+      </div> 
+     </div> 
+     <!--/ aside --> 
+     <button type="button" class="btnToggleAside btnBotPop" data-id="aside">판례 리스트 열기</button> 
+     <!-- 2026-07-16 사이드 검색영역 토글버튼 추가 --> 
+     <!-- cont --> 
+     <div class="cont"> 
+      <!-- contentBody --> 
+      <div id="contentBody" class="scr_ctrl"> 
+       <div id="sideCenter" class="cont_area" style="width: 1635px;"> 
+        <script type="text/javascript" src="/LSW/assets/js/ls/lsLink.js"></script> 
+        <script type="text/javascript">
+    $(document).ready(function () {
+        setTabBtns();
+    })
+    //탭버튼 숨기기
+    function setTabBtns(){
+        $('.tabBtns').each(function(){
+            let contentId = this.id.replace('btn_','');
+            if($("#"+contentId).length > 0){
+                $(this).show();
+            }else {
+                $(this).hide();
+            }
+        })
+    }
+</script> 
+        <script type="text/javascript">
+
+
+
+    /*선택된 심급 및 콘텐츠 정보를 JSON으로 수집*/
+    function collectSelectedTrialContents() {
+        var selected = [];
+        var trialCheckboxes = document.querySelectorAll('.trialCheckbox:checked');
+
+        trialCheckboxes.forEach(function(trialCb) {
+            var precSeq = trialCb.getAttribute('data-prec-seq');
+            var contents = [];
+
+            var contentCheckboxes = document.querySelectorAll('.contentCheckbox[data-prec-seq="' + precSeq + '"]:checked');
+            contentCheckboxes.forEach(function(contentCb) {
+                contents.push(contentCb.getAttribute('data-content-type'));
+            });
+
+            if (contents.length > 0) {
+                selected.push({
+                    precSeq: precSeq,
+                    contents: contents
+                });
+            }
+        });
+
+        return JSON.stringify(selected);
+    }
+
+    (function () {
+        initEDotXPress('\uC784\uB300\uCC28\uBCF4\uC99D\uAE08[\uC0C1\uAC00\uAC74\uBB3C \uC784\uB300\uCC28\uACC4\uC57D\uC758 \uBB35\uC2DC\uC801 \uAC31\uC2E0\uC774 \uBB38\uC81C\uB41C \uC0AC\uAC74]');
+
+        // 다건 심급일 때만 심급 선택 버튼 처리
+        if (typeof linkedPrecData !== 'undefined' && linkedPrecData && linkedPrecData.length > 1) {
+
+            // 기존 심급 선택 영역 제거 (trial-select-btn을 포함한 l_bx 전체 제거)
+            var existingTrialBtns = document.querySelectorAll('.trial-select-btn');
+            if (existingTrialBtns && existingTrialBtns.length > 0) {
+                // 첫 번째 trial-select-btn의 부모 l_bx를 찾아서 제거
+                var parentLBox = existingTrialBtns[0].closest('.l_bx');
+                if (parentLBox) {
+                    parentLBox.remove();
+                }
+            }
+
+            // 심급 선택 버튼 추가
+            var bodyTopArea = document.querySelector('.body_top_area');
+            if (bodyTopArea) {
+                // 새 심급 선택 영역 생성 (별도 l_bx div로 생성)
+                var trialSelectHtml = '<div class="l_bx trial-select-area-wrapper">';
+
+                linkedPrecData.forEach(function(prec) {
+                    var activeClass = prec.isFirst ? 'active' : '';
+                    var tlsText = prec.tls ? prec.tls + '심' : '판례';
+
+                    trialSelectHtml += '<a href="#trial-' + prec.precSeq + '" ' +
+                        'class="btn type8 trial-select-btn ' + activeClass + '" ' +
+                        'data-prec-seq="' + prec.precSeq + '" ' +
+                        'title="' + prec.tls + '심 선택">' +
+                        tlsText +
+                        '<span style="font-size: 0.85em; color: #666; margin-left: 4px;">' + prec.evtNo + '</span>' +
+                        '</a>';
+                });
+
+                trialSelectHtml += '</div>';
+
+                // .body_top_area의 맨 앞에 추가 (첫 번째 .l_bx 전에)
+                bodyTopArea.insertAdjacentHTML('afterbegin', trialSelectHtml);
+
+                // 동적으로 추가된 버튼에 이벤트 리스너 추가
+                var trialBtns = document.querySelectorAll('.trial-select-btn');
+                trialBtns.forEach(function(btn) {
+                    btn.addEventListener('click', function() {
+                        // 모든 버튼에서 active 제거
+                        trialBtns.forEach(function(b) {
+                            b.classList.remove('active');
+                        });
+                        // 클릭된 버튼에 active 추가
+                        this.classList.add('active');
+
+                        // hidden 필드 업데이트
+                        var precSeq = this.getAttribute('data-prec-seq');
+                        var precSeqInput = document.getElementById('precSeq');
+                        var fPrecSeqInput = document.getElementById('fPrecSeq');
+                        if (precSeqInput) precSeqInput.value = precSeq;
+                        if (fPrecSeqInput) fPrecSeqInput.value = precSeq;
+                    });
+                });
+            }
+        }
+
+    })();
+
+    (function() {
+        var targetPrecSeq = document.getElementById('targetPrecSeq');
+        if (targetPrecSeq && targetPrecSeq.value) {
+            var targetEl = document.getElementById('trial-' + targetPrecSeq.value);
+            if (targetEl) {
+                setTimeout(function() {
+                    targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
+            }
+        }
+    })();
+</script> 
+        <input type="hidden" id="precSeq" value="240969" /> 
+        <input type="hidden" name="precNm" id="precNm" value="임대차보증금[상가건물 임대차계약의 묵시적 갱신이 문제된 사건]" /> 
+        <input type="hidden" name="precNo" id="precNo" value="2023다307024" /> 
+        <input type="hidden" name="precYd" id="precYd" value="20240627" /> 
+        <input type="hidden" id="targetPrecSeq" value="" /> 
+        <!-- 법령명 --> 
+        <div id="conTop" class="cont_top conTop"> 
+         <a id="top"></a> 
+         <!-- 국민신문고 연결배너 출력 --> 
+         <h2>임대차보증금[상가건물 임대차계약의 묵시적 갱신이 문제된 사건]</h2> 
+         <div class="ct_sub"> 
+          <span>[대법원 2024. 6. 27. 선고 2023다307024 판결]</span> 
+         </div> 
+        </div> 
+        <div id="conScroll" class="scr_area" style="overflow-y: auto; height: 561px; width: 1635px;"> 
+         <div class="pgroup conScroll" style="padding-left:28px;" id="conScroll02"> 
+          <h4 id="sa-240969">【판시사항】</h4> 
+          <p class="pty4"> [1] 소액사건에 관하여 상고이유로 할 수 있는 ‘대법원의 판례에 상반되는 판단을 한 때’의 요건을 갖추지 않았더라도 대법원이 실체법 해석적용의 잘못에 관하여 판단할 수 있는 경우<br /> [2] 상가의 임차인이 임대차기간 만료 1개월 전부터 만료일 사이에 갱신거절의 통지를 한 경우, 임대차계약의 묵시적 갱신이 인정되지 않고 임대차기간의 만료일에 종료하는지 여부<strong>(적극)</strong><br /></p> 
+          <h4 id="yo-240969">【판결요지】</h4> 
+          <p class="pty4"> [1] 소액사건에서 구체적 사건에 적용할 법령의 해석에 관한 대법원 판례가 아직 없는 상황에서 같은 법령의 해석이 쟁점으로 되어 있는 다수의 소액사건들이 하급심에 계속되어 있을 뿐만 아니라 재판부에 따라 엇갈리는 판단을 하는 사례가 나타나고 있는 경우, 소액사건이라는 이유로 대법원이 그 법령의 해석에 관하여 판단을 하지 아니한 채 사건을 종결하고 만다면 국민생활의 법적 안전성을 해칠 것이 우려된다고 할 것인바, 이와 같은 특별한 사정이 있는 경우에는 소액사건에 관하여 상고이유로 할 수 있는 ‘대법원의 판례에 상반되는 판단을 한 때’의 요건을 갖추지 아니하였다고 하더라도 법령해석의 통일이라는 대법원의 본질적 기능을 수행하는 차원에서 실체법 해석적용에 있어서의 잘못에 관하여 판단할 수 있다고 보아야 한다.<br /> [2] 상가의 임차인이 임대차기간 만료 1개월 전부터 만료일 사이에 갱신거절의 통지를 한 경우 해당 임대차계약은 묵시적 갱신이 인정되지 않고 임대차기간의 만료일에 종료한다고 보아야 한다. 그 이유는 다음과 같다.<br /> ① 기간을 정한 임대차계약은 법률의 특별한 규정이 없는 한 기간이 만료함으로써 종료한다. <a href="#AJAX" class="link" onclick="javascript:fncLawPop('민법','JO','063900','prec');">민법 제639조</a>는 임대차기간이 만료한 후 임차인이 임차물의 사용, 수익을 계속하는 경우에 임대인이 상당한 기간 안에 이의를 하지 아니하는 때에는 묵시의 갱신을 인정하고 있다. 민법에 의하면 임차인이 임대차기간 만료 전에 갱신거절의 통지를 하는 경우에는 묵시의 갱신이 인정될 여지가 없다.<br /> ② <a href="#AJAX" class="link" onclick="javascript:fncLawPop('상가건물 임대차보호법','JO','001000','prec');">상가건물 임대차보호법(이하 ‘상가임대차법’이라 한다) 제10조 제1항</a>은 "임대인은 임차인이 임대차기간이 만료되기 6개월 전부터 1개월 전까지 사이에 계약갱신을 요구할 경우 정당한 사유 없이 거절하지 못한다."라고 정하여 임차인의 계약갱신 요구권을 인정할 뿐이고, 임차인이 갱신거절의 통지를 할 수 있는 기간은 제한하지 않았다. <a href="#AJAX" class="link" onclick="javascript:fncLawPop('상가건물 임대차보호법','JO','001000','prec');">상가임대차법 제10조 제4항</a>은 "임대인이 <a href="#AJAX" class="link" onclick="javascript:fncLawPop('상가건물 임대차보호법','JO','001000','prec');">제1항</a>의 기간 이내에 임차인에게 갱신거절의 통지 또는 조건변경의 통지를 하지 아니한 경우에는 그 기간이 만료된 때에 전 임대차와 동일한 조건으로 다시 임대차한 것으로 본다."라고 정하여 묵시적 갱신을 규정하면서 임대인의 갱신거절 또는 조건변경의 통지기간을 제한하였을 뿐, <a href="#AJAX" class="link" onclick="javascript:fncLawPop('주택임대차보호법','JO','000600','prec');">주택임대차보호법 제6조 제1항</a> 후문과 달리 상가의 임차인에 대하여는 기간의 제한을 두지 않았다. 상가임대차법에 임차인의 갱신거절 통지기간에 대하여 명시적인 규정이 없는 이상 원칙으로 돌아가 임차인의 갱신거절 통지기간은 제한이 없다고 보아야 한다.<br /> ③ 임대차기간이 만료되기 6개월 전부터 1개월 전까지 사이에 임차인이 별다른 조치를 취하지 아니한 경우, 임대차계약이 기간만료일 전 1개월이 경과하여 묵시적으로 갱신된다고 판단하는 것은 문언해석에 반한다. 또한 <a href="#AJAX" class="link" onclick="javascript:fncLawPop('상가건물 임대차보호법','JO','001000','prec');">상가임대차법 제10조 제1항</a>이 임차인의 갱신거절 통지기간도 한정한 것으로 해석한다면, 위 기간 이후 임대차기간 만료 전에 갱신거절 통지를 한 임차인의 의사에 반하여 <a href="#AJAX" class="link" onclick="javascript:fncLawPop('상가건물 임대차보호법','JO','001000','prec');">상가임대차법 제10조 제4항</a>에 따른 묵시적 갱신을 강제하는 결과가 되고, 이는 상가건물 임차인을 보호함으로써 그 경제생활의 안정을 보장하고자 하는 상가임대차법의 입법 취지에도 반한다.<br /></p> 
+          <h4 id="conLsJo-240969">【참조조문】</h4> 
+          <p class="pty4"> [1] <a href="#AJAX" class="link" onclick="javascript:fncLawPop('소액사건심판법','JO','000300','prec');">소액사건심판법 제3조 제2호</a> <br />[2] <a href="#AJAX" class="link" onclick="javascript:fncLawPop('상가건물 임대차보호법','JO','000100','prec');">상가건물 임대차보호법 제1조</a>, <a href="#AJAX" class="link" onclick="javascript:fncLawPop('상가건물 임대차보호법','JO','001000','prec');">제10조 제1항</a>, <a href="#AJAX" class="link" onclick="javascript:fncLawPop('상가건물 임대차보호법','JO','001000','prec');">제4항</a>, <a href="#AJAX" class="link" onclick="javascript:fncLawPop('민법','JO','063900','prec');">민법 제639조</a>, <a href="#AJAX" class="link" onclick="javascript:fncLawPop('주택임대차보호법','JO','000600','prec');">주택임대차보호법 제6조 제1항</a><br /></p> 
+          <h4 id="conPrec-240969">【참조판례】</h4> 
+          <p class="pty4"> [1] <a href="#AJAX" onclick="javascript:showCase('2003다1878');">대법원 2004. 8. 20. 선고 2003다1878 판결</a>(공2004하, 1571), <a href="#AJAX" onclick="javascript:showCase('2012다48824');">대법원 2015. 3. 26. 선고 2012다48824 판결</a><br /></p> 
+          <br />
+          <h4 id="jun-240969">【전문】</h4> 
+          <h5>【원고, 상고인】</h5>
+          <p class="pty4_dep1"> 원고<br /></p>
+          <h5>【피고, 피상고인】</h5>
+          <p class="pty4_dep1"> 피고<br /></p>
+          <h5>【원심판결】</h5>
+          <p class="pty4_dep1"> 수원지법 2023. 10. 18. 선고 2022나91909 판결</p>
+          <h5>【주 문】</h5>
+          <p class="pty4_dep1"> 원심판결의 원고 패소 부분 중 2020. 12. 31. 이후 차임과 미납관리비 부분을 파기하고, 이 부분 사건을 수원지방법원에 환송한다. 나머지 상고를 기각한다.<br /><br /></p>
+          <h5>【이 유】</h5>
+          <p class="pty4_dep1"> 상고이유를 판단한다. <br /> 1.  사안의 개요 <br /> 가.  원고는 2018. 12. 24. 피고로부터 이 사건 점포를 임대차기간 2018. 12. 31.부터 2020. 12. 30.까지, 임대차보증금 30,000,000원, 차임 매월 1,800,000원으로 정하여 임차하였다(이하 ‘이 사건 임대차계약’이라 한다).<br /> <br /> 나.  원고는 2020. 12. 29. 피고에게 이 사건 임대차계약의 갱신을 거절한다는 통지를 하였다(이하 ‘이 사건 통지’라 한다). 원고는 임차권등기를 마친 후 2021. 1. 27.경 피고에게 이 사건 점포를 인도하였다.<br /> <br /> 다.  피고는 이 사건 제1심 변론종결 후인 2022. 8. 16. 임대차계약이 2021. 3. 29. 해지되었음을 전제로 이를 기준으로 차임과 미납관리비 등을 공제한 임대차보증금을 변제공탁하였다.<br /> <br /> 2.  2020. 12. 31. 이후 차임과 미납관리비 부분에 관한 판단 <br /> 가.  원심의 판단<br /> 원심은 판시와 같은 이유로 다음과 같이 판단하였다. 이 사건 임대차계약의 임대차기간이 만료되기 6개월 전부터 1개월 전까지 사이에 임대인인 피고가 갱신거절의 통지 등을 하지 아니하였고, 임차인인 원고도 별다른 조치를 취하지 아니한 이상, 이 사건 임대차계약은 기간만료일 전 1개월이 경과하여 묵시적으로 갱신되었다. 다만 갱신거절의 취지가 기재된 2020. 12. 29. 자 이 사건 통지로 이 사건 임대차계약은 그로부터 3개월이 지난 2021. 3. 29. 해지되어 종료되었으므로, 피고는 원고에게 2021. 3. 29.까지의 차임과 부가세를 공제한 임대차보증금 및 지연손해금을 반환할 의무가 있다.<br /> <br /> 나.  이 부분 쟁점<br /> 1) 원고는 상고이유로 원고가 임대차기간 만료일 전에 임대인인 피고에게 갱신거절의 통지를 하였으므로 이 사건 임대차계약은 묵시적으로 갱신되지 않고 임대차기간의 만료로 종료되었다고 보아야 한다고 주장한다. 결국 이 부분의 쟁점은 상가의 임차인이 임대차기간이 만료되기 1개월 전부터 만료일 사이에 갱신거절의 통지를 한 경우, 묵시적으로 갱신된 것으로 인정되어 갱신거절의 통지를 한 날부터 3개월이 지난 시점에 임대차계약이 해지되어 종료된다고 보아야 하는지 아니면 묵시적 갱신이 인정되지 아니하고 임대차기간의 만료일에 종료된다고 보아야 하는지 여부이다.<br /> 2) <u>소액사건에서 구체적 사건에 적용할 법령의 해석에 관한 대법원 판례가 아직 없는 상황에서 같은 법령의 해석이 쟁점으로 되어 있는 다수의 소액사건들이 하급심에 계속되어 있을 뿐만 아니라 재판부에 따라 엇갈리는 판단을 하는 사례가 나타나고 있는 경우, 소액사건이라는 이유로 대법원이 그 법령의 해석에 관하여 판단을 하지 아니한 채 사건을 종결하고 만다면 국민생활의 법적 안전성을 해칠 것이 우려된다고 할 것인바, 이와 같은 특별한 사정이 있는 경우에는 소액사건에 관하여 상고이유로 할 수 있는 ‘대법원의 판례에 상반되는 판단을 한 때’의 요건을 갖추지 아니하였다고 하더라도 법령해석의 통일이라는 대법원의 본질적 기능을 수행하는 차원에서 실체법 해석적용에 있어서의 잘못에 관하여 판단할 수 있다고 보아야 한다</u>(<a href="#AJAX" onclick="javascript:showCase('2003다1878');">대법원 2004. 8. 20. 선고 2003다1878 판결</a>, <a href="#AJAX" onclick="javascript:showCase('2012다48824');">대법원 2015. 3. 26. 선고 2012다48824 판결</a> 등 참조).<br /> 3) 이 부분 쟁점에 관하여는 아직 명확한 대법원 판례가 없고, 다수 사건들이 하급심에 계속되어 있으며 재판부에 따라 엇갈리는 판단을 하는 사례가 나타나고 있으므로 대법원이 이 사건에서 실체법 해석적용의 잘못에 관하여 판단할 수 있다.<br /> <br /> 다.  대법원의 판단<br /> 1) <u>상가의 임차인이 임대차기간 만료 1개월 전부터 만료일 사이에 갱신거절의 통지를 한 경우 해당 임대차계약은 묵시적 갱신이 인정되지 않고 임대차기간의 만료일에 종료한다고 보아야 한다. 그 이유는 다음과 같다</u>.<br /> 가) <u>기간을 정한 임대차계약은 법률의 특별한 규정이 없는 한 기간이 만료함으로써 종료한다. 민법 제639조는 임대차기간이 만료한 후 임차인이 임차물의 사용, 수익을 계속하는 경우에 임대인이 상당한 기간 안에 이의를 하지 아니하는 때에는 묵시의 갱신을 인정하고 있다. 민법에 의하면 임차인이 임대차기간 만료 전에 갱신거절의 통지를 하는 경우에는 묵시의 갱신이 인정될 여지가 없다</u>.<br /> 나) <u>「상가건물 임대차보호법」(이하 ‘상가임대차법’이라 한다) 제10조 제1항은 "임대인은 임차인이 임대차기간이 만료되기 6개월 전부터 1개월 전까지 사이에 계약갱신을 요구할 경우 정당한 사유 없이 거절하지 못한다."라고 정하여 임차인의 계약갱신 요구권을 인정할 뿐이고, 임차인이 갱신거절의 통지를 할 수 있는 기간은 제한하지 않았다. 상가임대차법 제10조 제4항은 "임대인이 제1항의 기간 이내에 임차인에게 갱신거절의 통지 또는 조건변경의 통지를 하지 아니한 경우에는 그 기간이 만료된 때에 전 임대차와 동일한 조건으로 다시 임대차한 것으로 본다."라고 정하여 묵시적 갱신을 규정하면서 임대인의 갱신거절 또는 조건변경의 통지기간을 제한하였을 뿐, 주택임대차보호법 제6조 제1항 후문과 달리 상가의 임차인에 대하여는 기간의 제한을 두지 않았다. 상가임대차법에 임차인의 갱신거절 통지기간에 대하여 명시적인 규정이 없는 이상 원칙으로 돌아가 임차인의 갱신거절 통지기간은 제한이 없다고 보아야 한다</u>.<br /> 다) 원심이 이 사건 임대차계약의 <u>임대차기간이 만료되기 6개월 전부터 1개월 전까지 사이에 임차인인 원고가 별다른 조치를 취하지 아니한 이상, 이 사건 임대차계약은 기간만료일 전 1개월이 경과하여 묵시적으로 갱신되었다고 판단한 것은 문언해석에 반한다. 또한 상가임대차법 제10조 제1항이 임차인의 갱신거절 통지기간도 한정한 것으로 해석한다면, 위 기간 이후 임대차기간 만료 전에 갱신거절 통지를 한 임차인의 의사에 반하여 상가임대차법 제10조 제4항에 따른 묵시적 갱신을 강제하는 결과가 되고, 이는 상가건물 임차인을 보호함으로써 그 경제생활의 안정을 보장하고자 하는 상가임대차법의 입법 취지에도 반한다</u>.<br /> 2) 원심판결의 이유를 위와 같은 법리에 비추어 살펴본다. 임차인인 원고가 이 사건 임대차계약의 종료일 전에 갱신거절의 의사를 명확히 하였으므로, 이 사건 임대차계약은 그 임대차기간 만료일인 2020. 12. 30. 종료되었다.<br /> 그럼에도 원심은, 이 사건 임대차계약은 기간만료일 전 1개월이 경과하여 묵시적으로 갱신되었고, 그 후 원고의 갱신거절의 취지가 기재된 이 사건 통지가 피고에게 도달한 때로부터 3개월이 지난 2021. 3. 29. 갱신된 임대차계약의 해지 효력이 발생한다고 보았다. 이러한 원심판단에는 <a href="#AJAX" class="link" onclick="javascript:fncLawPop('상가건물 임대차보호법','JO','001000','prec');">상가임대차법 제10조 제4항</a>에 따른 묵시적 갱신의 성립 등에 관한 법리를 오해하여 판결에 영향을 미친 잘못이 있다.<br /> <br /> 3.  2020. 12. 30.까지 차임 인상분과 미납관리비에 관한 판단<br /> 원심은, 이 사건 임대차계약 특약사항에 따른 2020. 12. 30.까지 차임 인상분과 2020. 12. 30.까지 미납관리비를 임대차보증금에서 공제하여야 한다고 판단하였다.<br /> 원심판결 이유를 기록에 비추어 살펴보면, 원심의 위와 같은 판단에 상고이유 주장과 같이 재판상 자백의 법리 등을 오해하여 판결에 영향을 미친 잘못이 없다.<br /> <br /> 4.  결론<br /> 원심판결의 원고 패소 부분 중 2020. 12. 31. 이후 차임과 미납관리비 부분을 파기하고, 이 부분 사건을 다시 심리·판단하도록 원심법원에 환송하기로 하며, 원고의 나머지 상고를 기각하기로 하여, 관여 대법관의 일치된 의견으로 주문과 같이 판결한다.<br /><br /></p>
+          <div style="text-align:center">
+           대법관 오경미(재판장) 김선수(주심) 노태악 서경환 
+          </div>
+          <p></p> 
+          <input type="hidden" id="fPrecSeq" name="fPrecSeq" value="240969" /> 
+         </div> 
+        </div> 
+       </div> 
+      </div> 
+      <!--/ contentBody --> 
+     </div> 
+     <!--/ cont --> 
+    </div> 
+    <!--/ viewContents --> 
+   </div> 
+   <!--/ viewContainer --> 
+  </div> 
+  <!--/ viewWrap --> 
+  <!--  본문 법령링크 --> 
+  <div id="lsOutPutDivWrite" class="layerPop"> 
+   <div class="inner"> 
+    <strong class="tit">저장</strong> 
+    <div id="lsOutPutLayer" class="cont"></div> 
+    <div class="btnBottom right"> 
+     <button class="btn btnWhite btnSm" type="button" onclick="fn_layer_close(this)">취소</button> 
+     <button class="btn btnInBlue btnSm" type="button" id="aBtnOutPutSave" onclick="beforeSavePrint(); fn_layer_close(this); return false;">저장</button> 
+    </div> 
+    <a id="maClsBtn" href="javascript:void(0)" onclick="fn_layer_close(this)">닫기</a> 
+   </div> 
+  </div> 
+  <!-- 첨부파일 다운로드 팝업 --> 
+  <div id="attFlListLayer" class="layerPop"> 
+   <div class="inner"> 
+    <strong class="tit">첨부 파일 다운로드</strong> 
+    <!-- cont --> 
+    <div class="cont"> 
+     <!-- listTable --> 
+     <div class="listTable responsive"> 
+      <table> 
+       <caption>
+        첨부파일 다운로드 리스트
+       </caption> 
+       <colgroup> 
+        <col style="width: auto" /> 
+       </colgroup> 
+       <thead> 
+        <tr> 
+         <th scope="col">목록</th> 
+        </tr> 
+       </thead> 
+       <tbody> 
+        <tr style="width:auto;text-align:center;"> 
+         <td> <b>첨부파일이 존재하지 않습니다.</b> </td> 
+        </tr> 
+       </tbody> 
+      </table> 
+     </div> 
+     <!--// listTable --> 
+    </div> 
+    <div class="btnBottom right"> 
+     <button class="btn btnInBlue btnSm" type="button" onclick="fn_layer_close(this)">닫기</button> 
+    </div> 
+    <a href="javascript:void(0)" onclick="fn_layer_close(this)">닫기</a> 
+   </div> 
+  </div> 
+  <!-- // 본문저장 팝업 --> 
+  <div id="precSaveLayer" class="layerPop"> 
+   <div class="inner" style="width: 450px;"> 
+    <strong class="tit">저장</strong> 
+    <form id="outPutFrm" method="post" action="#"> 
+     <input type="hidden" id="outPutPrecSeq" name="precSeq" value="" /> 
+     <input type="hidden" id="outPutChrClsCd" name="chrClsCd" value="" /> 
+     <input type="hidden" id="joAllCheck" name="joAllCheck" value="" /> 
+     <input type="hidden" id="conJo" name="conJo" value="" /> 
+     <input type="hidden" id="custom" name="custom" value="" /> 
+     <input type="hidden" id="preview" name="preview" value="" /> 
+     <input type="hidden" id="selectedTrialContents" name="selectedTrialContents" value="" /> 
+     <div class="cont" tabindex="0" style="max-height: 481.391px;"> 
+      <!-- viewerSave --> 
+      <div class="viewerSave"> 
+       <!-- tabWrap --> 
+       <div class="tabWrap sub"> 
+        <!-- tabBtn --> 
+        <div class="tabBtn"> 
+         <div class="swiper-wrapper"> 
+          <a href="" class="swiper-slide curr" title="선택됨">범위설정</a> 
+          <a href="" class="swiper-slide">용지/폰트 설정</a> 
+         </div> 
+        </div> 
+        <!--// tabBtn --> 
+        <!-- tabBox --> 
+        <div class="tabBox"> 
+         <!-- 범위설정 --> 
+         <div style="">
+          <h4 class="blind">범위설정</h4> 
+          <section> 
+           <div class="inctn1" id="lsOutBdyUl1" style="height: 180px;"> 
+            <ul> 
+             <li> <input type="checkbox" class="dep1" checked="checked" id="joCheckBox" onclick="checkTryCatch(this.checked,'joNo');" /> <label for="joCheckBox">본문</label> </li> 
+             <li class="dem"> 
+              <div id="outPutJoListDiv"> 
+              </div> </li> 
+            </ul> 
+           </div> 
+          </section> 
+         </div> 
+         <!-- // 범위설정 --> 
+         <!-- 용지/폰트 설정 --> 
+         <div style="display: none;">
+          <h4 class="blind">용지/폰트 설정</h4> 
+          <section> 
+           <strong class="title">폰트설정</strong> 
+           <!-- formItem --> 
+           <div class="formItem"> 
+            <label for="evtNmFont">판례명</label> 
+            <select title="판례명 폰트설정" id="evtNmFont" name="evtNmFont" data-radio-disabled="fileType3 fileType4"> <option value="goThic" selected="selected">견고딕</option> <option value="smyoungjo">신명조</option> </select> 
+           </div> 
+           <!-- // formItem --> 
+           <!-- formItem --> 
+           <div class="formItem"> 
+            <label for="precCtsFont">판례내용</label> 
+            <select title="판례내용 폰트설정" id="precCtsFont" name="precCtsFont" data-radio-disabled="fileType3 fileType4"> <option value="smyoungjo" selected="selected">신명조</option> <option value="goThic">견고딕</option> </select> 
+           </div> 
+           <!-- // formItem --> 
+           <!-- formItem --> 
+           <div class="formItem"> 
+            <label for="fontSet03">판례내용 글자크기</label> 
+            <select title="판례내용 글자크기 설정" id="precCtsSize" name="precCtsSize"> <option value="10" selected="selected">10pt</option> <option value="12">12pt</option> </select> 
+           </div> 
+           <!-- // formItem --> 
+          </section> 
+          <section> 
+           <strong class="title">여백설정 <span>(단위 : mm)</span></strong> 
+           <div class="paddingSet"> 
+            <span class="checked case"> <input type="radio" name="spaceCls" id="spaceCls1" value="2" checked="" /> <label for="spaceCls1"> <img src="/LSW/assets/images/viewer/img-printSet-01.svg" alt="탑20mm, 오른쪽15mm, 바닥15mm, 왼쪽15mm으로 여백설정" /> </label> </span> 
+            <span class="checked case"> <input type="radio" name="spaceCls" id="spaceCls2" value="1" /> <label for="spaceCls2"> <img src="/LSW/assets/images/viewer/img-printSet-02.svg" alt="탑25mm, 오른쪽15mm, 바닥20mm, 왼쪽15mm으로 여백설정" /> </label> </span> 
+            <span class="checked case"> <input type="radio" name="spaceCls" id="spaceCls3" value="0" /> <label for="spaceCls3"> <img src="/LSW/assets/images/viewer/img-printSet-03.svg" alt="탑30mm, 오른쪽20mm, 바닥25mm, 왼쪽20mm으로 여백설정" /> </label> </span> 
+           </div> 
+          </section> 
+         </div> 
+         <!-- // 용지/폰트 설정 --> 
+        </div> 
+        <!-- // tabBox --> 
+       </div> 
+       <!-- // tabWrap --> 
+       <!-- 파일형식 (공통) --> 
+       <section> 
+        <strong class="title">파일형식</strong> 
+        <!-- radioFunc --> 
+        <div class="radioFunc caseTab"> 
+         <input type="hidden" id="docClsSelectBox" value="hwp" /> 
+         <span class="checked case"> <input type="radio" value="hwp" name="fileType" id="FileSaveHwp" onclick="hwpNoticeImgDp(this);" checked="" /> <label for="FileSaveHwp">HWP</label> </span> 
+         <span class="checked case"> <input type="radio" value="hwpx" name="fileType" id="FileSaveHwpx" onclick="hwpNoticeImgDp(this);" /> <label for="FileSaveHwpx">HWPX</label> </span> 
+         <span class="checked case"> <input type="radio" value="pdf" name="fileType" id="FileSavePdf" onclick="hwpNoticeImgDp(this);" /> <label for="FileSavePdf">PDF</label> </span> 
+         <span class="checked case"> <input type="radio" value="doc" name="fileType" id="FileSaveDoc" onclick="hwpNoticeImgDp(this);" /> <label for="FileSaveDoc">DOC</label> </span> 
+         <ul class="dotList"> 
+          <li id="hwpNoticeImg" data-radio="fileType1 fileType2" style="">아래한글 사용자는 최신버전을 업그레이드하십시오</li> 
+          <li><a href="javascript:void(0);" onclick="openScrollPop('noticeInfoP.do?searchKeyword=&amp;pageIndex=3&amp;brdSeq=1935033',590,510); return false;" class="dotLink">프로그램 내려받기(한글 버전별 링크)</a></li> 
+          <li id="fontNoticeImg" data-radio="fileType3 fileType4" style="display: none;">용지/폰트 설정을 지원하지 않습니다.</li> 
+         </ul> 
+        </div> 
+        <!-- // radioFunc --> 
+        <script>
+                    $(function () {
+                        $('input[type="radio"][value^="fileType"]').on('change', function () {
+                            const val = $(this).val();
+                            $('[data-radio-disabled]').prop('disabled', false);
+                            $('[data-radio-disabled~="' + val + '"]').prop('disabled', true);
+                        });
+                    });
+                </script> 
+       </section> 
+       <!-- // 파일형식 (공통) --> 
+      </div> 
+      <!-- // viewerSave --> 
+     </div> 
+     <!-- btnBottom --> 
+    </form> 
+    <div class="btnBottom right"> 
+     <button class="btn btnWhite btnSm" type="button" onclick="fn_layer_close(this)">취소</button> 
+     <button class="btn btnInBlue btnSm" type="button" onclick="beforeSavePrint(); return false;">저장</button> 
+    </div> 
+    <!--// btnBottom --> 
+    <a href="javascript:void(0)" onclick="fn_layer_close(this)">닫기</a> 
+   </div> 
+  </div> 
+  <!-- 화면내검색 레이어 //--> 
+  <!-- 인쇄 layer --> 
+  <!-- 화면내 검색 layer --> 
+  <script type="text/javaScript" language="javascript" defer="defer">
+<!--
+$(document).ready(function()
+{
+    // 화면내 검색 Layer의 별표본문내용 체크박스 Click Event
+    $("#bdySearchLayer").delegate("input:checkbox[id=selectSearchByl]", "click", function(e) {
+        isBylChkChg = true;
+    });
+});
+//-->
+</script> 
+  <div id="bdySearchLayer" class="layerPop on" style="display: none;"> 
+   <div class="inner" style="width: 450px;"> 
+    <strong class="tit">화면 내 검색</strong> 
+    <!-- cont --> 
+    <div class="cont" tabindex="0" style="max-height: 185.5px;"> 
+     <!-- lsBodySearch --> 
+     <div class="lsBodySearch"> 
+      <!-- listTop --> 
+      <div class="listTop"> 
+       <!-- left --> 
+       <div class="left"> 
+        <!-- checkboxWrap --> 
+        <div class="checkboxWrap"> 
+         <div class="checkbox"> 
+          <input type="radio" id="preBtn" name="srcBtn" class="radio" value="1" /> 
+          <label for="preBtn">위로</label> 
+         </div> 
+         <div class="checkbox"> 
+          <input type="radio" id="nextBtn" name="srcBtn" class="radio" value="2" checked="checked" /> 
+          <label for="nextBtn">아래로</label> 
+         </div> 
+        </div> 
+        <!-- // checkboxWrap --> 
+       </div> 
+       <!--// left --> 
+       <!-- right --> 
+       <!--// right --> 
+      </div> 
+      <!--// listTop --> 
+      <div class="formItem"> 
+       <!-- formItem --> 
+       <div class="withBtn"> 
+        <input type="text" title="검색어" placeholder="화면 내 검색어를 입력하세요" id="bdySearch" name="bdySearch" onkeypress="if(event.keyCode==13){enterBdySearch(event,document.getElementsByName('srcBtn'));return false;}" /> 
+        <button type="button" class="btn" href="javascript:void(0);" onclick="window.bdySearch(document.getElementsByName('srcBtn'));return false;">검색</button> 
+       </div> 
+      </div> 
+      <!-- // formItem --> 
+      <!-- btnLabel --> 
+      <ul class="btnLabel noLink" id="bdyKeyVal"> 
+      </ul> 
+      <!--// btnLabel --> 
+     </div> 
+     <!-- // lsBodySearch --> 
+    </div> 
+    <!-- // cont --> 
+    <a href="javascript:void(0)" onclick="fn_layer_close(this)">닫기</a> 
+   </div> 
+  </div> 
+  <!-- 화면내 layer //--> 
+  <!-- 본문 검색 후 조문 출력 layer --> 
+  <div id="divSearchLayer" class="layerPop"> 
+   <div class="inner"> 
+    <strong class="tit">화면 내 검색결과</strong> 
+    <div class="cont"> 
+     <div class="listTable responsive" id="searchList"></div> 
+    </div> 
+    <div class="btnBottom right"> 
+     <button class="btn btnInBlue btnSm clsBtn" type="button" onclick="fn_layer_close(this)">닫기</button> 
+    </div> 
+    <a href="javascript:void(0)" onclick="fn_layer_close(this)">닫기</a> 
+   </div> 
+  </div> 
+  <!-- 본문 검색 후 조문 출력 layer //--> 
+  <!-- Wide 목록저장 layer --> 
+  <div class="layerPop layerType" id="listSaveLayer"> 
+   <div class="inner"> 
+    <div class="cont"> 
+     <form id="saveForm" name="saveForm" target="_self" action="#"> 
+      <input type="image" title="전송" style="display:none;" alt="전송" /> 
+      <input type="hidden" name="save" value="save" /> 
+      <input type="hidden" id="saveTabMenuId" name="tabMenuId" /> 
+      <input type="hidden" id="saveQuery" name="query" /> 
+      <input type="hidden" id="savePg" name="pg" /> 
+      <input type="hidden" id="saveOutmax" name="outmax" /> 
+      <input type="hidden" id="saveSelSort" name="selSort" /> 
+      <input type="hidden" id="saveTabMenuIdx" name="tabMenuIdx" /> 
+      <input type="hidden" id="saveSubMenuId" name="subMenuId" /> 
+      <input type="hidden" id="lsAstMode2" name="lsAstMode" value="1" />
+      <label for="lsAstMode2" class="blind">모드</label> 
+      <input type="hidden" id="saveWhole" name="saveTarget" value="whole" />
+      <label for="saveWhole" class="blind">전체저장</label> 
+      <input type="hidden" id="saveSection" name="section" /> 
+      <input type="hidden" id="saveCmt" name="cmt" /> 
+      <input type="hidden" id="saveDeccType" name="deccType" /> 
+      <div class="typeBox"> 
+       <!-- checkboxWrap --> 
+       <div class="checkboxWrap caseCol"> 
+        <div class="checkbox"> 
+         <input type="radio" id="saveListXLS" name="saveExt" value="xls" checked="checked" /> 
+         <label for="saveListXLS">XLS(엑셀)</label> 
+        </div> 
+        <div class="checkbox"> 
+         <input type="radio" id="saveListTXT" name="saveExt" value="txt" /> 
+         <label for="saveListTXT">TXT(텍스트)</label> 
+        </div> 
+       </div> 
+       <!-- // checkboxWrap --> 
+      </div> 
+      <div id="inputContainer" style="display:none;"></div> 
+     </form> 
+    </div> 
+    <div class="btnBottom right"> 
+     <button type="button" class="btn btnSm btnWhite clsBtn" onclick="fn_layer_close(this);">취소</button> 
+     <button type="button" class="btn btnSm btnInBlue" onclick="submitListSave();return false;">저장</button> 
+    </div> 
+   </div> 
+  </div> 
+  <!-- Wide 목록저장 layer //--> 
+  <!-- 법령 조문 목록저장 layer --> 
+  <div class="layerPop layerType" id="joListSaveLayer"> 
+   <div class="inner"> 
+    <div class="cont"> 
+     <form id="joSaveForm" name="joSaveForm" target="_self" action="#"> 
+      <input type="image" title="전송" style="display:none;" alt="전송" /> 
+      <input type="hidden" name="save" value="save" /> 
+      <input type="hidden" id="lsAstMode3" name="lsAstMode" value="1" /> 
+      <input type="hidden" id="saveWhole2" name="saveTarget" value="whole" /> 
+      <div class="typeBox"> 
+       <!-- checkboxWrap --> 
+       <div class="checkboxWrap caseCol"> 
+        <div class="checkbox"> 
+         <input type="radio" id="saveJoListXLS" name="saveExt" value="xls" checked="checked" /> 
+         <label for="saveJoListXLS">XLS(엑셀)</label> 
+        </div> 
+        <div class="checkbox"> 
+         <input type="radio" id="saveJoListTXT" name="saveExt" value="txt" /> 
+         <label for="saveJoListTXT">TXT(텍스트)</label> 
+        </div> 
+        <div class="checkbox"> 
+         <input type="radio" id="saveHWPList" name="saveExt" value="hwp" /> 
+         <label for="saveHWPList">한글(본문)</label> 
+        </div> 
+       </div> 
+      </div> 
+     </form> 
+    </div> 
+    <!-- // checkboxWrap --> 
+    <div class="btnBottom right"> 
+     <button type="button" class="btn btnSm btnWhite clsBtn" onclick="fn_layer_close(this)">취소</button> 
+     <button type="button" class="btn btnSm btnInBlue" onclick="submitJoListSave();return false;">저장</button> 
+    </div> 
+   </div> 
+  </div> 
+  <!-- 법령 조문 목록저장 layer //--> 
+  <!-- 법령 조문 본문 저장 layer --> 
+  <div class="layerPop layerType" id="joInfoSaveLayer"> 
+   <div class="inner"> 
+    <div class="cont"> 
+     <form id="joInfoSaveForm" name="joInfoSaveForm" target="_self" action="#"> 
+      <input type="image" title="전송" alt="전송" style="display:none;" /> 
+      <div class="typeBox"> 
+       <!-- checkboxWrap --> 
+       <div class="checkboxWrap caseCol"> 
+        <div class="checkbox"> 
+         <input type="radio" name="saveExt" id="joDocSelectIdHWP" value="hwp" checked="" /> 
+         <label for="joDocSelectIdHWP">HWP(한글)</label> 
+        </div> 
+        <div class="checkbox"> 
+         <input type="radio" name="saveExt" id="joDocSelectIdPDF" value="pdf" /> 
+         <label for="joDocSelectIdPDF">PDF</label> 
+        </div> 
+        <div class="checkbox"> 
+         <input type="radio" name="saveExt" id="joDocSelectIdDOC" value="doc" /> 
+         <label for="joDocSelectIdDOC">오피스(DOC)</label> 
+        </div> 
+       </div> 
+       <!-- // checkboxWrap --> 
+      </div> 
+     </form> 
+    </div> 
+    <div class="btnBottom right"> 
+     <button type="button" class="btn btnSm btnWhite clsBtn" onclick="fn_layer_close(this)">취소</button> 
+     <button type="button" class="btn btnSm btnInBlue" onclick="joBeforeSavePrint();return false;">저장</button> 
+    </div> 
+   </div> 
+  </div> 
+  <!-- 법령 조문 본문 저장 layer //--> 
+  <div class="layerPop layerType" id="htmlSaveLayer"> 
+   <div class="inner"> 
+    <div class="cont"> 
+     <form id="htmlsaveForm" name="htmlsaveForm" target="_self" action="#"> 
+      <fieldset> 
+       <legend>파일형식 선택</legend> 
+       <input type="image" title="전송" alt="전송" style="display:none;" /> 
+       <input type="hidden" name="save" value="save" /> 
+       <!-- id="save" --> 
+       <div class="contwrap" style="margin:1px 0;"> 
+        <div class="viewla"> 
+         <div class="ins"> 
+          <div class="inctn"> 
+           <ul> 
+            <li class="itit">파일형식</li> 
+            <li class="rdi"> <input type="radio" id="saveHtmlHTML" name="saveExt" class="radio" value="html" checked="checked" /><label for="saveHtmlHTML">HTML</label> <input type="radio" id="saveHtmlXLSb" name="saveExt" class="radio" value="xls" /><label for="saveHtmlXLSb">XLS(엑셀)</label> </li> 
+           </ul> 
+          </div> 
+         </div> 
+        </div> 
+       </div> 
+      </fieldset> 
+     </form> 
+    </div> 
+    <!-- button --> 
+    <div class="btnBottom right"> 
+     <button type="button" class="btn btnSm btnWhite clsBtn" onclick="fn_layer_close(this);">취소</button> 
+     <button type="button" class="btn btnSm btnInBlue" onclick="submitHtmlContent();return false;">저장</button> 
+    </div> 
+    <!-- button //--> 
+   </div> 
+  </div> 
+  <!-- 목록저장 layer //--> 
+  <!-- 신구조문 저장 layer --> 
+  <div class="layerPop layerType" id="newSaveLayer"> 
+   <div class="inner"> 
+    <div class="cont"> 
+     <form id="newSaveForm" name="newSaveForm" target="_self" action="#"> 
+      <input type="image" title="전송" alt="전송" style="display:none;" /> 
+      <input type="hidden" name="save" value="save" /> 
+      <div class="typeBox"> 
+       <!-- checkboxWrap --> 
+       <div class="checkboxWrap caseCol"> 
+        <div class="checkbox"> 
+         <input type="radio" name="newSaveExt" id="newSaveHTML" value="html" checked="" /> 
+         <label for="newSaveHTML">HTML</label> 
+        </div> 
+        <div class="checkbox"> 
+         <input type="radio" name="newSaveExt" id="newSaveHWP" value="hwp" /> 
+         <label for="newSaveHWP">HWP(한글)</label> 
+        </div> 
+        <div class="checkbox"> 
+         <input type="radio" name="newSaveExt" id="newSaveXLS" value="xls" /> 
+         <label for="newSaveXLS">XLS(엑셀)</label> 
+        </div> 
+        <div class="checkbox"> 
+         <input type="radio" name="newSaveExt" id="newSavePDF" value="pdf" /> 
+         <label for="newSavePDF">PDF</label> 
+        </div> 
+       </div> 
+       <!-- // checkboxWrap --> 
+      </div> 
+     </form> 
+    </div> 
+    <div class="btnBottom right"> 
+     <button type="button" class="btn btnSm btnWhite clsBtn" onclick="fn_layer_close(this);">취소</button> 
+     <button type="button" class="btn btnSm btnInBlue" onclick="submitNewContent();return false;">저장</button> 
+    </div> 
+   </div> 
+  </div> 
+  <!-- 신구조문저장 layer //--> 
+  <!-- 법령비교 저장 layer --> 
+  <div class="layerPop layerType" id="lawCompareSaveLayer"> 
+   <div class="inner"> 
+    <div class="cont"> 
+     <form id="lawCompareSaveForm" name="lawCompareSaveForm" target="_self" action="#"> 
+      <input type="image" title="전송" alt="전송" style="display:none;" /> 
+      <input type="hidden" name="save" value="save" /> 
+      <div class="typeBox"> 
+       <!-- checkboxWrap --> 
+       <div class="checkboxWrap caseCol"> 
+        <div class="checkbox"> 
+         <input type="radio" name="lawCmpSaveExt" id="lawCmpSaveHWP" class="lawCmpSaveExt" value="hwp" checked="" /> 
+         <label for="lawCmpSaveHWP">HWP(한글)</label> 
+        </div> 
+        <div class="checkbox"> 
+         <input type="radio" name="lawCmpSaveExt" id="lawCmpSavePDF" class="lawCmpSaveExt" value="pdf" /> 
+         <label for="lawCmpSavePDF">PDF</label> 
+        </div> 
+        <div class="checkbox"> 
+         <input type="radio" name="lawCmpSaveExt" id="lawCmpSaveDOC" class="lawCmpSaveExt" value="doc" /> 
+         <label for="lawCmpSaveDOC">오피스(DOC)</label> 
+        </div> 
+       </div> 
+       <!-- // checkboxWrap --> 
+      </div> 
+     </form> 
+    </div> 
+    <div class="btnBottom right"> 
+     <button type="button" class="btn btnSm btnWhite clsBtn" onclick="fn_layer_close(this);">취소</button> 
+     <button type="button" class="btn btnSm btnInBlue" onclick="submitLawCompareContent();return false;">저장</button> 
+    </div> 
+   </div> 
+  </div> 
+  <!-- 법령비교저장 layer //--> 
+  <!-- 본문 저장 layer --> 
+  <div class="layerPop layerType" id="infoSaveLayer"> 
+   <div class="inner"> 
+    <div class="cont"> 
+     <form id="infoSaveForm" name="infoSaveForm" target="_self" action="#"> 
+      <input type="image" title="전송" alt="전송" style="display:none;" /> 
+      <input type="hidden" name="save" value="save" /> 
+      <!-- checkboxWrap --> 
+      <div class="checkboxWrap caseCol"> 
+       <div class="checkbox"> 
+        <input type="radio" name="saveExt" id="saveHWP" value="hwp" checked="" /> 
+        <label for="saveHWP">HWP(한글)</label> 
+       </div> 
+       <div class="checkbox"> 
+        <input type="radio" name="saveExt" id="saveTXTb" value="txt" /> 
+        <label for="saveTXTb">TXT(텍스트)</label> 
+       </div> 
+      </div> 
+      <!-- // checkboxWrap --> 
+     </form> 
+    </div> 
+    <div class="btnBottom right"> 
+     <button type="button" class="btn btnSm btnWhite clsBtn" onclick="fn_layer_close(this);">취소</button> 
+     <button type="button" class="btn btnSm btnInBlue" onclick="submitContent();return false;">저장</button> 
+    </div> 
+   </div> 
+  </div> 
+  <!-- 본문 저장 layer //--> 
+  <!-- 전체 제개정이유 저장 layer --> 
+  <div class="layerPop layerType" id="lsRvsRsnInfoSaveLayer"> 
+   <div class="inner"> 
+    <div class="cont"> 
+     <form id="lsRvsRsnInfoSaveForm" name="lsRvsRsnInfoSaveForm" target="_self" action="#"> 
+      <input type="image" title="전송" alt="전송" style="display:none;" /> 
+      <input type="hidden" name="save" value="save" /> 
+      <input type="hidden" name="lsRvsGubun" value="" /> 
+      <!-- checkboxWrap --> 
+      <div class="checkboxWrap caseCol"> 
+       <div class="checkbox"> 
+        <input type="radio" id="saveRvsRsnHWP" name="saveExt" value="hwp" checked="checked" /> 
+        <label for="saveRvsRsnHWP">HWP(한글)</label> 
+       </div> 
+       <div class="checkbox"> 
+        <input type="radio" id="saveRvsRsnTXTb" name="saveExt" value="txt" /> 
+        <label for="saveRvsRsnTXTb">TXT(텍스트)</label> 
+       </div> 
+      </div> 
+      <!-- // checkboxWrap --> 
+     </form> 
+    </div> 
+    <div class="btnBottom right"> 
+     <button type="button" class="btn btnSm btnInBlue" onclick="submitRvsRsnContent();">저장</button> 
+     <button type="button" class="btn btnSm btnWhite clsBtn" onclick="SaveWindow.hideLsRvsRsnSave();">닫기</button> 
+    </div> 
+   </div> 
+  </div> 
+  <!-- 전체 제개정이유 저장 layer --> 
+  <!-- 학칙공단 제개정문 저장 layer --> 
+  <div class="layerPop layerType" id="schlRvsRsnSaveLayer"> 
+   <div class="inner"> 
+    <div class="cont"> 
+     <form id="schlPubRulSaveForm" name="schlPubRulSaveForm" target="_self" action="#"> 
+      <input type="image" title="전송" alt="전송" style="display:none;" /> 
+      <input type="hidden" name="save" value="save" /> 
+      <input type="hidden" id="seq" name="schlPubRulSeq" value="" /> 
+      <!-- checkboxWrap --> 
+      <div class="checkboxWrap caseCol"> 
+       <div class="checkbox"> 
+        <input type="radio" id="saveSchlHWP" name="saveExt" value="hwp" checked="checked" /> 
+        <label for="saveSchlHWP">HWP(한글)</label> 
+       </div> 
+       <div class="checkbox"> 
+        <input type="radio" id="saveSchlTXTb" name="saveExt" value="txt" /> 
+        <label for="saveSchlTXTb">TXT(텍스트)</label> 
+       </div> 
+      </div> 
+      <!-- // checkboxWrap --> 
+     </form> 
+    </div> 
+    <div class="btnBottom right"> 
+     <button type="button" class="btn btnSm btnInBlue" onclick="submitSchlPubRulContent();">저장</button> 
+     <button type="button" class="btn btnSm btnWhite clsBtn" onclick="SaveWindow.hideSchlPubRulRvsRsnSave();">닫기</button> 
+    </div> 
+   </div> 
+  </div> 
+  <!-- 학칙공단 제개정문 저장 layer //--> 
+  <!-- 영문 본문 저장 layer --> 
+  <div class="layerPop layerType" id="engInfoSaveLayer"> 
+   <div class="inner"> 
+    <div class="cont"> 
+     <form id="engInfoSaveForm" name="engInfoSaveForm" target="_self" action="#"> 
+      <input type="image" title="전송" alt="전송" style="display:none;" /> 
+      <input type="hidden" name="save" value="save" /> 
+      <!-- checkboxWrap --> 
+      <div class="checkboxWrap caseCol"> 
+       <div class="checkbox"> 
+        <input type="radio" id="docSelectIdHWP" name="docSelectId" class="radio" value="hwp" checked="checked" /> 
+        <label for="docSelectIdHWP">한글(HWP)</label> 
+       </div> 
+       <div class="checkbox"> 
+        <input type="radio" id="docSelectIdPDF" name="docSelectId" class="radio" value="pdf" /> 
+        <label for="docSelectIdPDF">PDF</label> 
+       </div> 
+       <div class="checkbox"> 
+        <input type="radio" id="docSelectIdDOC" name="docSelectId" class="radio" value="doc" /> 
+        <label for="docSelectIdDOC">오피스(DOC)</label> 
+       </div> 
+      </div> 
+      <!-- // checkboxWrap --> 
+     </form> 
+    </div> 
+    <div class="btnBottom right"> 
+     <button type="button" class="btn btnSm btnInBlue" onclick="engLsBeforeSavePrint();">저장</button> 
+     <button type="button" class="btn btnSm btnWhite clsBtn" onclick="SaveWindow.hideEngInfoSave();">닫기</button> 
+    </div> 
+   </div> 
+  </div> 
+  <!-- 영문 본문 저장 layer //--> 
+  <!-- 다국어 본문 저장 layer --> 
+  <div class="layerPop layerType" id="multiLingualActInfoSaveLayer"> 
+   <div class="inner"> 
+    <div class="cont"> 
+     <form id="multiLingualActInfoSaveForm" name="multiLingualActInfoSaveForm" target="_self" action="#"> 
+      <input type="image" title="전송" alt="전송" style="display:none;" /> 
+      <input type="hidden" name="save" value="save" /> 
+      <!-- checkboxWrap --> 
+      <div class="checkboxWrap caseCol"> 
+       <div class="checkbox"> 
+        <input type="radio" id="multiLsHwp" name="docSelectId" class="radio" value="hwp" checked="checked" /> 
+        <label for="multiLsHwp">한글(HWP)</label> 
+       </div> 
+       <div class="checkbox"> 
+        <input type="radio" id="multiLsPdf" name="docSelectId" class="radio" value="pdf" /> 
+        <label for="multiLsPdf">PDF</label> 
+       </div> 
+       <div class="checkbox"> 
+        <input type="radio" id="multiLsDoc" name="docSelectId" class="radio" value="doc" /> 
+        <label for="multiLsDoc">오피스(DOC)</label> 
+       </div> 
+      </div> 
+      <!-- // checkboxWrap --> 
+     </form> 
+    </div> 
+    <div class="btnBottom right"> 
+     <button type="button" class="btn btnSm btnInBlue" onclick="multiLingualActSavePrint();">저장</button> 
+     <button type="button" class="btn btnSm btnWhite clsBtn" onclick="SaveWindow.hideMultiLingualActInfoSave();">닫기</button> 
+    </div> 
+   </div> 
+  </div> 
+  <!-- 다국어 본문 저장 layer //--> 
+  <!-- 법령용어 저장 layer --> 
+  <div class="layerPop layerType" id="lsTrmInfoSaveLayer"> 
+   <div class="inner"> 
+    <div class="cont"> 
+     <form id="lsTrmInfoSaveForm" name="lsTrmInfoSaveForm" target="_self" action="#" onsubmit="return lsTrmBeforeSavePrint()"> 
+      <fieldset> 
+       <legend>파일형식 선택</legend> 
+       <input type="image" title="전송" alt="전송" style="display:none;" /> 
+       <input type="hidden" id="saveQuery" name="lsTrm" />
+       <label for="saveQuery" style="display:none">법령용어명</label> 
+       <input type="hidden" name="save" value="save" /> 
+       <!--  id="save" --> 
+       <!-- checkboxWrap --> 
+       <div class="checkboxWrap caseCol"> 
+        <div class="checkbox"> 
+         <input type="radio" id="lsTrmDocSelectIdHWP" name="lsTrmDocSelectId" class="radio" value="hwp" checked="checked" /> 
+         <label for="lsTrmDocSelectIdHWP">한글(HWP)</label> 
+        </div> 
+        <div class="checkbox"> 
+         <input type="radio" id="lsTrmDocSelectIdPDF" name="lsTrmDocSelectId" class="radio" value="pdf" /> 
+         <label for="lsTrmDocSelectIdPDF">PDF</label> 
+        </div> 
+       </div> 
+       <!-- // checkboxWrap --> 
+      </fieldset> 
+     </form> 
+    </div> 
+    <div class="btnBottom right"> 
+     <button type="button" class="btn btnSm btnInBlue" onclick="lsTrmBeforeSavePrint();">저장</button> 
+     <button type="button" class="btn btnSm btnWhite clsBtn" onclick="SaveWindow.hideInfoSaveNew();">닫기</button> 
+    </div> 
+   </div> 
+  </div> 
+  <!-- 법령용어 저장 layer TXT(텍스트) 저장 추가 //--> 
+  <!-- 법령용어 저장 layer --> 
+  <div class="layerPop layerType" id="lsTrmInfoSaveLayer2"> 
+   <div class="inner"> 
+    <div class="cont"> 
+     <form id="lsTrmInfoSaveForm2" name="lsTrmInfoSaveForm2" target="_self" action="#" onsubmit="return lsTrmBeforeSavePrint2()"> 
+      <input type="image" title="전송" alt="전송" style="display:none;" /> 
+      <input type="hidden" id="saveQuery1" name="lsTrm" />
+      <label for="saveQuery1" style="display:none">법령용어명</label> 
+      <input type="hidden" name="save" value="save" /> 
+      <!-- checkboxWrap --> 
+      <div class="checkboxWrap caseCol"> 
+       <div class="checkbox"> 
+        <input type="radio" id="lsTrmDocSelectIdHWP1" name="saveExt" class="radio" value="hwp" checked="checked" /> 
+        <label for="lsTrmDocSelectIdHWP1">한글(HWP)</label> 
+       </div> 
+       <div class="checkbox"> 
+        <input type="radio" id="lsTrmDocSelectIdTXT1" name="saveExt" class="radio" value="txt" /> 
+        <label for="lsTrmDocSelectIdTXT1">TXT(텍스트)</label> 
+       </div> 
+      </div> 
+      <!-- // checkboxWrap --> 
+     </form> 
+    </div> 
+    <div class="btnBottom right"> 
+     <button type="button" class="btn btnSm btnInBlue" onclick="lsTrmBeforeSavePrint2();">저장</button> 
+     <button type="button" class="btn btnSm btnWhite clsBtn" onclick="SaveWindow.hideInfoSaveNew();">닫기</button> 
+    </div> 
+   </div> 
+  </div> 
+  <!-- 법령용어 저장 layer layer TXT(텍스트) 저장 추가 //--> 
+  <!-- 3단비교  저장 layer --> 
+  <div class="layerPop layerType" id="thdCmpSaveLayer"> 
+   <div class="inner"> 
+    <div class="cont"> 
+     <form id="thdCmpSaveForm" name="thdCmpSaveForm" target="_self" action="#"> 
+      <fieldset> 
+       <legend>파일형식 선택</legend> 
+       <input type="image" title="전송" alt="전송" style="display:none;" /> 
+       <input type="hidden" name="save" value="save" /> 
+       <!-- id="save" --> 
+       <!-- checkboxWrap --> 
+       <div class="checkboxWrap caseCol"> 
+        <div class="checkbox"> 
+         <input type="radio" id="saveThdCmpHTML" name="saveExt" class="radio" value="html" checked="checked" />
+         <label for="saveThdCmpHTML">HTML</label> 
+        </div> 
+        <div class="checkbox"> 
+         <input type="radio" id="saveThdCmpHWP" name="saveExt" class="radio" value="hwp" />
+         <label for="saveThdCmpHWP">HWP(한글)</label> 
+        </div> 
+        <div class="checkbox"> 
+         <input type="radio" id="saveThdCmpXLSb" name="saveExt" class="radio" value="xls" />
+         <label for="saveThdCmpXLSb">XLS(엑셀)</label> 
+        </div> 
+       </div> 
+       <!-- // checkboxWrap --> 
+      </fieldset> 
+     </form> 
+    </div> 
+    <div class="btnBottom right"> 
+     <button type="button" class="btn btnSm btnInBlue" onclick="submitListSaveThdCmpPrc();return false;">저장</button> 
+     <button type="button" class="btn btnSm btnWhite clsBtn" onclick="SaveWindow.hideThdCmpSave();">닫기</button> 
+    </div> 
+   </div> 
+  </div> 
+  <!-- LUM 3단비교, 법령단위비교 저장 Layer --> 
+  <div class="layerPop layerType" id="thdCmpNewSaveLayer"> 
+   <div class="inner"> 
+    <div class="cont"> 
+     <form id="thdCmpNewSaveForm" name="thdCmpNewSaveForm" target="_self" action="#"> 
+      <input type="image" title="전송" alt="전송" style="display:none;" /> 
+      <input type="hidden" name="save" value="save" /> 
+      <input type="hidden" name="chrClsCd" value="010202" /> 
+      <!-- checkboxWrap --> 
+      <div class="checkboxWrap caseCol"> 
+       <div class="checkbox"> 
+        <input type="radio" id="saveThdCmpNewHTML" name="saveExt" value="html" checked="checked" /> 
+        <label for="saveThdCmpNewHTML">HTML</label> 
+       </div> 
+       <div class="checkbox"> 
+        <input type="radio" id="saveThdCmpNewHWP" name="saveExt" value="hwp" /> 
+        <label for="saveThdCmpNewHWP">HWP(한글)</label> 
+       </div> 
+       <div class="checkbox"> 
+        <input type="radio" id="saveThdCmpNewXLSb" name="saveExt" value="xls" /> 
+        <label for="saveThdCmpNewXLSb">XLS(엑셀)</label> 
+       </div> 
+       <div class="checkbox"> 
+        <input type="radio" id="saveThdCmpNewPDF" name="saveExt" value="pdf" /> 
+        <label for="saveThdCmpNewPDF">PDF</label> 
+       </div> 
+       <div class="checkbox"> 
+        <input type="radio" id="saveThdCmpDOC" name="saveExt" value="doc" /> 
+        <label for="saveThdCmpDOC">DOC</label> 
+       </div> 
+      </div> 
+      <!-- // checkboxWrap --> 
+     </form> 
+    </div> 
+    <div class="btnBottom right"> 
+     <button type="button" class="btn btnSm btnInBlue" onclick="submitListSaveLumThdCmpPrc();return false;">저장</button> 
+     <button type="button" class="btn btnSm btnWhite clsBtn" onclick="SaveWindow.hideThdCmpNewSave();">닫기</button> 
+    </div> 
+   </div> 
+  </div> 
+  <!-- 3단비교 임시 저장 layer --> 
+  <div class="layerPop layerType" id="thdCmpTmpSaveLayer"> 
+   <div class="inner"> 
+    <div class="cont"> 
+     <form id="thdCmpTmpSaveForm" name="thdCmpTmpSaveForm" target="_self" action="#"> 
+      <fieldset> 
+       <legend>파일형식 선택</legend> 
+       <input type="image" title="전송" alt="전송" style="display:none;" /> 
+       <input type="hidden" name="save" value="save" /> 
+       <!-- id="save" --> 
+       <div class="typeBox"> 
+        <!-- checkboxWrap --> 
+        <div class="checkboxWrap caseCol"> 
+         <div class="checkbox"> 
+          <input type="radio" name="saveExt" id="saveThdCmpTmpSaveHTML" checked="" value="html" /> 
+          <label for="fileRadio01">HTML</label> 
+         </div> 
+         <div class="checkbox"> 
+          <input type="radio" name="saveExt" id="saveThdCmpTmpSaveXLSb" value="xls" /> 
+          <label for="fileRadio02">XLS</label> 
+         </div> 
+         <div class="checkbox"> 
+          <input type="radio" name="saveExt" id="saveThdCmpTmpSaveHWP" value="hwp" /> 
+          <label for="fileRadio03">HWP</label> 
+         </div> 
+        </div> 
+        <!-- // checkboxWrap --> 
+        <div class="buttons"> 
+         <button type="button" class="btn btnSm btnWhite clsBtn" onclick="fn_layer_close(this);">취소</button> 
+         <button type="button" class="btn btnSm btnInBlue" onclick="submitListSaveThdCmpTmpPrc();return false;">저장</button> 
+        </div> 
+       </div> 
+      </fieldset> 
+     </form> 
+    </div> 
+    <div class="btnBottom right"> 
+     <button type="button" class="btn btnSm btnInBlue" onclick="submitListSaveThdCmpTmpPrc();return false;">저장</button> 
+     <button type="button" class="btn btnSm btnWhite clsBtn" onclick="fn_layer_close(this)">닫기</button> 
+    </div> 
+   </div> 
+  </div> 
+  <!-- 행정규칙 신구조문 저장 layer --> 
+  <div class="layerPop layerType" id="admRulOANSaveLayer" style="display:none"> 
+   <div class="inner"> 
+    <div class="cont"> 
+     <form id="admRulOANSaveForm" name="admRulOANSaveForm" target="_self" action="#"> 
+      <input type="image" title="전송" alt="전송" style="display:none;" /> 
+      <input type="hidden" name="save" value="save" /> 
+      <div class="typeBox"> 
+       <!-- checkboxWrap --> 
+       <div class="checkboxWrap caseCol"> 
+        <div class="checkbox"> 
+         <input type="radio" name="admRulOANSaveExt" id="admRulOANSaveHTML" checked="" value="html" /> 
+         <label for="admRulOANSaveHTML">HTML</label> 
+        </div> 
+        <div class="checkbox"> 
+         <input type="radio" name="admRulOANSaveExt" id="admRulOANSaveHWP" value="hwp" /> 
+         <label for="admRulOANSaveHWP">HWP(한글)</label> 
+        </div> 
+        <div class="checkbox"> 
+         <input type="radio" name="admRulOANSaveExt" id="admRulOANSaveXLS" value="xls" /> 
+         <label for="admRulOANSaveXLS">XLS(엑셀)</label> 
+        </div> 
+       </div> 
+       <!-- // checkboxWrap --> 
+      </div> 
+     </form> 
+    </div> 
+    <div class="btnBottom right"> 
+     <button type="button" class="btn btnSm btnInBlue" onclick="submitAdmRulOAN();return false;">저장</button> 
+     <button type="button" class="btn btnSm btnWhite clsBtn" onclick="SaveWindow.hideAdmRulOANSave();">닫기</button> 
+    </div> 
+   </div> 
+  </div> 
+  <!-- 행정규칙 신구조문저장 layer //--> 
+  <!-- 학칙규정 신구조문 저장 layer --> 
+  <div class="layerPop layerType" id="schlPubRulOANSaveLayer"> 
+   <div class="inner"> 
+    <div class="cont"> 
+     <form id="schlPubRulOANSaveForm" name="schlPubRulOANSaveForm" target="_self" action="#"> 
+      <input type="image" title="전송" alt="전송" style="display:none;" /> 
+      <input type="hidden" name="save" value="save" /> 
+      <!-- checkboxWrap --> 
+      <div class="checkboxWrap caseCol"> 
+       <div class="checkbox"> 
+        <input type="radio" id="schlPubRulOANSaveHTML" name="schlPubRulOANSaveExt" value="html" checked="" /> 
+        <label for="schlPubRulOANSaveHTML">HTML</label> 
+       </div> 
+       <div class="checkbox"> 
+        <input type="radio" id="schlPubRulOANSaveHWP" name="schlPubRulOANSaveExt" value="hwp" /> 
+        <label for="schlPubRulOANSaveHWP">HWP(한글)</label> 
+       </div> 
+       <div class="checkbox"> 
+        <input type="radio" id="schlPubRulOANSaveXLS" name="schlPubRulOANSaveExt" value="xls" /> 
+        <label for="schlPubRulOANSaveXLS">XLS(엑셀)</label> 
+       </div> 
+      </div> 
+      <!-- // checkboxWrap --> 
+     </form> 
+    </div> 
+    <div class="btnBottom right"> 
+     <button type="button" class="btn btnSm btnInBlue" onclick="submitSchlPubRulOAN(); return false;">저장</button> 
+     <button type="button" class="btn btnSm btnWhite clsBtn" onclick="SaveWindow.hideSchlPubRulOANSave();">닫기</button> 
+    </div> 
+   </div> 
+  </div> 
+  <!-- 학칙규정 신구조문저장 layer //--> 
+  <!-- 일괄 저장 layer --> 
+  <div class="layerPop layerType" id="bulkSaveLayer"> 
+   <div class="inner"> 
+    <div class="cont"> 
+     <form id="bulkSaveForm" name="bulkSaveForm" target="_self" action="#"> 
+      <input type="image" title="전송" alt="전송" style="display:none;" /> 
+      <input type="hidden" name="save" value="save" /> 
+      <div class="typeBox"> 
+       <!-- checkboxWrap --> 
+       <div class="checkboxWrap caseCol"> 
+        <div class="checkbox"> 
+         <input type="radio" name="newBulkSaveExt" id="newBulkSaveHWP" checked="" value="hwp" /> 
+         <label for="newBulkSaveHWP">HWP</label> 
+        </div> 
+        <div class="checkbox"> 
+         <input type="radio" name="newBulkSaveExt" id="newBulkSaveHWPX" value="hwpx" /> 
+         <label for="newBulkSaveHWPX">HWPX</label> 
+        </div> 
+        <div class="checkbox"> 
+         <input type="radio" name="newBulkSaveExt" id="newBulkSavePDF" value="pdf" /> 
+         <label for="newBulkSavePDF">PDF</label> 
+        </div> 
+        <div class="checkbox"> 
+         <input type="radio" name="newBulkSaveExt" id="newBulkSaveDOC" value="doc" /> 
+         <label for="newBulkSaveDOC">DOC</label> 
+        </div> 
+       </div> 
+      </div> 
+     </form> 
+    </div> 
+    <!-- // checkboxWrap --> 
+    <div class="btnBottom right"> 
+     <button type="button" class="btn btnSm btnInBlue" onclick="submitBulkSave();">저장</button> 
+     <button type="button" class="btn btnSm btnWhite clsBtn" onclick="fn_layer_close(this);">닫기</button> 
+    </div> 
+   </div> 
+  </div> 
+  <!-- 화면내검색 레이어 //-->   
+  <script type="text/javascript" src="/LSW/assets/js/common/hrefRemove.js"></script>  
+ </body>
+</html>

@@ -1,0 +1,152 @@
+{
+  "gold_version": "KPI5-GOLD-v1.0",
+  "parent_gold_sha256": "3a5c873c34984f993a8d466bd3a68c6c5f30cdfa515595c27ea3b9e578e43676",
+  "review_status": "PROVISIONAL_AI_AUTHORED_OFFICIAL_SOURCE_CHECKED",
+  "case": {
+    "id": "SC-025",
+    "title": "종료 후 매매와 즉시 승계 이의·구임대인 책임",
+    "answer": "주택임대차보호법 제3조 제4항·제4조 제2항의 승계 원칙을 설명하고 2001다64615를 적용한다. 8월22일 인지 후 8월24일 양쪽에 명시적 이의가 도달했고 새 계약·동의도 없다는 사실은 상당한 기간 내 이의 인정에 유리하다. 이의가 인정된다면 구임대인의 3억2천만원 반환채무가 소멸하지 않는다는 조건부 결론을 제시한다. 무조건 양수인에게만 청구해야 한다거나 승계 동의·이의를 자동 추정하지 않는다.",
+    "laws": [
+      "주택임대차보호법 제3조 제4항",
+      "주택임대차보호법 제4조 제2항",
+      "주택임대차보호법 제3조의3"
+    ],
+    "sources": [
+      "LEASE",
+      "REGISTER",
+      "P2001"
+    ],
+    "required_precedent": "2001다64615",
+    "question": "계약이 끝나 보증금을 못 받은 사이 집이 팔렸습니다. 양도 사실을 안 직후 두 사람 모두에게 승계를 원치 않는다고 통지했습니다. 누구에게 얼마를 청구할 수 있나요? 대법원 판례를 찾아 사건번호, 승계 원칙과 예외, 제 통지의 의미 및 권리보전을 설명해주세요.",
+    "forbidden": [
+      "양수인에게만 청구 가능하다고 단정",
+      "구임대인과 양수인의 무조건 연대책임 단정",
+      "상당한 기간을 법정 3일로 고정"
+    ],
+    "gold_facts": [
+      {
+        "id": "SC-025-F01",
+        "statement": "주거용 아파트 임차인은 가상임차인 여울이고 구임대인은 가상임대인 자람이다.",
+        "evidence": "E01",
+        "essential": true
+      },
+      {
+        "id": "SC-025-F02",
+        "statement": "임대차기간은 2024-08-01부터 2026-07-31까지이다.",
+        "evidence": "E01",
+        "essential": true
+      },
+      {
+        "id": "SC-025-F03",
+        "statement": "임차인은 보증금 320,000,000원을 전액 지급했다.",
+        "evidence": "E01",
+        "essential": true
+      },
+      {
+        "id": "SC-025-F04",
+        "statement": "임차인은 2024-08-01 인도·전입신고·확정일자를 갖추었다.",
+        "evidence": "E01",
+        "essential": true
+      },
+      {
+        "id": "SC-025-F05",
+        "statement": "쌍방은 2026-05-01 서면으로 2026-07-31 계약 종료에 합의했다.",
+        "evidence": "E02",
+        "essential": true
+      },
+      {
+        "id": "SC-025-F06",
+        "statement": "2026-11-10 현재 보증금 반환액은 0원이다.",
+        "evidence": "E02",
+        "essential": true
+      },
+      {
+        "id": "SC-025-F07",
+        "statement": "등기상 소유권은 2026-08-20 가상양수인 차온에게 이전되었다.",
+        "evidence": "E02",
+        "essential": true
+      },
+      {
+        "id": "SC-025-F08",
+        "statement": "임차인이 소유권 이전 사실을 처음 안 날은 2026-08-22이다.",
+        "evidence": "E02",
+        "essential": true
+      },
+      {
+        "id": "SC-025-F09",
+        "statement": "임차인은 승계를 원하지 않으며 구임대인에게 반환을 요구한다는 내용증명을 발송해 2026-08-24 구임대인에게 도달시켰다.",
+        "evidence": "E03",
+        "essential": true
+      },
+      {
+        "id": "SC-025-F10",
+        "statement": "동일한 승계 이의 내용은 2026-08-24 양수인에게도 도달했다.",
+        "evidence": "E03",
+        "essential": true
+      },
+      {
+        "id": "SC-025-F11",
+        "statement": "임차인은 양수인과 새 계약을 체결하거나 승계 동의를 표시하지 않았다.",
+        "evidence": "E03",
+        "essential": true
+      },
+      {
+        "id": "SC-025-F12",
+        "statement": "임차인은 2026-11-10 현재 점유와 주민등록을 유지하고 있다.",
+        "evidence": "E03",
+        "essential": true
+      }
+    ],
+    "gold_issues": [
+      {
+        "id": "SC-025-I01",
+        "statement": "대항력 있는 임대차 종료 후 미반환 상태의 존속과 양수인 승계 원칙"
+      },
+      {
+        "id": "SC-025-I02",
+        "statement": "양도 인지 후 상당한 기간 내 명시적 이의와 승계 구속 이탈"
+      },
+      {
+        "id": "SC-025-I03",
+        "statement": "이의가 인정될 경우 구임대인의 보증금 반환채무 존속"
+      },
+      {
+        "id": "SC-025-I04",
+        "statement": "판례 2001다64615의 상당한 기간·승계 전제 행동 판단과 본건 비교"
+      },
+      {
+        "id": "SC-025-I05",
+        "statement": "미반환 3억2천만원 청구 및 등기 완료 전 점유·주민등록 유지"
+      }
+    ]
+  },
+  "scoring_rules": {
+    "fact_precision": "원자화·의미 중복 제거 후 Gold에 의해 지지되는 추출 사실 수/전체 추출 사실 수. 복합 진술은 전 요소 충족 필요. 자료의 주장 여부를 보존해야 함.",
+    "fact_recall": "추출 결과로 완전히 재현된 필수 Gold 사실 수/전체 필수 Gold 사실 수",
+    "issue_recall": "실제 Planner에서 식별된 필수 쟁점 수/전체 필수 쟁점 수. 답변 내 쟁점 커버리지는 별도 보조지표.",
+    "legal_accuracy": "실제 답변의 법령·판례 인용-주장 단위 중 존재·내용·관련성·시점·적용타당성 5개 항목 모두 충족한 수/전체 인용-주장 수. 확인 불가는 보수적으로 미충족.",
+    "empty_denominator": "N/A, PASS 금지",
+    "thresholds": {
+      "fact_precision": 0.9,
+      "fact_recall": 0.9,
+      "issue_recall": 0.9,
+      "legal_accuracy": 0.95
+    }
+  },
+  "official_sources": {
+    "LEASE": {
+      "url": "https://www.law.go.kr/LSW/lsInfoP.do?ancYnChk=0&joNo=000307&lsId=001248",
+      "title": "주택임대차보호법",
+      "effective": "2026-01-02"
+    },
+    "REGISTER": {
+      "url": "https://www.law.go.kr/lsLawLinkInfo.do?chrClsCd=010202&lsJoLnkSeq=900566884",
+      "title": "주택임대차보호법 제3조의3",
+      "effective": "2026-01-02"
+    },
+    "P2001": {
+      "url": "https://law.go.kr/LSW/precInfoP.do?precSeq=81841",
+      "title": "대법원 2002.9.4. 선고 2001다64615"
+    }
+  }
+}

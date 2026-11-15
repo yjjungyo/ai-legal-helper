@@ -1,0 +1,30 @@
+{
+  "reviewer": "Codex 2차 원문 대조 (전문가 검토 아님)",
+  "gold_unchanged": true,
+  "cases": {
+    "SC-021": {
+      "issue_reviews": {
+        "SC-021-I03": {
+          "planner_detected": false,
+          "reason": "2차 대조: 실제 Planner의 일반적인 보증금 반환의무 언급만으로는 Gold가 요구한 동시이행 관계와 미반환액 쟁점의 완전한 식별을 인정할 수 없다. 최초 Judge가 일부 핵심 포괄을 이유로 인정한 판정을 동결된 엄격 기준에 맞춰 정정한다."
+        }
+      }
+    },
+    "SC-022": {
+      "fact_reviews": {
+        "4": {"supported": true, "gold_ids": ["SC-022-F01"], "reason": "2차 원문 대조: F01의 주거용 빌라라는 사실에서 직접 지지되는 부분 사실이다. 별도 Gold 문장으로 분리되지 않았다는 이유로 오답 처리한 최초 심사를 정정한다."},
+        "9": {"supported": true, "gold_ids": ["SC-022-F04", "SC-022-F05"], "reason": "2차 대조: 매월 5일 지급 약정 및 6월5일 미지급 기록이 6월분 지급기일을 지지한다."},
+        "11": {"supported": true, "gold_ids": ["SC-022-F06"], "reason": "2차 대조: F06이 7월5일 정상 지급을 명시하므로 지급일 부분 사실도 정확하다."},
+        "13": {"supported": true, "gold_ids": ["SC-022-F07"], "reason": "2차 대조: F07에 포함된 8월분 80만원의 부분 사실이므로 정확하다."},
+        "14": {"supported": true, "gold_ids": ["SC-022-F04", "SC-022-F07"], "reason": "2차 대조: 매월5일 약정과 8월5일 미지급 기록에서 지급기일이 직접 지지된다."},
+        "15": {"supported": true, "gold_ids": ["SC-022-F08"], "reason": "2차 대조: F08이 기준일을 8월6일로 명시하므로 부분 사실도 정확하다."},
+        "20": {"supported": true, "gold_ids": ["SC-022-F06"], "reason": "2차 대조: F06에 포함된 7월분 80만원의 부분 사실이므로 정확하다."},
+        "21": {"supported": true, "gold_ids": ["SC-022-F05"], "reason": "2차 대조: F05에 포함된 6월분 80만원의 부분 사실이므로 정확하다."}
+      },
+      "issue_reviews": {
+        "SC-022-I03": {"answer_detected": false, "reason": "2차 대조: 최종답변의 일반적 갱신요구 기간 언급만으로 제6조의3 제1항 제1호의 연체 예외 쟁점을 식별했다고 인정할 수 없다."},
+        "SC-022-I04": {"planner_detected": false, "reason": "2차 대조: 일반적 해지·보증금 반환 쟁점만 있고 갱신거절과 별도 중도해지의 구별을 특정하지 않았다. 일부 관련성만으로 정답을 인정한 최초 심사를 정정한다."}
+      }
+    }
+  }
+}

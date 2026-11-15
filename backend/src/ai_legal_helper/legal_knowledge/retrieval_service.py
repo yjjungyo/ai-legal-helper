@@ -234,7 +234,7 @@ class LawRetrievalService:
         query: str,
         *,
         category: str,
-        k: int = 7,
+        k: int = 10,
         original_question: Optional[str] = None,
         as_of_date: Optional[str] = None,
         required_laws: Optional[list[dict[str, str]]] = None,
@@ -409,11 +409,11 @@ class LawRetrievalService:
                     metadata_filter = clauses[0] if len(clauses) == 1 else {"$or": clauses}
                     ret = self.retrieval_fn(
                         query=query, category=source_category,
-                        k=max(k * 2, 7), metadata_filter=metadata_filter,
+                        k=max(k * 2, 10), metadata_filter=metadata_filter,
                     )
                 else:
                     ret = self.retrieval_fn(
-                        query=query, category=source_category, k=max(k * 2, 7),
+                        query=query, category=source_category, k=max(k * 2, 10),
                     )
                 status = _status_value(getattr(ret, "status", "RETRIEVER_UNAVAILABLE"))
                 response.collection_statuses[collection] = status
@@ -556,16 +556,18 @@ class LawRetrievalService:
                         from ai_legal_helper.rag.retrieval import _get_client
                         client = _get_client()
                     col = client.get_collection(coll_name)
-                    addenda_records = col.get(where={"part": "부칙"}, limit=5)
-                    if not addenda_records.get("ids"):
-                        addenda_records = col.get(where={"article": "부칙"}, limit=5)
+                    # 해당 법령(law_name)의 부칙을 직접 조회하여 동반 포함
+                    addenda_records = col.get(
+                        where={"statute_name": law_name},
+                        include=["documents", "metadatas"],
+                    )
                     for b_id, b_text, b_meta in zip(
                         addenda_records.get("ids") or [],
                         addenda_records.get("documents") or [],
                         addenda_records.get("metadatas") or [],
                     ):
                         meta = dict(b_meta or {})
-                        if meta.get("law_name") != law_name and meta.get("statute_name") != law_name:
+                        if meta.get("article") != "부칙" and meta.get("part") != "부칙":
                             continue
                         from langchain_core.documents import Document
                         doc_obj = Document(id=b_id, page_content=b_text or "", metadata=meta)

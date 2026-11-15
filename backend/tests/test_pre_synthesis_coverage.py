@@ -33,7 +33,7 @@ def test_approved_or_completed_search_does_not_repeat():
         },
         "hitl_executed": True,
     }
-    assert coverage_next(state) == "legal_evidence_bundle"
+    assert coverage_next(state) == "synthesize"
 
 
 def test_case_facts_and_issues_included_in_coverage_prompt(monkeypatch):

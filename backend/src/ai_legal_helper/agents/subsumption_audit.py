@@ -9,8 +9,9 @@ LLM은 기존 검증 호출에서 법률 요건, 판례 적용 차이, 예외를
 주의:
 - 이 감사는 법리 적용의 충분조건이 아니다. 구조가 PASS여도 기존 LLM
   verifier의 실질 분석과 Temporal/Citation gate를 반드시 통과해야 한다.
-- 기존 검증 출력에 application_checks가 없고 LEGAL_APPLICATION 주장이
-  SUPPORTED라면 해당 주장만 불확실로 취급한다(fail closed).
+- [방법 2: 참고 신호 전환] 포섭 감사의 진단 결과는 warning 및 revision_instructions로
+  제공되며, 자연어 표기 차이나 말줄임표 인용 등으로 인한 오탐이 LLM의 유효한
+  PASS 판정을 강제 강등(REVISE)시키거나 정상 답변을 WITHHELD로 폐기하지 않는다.
 - 순수 LEGAL_RULE 설명이나 CASE_FACT, USER_STATEMENT는 포섭 감사를
   강제하지 않아 기존 일반법령 해설을 오탐으로 차단하지 않는다.
 """

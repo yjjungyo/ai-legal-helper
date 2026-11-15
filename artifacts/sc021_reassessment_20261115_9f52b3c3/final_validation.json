@@ -1,0 +1,10 @@
+{
+  "report": "C:\\myprjs\\ai-legal-helper\\docs\\evaluation\\kpi\\AI_Legal_Helper_KPI_20261115_SC021_재평가_9f52b3c3.xlsx",
+  "case": "SC-021",
+  "request_id": "9f52b3c3-8913-4e0d-b830-c3f28db5d5c8",
+  "trace_id": "8db718a6-0dec-4d38-b9e8-3ebffa09d8c8",
+  "facts_identical": true,
+  "planner_identical": true,
+  "baseline_preserved": true,
+  "scoring_complete": true
+}

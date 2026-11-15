@@ -987,6 +987,10 @@ def verify_issue(
         elif has_supported_facts:
             status = "CONDITIONAL"
             reason_codes.append("GENERAL_FACTS_SUPPORTED_LAW_INSUFFICIENT")
+        elif law_verified:
+            # 사건 증거 자료 없이 사용자 질의에 따른 법령 요건/해석 쟁점인 경우
+            status = "CONDITIONAL"
+            reason_codes.append("GENERAL_LAW_VERIFIED_CASE_EVIDENCE_UNATTACHED")
         else:
             status = "NEEDS_EVIDENCE"
             reason_codes.append("GENERAL_EVIDENCE_NEEDED")

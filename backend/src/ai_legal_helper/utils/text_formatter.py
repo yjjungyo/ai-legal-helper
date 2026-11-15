@@ -48,17 +48,17 @@ def _extract_evidence_filename(item: Any) -> str:
 
 
 def extract_all_registered_evidence_sources(state: Any) -> List[Any]:
-    """LangGraph State 또는 상담 컨텍스트에서 등록된 모든 사건 증거 파일 출처를 안전하게 수집한다.
+    """LangGraph State 또는 상담 컨텍스트에서 등록된 모든 사건 증거 파일 및 판례 출처를 안전하게 수집한다.
 
     1. case_evidence_briefing (source_documents, evidence_files, source_registry)
-    2. retrieved_sources
+    2. retrieved_sources 및 precedent_search_results (판례 및 공식 법률 출처)
     3. DB EvidenceDocument (case_id 기준 - 인메모리 누락 시 안전한 Fallback)
 
     Args:
         state (Any): LangGraph 워크플로우 상태 객체(LegalState 또는 딕셔너리).
 
     Returns:
-        List[Any]: 중복이 제거된 사건 증거 파일명 및 출처 객체 리스트.
+        List[Any]: 중복이 제거된 사건 증거 파일명 및 판례 출처 객체 리스트.
     """
     sources: List[Any] = []
     seen_names = set()
@@ -66,6 +66,16 @@ def extract_all_registered_evidence_sources(state: Any) -> List[Any]:
     def _add(item: Any):
         if not item:
             return
+        if isinstance(item, dict):
+            stype = str(item.get("source_type") or "").upper()
+            sid = str(item.get("source_id") or "").strip()
+            cn = str(item.get("case_number") or "").strip()
+            if stype == "PRECEDENT" or sid.upper().startswith("PRECEDENT:") or cn:
+                dedup_key = f"prec:{sid.lower() or cn.lower()}"
+                if dedup_key not in seen_names:
+                    seen_names.add(dedup_key)
+                    sources.append(item)
+                return
         fn = _extract_evidence_filename(item)
         if fn and fn.lower() not in seen_names:
             seen_names.add(fn.lower())
@@ -95,8 +105,10 @@ def extract_all_registered_evidence_sources(state: Any) -> List[Any]:
         for val in s_reg.values():
             _add(val)
 
-    # 2. retrieved_sources
+    # 2. retrieved_sources 및 신규 판례 검색 결과
     for src in (state.get("retrieved_sources") or []):
+        _add(src)
+    for src in (state.get("precedent_search_results") or []):
         _add(src)
 
     # 3. DB EvidenceDocument Fallback
@@ -121,31 +133,104 @@ def extract_all_registered_evidence_sources(state: Any) -> List[Any]:
 
     return sources
 
-
 def expand_evidence_citations(
     text: str,
     registered_sources: List[Union[str, Dict[str, Any]]] | None = None,
 ) -> str:
-    """답변 본문 내 축약된 증거 인용 표기([01], [03], [E01], [01, 03] 등)를 등록된 실제 전체 파일명으로 자동 확장 복원한다.
+    """답변 본문 내 축약된 증거 인용([01], [03], [E01]) 및 판례 표기([PRECEDENT:241383] 등)를 등록된 실제 전체 파일명 및 공식 판례명(예: [대법원 2023다318857])으로 자동 확장 복원한다.
 
-    의뢰인 및 법률 전문가가 답변을 읽을 때 단순 일련번호나 축약 부호만으로는 어떤 증거를 가리키는지
-    인지하기 어려우므로, 사건에 등록된 실제 증거 파일명(예: `[01_임대차_주요내용.txt]`, `[E01_주택임대차계약서.txt]`)을
-    온전히 복원하여 가독성과 출처 신뢰성을 극대화한다 (Option B: 전체 파일명 보존 표준).
+    의뢰인 및 법률 전문가가 답변을 읽을 때 단순 일련번호나 시스템 내부 식별자(ID)만으로는 어떤 증거와 판례를 가리키는지
+    인지하기 어려우므로, 사건에 등록된 실제 증거 파일명(예: `[01_임대차_주요내용.txt]`, `[E01_주택임대차계약서.txt]`)과
+    법원 및 사건번호가 명시된 공식 판례명(예: `[대법원 2023다318857]`)을 온전히 복원하여 가독성과 출처 신뢰성을 극대화한다 (Option B & 공식 판례 명칭 표준).
 
     Args:
-        text (str): 축약 인용 표기가 포함될 수 있는 답변 초안 또는 최종 텍스트.
+        text (str): 축약 인용 표기 또는 원시 판례 ID가 포함될 수 있는 답변 초안 또는 최종 텍스트.
         registered_sources (Optional[List[Union[str, Dict[str, Any]]]]):
-            사건에 등록된 실제 증거 파일명 목록 또는 출처 딕셔너리 리스트.
+            사건에 등록된 실제 증거 파일명 목록 또는 출처 딕셔너리 리스트 (판례 출처 포함).
 
     Returns:
-        str: 축약 인용 부호가 실제 전체 파일명으로 복원된 텍스트.
+        str: 축약 인용 부호와 판례 식별자가 실제 전체 파일명 및 공식 판례명으로 복원된 텍스트.
     """
     if not text or not registered_sources:
         return text
 
-    # 등록된 파일명 기반의 별칭-파일명 매핑 테이블 구성
+    # 1. 등록된 파일명 기반의 증거 별칭-파일명 매핑 테이블 구성
     key_map: Dict[str, str] = {}
+    # 2. 등록된 판례 기반의 별칭-공식판례명(예: '대법원 2023다318857') 매핑 테이블 구성
+    precedent_map: Dict[str, str] = {}
+
     for s in registered_sources:
+        # 판례 출처 항목 판별 및 매핑 생성
+        if isinstance(s, dict):
+            stype = str(s.get("source_type") or "").upper()
+            sid = str(s.get("source_id") or "").strip()
+            court = str(s.get("court") or "").strip()
+            cn = str(s.get("case_number") or "").strip()
+            title = str(s.get("title") or "").strip()
+            seq = str(s.get("precSeq") or s.get("seq") or "").strip()
+
+            is_precedent = (
+                stype == "PRECEDENT"
+                or sid.upper().startswith("PRECEDENT:")
+                or bool(cn and any(c in cn for c in ("다", "가합", "가단", "나", "도", "두", "마", "카합", "타경", "타채", "고합", "고단", "구합", "누")))
+                or ("선고" in title and "판결" in title)
+            )
+            if is_precedent:
+                canonical = ""
+                if court and cn:
+                    canonical = f"{court} {cn}"
+                elif cn:
+                    canonical = cn
+                elif title:
+                    canonical = title
+
+                if canonical:
+                    # canonical 자체 정규화 매핑 보존 (예: '대법원 2023다318857' -> '대법원 2023다318857')
+                    precedent_map[re.sub(r"\s+", "", canonical).lower()] = canonical
+
+                    # source_id 전체 매핑 (예: 'precedent:241383' -> '대법원 2023다318857')
+                    if sid:
+                        sid_clean = re.sub(r"\s+", "", sid).lower()
+                        precedent_map[sid_clean] = canonical
+                        if ":" in sid:
+                            suffix = sid.split(":", 1)[1].strip()
+                            if suffix:
+                                suf_clean = re.sub(r"\s+", "", suffix).lower()
+                                precedent_map[suf_clean] = canonical
+                                precedent_map[f"precedent:{suf_clean}"] = canonical
+                                precedent_map[f"판례:{suf_clean}"] = canonical
+                    if cn:
+                        cn_clean = re.sub(r"\s+", "", cn).lower()
+                        precedent_map[cn_clean] = canonical
+                        precedent_map[f"precedent:{cn_clean}"] = canonical
+                        precedent_map[f"판례:{cn_clean}"] = canonical
+                    if seq:
+                        seq_clean = seq.lower()
+                        precedent_map[seq_clean] = canonical
+                        precedent_map[f"precedent:{seq_clean}"] = canonical
+                        precedent_map[f"판례:{seq_clean}"] = canonical
+                    url_str = str(s.get("source_url") or "")
+                    m_url = re.search(r"precSeq=(\d+)", url_str)
+                    if m_url:
+                        url_seq = m_url.group(1).lower()
+                        precedent_map[url_seq] = canonical
+                        precedent_map[f"precedent:{url_seq}"] = canonical
+                        precedent_map[f"판례:{url_seq}"] = canonical
+                    continue
+        elif isinstance(s, str) and s.upper().startswith("PRECEDENT:"):
+            sid = s.strip()
+            suffix = sid.split(":", 1)[1].strip()
+            m_cn = re.search(r"(?:19|20)\d{2}\s*(?:가합|가단|가소|나|다|라|마|그|바|카합|카단|카기|카명|타경|타채|타기|고합|고단|고정|고약|노|도|로|모|구합|구단|누|두|후|허|헌가|헌나|헌다|헌라|헌마|헌바|헌사)\s*\d{1,7}", suffix)
+            if m_cn:
+                cn_clean = re.sub(r"\s+", "", m_cn.group(0))
+                canon = f"대법원 {cn_clean}" if "다" in cn_clean else cn_clean
+                precedent_map[re.sub(r"\s+", "", sid).lower()] = canon
+                precedent_map[re.sub(r"\s+", "", suffix).lower()] = canon
+                suf_clean = re.sub(r"\s+", "", suffix).lower()
+                precedent_map[f"precedent:{suf_clean}"] = canon
+                continue
+
+        # 증거 파일명 매핑 (기존 로직 유지)
         fn = _extract_evidence_filename(s)
         if not fn:
             continue
@@ -191,7 +276,7 @@ def expand_evidence_citations(
         if re.search(r"\.(txt|pdf|docx|png|jpe?g|hwp|hwpx)$", raw, re.IGNORECASE):
             return match.group(0)
 
-        # 쉼표(,)로 구분된 다중 인용([01, 03]) 또는 단일 인용([01]) 분할 검사
+        # 쉼표(,)로 구분된 다중 인용([01, 03], [PRECEDENT:241383, 01]) 분할 검사
         parts = [p.strip() for p in raw.split(",") if p.strip()]
         if not parts:
             return match.group(0)
@@ -202,6 +287,8 @@ def expand_evidence_citations(
             p_clean = re.sub(r"\s+", "", p).lower()
             if p_clean in key_map:
                 expanded_parts.append(f"[{key_map[p_clean]}]")
+            elif p_clean in precedent_map:
+                expanded_parts.append(f"[{precedent_map[p_clean]}]")
             else:
                 all_matched = False
                 break
@@ -211,9 +298,19 @@ def expand_evidence_citations(
 
         return match.group(0)
 
-    # 대괄호 패턴 검색 및 자동 확장 치환
-    return re.sub(r"\[([^\]\n]+)\]", _replace_match, text)
+    # 1. 대괄호 패턴([PRECEDENT:241383], [01] 등) 검색 및 자동 확장 치환
+    expanded = re.sub(r"\[([^\]\n]+)\]", _replace_match, text)
 
+    # 2. 대괄호 없이 노출된 원시 PRECEDENT:일련번호/사건번호 표기 치환 (안전망)
+    if precedent_map:
+        for raw_k, canon in precedent_map.items():
+            if raw_k.startswith("precedent:"):
+                tok = raw_k.split(":", 1)[1]
+                if tok and len(tok) >= 3:
+                    pat = re.compile(rf"(?<!\[)PRECEDENT:\s*{re.escape(tok)}(?!\])", re.IGNORECASE)
+                    expanded = pat.sub(f"[{canon}]", expanded)
+
+    return expanded
 
 def clean_markdown_formatting(text: str) -> str:
     """마크다운 원시 기호(헤더, 볼드, 이탤릭, 수평선, 인용구)를 정제하여 정형화된 플레인 텍스트로 변환한다.

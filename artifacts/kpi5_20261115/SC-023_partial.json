@@ -1,0 +1,23 @@
+{
+  "id": "SC-023",
+  "case_id": "kpi5_sc-023_21484bb0b9",
+  "title": "임차권등기 완료 후 이사와 미반환 보증금 20261115_E2E_V6_KPI5",
+  "ingestion_trace_id": "337c62dd-32e8-4191-a4e4-d64e287d4770",
+  "ingestion": [
+    {
+      "evidence_id": "3e9554b8-80ee-4a52-8978-bd9ebdbfc70f",
+      "filename": "E01_synthetic_record.txt",
+      "claims": 12
+    },
+    {
+      "evidence_id": "8bd4ee2d-677c-4271-8cf8-d58af27472b8",
+      "filename": "E02_synthetic_record.txt",
+      "claims": 14
+    },
+    {
+      "evidence_id": "49082f3f-187f-4685-a4ce-9fe14c2fb7c1",
+      "filename": "E03_synthetic_record.txt",
+      "claims": 11
+    }
+  ]
+}

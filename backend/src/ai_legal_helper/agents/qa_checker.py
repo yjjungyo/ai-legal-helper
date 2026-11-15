@@ -269,8 +269,18 @@ def check_deterministic_qa(
         # 해당 문장에 자체 조건부 설명(도달한 때부터 등)이 포함되어 있다면 안전함
         sent_is_conditional = any(kw in sent for kw in RECEIPT_CONDITIONAL_PATTERNS)
         # 소제목, 불릿 항목 명칭, 질문/의문형/검토형 종결 문장은 법률 효과 확정 단정이 아니므로 제외
+        # 부정문(예: "종료되지는 않습니다", "보기 어렵습니다" 등)은 법률 효과 단정이 아니므로 오탐 방지
+        sent_is_negation = any(
+            kw in sent_stripped for kw in (
+                "종료되지는 않", "종료되지 않", "해지되지는 않", "해지되지 않",
+                "소멸하지 않", "소멸되지는 않", "소멸되지 않", "끝나지는 않", "끝나지 않",
+                "종료된다고 보기는 어렵", "종료된다고 보기 어렵", "단정할 수 없",
+                "종료되는 것은 아닙니다", "해지되는 것은 아닙니다", "소멸하는 것은 아닙니다",
+            )
+        )
         sent_is_caution_or_inquiry = (
             sent_stripped.startswith(("#", "- **", "* **"))
+            or sent_is_negation
             or sent_stripped.endswith(("?", "인지", "는지", "여부", "여부입니다.", "검토", "살펴봅니다.", "확인", "필요가 있습니다.", "주의해야 합니다.", "위험이 있습니다.", "수 있습니다."))
             or any(kw in sent_stripped for kw in ("성숙했는지", "가능 여부", "확인할 필요", "지연될 실무적 위험", "주의가 필요"))
         )

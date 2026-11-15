@@ -27,7 +27,7 @@ from ai_legal_helper.rag.query_rewrite import rewrite_query
 
 logger = get_logger(__name__)
 
-MAX_DOCS = 7
+MAX_DOCS = 10
 SNIP = 240
 
 
@@ -131,7 +131,16 @@ def make_fixed_retrieval_tool(tool_name: str, category_eng: str, label_ko: str) 
                 citation = f"({filename}, p.{page})"
             elif statute_name and article and source_url:
                 # 공식 XML 원문은 파일/페이지가 없으므로 PDF와 페이지를 지어내지 않는다.
-                citation = f"({statute_name} {article}, {source_url})"
+                # [시행일/공포일 정보 노출] 조문의 실제 효력 시점을 에이전트가 인지하도록 표기
+                eff = std_src.get("article_effective_date") or std_src.get("effective_date") or std_src.get("law_effective_date")
+                prom = std_src.get("promulgation_date")
+                date_parts = []
+                if prom:
+                    date_parts.append(f"공포일 {prom}")
+                if eff:
+                    date_parts.append(f"시행일 {eff}")
+                date_sfx = f" [{', '.join(date_parts)}]" if date_parts else ""
+                citation = f"({statute_name} {article}{date_sfx}, {source_url})"
             else:
                 citation = f"(출처ID: {std_src.get('source_id')})"
             lines.append(f"[CITE] {citation}\n{snippet}")

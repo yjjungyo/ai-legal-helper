@@ -154,7 +154,8 @@ async def test_specialist_brief_contains_preapproved_official_version():
 def test_compiled_graph_has_evidence_bundle_before_synthesizer():
     from langgraph.checkpoint.memory import MemorySaver
     compiled = build_legal_graph(checkpointer=MemorySaver())
-    assert "legal_evidence_bundle" in compiled.nodes
+    assert "synthesize" in compiled.nodes
+    assert "legal_evidence_bundle" not in compiled.nodes
 
 
 

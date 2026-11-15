@@ -1139,18 +1139,34 @@ def build_dynamic_withheld_answer(
 
     # 3. 보완이 필요한 구체적 쟁점 및 서류
     sections.append("\n[3. 유보 사유 및 보완이 필요한 사항]")
+    combined_context = " ".join([
+        str(getattr(f, "statement", "")) for f in (briefing.facts or [])
+    ]) + " " + " ".join([
+        str(getattr(r, "issue_title", "")) for r in (issue_results or [])
+    ])
+    is_deposit_context = any(k in combined_context for k in ("보증금", "임차권", "대항력", "우선변제", "전입"))
+
     if briefing.evidence_gaps:
         for g in briefing.evidence_gaps[:4]:
             sections.append(f"- {g.target_proposition} (권장: {g.recommended_action or '관련 확인'})")
     else:
-        sections.append("- 목적물에 관한 최신 등기사항전부증명서 및 권리 변동 내역의 확인이 필요합니다.")
+        if is_deposit_context:
+            sections.append("- 목적물에 관한 최신 등기사항전부증명서 및 권리 변동 내역의 확인이 필요합니다.")
+        else:
+            sections.append("- 질의하신 사안의 법률 요건 확인을 위한 객관적 서류 및 사실관계의 추가 검증이 필요합니다.")
 
     # 4. 안전한 후속 행동 가이드
     sections.append("\n[4. 안전한 후속 행동 가이드]")
-    sections.append(
-        "- 보증금 반환을 받지 못한 상태에서 퇴거나 전입 이전을 하지 마시고 점유를 유지하십시오.\n"
-        "- 관할 법원 임차권등기명령 신청 또는 대한법률구조공단(132), 전문 변호사의 대면 상담을 병행하십시오."
-    )
+    if is_deposit_context:
+        sections.append(
+            "- 보증금 반환을 받지 못한 상태에서 퇴거나 전입 이전을 하지 마시고 점유를 유지하십시오.\n"
+            "- 관할 법원 임차권등기명령 신청 또는 대한법률구조공단(132), 전문 변호사의 대면 상담을 병행하십시오."
+        )
+    else:
+        sections.append(
+            "- 해당 행정 신고나 법률 행위 진행 전, 관할 지자체 담당 부서 또는 관련 법령의 최신 개정·시행 여부를 재확인하십시오.\n"
+            "- 필요시 대한법률구조공단(국번없이 132) 또는 법률 전문가와의 구체적 대면 상담을 병행하십시오."
+        )
 
     final_text = "\n".join(sections)
     return clean_markdown_formatting(final_text)

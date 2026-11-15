@@ -302,3 +302,36 @@ def test_followup_action_verification_avoids_coverage_lock():
             assert kwargs.get("require_question_coverage") is False
             assert res["verification_result"]["status"] == "PASS"
             assert res["verification_result"]["reason_code"] != "VERIFICATION_ERROR"
+
+
+def test_revise_node_document_mode_always_repairs_even_with_followup_action():
+    """DOCUMENT_MODE 환경에서는 intent가 FOLLOWUP_ACTION이더라도 followup_action_node로 우회하지 않고
+
+    반드시 검증 피드백을 전달하는 generate_answer(state, repair=True)를 호출해야 함을 검증한다.
+    """
+    from ai_legal_helper.workflows.legal_workflow import revise_node
+
+    state = {
+        "answer_mode": "DOCUMENT_GROUNDED",
+        "intent": "FOLLOWUP_ACTION",
+        "intent_decision": {"intent": "FOLLOWUP_ACTION", "requires_full_analysis": False},
+        "question": "계약만료일에 이사를 가야 하는데 어떻게 해야 하나요?",
+        "draft_answer": "이전 초안 내용",
+        "verification_result": {
+            "status": "REVISE",
+            "reason_code": "ANSWER_REVISION_REQUIRED",
+            "revision_instructions": ["임차권등기명령 절차를 명시하세요."],
+        },
+        "retrieved_sources": [],
+    }
+
+    with patch("ai_legal_helper.workflows.legal_workflow.generate_answer") as mock_generate_answer:
+        mock_generate_answer.return_value = {
+            "draft_answer": "수정된 정밀 의견서",
+            "revision_count": 1,
+        }
+        res = revise_node(state)
+
+        mock_generate_answer.assert_called_once_with(state, repair=True)
+        assert res["draft_answer"] == "수정된 정밀 의견서"
+        assert res["revision_count"] == 1

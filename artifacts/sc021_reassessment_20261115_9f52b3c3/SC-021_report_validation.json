@@ -1,0 +1,28 @@
+{
+  "path": "C:\\myprjs\\ai-legal-helper\\docs\\evaluation\\kpi\\AI_Legal_Helper_KPI_20261115_SC021_재평가_9f52b3c3.xlsx",
+  "sheets": [
+    "평가안내",
+    "KPI_종합",
+    "사건별_KPI",
+    "실행_성능",
+    "테스트케이스",
+    "Gold_필수사실",
+    "Gold_필수쟁점",
+    "Gold_정답",
+    "추출사실_정밀도",
+    "필수사실_재현율",
+    "쟁점_식별감사",
+    "법령판례_인용감사",
+    "실제_답변_Planner",
+    "응답_출처제공현황",
+    "Langfuse_호출",
+    "Langfuse_Trace",
+    "공식출처",
+    "개선필요사항",
+    "평가모델_별도비용"
+  ],
+  "gold_facts": 12,
+  "gold_issues": 5,
+  "case_rows": 1,
+  "all_scored": true
+}

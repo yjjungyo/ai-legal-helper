@@ -531,12 +531,12 @@ def test_early_finalize_preserves_actual_disclosed_partial_answer(document_state
 
 
 def test_early_finalize_bans_failed_law_subsumption(document_state):
-    """4단계 요건 검증의 명시적 결함을 다른 정상 사건 사실로 감추지 않는다."""
+    """[방법 2: 참고 신호 전환] 포섭 감사는 참고/경고 신호이므로 단순 감사 결함만으로 초안을 WITHHELD로 전면 폐기하지 않고 CAUTIONARY 보존한다."""
     state = fallback_state(document_state, application_audit={
         "failed_claims": 1,
         "findings": [{"claim_index": 1, "reason_codes": ["FACT_PREMISE_UNGROUNDED"]}],
     })
-    assert finish_without_external_dependencies(state)["final_disposition"] == "WITHHELD"
+    assert finish_without_external_dependencies(state)["final_disposition"] == "CAUTIONARY"
 
 
 def test_early_finalize_bans_failed_timeline_consistency(document_state):
