@@ -61,6 +61,7 @@ from ai_legal_helper.workflows.conversation_context import ConversationContext, 
 from ai_legal_helper.llm.usage import global_token_tracker
 from ai_legal_helper.observability.context import set_trace_id, reset_trace_id, set_case_id, reset_case_id
 from ai_legal_helper.observability.langfuse_client import get_langfuse, flush_langfuse, start_trace, end_trace
+from scripts.evaluation.e2e_turn_audit import evidence_snapshot, answer_provenance
 from scripts.evaluation.create_complex_10cases_testset import TEST_CASES
 from scripts.evaluation.update_kpi_excel_v6 import append_and_update_v6_kpi
 
@@ -212,7 +213,10 @@ def export_trace_json(
             "langfuse_fetched": trace_dict is not None
         },
         "consultation_context": fallback_data,
-        "langfuse_trace": trace_dict
+        "langfuse_trace": trace_dict,
+        # 감사 원칙: 사용자에게 반환된 응답과 내부 finalize 결과를 바꾸지 않고 각각 추적한다.
+        # Presentation 후처리 차이일 수 있으므로 불일치는 기록하되 임의로 양쪽을 같게 만들지 않는다.
+        "answer_provenance": answer_provenance(fallback_data.get("answer"), trace_dict),
     }
 
     with open(file_path, "w", encoding="utf-8") as f:
@@ -363,9 +367,17 @@ async def run_case_evaluation(
     results: Dict[str, Any],
     catalog_entries: List[Dict[str, Any]],
     anomalies: List[Dict[str, Any]],
-    lf: Any
+    lf: Any,
+    stop_after_turn: Optional[int] = None,
 ):
-    """단일 사건에 대해 3단계 시계열 증거 등록, 다회차 법률 상담, 대응계획, 문서 작성을 실행한다."""
+    """기본 E2E 또는 선택적 격리 재현을 공통 코드로 실행한다.
+
+    stop_after_turn=None: 기존 10건 E2E와 체크포인트/KPI/문서 작성 경로 유지.
+    stop_after_turn=N: 매번 신규 사건에서 1~N차 증거 및 상담을 실행하고
+      N차 직후 반환한다. 전체 평가 KPI를 덮어쓰지 않고 재현 오염을 방지한다.
+    """
+    if stop_after_turn is not None and not (1 <= stop_after_turn <= len(case_meta["turns"])):
+        raise ValueError("stop_after_turn must be within the test case turn range")
     case_id = case_meta["case_id"]
     if case_id in results and results[case_id].get("completed", False):
         logger.info(f"[{case_id}] 이미 완료된 사건입니다. 건너뜁니다.")
@@ -411,7 +423,10 @@ async def run_case_evaluation(
         evidence_base = os.path.join(BASE_TESTSET, case_dir_name, "증거")
 
         # 2~4. 3단계 시계열 증거 등록 및 법률 상담 반복
-        for t_idx, turn_meta in enumerate(case_meta["turns"], start=1):
+        # 재현 모드: 원하는 턴만 단독 호출하면 이전 대화 맥락이 소실된다.
+        # 반드시 1차부터 순서대로 실행하여 이전 상담 기록과 단계별 증거 축적을 보존한다.
+        selected_turns = case_meta["turns"][:stop_after_turn] if stop_after_turn is not None else case_meta["turns"]
+        for t_idx, turn_meta in enumerate(selected_turns, start=1):
             stage_name = f"{t_idx}차"
             stage_dir = os.path.join(evidence_base, stage_name)
             logger.info(f"\n  --- [{stage_name} 단계] 신규 증거 등록 및 사실 승인 ---")
@@ -425,6 +440,22 @@ async def run_case_evaluation(
                         doc_id = ingest_and_approve_evidence(db, db_case_id, fpath, fname)
                         ingested_docs.append((fname, doc_id))
                         logger.info(f"    + 증거 등록/승인: {fname} (ID: {doc_id[:8]})")
+
+            # Fail-closed: 해당 사건 DB에 현재 턴까지의 증거만 있는지 상담 시작 전에 확인.
+            # 새로운 Case ID가 생성되므로 과거 3차의 Fact/Claim/메모리도 섞이지 않는다.
+            # 기본 전체 평가 경로의 기존 동작을 보호하기 위해 선택적 재현 모드에서만 검사한다.
+            stage_snapshot = None
+            if stop_after_turn is not None:
+                stage_snapshot = evidence_snapshot(
+                    case_id=db_case_id,
+                    turn_index=t_idx,
+                    evidence_base=evidence_base,
+                    documents=db.query(EvidenceDocument).filter(EvidenceDocument.case_id == db_case_id).all(),
+                )
+                logger.info(
+                    "  [TURN ISOLATION] turn=%s count=%s manifest=%s",
+                    t_idx, stage_snapshot["document_count"], stage_snapshot["manifest_sha256"],
+                )
 
             # 상담 질문 실행
             question = turn_meta["question"]
@@ -554,6 +585,8 @@ async def run_case_evaluation(
                 "cost_usd": cost,
                 "llm_calls": calls,
                 "new_evidence": [f[0] for f in ingested_docs],
+                "evidence_snapshot": stage_snapshot,
+                "db_case_id": db_case_id,
                 "expected_answer_points": turn_meta.get("expected", ""),
                 "check_items": turn_meta.get("check_items", "")
             }
@@ -576,7 +609,8 @@ async def run_case_evaluation(
                 "score_legal": 100,
                 "score_evidence": 100,
                 "success": 1,
-                "trace_json": os.path.basename(json_file)
+                "trace_json": os.path.basename(json_file),
+                "evidence_snapshot": stage_snapshot,
             }
             case_results["turns"].append(turn_result)
 
@@ -593,6 +627,16 @@ async def run_case_evaluation(
             })
 
             logger.info(f"    ✓ 턴 {t_idx} 완료: {latency}s | {tot_tok:,} toks | ${cost} | 검증: {verif_status}")
+
+        # 격리 재현은 여기서 반드시 종료한다: 대응계획·문서 생성 또는
+        # 전체 V6 체크포인트/카탈로그/KPI 변경으로 평가 데이터를 오염시키지 않는다.
+        # 사용자 수동 통합 테스트를 위해 새 DB 사건 ID와 각 턴의 Trace ID를 반환한다.
+        if stop_after_turn is not None:
+            case_results["replay_only"] = True
+            case_results["replayed_through_turn"] = stop_after_turn
+            results[case_id] = case_results
+            logger.info("  [REPLAY DONE] case_id=%s through_turn=%s", db_case_id, stop_after_turn)
+            return case_results
 
         # 5. 대응계획 자동 수립 (Action Plan)
         logger.info(f"\n  [5/6] 사실 기반 대응계획 자동 수립...")
