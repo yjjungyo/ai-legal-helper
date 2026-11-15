@@ -483,6 +483,15 @@ def fallback_state(document_state, **changes):
         }],
         "missing_legal_issues": [], "missing_issues": [],
         "contradictions": [],
+        # [STEP5-TEST-03 / Gemini] 실제 문서 Verifier가 요구하는
+        # 질문 Coverage + 4개 일관성 점검을 완비한 경우만
+        # 지지된 부분 답변을 CAUTIONARY로 보존할 수 있다.
+        "required_question_coverage": True,
+        "question_coverage": [{"question": "반환 여부", "answered": True}],
+        "consistency_checks": {
+            name: {"passed": True, "reason": "문서 대조 완료"}
+            for name in ("opening_conclusion", "timeline", "expressed_intent", "provenance")
+        },
         **changes,
     }
     return {**document_state, "verification_result": result,
@@ -551,4 +560,16 @@ def test_early_finalize_bans_unsupported_case_fact(document_state):
         "fact_status": "VERIFIED_FACT", "grounding_status": "UNSUPPORTED",
         "source_ids": [],
     })
+    assert finish_without_external_dependencies(state)["final_disposition"] == "WITHHELD"
+
+
+def test_early_finalize_bans_missing_mandatory_coverage(document_state):
+    """Verifier가 질문별 coverage 정보를 반환하지 않았는데도 PASS하지 못한다."""
+    state = fallback_state(document_state, question_coverage=[])
+    assert finish_without_external_dependencies(state)["final_disposition"] == "WITHHELD"
+
+
+def test_early_finalize_bans_missing_mandatory_consistency(document_state):
+    """임의 주장의 SUPPORTED만으로 시간/의사표시/출처 대조 누락을 숨길 수 없다."""
+    state = fallback_state(document_state, consistency_checks={})
     assert finish_without_external_dependencies(state)["final_disposition"] == "WITHHELD"
