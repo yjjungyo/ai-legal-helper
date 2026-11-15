@@ -228,6 +228,22 @@ def generate_answer(
                           answer_generation_error=None)
         else:
             result.update(draft_answer="", answer_generation_error=type(exc).__name__)
+    # [STEP5-PROGRESS-03 / Gemini] 수정 LLM이 동일 초안을 돌려줬고
+    # Writer가 확인한 Source Manifest도 동일하다면 법률효과를 검증할
+    # 새로운 정보가 없다. 다음 verification_node가 기존의 유효한
+    # 검증 스냅샷을 재사용할 수 있도록 신호만 기록한다.
+    # 출처가 1개라도 늘거나 같은 질문이라도 본문이 변경되면 False:
+    # 새로운 판례·부칙을 이전 검증 결과로 덮어쓰지 않도록 한다.
+    previous_draft = str(state.get("draft_answer") or "")
+    prior_sha = (state.get("answer_source_manifest") or {}).get("content_sha256")
+    current_sha = (result.get("answer_source_manifest") or {}).get("content_sha256")
+    no_progress = bool(
+        repair and previous_draft and result.get("draft_answer") == previous_draft
+        and prior_sha and current_sha and prior_sha == current_sha
+    )
+    result["revision_no_progress"] = no_progress
+    if no_progress:
+        logger.info("[STEP5_REWRITE] 수정된 답변/근거 원문 불변; 검증 재사용 가능성 평가 예정")
     return result
 
 
