@@ -332,7 +332,9 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
         or (conv_ctx.get("case_id") if isinstance(conv_ctx, dict) else getattr(conv_ctx, "case_id", None))
     )
     if case_id:
-        set_case_id(case_id)    # 2. 질문 원문은 변경하지 않고, 이전 대화의 의미만 별도의 내부 질의로 복원한다.
+        set_case_id(case_id)
+
+    # 2. 질문 원문은 변경하지 않고, 이전 대화의 의미만 별도의 내부 질의로 복원한다.
     # '그래 해줘' 같은 표현 사전/제안 문구 정규식은 사용하지 않는다.
     # 장기 기억의 사실은 승인 증거 DB가 기준이며 이전 AI 답변은 참조 대상일 뿐이다.
     c_obj = None
@@ -374,7 +376,7 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
         # 이전 대화가 없는 턴에만 인사/감사 Fast-Exit을 적용한다.
         # '네', '응' 같은 발화는 맥락 있는 턴에서 여기로 진입하지 않는다.
         pure_greeting = bool(re.fullmatch(
-            r"(?:안녕하세요|안녕|감사합니다|고맙습니다|네|예|수고하세요|수고하셨습니다|응|알겠습니다|알겠어)[.!?~\\s]*",
+            r"(?:안녕하세요|안녕|감사합니다|고맙습니다|네|예|수고하세요|수고하셨습니다|응|알겠습니다|알겠어)[.!?~\s]*",
             q,
         ))
         intent = (
@@ -387,7 +389,7 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
         )
         effective_resolved_query = q
         # 기존 첫 턴 날짜 추출은 호환 유지. 날짜의 법률적 역할은 후속 분석에서 검증한다.
-        date_match = re.search(r"(\\d{4})[.\\-/년]\\s*(\\d{1,2})[.\\-/월]\\s*(\\d{1,2})일?", q)
+        date_match = re.search(r"(\d{4})[.\-/년]\s*(\d{1,2})[.\-/월]\s*(\d{1,2})일?", q)
         extracted_date = None
         if date_match:
             try:
@@ -504,15 +506,6 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
             "event_date": extracted_date,
             "event_type": event_type,
             "statute_mention_date": statute_mention_date,
-        },
-        "consultation_mode": consultation_mode,
-            "categories": [],
-            "resolved_query": effective_resolved_query,
-            "requires_specialist": not pure_greeting,
-            "requires_retrieval": not pure_greeting,
-            "requires_verification": not pure_greeting,
-            "requires_full_analysis": not pure_greeting,
-            "event_date": extracted_date,
         },
         "consultation_mode": consultation_mode,
         "answer_mode": ans_mode,
