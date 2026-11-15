@@ -593,11 +593,50 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
             )
         )
 
+        # [STEP5-FINAL-01 / Gemini] 재작성 무진전으로 조기 finalize되어도
+        # 일부 주장만 SUPPORTED라는 이유로 질문 미응답·일관성 결함·
+        # 4단계 요건 포섭/인용 실패를 PASS로 바꾸지 않는다.
+        # 실제 답변에 한계가 명시된 조건부 설명은 허용한다.
+        coverage_items = result.get("question_coverage") or []
+        has_undisclosed_question_gap = any(
+            isinstance(item, dict)
+            and item.get("answered") is not True
+            and not (
+                item.get("answerable") is False
+                and item.get("limitation_disclosed") is True
+                and isinstance(item.get("limitation_statement"), str)
+                and bool(item["limitation_statement"].strip())
+                and item["limitation_statement"].strip() in draft
+            )
+            for item in coverage_items
+        )
+        has_consistency_failure = any(
+            isinstance(check, dict) and check.get("passed") is not True
+            for check in (result.get("consistency_checks") or {}).values()
+        )
+        application_audit = result.get("application_audit") or {}
+        has_subsumption_failure = bool(
+            application_audit.get("failed_claims") or application_audit.get("findings")
+        )
+        citation_audit = result.get("citation_audit") or {}
+        has_citation_failure = bool(
+            citation_audit.get("unverified_citations") or citation_audit.get("unsupported_citations")
+        )
+        has_unsupported_case_fact = any(
+            c.get("claim_type") in ("CASE_FACT", "CASE_INFERENCE")
+            and c.get("grounding_status") == "UNSUPPORTED"
+            for c in result.get("claims", [])
+        )
         has_fatal_legal_error = (
             has_unsupported_or_uncertain_legal_claim
             or unverified_legal_effects_present
             or has_statute_defects
             or bool(result.get("contradictions"))
+            or has_undisclosed_question_gap
+            or has_consistency_failure
+            or has_subsumption_failure
+            or has_citation_failure
+            or has_unsupported_case_fact
             or result.get("reason_code") in ("LEGAL_SOURCE_MISSING", "LEGAL_SOURCE_INSUFFICIENT", "CITATION_INVALID")
         )
 
