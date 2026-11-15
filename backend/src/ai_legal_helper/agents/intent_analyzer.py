@@ -433,13 +433,42 @@ def analyze_consultation_intent(
         except Exception as e:
             logger.warning(f"[INTENT_ANALYZER] LLM 질문 의도 분석 실패(규칙 폴백 적용): {e}")
 
-    # On model failure, the product must not dispose of a potentially valid
-    # legal question as unknown merely because intent classification failed.
-    # This fallback selects a workflow, NEVER proves a case fact.
+    # LLM 복원 실패 시 단문을 임의의 작업으로 해석하지 않는다.
+    # '그래 해줘' 같은 지시 대상 생략 입력에서 의미 복원에 실패했다면,
+    # 앞선 제안을 추측하는 것보다 질문을 다시 받는 것이 안전하다.
+    # 길이 기준은 *안전한 실패 처리*에만 사용하며 작업명/법률 결론을 만들지 않는다.
+    if decision is None and use_llm and has_history and len(question.strip()) <= 20:
+        decision = IntentDecision(
+            intent=ConsultationIntent.NEEDS_CLARIFICATION,
+            consultation_mode=ConsultationMode.CASE_EVIDENCE if case_context else ConsultationMode.GENERAL_LEGAL,
+            categories=[],
+            resolved_query=question.strip(),
+            requires_specialist=False,
+            requires_retrieval=False,
+            requires_verification=False,
+            requires_full_analysis=False,
+            reason="후속 질의의 참조 대상 의미 복원 실패: 확인 필요",
+        )
+
+    # 독립적으로 의미가 충분한 질문에서는 기존 규칙 폴백으로 실행 경로만 선택한다.
+    # 폴백은 사건 발생 사실이나 법률 효과를 결코 확정하지 않는다.
     if decision is None:
         decision = _heuristic_rule_fallback(
             question, has_history=has_history, case_context=case_context,
         )
+
+    # 모델이 후속 작업이라고 했지만 짧은 원문을 전혀 복원하지 못한 경우도
+    # 기존 결론을 임의 승계하지 않는다.
+    if (use_llm and has_history and len(question.strip()) <= 20
+            and decision.intent in (ConsultationIntent.FOLLOWUP_ACTION, ConsultationIntent.FOLLOWUP_QUESTION)
+            and decision.resolved_query.strip() == question.strip()):
+        decision.intent = ConsultationIntent.NEEDS_CLARIFICATION
+        decision.categories = []
+        decision.requires_specialist = False
+        decision.requires_retrieval = False
+        decision.requires_verification = False
+        decision.requires_full_analysis = False
+        decision.reason = "지시 대상이 해석되지 않아 후속 작업 보류"
 
     # Current user request, not a rewritten LLM query, controls whether the
     # user explicitly asked to analyze registered documents. A model must not
