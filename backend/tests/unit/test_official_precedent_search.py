@@ -259,3 +259,45 @@ def test_no_new_request_after_history_hash():
     req = pending_precedent_searches(state)[0]
     state["precedent_search_history"] = [req["key"]]
     assert pending_precedent_searches(state) == []
+
+def test_unverified_case_number_in_case_record_cannot_pass_citation_audit():
+    from ai_legal_helper.agents.verification import audit_citations_and_claims
+    claim = "대법원 2015다59801 판례에 따라 반환채무를 검토합니다."
+    audit = audit_citations_and_claims(
+        claim,
+        retrieved_sources=[{
+            "source_id": "E01_계약서.txt",
+            "source_type": "CASE_EVIDENCE",
+            "content": "임차인이 2015다59801을 참고하여 청구하겠다고 진술했다.",
+            "file": "E01_계약서.txt",
+        }],
+        case_context="과거 사용자 질문에도 2015다59801 판례를 언급한 적이 있음",
+    )
+    assert "PRECEDENT:2015다59801" in audit["rejected_citation_ids"]
+    assert audit["rejection_reasons"]["PRECEDENT:2015다59801"] == "UNVERIFIED_PRECEDENT_CASE_NUMBER"
+
+
+def test_verified_precedent_source_allows_case_number_citation():
+    from ai_legal_helper.agents.verification import audit_citations_and_claims
+    source = parse_precedent_detail(_detail_xml(), expected_id="226751")
+    audit = audit_citations_and_claims(
+        "대법원 2015다59801 판결은 해당 보증금 반환채무의 성질을 검토합니다.",
+        retrieved_sources=[source],
+    )
+    assert "PRECEDENT:2015다59801" in audit["validated_citation_ids"]
+    assert "PRECEDENT:2015다59801" not in audit["rejected_citation_ids"]
+
+
+def test_unrelated_statute_mention_does_not_validate_precedent_case_number():
+    from ai_legal_helper.agents.verification import audit_citations_and_claims
+    audit = audit_citations_and_claims(
+        "대법원 2015다59801 판결을 참고합니다.",
+        retrieved_sources=[{
+            "source_id": "STATUTE:generic",
+            "source_type": "STATUTE",
+            "statute_name": "민법",
+            "article": "제411조",
+            "content": "참조판례: 2015다59801",
+        }],
+    )
+    assert "PRECEDENT:2015다59801" in audit["rejected_citation_ids"]
