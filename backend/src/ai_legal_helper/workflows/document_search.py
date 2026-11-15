@@ -180,6 +180,17 @@ def pending_precedent_searches(state: dict[str, Any]) -> list[dict[str, Any]]:
         part = str(item.get("question_part") or "").strip()
         issue = str(item.get("issue") or "").strip()
         query = normalize_precedent_query(item.get("precedent_query") or "")
+        # [PRECEDENT-04B] PII 중앙 마스커는 자유형식 한글 인명을 전부 식별할
+        # 수 없다. 현재 사건 당사자 이름이 판례 검색어에 섞였다면 요청을
+        # 거부한다. 구조화된 법률 개념 검색어를 다시 얻기 전에는 API 전송 금지.
+        parties = (state.get("case_evidence_briefing") or {}).get("parties") or []
+        party_names = [
+            str(p.get("name") or "").strip()
+            for p in parties if isinstance(p, dict) and len(str(p.get("name") or "").strip()) >= 2
+        ]
+        if any(name in query for name in party_names):
+            logger.warning("[PRECEDENT] 개인 식별명이 검색어에 포함되어 공식 API 조회 차단")
+            continue
         if not (part and issue and query and _is_safe_question_match(part, question, resolved)):
             continue
         key = hashlib.sha256(json.dumps(
