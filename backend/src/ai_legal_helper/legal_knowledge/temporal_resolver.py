@@ -403,6 +403,7 @@ def evaluate_temporal_sources(
     event_date: str | None = None,
     event_type: str | None = None,
     llm_addendum_interpretation: bool = False,
+    target_articles: Optional[Iterable[str]] = None,
     addendum_invoke_fn: Optional[Any] = None,
     addendum_review_fn: Optional[Any] = None,
 ) -> TemporalResolution:
@@ -419,6 +420,7 @@ def evaluate_temporal_sources(
                 and s.get("article") not in (None, "", "부칙")]
     addenda = [s for s in documents if s.get("source_type") == "STATUTE"
                and s.get("article") == "부칙"]
+    target_art_set = {re.sub(r"\s+", "", a) for a in target_articles} if target_articles is not None else None
     decisions: list[TemporalSourceDecision] = []
     gaps: list[str] = []
     for src in articles:
@@ -466,7 +468,7 @@ def evaluate_temporal_sources(
                 enriched["temporal_status"] = "VERIFIED"
             else:
                 reason = "MATCHING_ADDENDUM_MISSING"
-        elif not llm_addendum_interpretation:
+        elif not llm_addendum_interpretation or (target_art_set is not None and re.sub(r"\s+", "", article) not in target_art_set):
             if is_before_effective:
                 determined_status = ApplicabilityStatus.NOT_APPLICABLE.value
                 reason = "BEFORE_ARTICLE_EFFECTIVE_DATE"

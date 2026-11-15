@@ -615,7 +615,16 @@ class LawRetrievalService:
                     )
                     if candidate is not None:
                         prioritized.append(candidate)
-        prioritized.extend(src for src in found if src not in prioritized)
+        # 명시적 조문 우선순위 슬롯 배정 후, 잔여 문서는 점수(score) 내림차순 및 도메인 우선으로 정렬
+        unprioritized = [src for src in found if src not in prioritized]
+        unprioritized.sort(
+            key=lambda s: (
+                float(s.get("score") or 0.0),
+                1 if s.get("retrieval_collection") != GLOBAL_LAW_COLLECTION else 0,
+            ),
+            reverse=True,
+        )
+        prioritized.extend(unprioritized)
         required_slots = len(selected) * len(requested_article_order) if selected and requested_article_order else len(selected)
         top_articles = prioritized[:max(k, required_slots)]
 

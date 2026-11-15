@@ -4542,6 +4542,13 @@ def execute_statute_search_node(state: LegalState) -> Dict:
 
         from ai_legal_helper.legal_knowledge.temporal_resolver import evaluate_temporal_sources
 
+        # [부칙 해석 호출 최적화] 질문 명시 조문 또는 검색 상위 핵심 조문으로 한정하여 LLM 호출 폭주 방지
+        target_arts = set(re.findall(r"제\s*\d+\s*조(?:\s*의\s*\d+)?", q or ""))
+        if not target_arts:
+            for s in (statute_sources or [])[:5]:
+                art = s.get("article")
+                if art and art not in ("부칙", "목차"):
+                    target_arts.add(str(art))
         temporal_result = evaluate_temporal_sources(
 
             q, statute_sources,
@@ -4551,6 +4558,7 @@ def execute_statute_search_node(state: LegalState) -> Dict:
             event_type=plan.get("event_type") or state.get("event_type"),
 
             llm_addendum_interpretation=True,
+            target_articles=target_arts or None,
 
         ).as_dict()
 

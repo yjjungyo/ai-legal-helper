@@ -382,7 +382,12 @@ def retrieve_with_status(query: str, k: int = 10, category: Optional[str] = None
                 raw_scored = [(d, 0.8) for d in raw_docs]
 
             reranked = rerank_with_article_and_keywords(query, raw_scored, top_k=fetch_k)
-            candidate_docs = [d for d, _ in reranked]
+            # 재순위화된 결합 점수(score)를 Document 메타데이터에 보존하여 다중 컬렉션 병합 시 상위 선별에 활용
+            candidate_docs = []
+            for d, score in reranked:
+                if hasattr(d, "metadata") and isinstance(d.metadata, dict):
+                    d.metadata["score"] = float(score)
+                candidate_docs.append(d)
             from ai_legal_helper.rag.hybrid_retrieval import restore_parent_content
             restored_candidates = [restore_parent_content(d) for d in candidate_docs]
             deduped_docs = deduplicate_chunks(restored_candidates)[:k]

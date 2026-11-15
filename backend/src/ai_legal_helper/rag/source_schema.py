@@ -58,6 +58,8 @@ class StandardSource(BaseModel):
     source_url: Optional[str] = None
     version_date: Optional[str] = None
     retrieved_at: Optional[str] = None
+    # ChromaDB 유사도 및 어휘 재순위 결합 점수 (Cross-Collection 정렬용)
+    score: Optional[float] = None
 
     # 2. 법령(STATUTE) 전용 필드 (P1-02 및 상세 메타정보 확장)
     law_id: Optional[str] = None
@@ -179,6 +181,13 @@ def build_source_from_chroma_doc(
     document_id = str(meta.get("document_id") or meta.get("doc_id") or "").strip() or filename
     source_url = str(meta.get("source_url") or meta.get("url") or "").strip() or None
     version_date = _format_yyyymmdd(meta.get("version_date"))
+
+    # Chroma 유사도 및 키워드 재순위 점수 추출 (Cross-Collection 점수 정렬용)
+    raw_score = meta.get("score") if meta.get("score") is not None else meta.get("similarity_score")
+    try:
+        doc_score = float(raw_score) if raw_score is not None else None
+    except (TypeError, ValueError):
+        doc_score = None
 
     # 유형(source_type) 및 법령/판례 메타데이터 추출 (실제 확인된 값만 기록)
     explicit_type = str(meta.get("source_type") or meta.get("doc_type") or "").strip().upper()
@@ -386,6 +395,7 @@ def build_source_from_chroma_doc(
         file=filename or source_id,
         file_name=filename,
         category=category,
+        score=doc_score,
     )
     return std.model_dump()
 
