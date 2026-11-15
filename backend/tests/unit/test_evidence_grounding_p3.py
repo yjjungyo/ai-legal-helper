@@ -127,7 +127,10 @@ def test_claim_level_adaptive_scope_recommendation_not_blocked():
             "claims": [
                 {
                     "claim": "임차권등기명령 신청 가능",
-                    "claim_type": "LEGAL_APPLICATION",
+                    # [SUBSUMPTION-11 / Gemini] 개별 사건의 계약 종료 및
+                    # 미반환 사실을 확인하지 않은 순수 요건 규범 설명.
+                    # 실제 적용 결론(LEGAL_APPLICATION)과 분리해야 한다.
+                    "claim_type": "LEGAL_RULE",
                     "fact_status": "VERIFIED_FACT",
                     "source_ids": ["주택임대차보호법_제3조의3"],
                     "grounding_status": "SUPPORTED",
