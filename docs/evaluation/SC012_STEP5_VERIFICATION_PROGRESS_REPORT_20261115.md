@@ -59,9 +59,16 @@
 
 - 1차 CI `https://github.com/yjjungyo/ai-legal-helper/actions/runs/43677795891`: **175 passed, 4 failed**. 새 검증 캐시 테스트 픽스처가 승인 사건 증거를 실제 `case_evidence_briefing.source_documents`가 아니라 일반 `retrieved_sources`에 넣어 Writer/Verifier source manifest가 불일치. **운영 코드 문제가 아닌 모의 자료 구성 오류**로 확인.
 - `STEP5-TEST-01`: 위 fixture를 승인된 문서로 작성하고 `document_sources`를 통해 검증기와 동일한 원문 Manifest를 생성하도록 수정. 2차 CI `https://github.com/yjjungyo/ai-legal-helper/actions/runs/43677937317`: **179 passed, 2 warnings, 0 failures**.
-- 추가 `STEP5-TEST-02`: `execute_statute_search_node` Mock 통합에서 신규 법령·판례/중복 API 응답의 `search_delta_count` 및 후속 그래프 분기 검사 (후속 CI 확인).
-- 기존 CI: Semantic Judgment Safety / Official Precedent Search / Conversation Context / Semantic Issue Planner Regression 함께 확인.
-- 마지막 HEAD CI 결과는 해당 GitHub Actions 완료 로그에서 확인한 뒤 아래에 기록한다. 완료하지 않은 결과를 PASS로 선언하지 않는다.
+- 추가 `STEP5-TEST-02`: `execute_statute_search_node` Mock 통합에서 신규 법령·판례/중복 API 응답의 `search_delta_count` 및 후속 그래프 분기를 직접 확인. 모두 성공.
+- **최종 코드 HEAD `9f46630b`(이후 보고서 커밋만 추가)의 GitHub Actions 5개 전부 통과**:
+  - `Verification Progress Regression`: **182 passed / 2 warnings, 0 failed** — <https://github.com/yjjungyo/ai-legal-helper/actions/runs/43678020867>.
+  - `Official Precedent Search Regression`: **107 passed / 2 warnings** — <https://github.com/yjjungyo/ai-legal-helper/actions/runs/43678020782>.
+  - `Conversation Context Regression`: **46 passed / 2 warnings** — <https://github.com/yjjungyo/ai-legal-helper/actions/runs/43678020924>.
+  - `Semantic Issue Planner Regression`: **25 passed / 2 warnings** — <https://github.com/yjjungyo/ai-legal-helper/actions/runs/43678020763>.
+  - `Semantic Judgment Safety Regression`: **176 passed (첫 잡); 299 passed / 3 skipped / 2 warnings (광범위 잡)** — <https://github.com/yjjungyo/ai-legal-helper/actions/runs/43678020759>.
+- CI 간 테스트 중복이 있으므로 `182+107+46+25+299`를 고유 테스트 총수로 오인하지 않는다. 3개의 스킵은 전체 법률 안전성 잡의 기존 스킵이며 5번 신규 테스트 제외가 아니다.
+- **추가 LLM 호출 도입 0회.** Mock 결과에서는 (a) 동일 원문 재작성 시 2번째 검증기 호출 방지, (b) 공식 검색의 신규 법률 출처 0건 시 `re_analyze` 분기 제거, (c) 서로 다른 질의·증거·검토일·새 조문·판례가 추가되는 반례에서는 캐시 금지와 필수 재분석 유지 확인.
+- 시간·토큰 절감 수치 및 SC-012/013 답변 정답률은 실운영 LLM+법제처 API E2E/동일 시나리오 비교 전 **미측정**. CI 숫자를 정답률 또는 비용 절감률이라고 해석하면 안 된다.
 
 ## 6. 수동 E2E 확인 항목
 
