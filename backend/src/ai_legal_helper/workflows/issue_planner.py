@@ -215,7 +215,11 @@ def plan_legal_issues(
     q_compact = re.sub(r"\s+", "", q)
 
     # 0. 쟁점: 가공의 증거 라벨 식별 및 존재 부인 (P0-4.2 작업 B / SC01-V05 대응)
-    unregistered_evs = detect_unregistered_evidence_references(q, briefing)
+    # [ISSUE-SEMANTIC-06] 존재하지 않는 증거번호 검사는 반드시 사용자 원문으로 한다.
+    # LLM의 resolved_query에 잘못 들어간 증거번호를 사용자의 인용 주장으로
+    # 오해하지 않는다. 구형/첫 턴 경로에서는 기존 q 검사로 동일하게 동작한다.
+    cited_question = (original_question or q) if focus_current_question else q
+    unregistered_evs = detect_unregistered_evidence_references(cited_question, briefing)
     if unregistered_evs:
         issues.append(
             LegalIssueTask(
