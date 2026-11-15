@@ -85,3 +85,17 @@
 - 최종 GitHub Actions 결과에 따른 코드리뷰/테스트 수정.
 - 사용자가 수행하는 SC-012/013 E2E 이후 Langfuse에서 품질과 토큰·지연 개선 수치 확정.
 - 1번 증거 원문 격리(사용자 처리) 및 이전 변경 PR #31/#32의 순차 병합 검토는 별도.
+
+
+## 8. 조기 종료에 따른 최종 답변 안전장치 보강 (추가 코드리뷰)
+
+- 기존 `finish_answer`는 `status=REVISE`여도 다른 주장이 SUPPORTED이면 일부 경우 CAUTIONARY로 보존한다. 5단계 검색·재작성 조기 종료로 해당 분기가 더 자주 실행될 가능성이 있어 **단순 주장 존재 여부뿐 아니라 검증된 전체 질문의 충족 여부를 필수로 확인**해야 한다.
+- `STEP5-FINAL-01 / Gemini`: 아래 명시적 미해결 문제가 하나라도 있으면 부분 답변 PASS 승격을 차단:
+  - 질문별 `question_coverage[].answered=false`이면서 실제 답변에 제한 사항이 기재되지 않음
+  - 검증기가 요구한 Full Coverage 목록 자체가 없거나, `consistency_checks`의 필수 4개 검사(결론·시간선·의사표시·출처)가 빠짐/실패함
+  - 4단계 `application_audit.failed_claims` 또는 `findings` 존재
+  - 유효하지 않은 판례/법령/사건 인용 또는 `CASE_FACT/CASE_INFERENCE`의 UNSUPPORTED 주장
+- `STEP5-FINAL-02 / Gemini`: `verify_answer`가 현재 질문이 엄격한 전 질문 Coverage 검증을 요구했는지 `required_question_coverage`에 명시. 후속 행동 안내 등 기존 축소 검증 경로에는 불필요하게 전체 4개 일관성 검사를 강제하지 않는다.
+- 중요한 반대 사례: 답변에서 조건·법률 근거 부재를 **실제로 명시**하고 해당 질문이 `answerable=false, limitation_disclosed=true`로 검증된 경우 기존 조건부 답변은 CAUTIONARY로 계속 허용.
+- 새 회귀 테스트: `test_early_finalize_*` (질문 미응답, 질문 coverage 목록 통째 누락, 일관성 검증 누락, 판례/법률요건 포섭 누락, 허위 인용, 미입증 사실, 안전한 조건부 답변 보존).
+- 이 방어선은 결함이 있는 초안을 사용자가 받지 않도록 하는 **전달 단계 보호**일 뿐, 결함을 `PASS`로 바꾸거나 법률의 진위를 regex로 결정하지 않는다.
