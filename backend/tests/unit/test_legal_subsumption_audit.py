@@ -326,3 +326,17 @@ def test_verifier_integration_accepts_supported_check_without_extra_llm(sources)
     assert result["application_audit"]["failed_claims"] == 0
     # PASS 여부는 포섭 체인 존재 외에 다른 인용·시행일·질문 충족 검사가 함께 결정.
     assert result["status"] != "INSUFFICIENT"
+
+
+def test_document_verification_prompt_renders_all_subsumption_json_examples():
+    """PromptTemplate JSON 예시의 중괄호가 새로운 필수 변수로 해석되면 검증기가 중단된다."""
+    from langchain_core.prompts import PromptTemplate
+    from ai_legal_helper.agents.document_verification_prompt import DOCUMENT_VERIFICATION_PROMPT
+    prompt = PromptTemplate.from_template(DOCUMENT_VERIFICATION_PROMPT)
+    assert set(prompt.input_variables) == {"question", "draft_answer", "retrieved_sources", "case_context"}
+    rendered = prompt.format(
+        question="법률 질문", draft_answer="법률 효과 결론",
+        retrieved_sources="법령 원문", case_context="사건 증거",
+    )
+    assert "application_checks" in rendered
+    assert '{"requirement"' in rendered
