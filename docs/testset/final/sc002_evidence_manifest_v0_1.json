@@ -1,0 +1,78 @@
+{
+  "scenario_id": "SC-002",
+  "source": "new_synthetic",
+  "documents": [
+    {
+      "evidence_id": "S01",
+      "file_name": "S01_임대차계약서.txt",
+      "stage": 1,
+      "sha256": "a7ae05df4d14837640bb8716a52d8766af630f3c70dcd2b95d6bf69965a1348c"
+    },
+    {
+      "evidence_id": "S02",
+      "file_name": "S02_보증금_이체기록.txt",
+      "stage": 1,
+      "sha256": "1535d44c96b3810754416fc793c1935a126658eb4ade565f8bb0fe300256519e"
+    },
+    {
+      "evidence_id": "S03",
+      "file_name": "S03_입주_전입_확정일자.txt",
+      "stage": 1,
+      "sha256": "bcd36a62a3d3da5344ac73a8e00c91afb706e7c5189f1316699a11bfa63c8a43"
+    },
+    {
+      "evidence_id": "S04",
+      "file_name": "S04_계약갱신_경위_진술.txt",
+      "stage": 1,
+      "sha256": "2c52b51d2fa6592b98ed251f102beafb8f249e9ddf60e3fe35c4a8bdff14b98c"
+    },
+    {
+      "evidence_id": "S05",
+      "file_name": "S05_배우자_전화통보_녹취록.txt",
+      "stage": 1,
+      "sha256": "568548b1c5758d053cad4cc6d5159c0350269ea79bacbf4c10b851528e5b1cd6"
+    },
+    {
+      "evidence_id": "S06",
+      "file_name": "S06_임대인_인지_문자.txt",
+      "stage": 1,
+      "sha256": "42e4fae4c8d8ce1a8c573291b7a5d09855145add7f38dbf371eae5eb5aae0124"
+    },
+    {
+      "evidence_id": "S07",
+      "file_name": "S07_집보기_협의_기록.txt",
+      "stage": 2,
+      "sha256": "3681eec4488b2051565eb52edc0a1e8f231a81185828b5190164ede55cf5a28d"
+    },
+    {
+      "evidence_id": "S08",
+      "file_name": "S08_제3자_보증금반환_계약서.txt",
+      "stage": 2,
+      "sha256": "ac7e8cf9e63984ce9eb28c2fd59bcd368373b7da77495280980c0ff717d6bda3"
+    },
+    {
+      "evidence_id": "S09",
+      "file_name": "S09_임대인_제3자사정_인지_문자.txt",
+      "stage": 2,
+      "sha256": "fea7395ad3d3da8248a813027ed46bc8e84f8abc1320a0194e16c356a962aa6a"
+    },
+    {
+      "evidence_id": "S10",
+      "file_name": "S10_반환곤란_통보_문자.txt",
+      "stage": 3,
+      "sha256": "cfa0de82d494449d2b5fb8c68b6654c9acd8ceffd0db4d5751aedb37568fabd9"
+    },
+    {
+      "evidence_id": "S11",
+      "file_name": "S11_미반환_점유유지_확인.txt",
+      "stage": 3,
+      "sha256": "890b064b1ed8156bf7a0776d65fce77ab83e095a2b558a0e6d733db5f7103624"
+    },
+    {
+      "evidence_id": "S12",
+      "file_name": "S12_긴급차입_이자지급_내역.txt",
+      "stage": 3,
+      "sha256": "64f4ad248eb1b365508a07b49e86b287f9fadd9a2056161af72b1ab147a80b3a"
+    }
+  ]
+}

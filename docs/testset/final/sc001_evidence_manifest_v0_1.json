@@ -1,0 +1,133 @@
+{
+  "scenario_id": "SC-001",
+  "source": "existing_repo",
+  "existing_repo_root": "docs/testset/SC-001_전세보증금미반환_사건자료/02_증거원문TXT",
+  "documents": [
+    {
+      "evidence_id": "E01",
+      "file_name": "E01_주택임대차계약서.txt",
+      "stage": 1,
+      "evaluation_role": "STAGE_EVIDENCE",
+      "sha256": "CALCULATE_FROM_REPOSITORY_BEFORE_FREEZE"
+    },
+    {
+      "evidence_id": "E02",
+      "file_name": "E02_보증금_지급_이체내역.txt",
+      "stage": 1,
+      "evaluation_role": "STAGE_EVIDENCE",
+      "sha256": "CALCULATE_FROM_REPOSITORY_BEFORE_FREEZE"
+    },
+    {
+      "evidence_id": "E03",
+      "file_name": "E03_전입신고_확정일자_입주_기록.txt",
+      "stage": 1,
+      "evaluation_role": "STAGE_EVIDENCE",
+      "sha256": "CALCULATE_FROM_REPOSITORY_BEFORE_FREEZE"
+    },
+    {
+      "evidence_id": "E04",
+      "file_name": "E04_임대차_갱신_경위_진술서.txt",
+      "stage": 1,
+      "evaluation_role": "STAGE_EVIDENCE",
+      "sha256": "CALCULATE_FROM_REPOSITORY_BEFORE_FREEZE"
+    },
+    {
+      "evidence_id": "E05",
+      "file_name": "E05_퇴거_및_보증금_반환_요청_문자.txt",
+      "stage": 1,
+      "evaluation_role": "STAGE_EVIDENCE",
+      "sha256": "CALCULATE_FROM_REPOSITORY_BEFORE_FREEZE"
+    },
+    {
+      "evidence_id": "E06",
+      "file_name": "E06_임대인_보증금_분할반환_제안_문자.txt",
+      "stage": 1,
+      "evaluation_role": "STAGE_EVIDENCE",
+      "sha256": "CALCULATE_FROM_REPOSITORY_BEFORE_FREEZE"
+    },
+    {
+      "evidence_id": "E07",
+      "file_name": "E07_임대인_임차인_통화_녹취록_1.txt",
+      "stage": 1,
+      "evaluation_role": "STAGE_EVIDENCE",
+      "sha256": "CALCULATE_FROM_REPOSITORY_BEFORE_FREEZE"
+    },
+    {
+      "evidence_id": "E08",
+      "file_name": "E08_신규_임차인_모집_및_시세_관련_기록.txt",
+      "stage": 1,
+      "evaluation_role": "STAGE_EVIDENCE",
+      "sha256": "CALCULATE_FROM_REPOSITORY_BEFORE_FREEZE"
+    },
+    {
+      "evidence_id": "E09",
+      "file_name": "E09_은행_채권_관련_가압류_등기_열람_메모.txt",
+      "stage": 2,
+      "evaluation_role": "STAGE_EVIDENCE",
+      "sha256": "CALCULATE_FROM_REPOSITORY_BEFORE_FREEZE"
+    },
+    {
+      "evidence_id": "E10",
+      "file_name": "E10_HUG_관련_구상권_가압류_등기_열람_메모.txt",
+      "stage": 2,
+      "evaluation_role": "STAGE_EVIDENCE",
+      "sha256": "CALCULATE_FROM_REPOSITORY_BEFORE_FREEZE"
+    },
+    {
+      "evidence_id": "E11",
+      "file_name": "E11_등기부_권리관계_종합_열람_메모.txt",
+      "stage": 2,
+      "evaluation_role": "STAGE_EVIDENCE",
+      "sha256": "CALCULATE_FROM_REPOSITORY_BEFORE_FREEZE"
+    },
+    {
+      "evidence_id": "E12",
+      "file_name": "E12_공증_요청_및_회피_문자.txt",
+      "stage": 2,
+      "evaluation_role": "STAGE_EVIDENCE",
+      "sha256": "CALCULATE_FROM_REPOSITORY_BEFORE_FREEZE"
+    },
+    {
+      "evidence_id": "E13",
+      "file_name": "E13_은행_대출_시도_및_반환_지연_통보_문자.txt",
+      "stage": 2,
+      "evaluation_role": "STAGE_EVIDENCE",
+      "sha256": "CALCULATE_FROM_REPOSITORY_BEFORE_FREEZE"
+    },
+    {
+      "evidence_id": "E14",
+      "file_name": "E14_임대인_임차인_통화_녹취록_2.txt",
+      "stage": 2,
+      "evaluation_role": "STAGE_EVIDENCE",
+      "sha256": "CALCULATE_FROM_REPOSITORY_BEFORE_FREEZE"
+    },
+    {
+      "evidence_id": "E15",
+      "file_name": "E15_계약_종료일_이후_미반환_확인_문자.txt",
+      "stage": 3,
+      "evaluation_role": "STAGE_EVIDENCE",
+      "sha256": "CALCULATE_FROM_REPOSITORY_BEFORE_FREEZE"
+    },
+    {
+      "evidence_id": "E16",
+      "file_name": "E16_임차인_현거주_및_인도_상태_확인.txt",
+      "stage": 3,
+      "evaluation_role": "STAGE_EVIDENCE",
+      "sha256": "CALCULATE_FROM_REPOSITORY_BEFORE_FREEZE"
+    },
+    {
+      "evidence_id": "E17",
+      "file_name": "E17_반환보증_가입_여부_확인_대화.txt",
+      "stage": 3,
+      "evaluation_role": "STAGE_EVIDENCE",
+      "sha256": "CALCULATE_FROM_REPOSITORY_BEFORE_FREEZE"
+    },
+    {
+      "evidence_id": "E18",
+      "file_name": "E18_임차인_법률상담_요청_및_우선_질문.txt",
+      "stage": null,
+      "evaluation_role": "INPUT_ONLY_NOT_SCORED_AS_EVIDENCE",
+      "sha256": "CALCULATE_FROM_REPOSITORY_BEFORE_FREEZE"
+    }
+  ]
+}
