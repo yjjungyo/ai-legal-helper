@@ -81,6 +81,26 @@ def test_sc012_semantic_followup_never_converts_inheritance_partition_to_install
     assert "민법 제411조" in issues[0].candidate_statutes
 
 
+def test_semantic_candidate_law_is_never_auto_verified_without_official_source():
+    """LLM 후보 조문만으로 법적 근거 PASS를 만들지 않는다."""
+    from ai_legal_helper.agents.issue_verifier import verify_issue
+
+    tasks = plan_legal_issues(
+        SC012_Q, _brief(),
+        semantic_outlines=_semantic(
+            "공동상속인이 승계한 보증금 반환채무를 누구에게 청구할 수 있는가?",
+            laws=["민법 제411조"],
+        ),
+        focus_current_question=True,
+        original_question=SC012_Q,
+    )
+    item = next(t for t in tasks if t.issue_id == "ISSUE_SEMANTIC_01")
+    result = verify_issue(item, draft_answer="공동상속인에 대한 반환청구를 검토해야 합니다.",
+                          briefing=_brief(), retrieved_sources=[])
+    assert "민법 제411조" in result.missing_statutes
+    assert result.status != "VERIFIED"
+
+
 def test_sc012_missing_semantic_outline_preserves_user_question_not_unrelated_templates():
     issues = plan_legal_issues(
         SC012_Q, _brief(),
