@@ -5,6 +5,7 @@ on:
     paths:
       - "backend/src/ai_legal_helper/agents/subsumption_audit.py"
       - "backend/src/ai_legal_helper/agents/verification.py"
+      - "backend/src/ai_legal_helper/agents/issue_verifier.py"
       - "backend/src/ai_legal_helper/agents/document_answer.py"
       - "backend/src/ai_legal_helper/agents/document_verification_prompt.py"
       - "backend/src/ai_legal_helper/rag/grounding_context.py"
@@ -39,6 +40,7 @@ jobs:
             backend/src/ai_legal_helper/agents/document_answer.py \
             backend/src/ai_legal_helper/agents/document_verification_prompt.py \
             backend/src/ai_legal_helper/agents/verification.py \
+            backend/src/ai_legal_helper/agents/issue_verifier.py \
             backend/src/ai_legal_helper/rag/grounding_context.py \
             backend/tests/unit/test_legal_subsumption_audit.py
       - name: Law-fact subsumption and related verification regressions
