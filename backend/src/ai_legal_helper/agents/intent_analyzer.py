@@ -127,6 +127,11 @@ INTENT_PROMPT = PromptTemplate.from_template(
 - 질문에 행동/절차 표현("조치", "실행 순서", "어떻게 해야")이 있더라도, "제출한 증거를 종합해", "권리를 지키면서", "보증금 회수 방안", "대항력/우선변제권 분석" 등 사건 증거의 법률적 종합 분석이 전제된 복합 질문은 FOLLOWUP_ACTION이 아니라 NEW_LEGAL_ANALYSIS로 분류하세요.
 - FOLLOWUP_ACTION은 이미 이전 턴에서 모든 증거와 권리관계 분석이 완료되어 추가적인 법률/증거 분석 없이 순수한 다음 행동 목록만 필요로 하는 단문 질의(예: "이제 뭘 해야 하죠?", "어디로 방문해야 하나요?")에만 적용하세요.
 - 짧은 질문이라도 이전 대화가 있다면 생략된 법률적 의미를 살려 'resolved_query'를 구체적으로 작성하세요.
+- 직전 답변 말미에 실제로 제안한 작업이 있고 사용자가 이를 수락하면, 그 제안의 내용을 작업 목표로 복원하세요. 제안이 없거나 참조 대상이 불명확하면 작업을 만들어내지 말고 NEEDS_CLARIFICATION을 선택하세요.
+- 현재 사용자가 이전 제안을 거절하거나 전혀 다른 주제로 질문하면 이전 작업을 승계하지 마세요.
+- 과거 AI 답변의 내용은 대화 대상을 식별하는 참고자료일 뿐 법률 근거 또는 확정 사실이 아닙니다.
+- 날짜·금액·법률효과는 사용자 발언과 사건 승인 자료에서 확인된 것만 복원하세요. 질문에 없더라도 임의로 법률 결론이나 시점을 확정하지 마세요.
+- 사용자 요청이 후속 행동이더라도 새로운 증거, 시간 순서, 법률 요건의 재검토가 필요하면 requires_retrieval / requires_verification을 true로 설정하세요.
   * 예: 현재 질문 "이제 뭘 해야 하죠?" + 이전 대화 "보증금 미반환 및 가압류 분쟁"
     → resolved_query: "앞선 보증금 반환 지연 및 가압류 분쟁 분석을 바탕으로 의뢰인이 지금 우선적으로 취해야 할 단계별 조치 가이드"
   * 예: 현재 질문 "그럼 지금 이사를 가도 돼?" + 이전 대화 "보증금 미반환 분쟁"
@@ -343,7 +348,15 @@ def analyze_consultation_intent(
         IntentDecision: 질문 의도, 해석된 쿼리, 실행 필요 플래그를 담은 결정 객체
     """
     has_history = bool(conversation_context and conversation_context.previous_turns)
-    conv_text = conversation_context.format_context_for_prompt(max_turns=3) if conversation_context else "(이전 상담 대화 없음 — 신규 대화)"
+    # 동일 대화라도 맥락 복원은 답변 결론뿐 아니라 *직전 제안의 말미*가 필요하다.
+    # 기존 format_context_for_prompt는 결론 요약만 보존해 수락 대상이 사라질 수 있다.
+    conv_text = (
+        conversation_context.format_context_for_resolution(max_turns=3)
+        if use_llm and conversation_context
+        else conversation_context.format_context_for_prompt(max_turns=3)
+        if conversation_context
+        else "(이전 상담 대화 없음 — 신규 대화)"
+    )
 
     # 1. LLM 호출 분기 (use_llm=True일 때만 실행하여 6~8초 레이턴시 단축)
     decision: Optional[IntentDecision] = None
@@ -448,28 +461,12 @@ def analyze_consultation_intent(
         decision.requires_retrieval = True
         decision.requires_full_analysis = True
 
-    # 정책 B: FOLLOWUP_ACTION인 경우 Specialist와 RAG는 비활성화하되, Verifier는 유지
-    # 단, 증거 종합 분석이나 권리 분석 키워드가 질문에 포함된 복합 질문인 경우 NEW_LEGAL_ANALYSIS로 승격
-    complex_evidence_kws = (
-        "증거를 종합", "증거 종합", "자료를 종합", "권리를 지키", "대항력",
-        "우선변제", "가압류", "배당", "실제 청구할 수 있는", "회수할 수 있는",
-    )
+    # 정책 B: 후속 요청이라는 이유만으로 검색/사건 분석을 금지하지 않는다.
+    # CHECKLIST 수락처럼 기존 판단을 활용하는 요청과 새로운 사실·법률 검토를
+    # 요구하는 후속 질문은 의미적으로 구분해야 한다. LLM이 판단한 실행 플래그를
+    # 보존하고 법률 검증만 필수로 유지한다 (도메인별 단어 사전 금지).
     if decision.intent == ConsultationIntent.FOLLOWUP_ACTION:
-        if any(kw in question for kw in complex_evidence_kws) and case_context:
-            logger.info(
-                "[INTENT_GUARDRAIL] FOLLOWUP_ACTION으로 분류되었으나 증거 종합 및 법률 권리 분석 요구가 포함되어 NEW_LEGAL_ANALYSIS로 승격합니다."
-            )
-            decision.intent = ConsultationIntent.NEW_LEGAL_ANALYSIS
-            decision.consultation_mode = ConsultationMode.CASE_EVIDENCE
-            decision.requires_specialist = True
-            decision.requires_retrieval = True
-            decision.requires_full_analysis = True
-            decision.requires_verification = True
-        else:
-            decision.requires_specialist = False
-            decision.requires_retrieval = False
-            decision.requires_verification = True
-            decision.requires_full_analysis = False
+        decision.requires_verification = True
 
     # 정책 C: GENERAL_CONVERSATION인 경우 모든 무거운 파이프라인 비활성화
     # 법률 무관 요청은 일반 인사와 별도 의도로 유지하고 무거운 분석을 중지한다.
@@ -481,8 +478,14 @@ def analyze_consultation_intent(
         decision.requires_verification = False
         decision.requires_full_analysis = False
 
-    # 정책 D: 참조 턴 ID 목록 등록
-    if conversation_context and conversation_context.previous_turns:
+    # 정책 D: 후속 대화에서만 이전 턴 참조를 기록한다. 새 질문에 과거
+    # 사건·법률 결론을 억지로 결합하지 않으며, 목록은 출처/사실 인증이 아니다.
+    if (conversation_context and conversation_context.previous_turns
+            and decision.intent in (
+                ConsultationIntent.FOLLOWUP_ACTION,
+                ConsultationIntent.FOLLOWUP_QUESTION,
+                ConsultationIntent.FACT_CLARIFICATION,
+            )):
         decision.referenced_previous_turn_ids = [
             t.request_id for t in conversation_context.previous_turns[-3:]
         ]
