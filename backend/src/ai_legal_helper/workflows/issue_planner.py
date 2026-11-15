@@ -263,8 +263,12 @@ def plan_legal_issues(
                 for k in (fact_keys_raw[:8] if isinstance(fact_keys_raw, list) else [])
                 if isinstance(k, str) and k.strip()
             ]
-            # 의미윤곽의 후보 법령은 공식 원문 검증 전에는 확정 조문이 아니다.
-            # 현재 downstream은 candidate_statutes를 검색 힌트로만 사용한다.
+            # 의미윤곽의 후보 법령은 '검증해야 할 조문'일 뿐 확정 근거가 아니다.
+            # IssueVerifier는 required_statutes 항목만 실제 retrieved_sources의
+            # 공식 원문과 대조한다. 이 연결을 비우면 아무리 법령을 잘 찾아도
+            # semantic Issue는 law_verified=False로 고정되는 회귀가 생긴다.
+            # 따라서 required_statutes에 후보를 명시하고, verified_statutes /
+            # applicable_statutes 등은 실제 검증 전까지 반드시 빈 목록이다.
             laws_raw = raw.get("candidate_statutes") or []
             candidate_laws = [
                 law.strip()[:100]
