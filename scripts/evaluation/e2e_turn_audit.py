@@ -60,7 +60,7 @@ def evidence_snapshot(
 
     docs = list(documents)
     names = [str(getattr(doc, "original_filename", "") or "") for doc in docs]
-    if Counter(names) != Counter(expected):
+    if Counter(names) != Counter(expected.keys()):
         missing = sorted(set(expected).difference(names))
         extra = sorted(set(names).difference(expected))
         duplicates = sorted(name for name, count in Counter(names).items() if count > 1)
