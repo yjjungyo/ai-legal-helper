@@ -203,6 +203,31 @@ def _decision(intent, resolved, consultation_mode=ConsultationMode.GENERAL_LEGAL
     )
 
 
+def test_short_case_offer_is_not_forced_to_full_new_analysis(turn1_context):
+    """사건 상담이라도 지시 대상이 구체화된 짧은 수락은 FOLLOWUP_ACTION을 유지."""
+    turn1_context["current_question"] = "그래 해줘"
+    turn1_context["case_id"] = "case-42"
+    ctx = ConversationContext(**turn1_context)
+    response = AIMessage(content='''{
+      "intent": "FOLLOWUP_ACTION",
+      "consultation_mode": "CASE_EVIDENCE",
+      "categories": ["행정"],
+      "resolved_query": "2026년 11월 1일 계약에 관한 신고항목 체크리스트 작성",
+      "requires_specialist": false,
+      "requires_retrieval": false,
+      "requires_verification": true,
+      "requires_full_analysis": false
+    }''')
+    with patch("ai_legal_helper.agents.intent_analyzer.get_llm") as llm:
+        llm.return_value.invoke.return_value = response
+        decision = analyze_consultation_intent(
+            "그래 해줘", ctx, case_context="사건명: 임대차 계약", use_llm=True,
+        )
+    assert decision.intent == ConsultationIntent.FOLLOWUP_ACTION
+    assert decision.requires_retrieval is False
+    assert "체크리스트 작성" in decision.resolved_query
+
+
 def test_supervisor_semantic_followup_preserves_raw_question(turn1_context):
     turn1_context["current_question"] = "그래 해줘"
     task = "2026년 11월 1일 계약을 기준으로 신고항목 체크리스트 작성"
