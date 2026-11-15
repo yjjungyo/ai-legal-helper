@@ -62,6 +62,14 @@ def format_grounding_sources(
         ):
             if source.get(law_key) is not None:
                 meta[law_key] = source[law_key]
+        # [SUBSUMPTION-02 / Gemini] PRECEDENT는 판결문 내용 외에 법원,
+        # 사건번호, 선고일이 있어야 다른 사건에 대한 법리 적용 범위와
+        # 선후 시점을 해석할 수 있다. 조문 메타와 섞지 말고 판례만 유지.
+        # 법원·선고일이 누락된 판례를 임의로 추론해서 채우지 않는다.
+        if stype == "PRECEDENT":
+            for precedent_key in ("court", "case_number", "decision_date"):
+                if source.get(precedent_key):
+                    meta[precedent_key] = source[precedent_key]
 
         # 사건 증거 검토 상태 (단위 테스트 및 안전 인용 검증 호환)
         for rev_key in ("approval_scope", "approval_scope_label"):
@@ -339,6 +347,14 @@ def prune_sources_for_consultation(
 
     pruned_evidence_sources = []
     for src in non_statute_sources:
+        # [SUBSUMPTION-03] 판례는 상대방 사건의 사실관계·예외·반대법리가
+        # 판결 뒷부분에 존재할 수 있다. 150자 스니펫으로 축약하면
+        # 법률요건의 중요한 구별 사실이 소실되므로 공식 PRECEDENT 원문
+        # (API 조회시 제한한 내용 범위)은 *재작성* 시에도 유지한다.
+        # 사건증거/일반문서 경량화 규칙은 그대로 둔다.
+        if src.get("source_type") == "PRECEDENT":
+            pruned_evidence_sources.append(src)
+            continue
         is_cited = False
         sid = str(src.get("source_id") or "").strip().lower()
         if sid and sid in targeted_source_ids:
