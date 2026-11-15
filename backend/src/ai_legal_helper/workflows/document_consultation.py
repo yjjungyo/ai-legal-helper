@@ -14,7 +14,10 @@ from langchain_core.messages import AIMessage, HumanMessage
 from ai_legal_helper.agents.document_answer import write_document_answer
 from ai_legal_helper.observability.logging_config import get_logger
 from ai_legal_helper.rag.grounding_context import format_grounding_sources
-from ai_legal_helper.workflows.document_search import pending_searches, search_is_approved
+from ai_legal_helper.workflows.document_search import (
+    pending_searches, search_is_approved,
+    pending_precedent_searches, precedent_search_is_approved,
+)
 
 logger = get_logger(__name__)
 DOCUMENT_MODE = "DOCUMENT_GROUNDED"
@@ -351,17 +354,22 @@ def next_verification_step(state: Dict[str, Any]) -> str:
         route_reason = "검증 통과(PASS)"
     else:
         requests = pending_searches(state)
+        precedents = pending_precedent_searches(state)
         search_count = state.get("statute_search_count") or 0
         branched_statute = False
-        if requests and search_count < 2:
-            if search_is_approved(state, requests):
+        if (requests or precedents) and search_count < 2:
+            # [PRECEDENT-06 / Gemini 인계] 판례 단독 요청은 법령명이 없다는
+            # 이유로 승인/검색 루프에서 사라지면 안 된다. 동시에 승인되지 않은
+            # 공식 판례 API 호출이 발생하지 않도록 유형별로 HITL을 검사한다.
+            statutes_ok = not requests or search_is_approved(state, requests)
+            precedents_ok = not precedents or precedent_search_is_approved(state, precedents)
+            if statutes_ok and precedents_ok:
                 target_node = "execute_statute_search"
-                route_reason = f"승인된 신규 법령 요청({len(requests)}건) 즉시 검색"
+                route_reason = f"승인된 법령 {len(requests)}건·판례 {len(precedents)}건 검색"
                 branched_statute = True
             else:
-                # 과거 HITL 실행 여부가 아니라 이번 신규 검색 범위의 승인 여부로 판단한다.
                 target_node = "statute_search_approval"
-                route_reason = f"신규 법령({len(requests)}건) 사용자 승인(HITL) 요청"
+                route_reason = f"법령 {len(requests)}건·판례 {len(precedents)}건 승인 요청"
                 branched_statute = True
 
         if not branched_statute:
