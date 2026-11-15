@@ -39,7 +39,7 @@
 - 후속 원문 질문이 명확한데 윤곽이 없으면 **질문 그대로의 우선 Issue**를 반환하여 검색의 기준을 보호한다. 후속 질문에서 이미 결정된 기존 범용 쟁점들이 임의의 추가 쟁점이 되는 것보다 원문을 우선한다.
 - 특정 분야 규칙 또는 정규식 예외는 추가하지 않는다. 기존 `plan_legal_issues(question, briefing)`의 호출은 역호환 보존.
 - 가짜 증거 참조 식별 등 안전 검사는 의미 윤곽 경로에서도 잃지 않는다.
-- 생성된 `required_statutes`는 확보·검증되지 않은 후보를 요구사항으로 간주하는 현재 downstream 계약 특성상, 명시적으로 알려진 조문만 유효 형식일 때만 사용; 나머지는 `candidate_statutes`에 둔다. **인용 결론은 별도 검증 필수**.
+- `issue_verifier.py`의 현재 계약은 `required_statutes`를 실제 `retrieved_sources`와 대조하며, 이 목록이 비면 의미 기반 Issue는 법령 근거를 확인할 수 없어 항상 조건부 처리될 수 있다. 따라서 의미적으로 제안된 후보 조문을 `required_statutes`(검증 필요 목록) 및 `candidate_statutes`(검색 후보)에 같이 넣되 **`verified_statutes` 등 결과 목록은 절대 사전 채우지 않는다. 검색된 공식 조문과 대조하여야만 법률 근거가 성립한다. 후보가 없다면 안전하게 판단을 보류한다.**
 
 ### Workflow (`workflows/legal_workflow.py`)
 
