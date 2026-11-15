@@ -123,7 +123,7 @@ def test_legacy_first_turn_still_generates_existing_installment_issue():
 def test_other_domain_labor_rights_without_lease_pollution():
     question = "근로계약이 종료되어 미지급 임금과 퇴직금을 청구할 수 있나요?"
     issues = plan_legal_issues(
-        question, CaseEvidenceBriefing(case_id="labor-case", case_type="노동"),
+        question, CaseEvidenceBriefing(case_id="labor-case", title="임금 체불 상담", case_type="노동"),
         semantic_outlines=_semantic(
             "근로자가 미지급 임금 및 퇴직금을 청구하기 위한 요건은?",
             keys=["근로기간", "임금지급내역"],
@@ -140,7 +140,7 @@ def test_other_domain_labor_rights_without_lease_pollution():
 def test_auction_question_does_not_assume_senior_tenant():
     question = "2021년 근저당이 설정됐고 2023년 전입했습니다. 경매 후 낙찰자에게 청구 가능한가요?"
     issues = plan_legal_issues(
-        question, CaseEvidenceBriefing(case_id="auction-case", case_type="임대차"),
+        question, CaseEvidenceBriefing(case_id="auction-case", title="임대차 권리관계 상담", case_type="임대차"),
         semantic_outlines=_semantic(
             "담보권 설정과 임차인의 대항요건 취득 시점을 비교하여 매수인에게 대항 가능한가?",
             keys=["근저당권설정일", "전입신고일"],
