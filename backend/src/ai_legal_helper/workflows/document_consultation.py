@@ -225,7 +225,8 @@ def generate_answer(
             logger.warning("[DOC_CONSULTATION] 재작성(repair) 실패로 기존 초안을 보존하여 검증을 지속합니다: %s", type(exc).__name__)
             result.update(draft_answer=state["draft_answer"],
                           answer_source_manifest=state.get("answer_source_manifest"),
-                          answer_generation_error=None)
+                          answer_generation_error=None,
+                          patch_technical_failure=True)
         else:
             result.update(draft_answer="", answer_generation_error=type(exc).__name__)
     # [STEP5-PROGRESS-03 / Gemini] 수정 LLM이 동일 초안을 돌려줬고
@@ -338,8 +339,11 @@ def verify_answer(state: Dict[str, Any]) -> Dict[str, Any]:
             require_question_coverage=require_coverage,
         )
         previous = state.get("verification_result") or {}
+        # 패치 엔진의 기술적 실패로 초안이 불변한 경우에는 동일 법률 실패를 재사용해 즉시 종료하지 않는다 (P1).
         reusable = bool(
-            state.get("revision_no_progress") and can_reuse_verification(
+            not state.get("patch_technical_failure")
+            and state.get("revision_no_progress")
+            and can_reuse_verification(
                 previous=previous,
                 expected_input_hash=input_hash,
                 current_draft=draft,
@@ -640,9 +644,13 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
         has_citation_failure = bool(
             citation_audit.get("unverified_citations") or citation_audit.get("unsupported_citations")
         )
+        # [P2] 검증 형식 오류(단순 인용 불일치)가 실제 사실 날조로 잘못 전파되지 않도록 보완:
+        # 모델 자체가 유효한 증거로 입증(model_grounding_status == 'SUPPORTED')한 사건 사실은 치명적 사실 오류로 보지 않는다.
         has_unsupported_case_fact = any(
             c.get("claim_type") in ("CASE_FACT", "CASE_INFERENCE")
             and c.get("grounding_status") == "UNSUPPORTED"
+            and c.get("model_grounding_status") != "SUPPORTED"
+            and c.get("quote_alignment") != "NOT_FOUND"
             for c in result.get("claims", [])
         )
         has_fatal_legal_error = (

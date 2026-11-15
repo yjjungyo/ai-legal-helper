@@ -140,7 +140,7 @@ def find_unique_target_span(draft: str, target: str) -> tuple[int, int] | None:
     if len(matches) == 1:
         return matches[0].start(), matches[0].end()
 
-    # 3차: 마크다운 글머리 기호/소제목 라벨 변형 허용 후방 토큰 매칭
+    # 3차: 마크다운 글머리 기호/소제목 라벨 변형 또는 문두 부사 차이 허용 후방 토큰 매칭 (P1)
     target_is_bullet = bool(re.match(r"^\s*[-*+]\s|^\s*\d+\.\s|^\s*#{1,6}\s", target))
     max_drop = min(8, len(tokens) - 4)
 
@@ -158,8 +158,11 @@ def find_unique_target_span(draft: str, target: str) -> tuple[int, int] | None:
             draft_is_bullet = bool(re.match(r"^\s*[-*+]\s|^\s*\d+\.\s|^\s*#{1,6}\s", line_prefix))
             if target_is_bullet and draft_is_bullet:
                 return line_start, sub_end
+            elif not target_is_bullet:
+                # 글머리기호가 아닌 일반 문장인 경우에도 고유 매칭된 구간을 안전하게 반환
+                return sub_start, sub_end
 
-    # 4차: 후행 인용구/출처 표기 차이 허용 전방 토큰 매칭
+    # 4차: 후행 인용구/출처 표기 차이 허용 전방 토큰 매칭 (P1)
     for k in range(1, max_drop):
         sub_tokens = tokens[:-k]
         if len(" ".join(sub_tokens)) < 20:
@@ -172,6 +175,20 @@ def find_unique_target_span(draft: str, target: str) -> tuple[int, int] | None:
             line_end = len(draft) if line_end == -1 else line_end
             if target_is_bullet:
                 return sub_start, line_end
+            else:
+                return sub_start, sub_end
+
+    # 5차: 양단 미세 불일치(문두 접속어 + 문미 인용부호) 허용 양방향 토큰 매칭 (P1)
+    if len(tokens) >= 8:
+        for k_lead in (1, 2):
+            for k_trail in (1, 2):
+                sub_tokens = tokens[k_lead:-k_trail]
+                if len(" ".join(sub_tokens)) < 25:
+                    continue
+                sub_pat = r"\s+".join(re.escape(t) for t in sub_tokens)
+                sub_matches = list(re.finditer(sub_pat, draft))
+                if len(sub_matches) == 1:
+                    return sub_matches[0].start(), sub_matches[0].end()
 
     return None
 

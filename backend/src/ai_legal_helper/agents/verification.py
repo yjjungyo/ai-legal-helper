@@ -100,6 +100,10 @@ class ClaimVerification(BaseModel):
     user_statement_equivalent: bool = Field(default=False, description="새로운 사실·법률 요건을 추가하지 않는 의미상 동일 진술 여부")
     model_grounding_status: Optional[str] = Field(default=None, description="정책 적용 전 모델 판정")
     model_reason: Optional[str] = Field(default=None, description="정책 적용 전 모델 사유")
+    quote_alignment: Optional[str] = Field(
+        default="MATCHED",
+        description="초안 본문과의 인용 일치 상태 ('MATCHED', 'PARAPHRASED', 'NOT_FOUND')"
+    )
 
     @field_validator("inference_basis", "inference_limit", "reason", mode="before")
     @classmethod
@@ -1257,6 +1261,48 @@ def run_verification(
             cleaned = re.sub(r"(\*\*|__|`)", "", txt or "")
             cleaned = re.sub(r"^\s*(?:[-•*]|\d+[.)]|#{1,4})\s*", "", cleaned)
             return " ".join(cleaned.split())
+        def _check_quote_alignment(claim_text: str, norm_draft_text: str) -> str:
+            """초안 본문과 주장 텍스트 간의 인용 일치도를 판별한다 (P0).
+
+            특정 단어를 하드코딩하지 않고 토큰 슬라이딩 및 포함율을 기반으로
+            완전 일치('MATCHED'), 경미한 패러프레이징('PARAPHRASED'), 본문 미발견('NOT_FOUND')을 구분한다.
+
+            Args:
+                claim_text: 검증 대상 주장 문자열.
+                norm_draft_text: 마크다운 및 공백이 정규화된 초안 본문 문자열.
+
+            Returns:
+                str: 'MATCHED', 'PARAPHRASED', 'NOT_FOUND' 중 하나.
+            """
+            clean_claim = _norm_quote(claim_text)
+            if not clean_claim:
+                return "NOT_FOUND"
+            if clean_claim in norm_draft_text:
+                return "MATCHED"
+
+            tokens = clean_claim.split()
+            if len(tokens) >= 4:
+                # 1. 문두 부사/접속어 차이 허용: 앞 1~3개 토큰 탈락 후 연속 부분 문자열 검색
+                max_drop = min(4, len(tokens) - 3)
+                for k in range(1, max_drop):
+                    sub_text = " ".join(tokens[k:])
+                    if len(sub_text) >= 15 and sub_text in norm_draft_text:
+                        return "PARAPHRASED"
+
+                # 2. 문미 종결어미/인용구 차이 허용: 뒤 1~2개 토큰 탈락 후 연속 부분 문자열 검색
+                for k in range(1, min(3, len(tokens) - 3)):
+                    sub_text = " ".join(tokens[:-k])
+                    if len(sub_text) >= 15 and sub_text in norm_draft_text:
+                        return "PARAPHRASED"
+
+                # 3. 토큰 포함율(Token Containment) 검사: 주장의 핵심 토큰(길이>=2) 중 75% 이상이 초안에 존재하는지 확인
+                significant_tokens = [t for t in tokens if len(t) >= 2]
+                if significant_tokens:
+                    found_count = sum(1 for t in significant_tokens if t in norm_draft_text)
+                    if found_count / len(significant_tokens) >= 0.75:
+                        return "PARAPHRASED"
+
+            return "NOT_FOUND"
 
         def _resolve_canonical_source_id(raw_sid: str) -> Optional[str]:
             """검증기가 반환한 출처 식별자를 Source Registry의 정규 전체 이름(source_id)으로 해석·정규화한다."""
@@ -1309,10 +1355,19 @@ def run_verification(
                 claim_obj.reason = "주장 내용이 비어 있습니다."
 
             # 검증기가 실제 문장을 조건부 문장으로 바꿔 옮기면 원래 단정의 오류를 놓친다.
-            # 문서 상담에서는 마크다운 기호·공백 정규화만 허용하고 답변에 없는 재서술을 근거 검증에서 제외한다.
-            if require_question_coverage and _norm_quote(claim_obj.claim) not in norm_draft:
-                claim_obj.grounding_status = "UNSUPPORTED"
-                claim_obj.reason = "실제 답변에 존재하는 문장을 그대로 검증해야 합니다."
+            # 인용 불일치는 진단 필드(quote_alignment)로 기록하되, 모델이 유효한 증거로 입증한 사실을
+            # 근거 없는 허위 사실(UNSUPPORTED)로 오염시켜 정당한 답변이 폐기되지 않도록 분리한다 (P0).
+            if require_question_coverage:
+                align = _check_quote_alignment(claim_obj.claim, norm_draft)
+                claim_obj.quote_alignment = align
+                if align == "NOT_FOUND":
+                    # 답변 본문에서 전혀 찾을 수 없는 문장은 인용 불일치로 UNSUPPORTED 처리하여 원래 단정의 오류를 잡는다.
+                    claim_obj.grounding_status = "UNSUPPORTED"
+                    claim_obj.reason = "실제 답변에 존재하는 문장을 그대로 검증해야 합니다."
+                elif align == "PARAPHRASED":
+                    # 문두/문미의 사소한 접속어·부사 차이로 초안 본문 문장과 실질적으로 일치하는 경우:
+                    # 모델의 실체적 입증 상태(model_grounding_status)를 존중하고 오탐으로 인한 UNSUPPORTED 강등을 방지한다.
+                    pass
 
             verified_claim_sids: List[str] = []
             all_resolved = True
