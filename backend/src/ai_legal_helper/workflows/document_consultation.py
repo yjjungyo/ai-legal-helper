@@ -296,6 +296,9 @@ def verify_answer(state: Dict[str, Any]) -> Dict[str, Any]:
         len(sources),
     )
     reused_verifier = False
+    # [STEP5-FINAL-02 / Gemini] 검증 단계에서 실제 적용한 질문 Coverage
+    # 강도를 검증 결과에 보존. 예외 시에도 안전 기본값은 Full Coverage.
+    require_coverage = True
     try:
         if state.get("answer_generation_error") or not draft.strip():
             raise ValueError("ANSWER_GENERATION_FAILED")
@@ -362,6 +365,7 @@ def verify_answer(state: Dict[str, Any]) -> Dict[str, Any]:
                   "claims": [], "warnings": ["등록 자료와 답변의 대조를 완료하지 못했습니다."],
                   "missing_issues": [], "revision_instructions": []}
     result["verified_answer_sha256"] = hashlib.sha256(draft.encode("utf-8")).hexdigest()
+    result["required_question_coverage"] = require_coverage
     # [STEP5-PROGRESS-05] 구조화 결함 fingerprint는 출처가 달라지거나
     # 질문 충족·법령/판례 포섭 결과가 개선되면 바뀐다. 모델이 답변의
     # 표현만 다르게 쓰고 동일 결함을 반복하면 그 사실만 표시한다.
@@ -598,7 +602,10 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
         # 4단계 요건 포섭/인용 실패를 PASS로 바꾸지 않는다.
         # 실제 답변에 한계가 명시된 조건부 설명은 허용한다.
         coverage_items = result.get("question_coverage") or []
-        has_undisclosed_question_gap = any(
+        # 완전한 질문 답변 검증을 요구한 상담에서 coverage 배열이
+        # 없는데도 일부 사건 사실만 SUPPORTED인 이유로 PASS할 수 없다.
+        required_coverage = result.get("required_question_coverage") is True
+        has_undisclosed_question_gap = (required_coverage and not coverage_items) or any(
             isinstance(item, dict)
             and item.get("answered") is not True
             and not (
@@ -610,9 +617,17 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
             )
             for item in coverage_items
         )
-        has_consistency_failure = any(
+        consistency_items = result.get("consistency_checks") or {}
+        has_consistency_failure = (
+            required_coverage
+            and not all(
+                isinstance(consistency_items.get(name), dict)
+                and consistency_items[name].get("passed") is True
+                for name in ("opening_conclusion", "timeline", "expressed_intent", "provenance")
+            )
+        ) or any(
             isinstance(check, dict) and check.get("passed") is not True
-            for check in (result.get("consistency_checks") or {}).values()
+            for check in consistency_items.values()
         )
         application_audit = result.get("application_audit") or {}
         has_subsumption_failure = bool(
