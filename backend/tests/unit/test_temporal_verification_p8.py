@@ -294,3 +294,64 @@ def test_unconfirmed_snapshot_without_keyword_is_not_skipped():
         CAUTIOUS, [source()], temporal_resolution=result("UNCONFIRMED"),
     )
     assert gate.status == "CAUTION"
+
+
+def test_semantic_review_preserves_statute_dates_and_promotes_supported_pass():
+    """시행일 미도래 규정에 대해 의무가 적용되지 않는다고 서술한 초안은
+    _semantic_review에 날짜 메타데이터가 전달되어 정상 PASS로 승격되어야 한다."""
+    captured_evidence = {}
+
+    def mock_invoke(prompt):
+        nonlocal captured_evidence
+        payload = json.loads(prompt.split("\n", 1)[1])
+        captured_evidence = payload
+        return json.dumps({
+            "verdict": "SUPPORTED",
+            "claim_quote": "사건일 기준 미시행이므로 신고의무가 적용되지 않습니다.",
+            "source_quote": "제36조(임대차계약 신고)",
+            "explanation": "시행일 미도래 조항에 대한 정당한 미적용 서술",
+        })
+
+    statute_source = {
+        "source_type": "STATUTE",
+        "source_id": "S:200",
+        "law_id": "L1",
+        "version_id": "200",
+        "article": "제36조",
+        "promulgation_date": "2026-10-27",
+        "effective_date": "2027-04-28",
+        "article_effective_date": "2027-04-28",
+        "content": "제36조(임대차계약 신고) 임대사업자는 신고하여야 한다.",
+    }
+    gate = evaluate_temporal_answer_gate(
+        QUESTION,
+        "사건일 기준 미시행이므로 신고의무가 적용되지 않습니다.",
+        [statute_source],
+        temporal_resolution=result("NOT_APPLICABLE"),
+        review_invoke_fn=mock_invoke,
+    )
+    assert gate.status == "PASS"
+
+    # 1. official_sources에 effective_date 및 promulgation_date가 보존되었는지 검증
+    official_srcs = captured_evidence.get("official_sources", [])
+    assert len(official_srcs) == 1
+    assert official_srcs[0]["effective_date"] == "2027-04-28"
+    assert official_srcs[0]["promulgation_date"] == "2026-10-27"
+
+    # 2. apply_temporal_gate_to_verification이 이전 REVISE 상태를 PASS로 정상 승격하는지 검증
+    prev_result = {
+        "status": "REVISE",
+        "reason_code": "ANSWER_REVISION_REQUIRED",
+        "claims": [
+            {
+                "claim": "사건일 기준 미시행이므로 신고의무가 적용되지 않습니다.",
+                "claim_type": "LEGAL_APPLICATION",
+                "grounding_status": "SUPPORTED",
+                "source_ids": ["S:200"],
+            }
+        ],
+        "candidate_laws": [],
+    }
+    final_output = apply_temporal_gate_to_verification(prev_result, gate)
+    assert final_output["status"] == "PASS"
+    assert final_output["reason_code"] == "NONE"

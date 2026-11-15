@@ -108,6 +108,9 @@ def _semantic_review(
             "law_id": str(src.get("law_id") or ""),
             "version_id": str(src.get("version_id") or ""),
             "article": str(src.get("article") or ""),
+            "promulgation_date": str(src.get("promulgation_date") or ""),
+            "effective_date": str(src.get("effective_date") or src.get("article_effective_date") or ""),
+            "article_effective_date": str(src.get("article_effective_date") or src.get("effective_date") or ""),
             "content": str(src.get("content") or ""),
         }
         for src in sources if src.get("source_type") == "STATUTE"
@@ -141,6 +144,10 @@ def _semantic_review(
         "조문별 시행일과 부칙 적용례 및 경과규정에 비추어 검토하세요. "
         "단어 존재 여부로 긍정/부정을 분류하지 마세요. "
         "다른 개정 버전이나 다른 사건에 대한 조건부 설명을 현재 적용 주장과 혼동하지 마세요. "
+        "[핵심 검증 원칙 - 시행일 미도래 조항의 서술]: "
+        "temporal_decisions에 status: 'NOT_APPLICABLE'(사건일이 조문 시행일 이전)으로 명시된 조항은 사건일 당시에는 아직 시행되지 않은 법령입니다. "
+        "따라서 답변에서 해당 조항에 따른 의무나 신고항목이 '사건일 기준 아직 발생하지 않는다/적용되지 않는다/미시행이다'라고 결론짓는 것은 공식 증거 및 temporal_decisions에 부합하는 정상적인 판단(SUPPORTED)입니다. "
+        "조문 본문에 '...하여야 한다'고 규정되어 있더라도, 시행일 미도래로 미시행이라는 취지의 서술을 조문 본문과 배치된다는 형식적 이유로 CONTRADICTED로 판정해서는 절대 안 됩니다. "
         "답변의 시점 판단이 공식 근거와 모순되는 것이 분명한 경우에만 CONTRADICTED를 택하세요. "
         "그렇지 않거나 근거가 부족하면 UNCONFIRMED로 반환하세요. "
         "SUPPORTED 또는 CONTRADICTED 판정에는 답변 및 공식 원문의 정확한 인용을 "
@@ -378,10 +385,19 @@ def apply_temporal_gate_to_verification(
             w for w in output.get("warnings", [])
             if "시행일을 구조화하여 확정하지 못했습니다" not in w
             and "법령 개정 조문의 시행일과 계약 기준일이 일치하지 않아" not in w
+            and "초안을 수정 또는 판단 유보해야 합니다" not in w
         ]
-        if output.get("status") == "REVISE" and output.get("pre_temporal_status") == "PASS":
+        unsupported_claims = [
+            c for c in (output.get("claims") or [])
+            if isinstance(c, Mapping) and c.get("grounding_status") in ("UNSUPPORTED", "UNVERIFIED")
+        ]
+        if output.get("status") == "REVISE" and (
+            output.get("pre_temporal_status") == "PASS"
+            or (not unsupported_claims and not output.get("candidate_laws"))
+        ):
             output["status"] = "PASS"
             output["reason_code"] = "NONE"
+            output["recommended_action"] = "FINALIZE"
     elif gate.status == "BLOCK":
         output["status"] = "REVISE"
         output["reason_code"] = "TEMPORAL_SEMANTIC_CONTRADICTION"
@@ -490,8 +506,9 @@ def apply_temporal_gate_to_verification(
                 s_name = d.get("source_id") or d.get("article") or "법령 조문"
                 e_date = d.get("event_date") or "사건일"
                 cleaned_instructions.append(
-                    f"[시행일 미도래 규정 반영]: {s_name}은 사건일({e_date}) 기준 아직 시행되지 않은 미시행 규정이므로, "
-                    f"해당 조항에 따른 법적 의무(신고사항 등)가 발생하지 않음(적용되지 않음)을 결론에 명확히 반영하여 답변을 작성하세요."
+                    f"[시행일 미도래 규정 반영]: {s_name}은 사건일({e_date}) 기준 아직 시행되지 않은 미시행 규정(또는 개정 규정)이므로, "
+                    f"해당 조항(또는 신설·개정된 신고항목)에 따른 법적 의무·신고사항이 적용되지 않음을 답변에 정확히 반영하세요. "
+                    f"(단, 이미 시행 중이던 법률 자체나 기존 기본 의무의 존재를 전면 부인하지 않도록 조문 맥락에 맞게 서술하세요.)"
                 )
             output["revision_instructions"] = cleaned_instructions
         elif gate.status == "PASS":
