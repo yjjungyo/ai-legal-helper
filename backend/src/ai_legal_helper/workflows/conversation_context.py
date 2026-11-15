@@ -234,6 +234,50 @@ class ConversationContext(BaseModel):
 
         return messages
 
+    def format_context_for_resolution(self, max_turns: int = 3, max_chars: int = 3200) -> str:
+        """후속 질의의 *의미*를 복원할 때만 사용하는 작은 대화 맥락.
+
+        결론만 요약하면 답변 끝의 후속 작업 제안이 사라질 수 있다.
+        제안 단어/따옴표를 정규식으로 해석하지 않고, 실제 직전 답변의 말미를
+        원문 그대로 LLM에 참고시킨다. 이전 답변은 확정 사실/법률 근거가 아니다.
+        일반 작성·검증 프롬프트에 이 맥락을 다시 중복 삽입하지 않는다.
+        """
+        if not self.previous_turns:
+            return "(이전 상담 대화 없음 — 신규 대화)"
+
+        parts = [
+            "[이전 상담 맥락 — 대화 참조 전용]",
+            "과거 AI 답변은 잠정적 설명입니다. 승인된 최신 사건 사실/증거 및 법령이 우선합니다.",
+        ]
+        if self.case_memory:
+            parts.append(
+                f"사건: {str(self.case_memory.get('title') or '')[:100]} "
+                f"(분야: {str(self.case_memory.get('case_type') or '')[:40]})"
+            )
+        if self.conversation_summary:
+            parts.append(f"오래된 대화 요지: {self.conversation_summary[:350]}")
+
+        for turn in self.previous_turns[-max_turns:]:
+            conclusion = extract_answer_conclusion(turn.answer, max_chars=160)
+            parts.append(
+                f"턴 {turn.turn_index} / ID {turn.request_id}: "
+                f"사용자: {turn.question.strip()[:260]} / "
+                f"당시 답변 요지({turn.answer_status}): {conclusion}"
+            )
+
+        # 마지막 답변의 *말미*는 의미 판단에 필수다.
+        # 중간 답변 내용은 생략하되, 말미에 있는 제안·조건·선택지는 보존한다.
+        last_turn = self.previous_turns[-1]
+        last_text = self.last_answer or last_turn.answer or ""
+        tail_block = (
+            f"[직전 AI 답변 말미(턴 {last_turn.turn_index}, {last_turn.answer_status}; "
+            "대화 참조용·사실 확정 불가)]\n"
+            f"{last_text[-1100:]}"
+        )
+        prefix = "\n".join(parts)
+        remaining = max(0, max_chars - len(tail_block) - 1)
+        return prefix[:remaining] + "\n" + tail_block
+
     def format_context_for_prompt(self, max_turns: int = 3, max_chars_per_turn: int = 600) -> str:
         """프롬프트 템플릿(Router, Synthesizer 등)에 삽입하기 위한 마크다운 텍스트를 생성한다.
 

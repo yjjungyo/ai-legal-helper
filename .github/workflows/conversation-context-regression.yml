@@ -1,0 +1,43 @@
+name: Conversation Context Regression
+
+on:
+  pull_request:
+    paths:
+      - 'backend/src/ai_legal_helper/workflows/legal_workflow.py'
+      - 'backend/src/ai_legal_helper/workflows/conversation_context.py'
+      - 'backend/src/ai_legal_helper/agents/intent_analyzer.py'
+      - 'backend/tests/unit/test_multi_turn_followup_resolution.py'
+      - 'backend/tests/unit/test_conversation_context.py'
+      - 'backend/tests/unit/test_conversation_context_diet.py'
+      - '.github/workflows/conversation-context-regression.yml'
+  workflow_dispatch:
+
+jobs:
+  conversation-context:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - name: Install backend test environment
+        run: python -m pip install -e './backend[dev]'
+      - name: Python syntax / importable modules
+        run: |
+          python -m py_compile \
+            backend/src/ai_legal_helper/workflows/conversation_context.py \
+            backend/src/ai_legal_helper/agents/intent_analyzer.py \
+            backend/src/ai_legal_helper/workflows/legal_workflow.py \
+            backend/tests/unit/test_multi_turn_followup_resolution.py
+      - name: Multi-turn context and regression tests
+        run: |
+          PYTHONPATH=backend/src python -m pytest \
+            backend/tests/unit/test_multi_turn_followup_resolution.py \
+            backend/tests/unit/test_conversation_context.py \
+            backend/tests/unit/test_conversation_context_diet.py \
+            backend/tests/unit/test_intent_analyzer.py \
+            backend/tests/unit/test_adaptive_workflow.py \
+            -q
