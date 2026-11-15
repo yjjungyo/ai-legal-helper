@@ -53,6 +53,16 @@ class LegalState(MessagesState):
     answer_source_manifest: Optional[Dict[str, Any]]
     verification_result: Dict[str, Any]
     revision_count: int
+    # [STEP5-PROGRESS-01 / Gemini] LangGraph Checkpointer가 턴 내부에서
+    # 검증 결함의 재발·수정 초안 불변·공식 법령/판례 검색 신규 근거 0건을
+    # 추적한다. 새 턴 Supervisor에서 모두 초기화하고 법적 판단 자체를
+    # SHA/정규식으로 대체하지 않는다.
+    verification_progress_history: Optional[List[str]] = None
+    verification_no_progress: Optional[bool] = None
+    verification_reused: Optional[bool] = None
+    revision_no_progress: Optional[bool] = None
+    search_delta_count: Optional[int] = None
+    search_added_source_ids: Optional[List[str]] = None
     cited_sources: Optional[List[Dict[str, Any]]] = None
     final_answer: str
     warnings: List[str]
