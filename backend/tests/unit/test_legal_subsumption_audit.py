@@ -254,3 +254,75 @@ def test_semantic_auction_timeline_unknown_does_not_become_senior_tenant(sources
     c["conclusion_status"] = "CONDITIONAL"
     c["condition_in_answer"] = "근저당과 전입신고 효력 발생 시점에 따라"
     assert audit([make_claim(SC013_EFFECT)], [c], sources, answer=SC013_EFFECT)["status"] == "PASS"
+
+
+def test_verifier_integration_blocks_pass_when_application_check_missing(sources):
+    """출처 ID가 맞고 모델이 PASS라 해도 핵심 포섭 누락이면 REVISE."""
+    import json
+    from unittest.mock import MagicMock, patch
+    from ai_legal_helper.agents.verification import run_verification
+
+    reply = {
+        "status": "PASS", "reason_code": "NONE", "recommended_action": "FINALIZE",
+        "claims": [{
+            "claim": SC012_EFFECT, "claim_type": "LEGAL_APPLICATION",
+            "fact_status": "VERIFIED_FACT",
+            "source_ids": ["STATUTE:CIVIL", "E03_상속관계.txt"],
+            "grounding_status": "SUPPORTED", "reason": "법령 및 사건 자료 확인",
+        }],
+        "application_checks": [],
+        "question_coverage": [{"question": "법률 책임 범위", "answered": True, "reason": "답변함"}],
+        "consistency_checks": {
+            name: {"passed": True, "reason": "근거 대조", "source_ids": ["E03_상속관계.txt"]}
+            for name in ("opening_conclusion", "timeline", "expressed_intent", "provenance")
+        },
+    }
+    llm = MagicMock()
+    llm.invoke.return_value.content = json.dumps(reply, ensure_ascii=False)
+    qa = MagicMock(status="PASS", requires_llm_eval=True, legal_risk_passed=True,
+                   citation_audit={}, preserved_points=[], repair_targets=[])
+    qa.model_dump.return_value = {"status": "PASS"}
+    with patch("ai_legal_helper.llm.gateway.get_llm", return_value=llm), \
+         patch("ai_legal_helper.agents.qa_checker.check_deterministic_qa", return_value=qa):
+        result = run_verification("상속인에게 반환채무 청구가 가능한가요?", SC012_EFFECT,
+                                  sources, case_context="사건이 등록됨", require_question_coverage=True)
+    assert llm.invoke.call_count == 1
+    assert result["application_audit"]["failed_claims"] == 1
+    assert result["status"] != "PASS"
+    assert result["claims"][0]["grounding_status"] == "UNSUPPORTED"
+
+
+def test_verifier_integration_accepts_supported_check_without_extra_llm(sources):
+    """요건포섭을 추가한 기존 1회 검증 응답을 정상 처리(추가 노드/호출 없음)."""
+    import json
+    from unittest.mock import MagicMock, patch
+    from ai_legal_helper.agents.verification import run_verification
+
+    reply = {
+        "status": "PASS", "reason_code": "NONE", "recommended_action": "FINALIZE",
+        "claims": [{
+            "claim": SC012_EFFECT, "claim_type": "LEGAL_APPLICATION",
+            "fact_status": "VERIFIED_FACT", "source_ids": ["STATUTE:CIVIL", "E03_상속관계.txt"],
+            "grounding_status": "SUPPORTED", "reason": "법령 및 사건 자료 확인",
+        }],
+        "application_checks": [make_check()],
+        "question_coverage": [{"question": "법률 책임 범위", "answered": True, "reason": "답변함"}],
+        "consistency_checks": {
+            name: {"passed": True, "reason": "근거 대조", "source_ids": ["E03_상속관계.txt"]}
+            for name in ("opening_conclusion", "timeline", "expressed_intent", "provenance")
+        },
+    }
+    llm = MagicMock()
+    llm.invoke.return_value.content = json.dumps(reply, ensure_ascii=False)
+    qa = MagicMock(status="PASS", requires_llm_eval=True, legal_risk_passed=True,
+                   citation_audit={}, preserved_points=[], repair_targets=[])
+    qa.model_dump.return_value = {"status": "PASS"}
+    with patch("ai_legal_helper.llm.gateway.get_llm", return_value=llm), \
+         patch("ai_legal_helper.agents.qa_checker.check_deterministic_qa", return_value=qa):
+        result = run_verification("상속인에게 반환채무 청구가 가능한가요?", SC012_EFFECT,
+                                  sources, case_context="사건이 등록됨", require_question_coverage=True)
+    assert llm.invoke.call_count == 1
+    assert result["application_audit"]["passed_claims"] == 1
+    assert result["application_audit"]["failed_claims"] == 0
+    # PASS 여부는 포섭 체인 존재 외에 다른 인용·시행일·질문 충족 검사가 함께 결정.
+    assert result["status"] != "INSUFFICIENT"
