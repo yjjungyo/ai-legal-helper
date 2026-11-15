@@ -460,7 +460,20 @@ def next_verification_step(state: Dict[str, Any]) -> str:
                 branched_statute = True
 
         if not branched_statute:
-            if result.get("status") in ("REVISE", "INSUFFICIENT") and (state.get("revision_count") or 0) < 3:
+            # [STEP5-PROGRESS-06 / Gemini] 첫 검증 실패는 고칠 기회를
+            # 주되, 동일한 원문·같은 법률요건/인용 결함이 재발했거나
+            # 재작성 모델이 실제로 동일 초안을 되돌려 줬다면
+            # 세 번을 기계적으로 소비하지 않는다. 먼저 *새로운 판례·
+            # 법령 검색 요청*을 검사한 뒤에만 무진전 종료를 적용하므로
+            # 필요한 공식 검색을 생략하지 않는다.
+            if state.get("verification_no_progress"):
+                if state.get("draft_answer") and result.get("claims"):
+                    target_node = "finalize"
+                    route_reason = "동일한 검증 결함 재발: 최종 안전검사로 종료"
+                else:
+                    target_node = "insufficient"
+                    route_reason = "동일한 검증 결함 재발: 확보된 답변 근거 없음"
+            elif result.get("status") in ("REVISE", "INSUFFICIENT") and (state.get("revision_count") or 0) < 3:
                 target_node = "revise"
                 route_reason = f"답변 보강 재작성 ({state.get('revision_count', 0) + 1}/3회)"
             else:
