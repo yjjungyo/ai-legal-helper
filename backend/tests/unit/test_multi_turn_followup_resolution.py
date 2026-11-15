@@ -7,9 +7,9 @@ E2E 3턴 연속 상담 평가에서 발견된 멀티턴 문맥 절삭 및 단문
 의도 판정 실패, 질의 복원 부재, 무한 제안 루프를 방지하는 최소 수정 로직을 엄격히 검증한다.
 
 [주요 검증 항목]
-1. `_is_short_followup_request`: 첫 턴 단문과 연속 대화 단문 수락을 정확히 구분하는지 검증
-2. `_resolve_multi_turn_task`: 직전 AI 답변의 제안 문구와 원래 1턴 루트 질문의 기준일을 올바르게 복원하는지 검증
-3. 다중 턴 추적: 3턴 연속 단문 질의 시 1턴 루트 질문 및 직전 작업 명칭을 역추적하여 재정리 질의를 구성하는지 검증
+1. 기존 Intent Analyzer를 이용해 직전 답변 제안과 현재 단문을 의미적으로 연결하는지 검증
+2. 기존 응답의 끝부분·검증 상태 보존 및 새로운 쟁점의 오염 방지 검증
+3. 후속 질문에서도 현재 사건 증거와 쟁점을 다시 로딩하는지 검증
 4. `supervisor_initialize_node`: 단문 후속 질의에서 intent=FOLLOWUP_ACTION 및 resolved_query, event_date 보존 검증
 5. `synthesizer._format_last_answer_context`: 직전 답변 말미의 제안 문장이 프롬프트에서 절삭되지 않고 보존되는지 검증
 6. `synthesizer`: 후속 질의 작성 시 말미의 반복적 제안 문구("원하시면 ~정리해드리겠습니다") 후처리 제거 검증
@@ -20,10 +20,11 @@ from unittest.mock import MagicMock, patch
 from langchain_core.messages import HumanMessage, AIMessage
 
 from ai_legal_helper.workflows.legal_workflow import (
-    _is_short_followup_request,
-    _extract_proposal_from_answer,
-    _resolve_multi_turn_task,
-    supervisor_initialize_node,
+    supervisor_initialize_node, supervisor_condition,
+)
+from ai_legal_helper.workflows.conversation_context import ConversationContext
+from ai_legal_helper.agents.intent_analyzer import (
+    IntentDecision, ConsultationMode, analyze_consultation_intent,
 )
 from ai_legal_helper.agents.synthesizer import (
     _format_last_answer_context,
@@ -49,6 +50,7 @@ def turn1_context():
     )
     return {
         "conversation_id": "conv-test-1234",
+        "current_question": "그래 해줘",
         "turn_index": 1,
         "previous_turns": [
             {
@@ -78,6 +80,7 @@ def turn2_context(turn1_context):
     )
     ctx = dict(turn1_context)
     ctx["turn_index"] = 2
+    ctx["current_question"] = "그래 정리해줘"
     ctx["previous_turns"] = list(turn1_context["previous_turns"]) + [
         {
             "turn_index": 2,
@@ -93,107 +96,180 @@ def turn2_context(turn1_context):
 
 
 # ---------------------------------------------------------------------------
-# 1. 단문 후속 질의 감지 및 제안 문구 추출 단위 테스트
+# 1. 의미 기반 문맥 복원: 기존 LLM 분석기를 재사용하며 정규식 제안 추출 금지
 # ---------------------------------------------------------------------------
 
-def test_is_short_followup_request_positive(turn1_context):
-    """이전 대화가 존재하고 사용자가 단문 동의/수락/정리 발언을 할 때 정확히 감지한다."""
-    assert _is_short_followup_request("그래 해줘", turn1_context) is True
-    assert _is_short_followup_request("응 해줘", turn1_context) is True
-    assert _is_short_followup_request("네 해주세요", turn1_context) is True
-    assert _is_short_followup_request("그래 정리해줘", turn1_context) is True
-    assert _is_short_followup_request("체크리스트 정리해줘", turn1_context) is True
-    assert _is_short_followup_request("체크리스트 줘", turn1_context) is True
-    assert _is_short_followup_request("그렇게 진행해줘", turn1_context) is True
+def test_resolution_context_keeps_actual_last_offer(turn1_context):
+    """결론 앞부분만 잘라 제안이 누락되는 오류를 방지한다."""
+    turn1_context["current_question"] = "그래 해줘"
+    ctx = ConversationContext(**turn1_context)
+    prompt_ctx = ctx.format_context_for_resolution()
+    assert "2026.11.1 계약 기준 실제 신고항목 체크리스트" in prompt_ctx
+    assert "과거 AI 답변은 잠정적 설명" in prompt_ctx
+    assert "직전 AI 답변 말미" in prompt_ctx
+    assert len(prompt_ctx) <= 3200
 
 
-def test_is_short_followup_request_negative_cases(turn1_context):
-    """첫 질문이거나 새로운 독립 질문, 인사말, 사실 정정 발언은 후속 단문으로 오판하지 않는다."""
-    # 1. 이전 대화 맥락이 없는 경우 (첫 턴 단문 질문 보호)
-    assert _is_short_followup_request("그래 해줘", None) is False
-    assert _is_short_followup_request("보증금 반환 언제까지?", None) is False
-    assert _is_short_followup_request("안녕하세요", None) is False
-
-    # 2. 이전 대화가 있더라도 단순 인사말인 경우
-    assert _is_short_followup_request("감사합니다 수고하세요", turn1_context) is False
-    assert _is_short_followup_request("고마워", turn1_context) is False
-
-    # 3. 새로운 독립적 법률 질문이 입력된 경우
-    assert _is_short_followup_request("그런데 임대인이 파산하면 어떻게 되나요?", turn1_context) is False
-    assert _is_short_followup_request("소송 비용은 얼마 정도 드나요?", turn1_context) is False
+def test_resolution_context_preserves_withheld_state(turn1_context):
+    turn1_context["current_question"] = "그다음은?"
+    turn1_context["previous_turns"][-1]["answer_status"] = "WITHHELD"
+    turn1_context["last_answer_status"] = "WITHHELD"
+    ctx = ConversationContext(**turn1_context)
+    prompt_ctx = ctx.format_context_for_resolution()
+    assert "WITHHELD" in prompt_ctx
+    assert "사실 확정 불가" in prompt_ctx
 
 
-def test_extract_proposal_from_answer():
-    """답변 원문의 말미에서 따옴표 제안 문구 및 체크리스트 키워드를 정확히 추출한다."""
-    ans1 = "요약 결론입니다.\n\n원하시면 제가 이어서 “2026.11.1 계약 기준 실제 신고항목 체크리스트”로 1분 요약해드리겠습니다."
-    assert _extract_proposal_from_answer(ans1) == "2026.11.1 계약 기준 실제 신고항목 체크리스트"
-
-    ans2 = "원하시면 '임대사업자용 임대차계약 신고 체크리스트' 형태로 한눈에 정리해드리겠습니다."
-    assert _extract_proposal_from_answer(ans2) == "임대사업자용 임대차계약 신고 체크리스트"
-
-    ans3 = "추가 안내입니다.\n\n필요하시면 임대차계약 신고 준비를 위한 체크리스트 형태로 정리해 드릴 수 있습니다."
-    extracted3 = _extract_proposal_from_answer(ans3)
-    assert extracted3 is not None
-    assert "체크리스트" in extracted3
-
-
-# ---------------------------------------------------------------------------
-# 2. 다중 턴 작업 복원 및 기준일 계승 테스트
-# ---------------------------------------------------------------------------
-
-def test_resolve_multi_turn_task_turn2(turn1_context):
-    """Turn 2: '그래 해줘' 입력 시 Turn 1 제안과 기준일을 결합하여 구체적 작업으로 복원한다."""
-    resolved_q, event_date = _resolve_multi_turn_task("그래 해줘", turn1_context)
-    assert "체크리스트" in resolved_q
-    assert "작성" in resolved_q
-    assert event_date == "2026-11-01"
-
-
-def test_resolve_multi_turn_task_turn3(turn2_context):
-    """Turn 3: '그래 정리해줘' 입력 시 다중 턴을 역추적하여 직전 작성물을 간결하게 재정리하는 질의로 복원한다."""
-    resolved_q, event_date = _resolve_multi_turn_task("그래 정리해줘", turn2_context)
-    assert "재정리" in resolved_q or "정리" in resolved_q
-    assert "체크리스트" in resolved_q
-    assert event_date == "2026-11-01"
+def test_semantic_intent_prompt_receives_last_offer(turn1_context):
+    """LLM에 실제 말미 제안과 현재 원문이 함께 전달되는지 검증."""
+    turn1_context["current_question"] = "그래 해줘"
+    ctx = ConversationContext(**turn1_context)
+    response = AIMessage(content="""{
+      "intent": "FOLLOWUP_ACTION",
+      "consultation_mode": "GENERAL_LEGAL",
+      "categories": ["행정"],
+      "resolved_query": "2026년 11월 1일 계약을 기준으로 신고항목 체크리스트 작성",
+      "requires_specialist": false,
+      "requires_retrieval": false,
+      "requires_verification": true,
+      "requires_full_analysis": false,
+      "event_date": "2026-11-01",
+      "event_type": "CONTRACT_SIGNED",
+      "statute_mention_date": null
+    }""")
+    with patch("ai_legal_helper.agents.intent_analyzer.get_llm") as mock_llm:
+        mock_llm.return_value.invoke.return_value = response
+        decision = analyze_consultation_intent("그래 해줘", ctx, use_llm=True)
+    sent_prompt = mock_llm.return_value.invoke.call_args[0][0]
+    assert "실제 신고항목 체크리스트" in sent_prompt
+    assert "그래 해줘" in sent_prompt
+    assert decision.intent == ConsultationIntent.FOLLOWUP_ACTION
+    assert decision.event_date == "2026-11-01"
+    assert decision.resolved_query.endswith("체크리스트 작성")
 
 
-# ---------------------------------------------------------------------------
-# 3. supervisor_initialize_node 통합 동작 테스트
-# ---------------------------------------------------------------------------
+def _decision(intent, resolved, consultation_mode=ConsultationMode.GENERAL_LEGAL,
+              event_date=None, categories=None):
+    """실제 LLM 출력 파싱과 분리해 Supervisor 전파·사건 로딩을 테스트한다."""
+    return IntentDecision(
+        intent=intent,
+        consultation_mode=consultation_mode,
+        categories=categories or ["행정"],
+        resolved_query=resolved,
+        event_date=event_date,
+        requires_verification=True,
+    )
 
-def test_supervisor_initialize_node_restores_followup_query(turn1_context):
-    """supervisor_initialize_node가 단문 '그래 해줘'를 FOLLOWUP_ACTION 및 복원 질의로 설정한다."""
-    state = {
-        "question": "그래 해줘",
-        "conversation_context": turn1_context,
-        "conversation_id": "conv-test-1234",
-        "turn_index": 2,
-    }
 
-    out = supervisor_initialize_node(state)
-
-    assert out["intent"] == ConsultationIntent.FOLLOWUP_ACTION.value
-    assert "체크리스트" in out["resolved_query"]
-    assert out["event_date"] == "2026-11-01"
-    assert out["intent_decision"]["resolved_query"] == out["resolved_query"]
+def test_supervisor_semantic_followup_preserves_raw_question(turn1_context):
+    turn1_context["current_question"] = "그래 해줘"
+    task = "2026년 11월 1일 계약을 기준으로 신고항목 체크리스트 작성"
+    with patch("ai_legal_helper.workflows.legal_workflow.analyze_consultation_intent",
+               return_value=_decision(ConsultationIntent.FOLLOWUP_ACTION, task,
+                                      event_date="2026-11-01")) as analyzer:
+        out = supervisor_initialize_node({
+            "question": "그래 해줘",
+            "conversation_context": turn1_context,
+            "conversation_id": "conv-test-1234",
+            "turn_index": 2,
+        })
+    assert analyzer.call_args.kwargs["use_llm"] is True
+    assert out["question"] == "그래 해줘"
+    assert out["resolved_query"] == task
+    assert out["intent"] == "FOLLOWUP_ACTION"
     assert out["intent_decision"]["event_date"] == "2026-11-01"
+    assert out["retrieved_sources"] == []  # 이전 조문을 최신 법령 근거로 자동 확정 금지
 
 
-def test_supervisor_initialize_node_first_turn_short_not_followup():
-    """첫 턴에 단문이 들어왔을 때 후속 질의로 오분류되지 않고 정상 신규 질문으로 처리된다."""
-    state = {
-        "question": "보증금 반환 방법",
-        "conversation_context": None,
-        "conversation_id": "conv-new-1",
-        "turn_index": 1,
-    }
+def test_supervisor_new_question_does_not_inherit_old_offer(turn1_context):
+    turn1_context["current_question"] = "회사의 근로계약 해지에 대해 알려줘"
+    question = turn1_context["current_question"]
+    with patch("ai_legal_helper.workflows.legal_workflow.analyze_consultation_intent",
+               return_value=_decision(ConsultationIntent.NEW_LEGAL_ANALYSIS, question,
+                                      categories=["노동"])):
+        out = supervisor_initialize_node({
+            "question": question, "conversation_context": turn1_context,
+        })
+    assert out["resolved_query"] == question
+    assert out["categories"] == ["노동"]
+    assert "체크리스트" not in out["resolved_query"]
 
-    out = supervisor_initialize_node(state)
 
+def test_supervisor_no_offer_does_not_fabricate_task(turn1_context):
+    turn1_context["current_question"] = "네"
+    turn1_context["previous_turns"][-1]["answer"] = "분석은 여기까지입니다."
+    turn1_context["last_answer"] = "분석은 여기까지입니다."
+    with patch("ai_legal_helper.workflows.legal_workflow.analyze_consultation_intent",
+               return_value=_decision(ConsultationIntent.NEEDS_CLARIFICATION, "네",
+                                      categories=[])):
+        out = supervisor_initialize_node({
+            "question": "네", "conversation_context": turn1_context,
+        })
+    assert out["resolved_query"] == "네"
+    assert out["intent"] == "NEEDS_CLARIFICATION"
+    assert supervisor_condition(out) == "routing_exit"
+
+
+def test_supervisor_first_turn_short_is_not_followup():
+    with patch("ai_legal_helper.workflows.legal_workflow.analyze_consultation_intent") as analyzer:
+        out = supervisor_initialize_node({
+            "question": "보증금 반환 방법",
+            "conversation_context": None,
+            "conversation_id": "conv-new-1",
+            "turn_index": 1,
+        })
+    analyzer.assert_not_called()
     assert out["intent"] == ConsultationIntent.NEW_LEGAL_ANALYSIS.value
     assert out["resolved_query"] == "보증금 반환 방법"
 
 
+def test_followup_case_reloads_current_evidence_and_plans_issues(turn1_context):
+    """이전에는 FOLLOWUP_ACTION 분기가 최신 승인 증거를 읽지 않는 결함이 있었다."""
+    turn1_context["current_question"] = "그럼 지금 이사해도 될까?"
+    turn1_context["case_id"] = "case-42"
+    question = "임대차 보증금 미반환 사건에서 이사 시 권리 유지 요건 검토"
+    d = _decision(ConsultationIntent.FOLLOWUP_QUESTION, question,
+                  consultation_mode=ConsultationMode.CASE_EVIDENCE,
+                  categories=["민법"])
+    briefing = MagicMock()
+    briefing.model_dump.return_value = {
+        "source_documents": [
+            {"review_status": "APPROVED", "document_name": "E01_계약서.txt",
+             "content": "최신 승인 원문"}
+        ],
+        "source_registry": {
+            "E01": {"source_id": "E01", "content": "최신 승인 원문"}
+        },
+    }
+    briefing.source_registry = {"E01": {"source_id": "E01", "content": "최신 승인 원문"}}
+    briefing.formatted_summary = "최신 승인 사실: 계약 종료 및 보증금 미반환"
+    issue = MagicMock()
+    issue.model_dump.return_value = {"issue_id": "issue-1", "issue_title": "이사 시 권리"}
+    with patch("ai_legal_helper.workflows.legal_workflow.analyze_consultation_intent",
+               return_value=d), \
+         patch("ai_legal_helper.database.session.SessionLocal") as session, \
+         patch("ai_legal_helper.case_intelligence.case_briefing.build_case_evidence_briefing",
+               return_value=briefing) as build, \
+         patch("ai_legal_helper.workflows.issue_planner.plan_legal_issues",
+               return_value=[issue]) as planner:
+        out = supervisor_initialize_node({
+            "question": "그럼 지금 이사해도 될까?",
+            "conversation_context": turn1_context,
+            "case_id": "case-42",
+        })
+    build.assert_called_once()
+    assert build.call_args.args[2] == question
+    assert planner.call_args.args[0] == question
+    assert out["answer_mode"] == "DOCUMENT_GROUNDED"
+    assert out["case_context"] == briefing.formatted_summary
+    assert len(out["issue_tasks"]) == 1
+    assert out["case_evidence_sources"] == [{"source_id": "E01"}]
+    session.return_value.close.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# 2. 기존 Synthesizer 및 후속 재작성 로직의 회귀검증
+# ---------------------------------------------------------------------------
 # ---------------------------------------------------------------------------
 # 4. Synthesizer 맥락 보존 및 무한 제안 루프 차단 테스트
 # ---------------------------------------------------------------------------
