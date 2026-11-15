@@ -19,8 +19,37 @@ from ai_legal_helper.workflows.document_consultation import DOCUMENT_MODE
 
 
 @pytest.mark.asyncio
-async def test_stage2_local_first_prefetch_civil_execution_act():
-    """쟁점 계획의 민사집행법 제91조가 로컬 인덱스에서 정상 사전 적재되는지 검증."""
+async def test_stage2_local_first_prefetch_civil_execution_act(monkeypatch):
+    """법률 쟁점 사전 적재를 *인덱스가 없는 CI에서도* 계약 수준으로 검증한다.
+
+    [REGRESSION-INDEX-01 / Gemini] 실제 ChromaDB 컬렉션이 설치돼 있어야
+    PASS하는 테스트는 코드의 정확성보다 개발자 컴퓨터 상태를 검증한다.
+    실제 검색 서비스는 별도 통합 E2E에서 시험하고, 여기서는 Local-First
+    조회가 정확한 법률명/조문으로 요청되고 반환 출처를 병합하는지 확인.
+    """
+    from ai_legal_helper.rag.retrieval import RetrievalResult, RetrievalStatus
+
+    monkeypatch.setattr(
+        "ai_legal_helper.rag.retrieval.retrieve_with_status",
+        lambda **_kw: RetrievalResult(status=RetrievalStatus.NO_MATCH),
+    )
+    prefetch_calls = []
+
+    def fake_local_index(*, law_name, articles=None, **_kwargs):
+        prefetch_calls.append((law_name, tuple(articles or [])))
+        if law_name == "민사집행법" and "제91조" in (articles or []):
+            return [{
+                "source_id": "LOCAL:민사집행법:제91조",
+                "source_type": "STATUTE", "statute_name": law_name,
+                "article": "제91조", "content": "민사집행법 제91조 경매 매각의 법률 요건",
+                "retrieval_method": "LOCAL_INDEX",
+            }]
+        return []
+
+    monkeypatch.setattr(
+        "ai_legal_helper.workflows.document_search._retrieve_from_local_index",
+        fake_local_index,
+    )
     state = {
         "question": "경매가 진행되면 보증금을 낙찰자에게 받을 수 있나요?",
         "answer_mode": DOCUMENT_MODE,
@@ -50,6 +79,8 @@ async def test_stage2_local_first_prefetch_civil_execution_act():
     }
 
     result = await run_agents_node(state)
+    assert any(name == "민사집행법" and "제91조" in articles
+               for name, articles in prefetch_calls), "계획된 핵심 조문이 로컬 인덱스에 요청되어야 한다."
     sources = result.get("retrieved_sources", [])
     assert len(sources) > 0, "검색 출처가 확보되어야 한다."
 
