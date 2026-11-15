@@ -528,6 +528,15 @@ def supervisor_initialize_node(state: LegalState) -> Dict:
         "answer_generation_error": None,
         "answer_source_manifest": None,
         "revision_count": 0,
+        # [STEP5-PROGRESS-02 / Gemini] 하나의 법률 상담 안에서만 적용되는
+        # 검증 진행 해시/검색 신규 출처/무변경 상태. 같은 LangGraph thread의
+        # 과거 턴과 혼합하면 이번 질문의 정상 검증을 조기 종료할 위험이 있다.
+        "verification_progress_history": [],
+        "verification_no_progress": False,
+        "verification_reused": False,
+        "revision_no_progress": False,
+        "search_delta_count": None,
+        "search_added_source_ids": [],
         "warnings": [],
         "retrieved_sources": initial_sources,
         "case_context": case_context,
