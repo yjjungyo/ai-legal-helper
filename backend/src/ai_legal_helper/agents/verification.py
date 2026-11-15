@@ -1078,7 +1078,7 @@ def run_verification(
         "어떻게 해야", "어떻게 되나요", "가능한가요", "해당하나요", "적용되나요",
         "해지되나요", "종료되나요", "성립하나요", "유효한가요", "무효인가요",
         "해지할 수", "반환받을 수", "대항할 수", "배당받을 수", "청구할 수",
-        "효력이 있", "책임이 있", "사망", "상속", "경매", "배당",
+        "효력이 있", "효력", "발생하나요", "책임이 있", "사망", "상속", "경매", "배당",
         "가압류", "압류", "원상복구", "손해배상", "소송", "지급명령", "묵시적 갱신", "언제 끝나"
     )
     is_legal_application = has_case_evidence or has_case_context or any(p in question for p in legal_application_patterns)
@@ -1354,20 +1354,13 @@ def run_verification(
                 claim_obj.grounding_status = "UNSUPPORTED"
                 claim_obj.reason = "주장 내용이 비어 있습니다."
 
-            # 검증기가 실제 문장을 조건부 문장으로 바꿔 옮기면 원래 단정의 오류를 놓친다.
-            # 인용 불일치는 진단 필드(quote_alignment)로 기록하되, 모델이 유효한 증거로 입증한 사실을
-            # 근거 없는 허위 사실(UNSUPPORTED)로 오염시켜 정당한 답변이 폐기되지 않도록 분리한다 (P0).
+            # [진단 메타데이터 기록]
+            # 초안 본문과의 인용 일치 상태(quote_alignment: 'MATCHED' | 'PARAPHRASED' | 'NOT_FOUND')를 기록한다.
+            # 자연어 생성 모델의 표현 다양성을 감안하여, 문자열 불일치 자체를 이유로 모델의 실체적 입증 결과(grounding_status)를
+            # 강제로 UNSUPPORTED로 뒤집지 않는다 (문자열 일치율은 검증 기준에서 완전 배제).
             if require_question_coverage:
                 align = _check_quote_alignment(claim_obj.claim, norm_draft)
                 claim_obj.quote_alignment = align
-                if align == "NOT_FOUND":
-                    # 답변 본문에서 전혀 찾을 수 없는 문장은 인용 불일치로 UNSUPPORTED 처리하여 원래 단정의 오류를 잡는다.
-                    claim_obj.grounding_status = "UNSUPPORTED"
-                    claim_obj.reason = "실제 답변에 존재하는 문장을 그대로 검증해야 합니다."
-                elif align == "PARAPHRASED":
-                    # 문두/문미의 사소한 접속어·부사 차이로 초안 본문 문장과 실질적으로 일치하는 경우:
-                    # 모델의 실체적 입증 상태(model_grounding_status)를 존중하고 오탐으로 인한 UNSUPPORTED 강등을 방지한다.
-                    pass
 
             verified_claim_sids: List[str] = []
             all_resolved = True

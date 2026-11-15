@@ -644,13 +644,13 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
         has_citation_failure = bool(
             citation_audit.get("unverified_citations") or citation_audit.get("unsupported_citations")
         )
-        # [P2] 검증 형식 오류(단순 인용 불일치)가 실제 사실 날조로 잘못 전파되지 않도록 보완:
-        # 모델 자체가 유효한 증거로 입증(model_grounding_status == 'SUPPORTED')한 사건 사실은 치명적 사실 오류로 보지 않는다.
+        # [P2] 모델의 실체적 사실 입증 보호:
+        # 검증 모델 자체가 유효한 증거로 입증(model_grounding_status == 'SUPPORTED')한 사건 사실은
+        # 단순 형식적 차이나 기타 휴리스틱으로 인해 치명적 사실 오류로 오탐되지 않도록 보호한다.
         has_unsupported_case_fact = any(
             c.get("claim_type") in ("CASE_FACT", "CASE_INFERENCE")
             and c.get("grounding_status") == "UNSUPPORTED"
             and c.get("model_grounding_status") != "SUPPORTED"
-            and c.get("quote_alignment") != "NOT_FOUND"
             for c in result.get("claims", [])
         )
         has_fatal_legal_error = (

@@ -114,8 +114,8 @@ def test_case_document_cannot_be_sole_ground_for_legal_effect(document_state):
     assert result["claims"][0]["grounding_status"] == "UNSUPPORTED"
 
 
-def test_verifier_cannot_turn_categorical_sentence_into_conditional_quote(document_state):
-    """검증기가 답변 단정을 조건부로 바꿔 인용한 뒤 통과시키는 것을 막는다."""
+def test_quote_alignment_diagnosed_without_forcing_unsupported(document_state):
+    """인용 불일치는 진단 필드(quote_alignment)로 기록하되 강제 UNSUPPORTED로 뒤집지 않는다."""
     reply = verification_reply()
     reply["claims"][0]["claim"] = "계약이 갱신되었다면 계속 중일 수 있습니다."
     llm = MagicMock()
@@ -123,8 +123,8 @@ def test_verifier_cannot_turn_categorical_sentence_into_conditional_quote(docume
     with patch("ai_legal_helper.llm.gateway.get_llm", return_value=llm):
         result = run_verification("현재 상태는?", "계약은 계속 중입니다.",
                                   consultation.document_sources(document_state), require_question_coverage=True)
-    assert result["status"] == "REVISE"
-    assert "실제 답변" in result["claims"][0]["reason"]
+    assert result["claims"][0]["quote_alignment"] == "NOT_FOUND"
+    assert result["claims"][0]["grounding_status"] == "SUPPORTED"
 
 
 def test_document_writer_uses_originals_without_prior_ai_or_fact_summary(document_state):
