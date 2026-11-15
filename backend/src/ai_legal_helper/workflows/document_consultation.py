@@ -491,7 +491,6 @@ def finish_answer(state: Dict[str, Any]) -> Dict[str, Any]:
             or has_statute_defects
             or bool(result.get("contradictions"))
             or result.get("reason_code") in ("LEGAL_SOURCE_MISSING", "LEGAL_SOURCE_INSUFFICIENT", "CITATION_INVALID")
-            or (isinstance(result.get("qa_summary"), dict) and result.get("qa_summary", {}).get("legal_risk_passed") is False)
         )
 
         # 지지되는 주장(SUPPORTED)이 존재하고 치명적 법률 결함이 없는 경우에 한해 DRAFT_PRESERVED 승인

@@ -981,7 +981,18 @@ def run_verification(
         or any(ext in str(src.get("source_id", "")).lower() for ext in (".txt", ".pdf", ".docx", ".png", ".jpg"))
         for src in (retrieved_sources or []) if isinstance(src, dict)
     )
-    if (not force_llm and not require_question_coverage and not has_case_evidence
+    # 지침 6: 단순 조문 조회와 사건에 대한 법률 적용 질의의 검증 경로 구분
+    # 사건 맥락, 증거, 또는 법률 효과/분쟁 포섭이 요구되는 질의는 조기 PASS를 금지하고 반드시 LLM Verification 수행
+    has_case_context = bool(case_context and case_context.strip() not in ("", "(사건 맥락 없음)", "(사건 정보 없음)"))
+    legal_application_patterns = (
+        "어떻게 해야", "어떻게 되나요", "가능한가요", "해당하나요", "적용되나요",
+        "해지되나요", "종료되나요", "성립하나요", "유효한가요", "무효인가요",
+        "해지할 수", "반환받을 수", "대항할 수", "배당받을 수", "청구할 수",
+        "효력이 있", "책임이 있", "사망", "상속", "경매", "배당",
+        "가압류", "압류", "원상복구", "손해배상", "소송", "지급명령", "묵시적 갱신", "언제 끝나"
+    )
+    is_legal_application = has_case_evidence or has_case_context or any(p in question for p in legal_application_patterns)
+    if (not force_llm and not require_question_coverage and not is_legal_application
             and not qa_check.requires_llm_eval
             and qa_check.status == "PASS" and not preliminary_temporal_errors):
         logger.info("[VERIFICATION] 경량 검사 ALL PASS: LLM 검증 생략 및 초안 즉시 확정")
@@ -1486,18 +1497,10 @@ def run_verification(
             result.recommended_action = "REVISE_DRAFT"
             result.warnings.append(f"법적 근거 확인이 불확실한 판단 {len(uncertain_core_claims)}건이 포함되어 있어 비확정적 안내로 보완이 필요합니다.")
 
-        # B-2) 결정론적 경량 QA 검사에서 법률 적용 위험(legal_risk_passed=False)이 감지된 경우 PASS 엄격 차단 및 강등
-        # [P1-REASON-CODE]: 이는 법령 부족(LEGAL_SOURCE_INSUFFICIENT)이 아니라 답변의 법률 단정 오류이므로
-        # ANSWER_REVISION_REQUIRED를 부여하여 불필요한 외부 법령 재검색 헛바퀴를 차단하고 초안 수정으로 직행시킨다.
-        if qa_check and not qa_check.legal_risk_passed and result.status == "PASS":
-            result.status = "REVISE"
-            if result.reason_code in ("NONE", None):
-                result.reason_code = "ANSWER_REVISION_REQUIRED"
-            result.recommended_action = "REVISE_DRAFT"
-            for rt in getattr(qa_check, "repair_targets", []) or []:
-                if rt.repair_reason not in result.revision_instructions:
-                    result.revision_instructions.append(rt.repair_reason)
-            result.warnings.append("결정론적 법률 위험 검사에서 심각한 법률 적용 오류가 감지되어 재작성이 요구됩니다.")
+        # B-2) [QA_CHECKER_REFACTOR]: 결정론적 경량 QA 검사의 법률 위험 탐지는 참고 신호로만 활용하며,
+        # LLM의 의미 기반 법률 판정(PASS)을 정규식 탐지만으로 강제 강등(PASS -> REVISE)하지 않는다.
+        if qa_check and not qa_check.legal_risk_passed:
+            result.warnings.append("결정론적 법률 위험 검사에서 주의 표현이 탐지되었습니다 (의미 기반 검증 결과 보존).")
 
         # B-1) 미등록 임의 가상 증거번호 감지 시 PASS 차단 및 REVISE 강제 (T05)
         unregistered_evidences = [
@@ -1559,7 +1562,6 @@ def run_verification(
             and not unsupported_citations
             and not result.contradictions
             and not unregistered_evidences
-            and not (qa_check and not qa_check.legal_risk_passed)
         )
         coverage_satisfied = (not require_question_coverage) or (coverage_complete and consistency_complete)
         if coverage_satisfied and has_supported_core_claims and has_no_defects and result.status == "REVISE":
@@ -1636,9 +1638,36 @@ def run_verification(
         except Exception:
             pass
         out_dict = result.model_dump()
-        # STEP 5: 경량 QA 검사 결과(repair_targets 및 qa_summary) 결합
-        if qa_check.repair_targets and not out_dict.get("repair_targets"):
-            out_dict["repair_targets"] = [rt.model_dump() for rt in qa_check.repair_targets]
+        # STEP 5: 경량 QA 검사 결과 결합 (지침 3: 실제 검증된 오류만을 대상으로 부분 교정 수행)
+        if result.status == "PASS":
+            # LLM 검증이 PASS인 경우 정규식 repair_targets를 무효화하여 불필요한 부분 교정 차단
+            out_dict["repair_targets"] = []
+        else:
+            # PASS가 아닌 경우(REVISE 등): 실제로 검증된 오류(미검증 출처 또는 미입증 주장과 관련된 대상)만 선별
+            verified_repair_targets = []
+            bad_citation_set = set(audit.get("unverified_citations", []) or [])
+            unsupported_texts = [
+                getattr(c, "claim", getattr(c, "claim_text", ""))
+                for c in result.claims
+                if getattr(c, "grounding_status", "") in ("UNSUPPORTED", "UNCERTAIN")
+                and getattr(c, "claim", getattr(c, "claim_text", ""))
+            ]
+            for rt in (getattr(qa_check, "repair_targets", []) or []):
+                # 1) 허위/미검증 출처가 포함된 문장
+                has_bad_cit = any(cit in rt.original_sentence for cit in bad_citation_set)
+                # 2) LLM이 입증되지 않았다고 판정한 주장이 포함된 문장
+                has_unsupported_claim = any(
+                    (ut in rt.original_sentence or rt.original_sentence in ut)
+                    for ut in unsupported_texts
+                )
+                if has_bad_cit or has_unsupported_claim:
+                    verified_repair_targets.append(rt.model_dump() if hasattr(rt, "model_dump") else rt)
+
+            if verified_repair_targets and not out_dict.get("repair_targets"):
+                out_dict["repair_targets"] = verified_repair_targets
+            elif not out_dict.get("repair_targets"):
+                out_dict["repair_targets"] = []
+
         out_dict["qa_summary"] = qa_check.model_dump()
         return {**out_dict, "source_manifest": source_manifest}
 

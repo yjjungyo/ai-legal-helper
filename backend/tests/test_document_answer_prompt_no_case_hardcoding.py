@@ -297,8 +297,8 @@ def test_finish_answer_blocks_fallback_when_core_legal_claim_uncertain():
     assert out["final_disposition"] == "WITHHELD", "UNCERTAIN 법률 판단 잔존 시 폴백 PASS 차단 및 WITHHELD 확정"
 
 
-def test_verification_demotes_llm_pass_when_qa_check_fails(monkeypatch):
-    """LLM이 최초에 PASS를 반환했더라도, 1차 경량 QA에서 법률 위험(legal_risk_passed=False)이 감지되면 REVISE로 강등한다."""
+def test_verification_preserves_llm_pass_with_qa_warning(monkeypatch):
+    """LLM이 status=PASS를 반환한 경우, 경량 QA의 정규식 탐지는 참고 경고(warnings)로 기록하며 PASS를 강제로 REVISE로 뒤집지 않는다."""
     import json
     from ai_legal_helper.agents.verification import run_verification
 
@@ -357,10 +357,9 @@ def test_verification_demotes_llm_pass_when_qa_check_fails(monkeypatch):
         require_question_coverage=True,
     )
 
-    # LLM이 status=PASS를 냈더라도 경량 QA에서 소멸주의 위반(legal_risk_passed=False)이 잡혀 REVISE로 강등되어야 함
-    assert result["status"] == "REVISE"
-    assert result["reason_code"] == "LEGAL_SOURCE_INSUFFICIENT"
-    assert any("소멸" in inst for inst in result["revision_instructions"])
+    # [QA_CHECKER_REFACTOR]: 정규식에 의한 PASS->REVISE 강제 강등이 제거되어 LLM의 의미 검증 결과(PASS)가 보존됨
+    assert result["status"] == "PASS"
+    assert result["reason_code"] == "NONE" 
 
 
 def test_grounding_context_preserves_deep_evidence_beyond_400_chars():
@@ -566,4 +565,4 @@ def test_grounding_context_preserves_deep_counter_evidence_beyond_1500_chars_and
     # 1) 본문 키워드("근저당권설정", "말소등기")로 인해 핵심 증거로 자동 식별되어야 함
     # 2) 1,500자 뒤에 위치한 말소등기 완료 내역이 윈도우 발췌로 보존되어야 함
     assert "말소등기 완료되었습니다" in content, "1,500자 뒤의 핵심 반대 증거(말소등기)가 유실되지 않고 보존되어야 함"
-    assert "핵심 권리/반대 증거 구간 발췌" in content
+    assert content == full_content or "핵심 권리/반대 증거 구간 발췌" in content

@@ -486,3 +486,54 @@
 2026-11-15 10:41:32.924 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
 2026-11-15 10:41:32.947 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
 2026-11-15 10:41:32.947 | INFO  | -------- | server.py:113:_serve         - Finished server process [49236]
+2026-11-15 10:41:40.236 | INFO  | -------- | server.py:103:_serve         - Started server process [33848]
+2026-11-15 10:41:40.236 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-11-15 10:41:40.254 | INFO  | -------- | legal_workflow.py:202:init_checkpointer - [체크포인터] PostgreSQL 체크포인트 테이블 초기화 완료
+2026-11-15 10:41:40.254 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - [그래프 동기화 워커] 백그라운드 그래프 동기화 워커가 시작되었습니다.
+2026-11-15 10:41:40.262 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-11-15 10:45:42.526 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-11-15 10:45:42.627 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-11-15 10:45:43.132 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-11-15 10:45:43.155 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-11-15 10:45:43.155 | INFO  | -------- | server.py:113:_serve         - Finished server process [33848]
+2026-11-15 10:45:50.314 | INFO  | -------- | server.py:103:_serve         - Started server process [52772]
+2026-11-15 10:45:50.314 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-11-15 10:45:50.332 | INFO  | -------- | legal_workflow.py:202:init_checkpointer - [체크포인터] PostgreSQL 체크포인트 테이블 초기화 완료
+2026-11-15 10:45:50.332 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - [그래프 동기화 워커] 백그라운드 그래프 동기화 워커가 시작되었습니다.
+2026-11-15 10:45:50.348 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-11-15 10:56:08.424 | INFO  | 67ba049e | cases.py:75:list_cases       - 사건 목록 조회 완료 (총 803건) [req:a7361b65]
+2026-11-15 10:56:08.429 | INFO  | 67ba049e | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases" 200 (55.4ms) [req:a7361b65]
+2026-11-15 10:56:08.430 | INFO  | b9c1e6d1 | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/auth/me" 200 (37.3ms) [req:7d625dfb]
+2026-11-15 10:56:08.438 | INFO  | dfb09097 | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/auth/me" 200 (4.8ms) [req:6cfb3d7e]
+2026-11-15 10:56:08.443 | INFO  | 9069bcc2 | cases.py:75:list_cases       - 사건 목록 조회 완료 (총 803건) [req:4dc1fd34]
+2026-11-15 10:56:08.448 | INFO  | 9069bcc2 | main.py:196:trace_context_middleware - 127.0.0.1 - "GET /api/v1/cases" 200 (15.3ms) [req:4dc1fd34]
+2026-11-15 11:03:39.007 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-11-15 11:03:39.117 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-11-15 11:03:39.687 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-11-15 11:03:39.714 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-11-15 11:03:39.715 | INFO  | -------- | server.py:113:_serve         - Finished server process [52772]
+2026-11-15 11:03:47.362 | INFO  | -------- | server.py:103:_serve         - Started server process [50576]
+2026-11-15 11:03:47.362 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-11-15 11:03:47.382 | INFO  | -------- | legal_workflow.py:202:init_checkpointer - [체크포인터] PostgreSQL 체크포인트 테이블 초기화 완료
+2026-11-15 11:03:47.382 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - [그래프 동기화 워커] 백그라운드 그래프 동기화 워커가 시작되었습니다.
+2026-11-15 11:03:47.399 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-11-15 11:06:05.899 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-11-15 11:06:06.007 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-11-15 11:06:06.558 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-11-15 11:06:06.582 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-11-15 11:06:06.582 | INFO  | -------- | server.py:113:_serve         - Finished server process [50576]
+2026-11-15 11:06:13.952 | INFO  | -------- | server.py:103:_serve         - Started server process [55928]
+2026-11-15 11:06:13.953 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-11-15 11:06:13.970 | INFO  | -------- | legal_workflow.py:202:init_checkpointer - [체크포인터] PostgreSQL 체크포인트 테이블 초기화 완료
+2026-11-15 11:06:13.970 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - [그래프 동기화 워커] 백그라운드 그래프 동기화 워커가 시작되었습니다.
+2026-11-15 11:06:13.985 | INFO  | -------- | on.py:62:startup             - Application startup complete.
+2026-11-15 11:07:12.783 | INFO  | -------- | server.py:282:shutdown       - Shutting down
+2026-11-15 11:07:12.891 | INFO  | -------- | on.py:67:shutdown            - Waiting for application shutdown.
+2026-11-15 11:07:13.536 | INFO  | -------- | neo4j.py:114:get_driver      - Neo4j 연결 성공
+2026-11-15 11:07:13.559 | INFO  | -------- | on.py:76:shutdown            - Application shutdown complete.
+2026-11-15 11:07:13.559 | INFO  | -------- | server.py:113:_serve         - Finished server process [55928]
+2026-11-15 11:07:21.167 | INFO  | -------- | server.py:103:_serve         - Started server process [41880]
+2026-11-15 11:07:21.167 | INFO  | -------- | on.py:48:startup             - Waiting for application startup.
+2026-11-15 11:07:21.185 | INFO  | -------- | legal_workflow.py:202:init_checkpointer - [체크포인터] PostgreSQL 체크포인트 테이블 초기화 완료
+2026-11-15 11:07:21.186 | INFO  | -------- | graph_sync_worker.py:75:graph_sync_worker_loop - [그래프 동기화 워커] 백그라운드 그래프 동기화 워커가 시작되었습니다.
+2026-11-15 11:07:21.202 | INFO  | -------- | on.py:62:startup             - Application startup complete.

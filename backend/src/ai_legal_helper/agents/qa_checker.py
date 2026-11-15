@@ -23,6 +23,7 @@ CODING_COMMENT_STANDARD.md, AGENTS.md, 상담 답변 품질 및 사용자 UX 개
 """
 
 import re
+import json
 import os
 import time
 import hashlib
@@ -393,12 +394,8 @@ def check_deterministic_qa(
     elif not date_amount_passed:
         status = "REPAIR"
         reason_code = "FACT_MISMATCH"
-    elif not legal_risk_passed:
-        status = "REPAIR"
-        reason_code = "LEGAL_APPLICATION_ERROR"
-    elif not question_coverage_passed:
-        status = "REPAIR"
-        reason_code = "QUESTION_UNANSWERED"
+    # [QA_CHECKER_REFACTOR]: 질문 충족 및 법률 위험 정규식은 최종 판정 권한(status=REPAIR)을 갖지 않음
+    # 불확실한 정규식 탐지는 llm_eval_reasons 및 requires_llm_eval을 통해 LLM Verification의 참고 신호로만 활용함
 
     return QACheckResult(
         status=status,
@@ -499,8 +496,8 @@ def repair_draft_answer(
             logger.info(f"[ANSWER_REPAIR] 단일 문장 교체 완료: '{rt.original_sentence[:30]}...' -> '{replacement_text[:30]}...'")
         except Exception as e:
             logger.error(f"[ANSWER_REPAIR] 단일 문장 LLM 교정 실패: {e}")
-            if rt.recommended_fix:
-                replacements[rt.original_sentence] = f"(참고) {rt.recommended_fix}"
+            # Fail-Safe: 교정 실패 시 사용자 답변에 내부 안내/지침이 노출되지 않도록 원문을 안전 보존
+            replacements[rt.original_sentence] = rt.original_sentence
 
     # 2. 복수 대상 문장인 경우: Single-Pass Batch Repair로 1회 호출에 일괄 교정
     else:
@@ -552,12 +549,12 @@ def repair_draft_answer(
                     logger.info(f"[ANSWER_REPAIR] 일괄 문장[{idx}] 교체: '{rt.original_sentence[:25]}...' -> '{rep_text[:25]}...'")
                 else:
                     logger.warning(f"[ANSWER_REPAIR] 항목 {idx} 파싱 누락, 폴백 적용")
-                    replacements[rt.original_sentence] = f"(참고) {rt.recommended_fix}" if rt.recommended_fix else rt.original_sentence
+                    # Fail-Safe: 파싱 누락 시 원문 안전 보존
+                    replacements[rt.original_sentence] = rt.original_sentence
         except Exception as e:
-            logger.error(f"[ANSWER_REPAIR] 일괄 배치 LLM 교정 실패, 권장조치 폴백 일괄 적용: {e}")
+            logger.error(f"[ANSWER_REPAIR] 일괄 배치 LLM 교정 실패, 원문 안전 보존(Fail-Safe): {e}")
             for rt in repair_targets:
-                if rt.recommended_fix:
-                    replacements[rt.original_sentence] = f"(참고) {rt.recommended_fix}"
+                replacements[rt.original_sentence] = rt.original_sentence
 
     # 초안 본문에서 문제 문장만 정확히 교체 (정상 문장 100% 보존)
     repaired_answer = draft_answer

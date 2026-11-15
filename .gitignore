@@ -20,7 +20,7 @@ backend/.langfuse.key
 storage/
 vectorstore/
 data/chroma/
-# backend/logs/
+backend/logs/
 backend/storage/
 backend/vectorstore/
 backend/data
