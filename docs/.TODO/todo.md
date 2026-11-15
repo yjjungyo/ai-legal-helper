@@ -18,24 +18,15 @@ legal_evidence_bundle_node 제거하자
 qa_checker.py  필요성
 
 
-done --그리고, 3단계 벡터 검색(RAG)의 수집 한계 (k=4) 여기서 k를 10으로 늘려라. 
+done --그리고, 3단계 벡터 검색(RAG)의 수집 한계 (k=4) 여기서 k를 10으로 늘린걸 다시 7로 조정 완료. 
 
 토큰 증가량 분석:
 retrieval_factory.py는 조문 원문 전체 대신 SNIP = 240자 내외의 요약 스니펫을 Agent Observation으로 전달합니다.
 
 
-\
-답변완료 시 나오는 판단유보, 이런거 잘 안맞는다. 없애던지 제대로 하던지 
 
 
 
-done --SC011 ~ SC020까지 자동테스트 진행하고 결과보고서 및  kpi까지 작성하자.  
-오류, 개선이 필요한 부분이 있으면 별도 파일로 저장하여 보기 쉽게 하라.
-각 사건 등록할때 제목에 20261114_E2E_V6 를 넣어라.
-AI_Legal_Helper_KPI_20261113_자동평가_e2ev5_hitl_auto.xlsx 파일에 작성하라. 
-각 테스트 시나리오별 E2E V6 버전용 행을 추가하여 작성한다. 
-기존 V5 버전과 비교 평가하여 특이사항란 마지막에  (V5 대비 속도 몇배 향상, 토큰 몇% 절감, 비용 몇% 절감)  처럼 V5 대비 V6를 측정한다. 
-langfuse trace 를 json으로 받아 저장하여 chatgpt가 분석할 수 있도록 한다. 
 
 done --SC011 ~ SC020까지 자동테스트 진행하고 결과보고서 및  kpi까지 작성하자.  
 각 사건 등록할때 제목에 20261114_E2E_V6 를 넣어라.
@@ -44,6 +35,8 @@ AI_Legal_Helper_KPI_20261113_자동평가_e2ev5_hitl_auto.xlsx 파일에 작성�
 기존 V5 버전과 비교 평가하여 특이사항란 마지막에  (V5 대비 속도 몇배 향상, 토큰 몇% 절감, 비용 몇% 절감)  처럼 V5 대비 V6를 측정한다. 
 langfuse trace 를 json으로 받아 저장하여 chatgpt가 분석할 수 있도록 한다. 
 이번 테스트의 목적은 오류 해결, 논리충돌, 응답시간, 비용, 토큰 사용량 등 성능개선이 필요한 부분을 찾는것이다. 
+
+
 개선할 부분이 있으면 별도 파일로 저장하여 보기 쉽게 하라.
 - [E2E V6 종합 평가 보고서](file:///c:/myprjs/ai-legal-helper/docs/evaluation/E2E_V6_COMPREHENSIVE_EVALUATION_REPORT.md)
 - [E2E V6 자동테스트 결과보고서](file:///c:/myprjs/ai-legal-helper/docs/evaluation/E2E_V6_EVALUATION_REPORT.md)
@@ -52,6 +45,9 @@ langfuse trace 를 json으로 받아 저장하여 chatgpt가 분석할 수 있�
 - [Langfuse 트레이스 카탈로그](file:///c:/myprjs/ai-legal-helper/artifacts/langfuse_review_v6/README_V6.md)
 
 ===
+왜 판단유보이지 ? 
+\
+답변완료 시 나오는 판단유보, 이런거 잘 안맞는다. 없애던지 제대로 하던지 
 
 저는 등록 민간임대주택의 임대사업자입니다. 2026년 11월 1일에 새로운 임대차계약을 체결했습니다. 임대차계약 신고 시 관리비와 전기·수도료 등 임차인 부담 비용의 금액이나 산정방식까지 신고해야 하나요?
 오후 10:43

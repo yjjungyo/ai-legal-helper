@@ -1406,7 +1406,7 @@ async def run_agents_node(state: LegalState) -> Dict:
         for category in categories_to_query:
             try:
                 retrieved = await asyncio.to_thread(
-                    retrieve_with_status, query=retrieval_query, category=category, k=10,
+                    retrieve_with_status, query=retrieval_query, category=category, k=7,
                 )
                 sources.extend(build_source_from_chroma_doc(
                     doc, category=category or "전체", retrieval_method="CHROMA_VECTOR",
@@ -3167,7 +3167,7 @@ def revise_node(state: LegalState) -> Dict:
 
             try:
 
-                docs = retrieve(query=re_query[:300], category=cat, k=10)
+                docs = retrieve(query=re_query[:300], category=cat, k=7)
 
                 for doc in docs or []:
 
