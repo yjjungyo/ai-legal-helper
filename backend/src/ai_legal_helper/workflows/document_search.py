@@ -700,7 +700,8 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
                 max_results=3,
                 diagnostic=precedent_diagnostic,
             )
-            channels_used.add("OPENLAW_PRECEDENT_API")
+            if precedent_diagnostic.get("request_count", 0):
+                channels_used.add("OPENLAW_PRECEDENT_API")
         except Exception as exc:
             precedent_diagnostic["status"] = "API_ERROR"
             logger.warning("[DOCUMENT_SEARCH] 판례 공식 조회 실패 type=%s", type(exc).__name__)
@@ -729,7 +730,10 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
             return True
         return all(any(src.get("article") == article for src in matches) for article in articles)
 
-    partial = bool(found) and not all(_request_fulfilled(r) for r in requests)
+    partial = bool(found or precedent_sources) and (
+        not all(_request_fulfilled(r) for r in requests)
+        or (bool(precedent_requests) and not bool(precedent_sources))
+    )
     if partial:
         logger.warning("[DOCUMENT_SEARCH] 일부 법령만 확보: %d/%d", len(found_laws & requested_laws), len(requested_laws))
     merged = list(state.get("retrieved_sources") or [])
@@ -768,13 +772,17 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
 
     is_auto = bool(state.get("auto_approve_statute_search") or os.getenv("AUTO_APPROVE_STATUTE_SEARCH", "").lower() in ("true", "1", "yes"))
     prefix = "[자동승인] " if is_auto else ""
-    items_str = " · ".join(item["display"] for item in statute_search_items)
+    precedent_displays = [
+        " ".join(filter(None, [p.get("court"), p.get("case_number")]))
+        for p in precedent_sources
+    ]
+    items_str = " · ".join([item["display"] for item in statute_search_items] + precedent_displays)
     if channel_mode == "HYBRID":
         completion_desc = f"{prefix}로컬 벡터DB 및 OpenLaw API 병행 확보 | {items_str}"
     elif channel_mode == "VECTOR_DB":
         completion_desc = f"{prefix}로컬 벡터DB에서 {len(found)}건 확보 | {items_str}"
     elif channel_mode == "OPENLAW_API":
-        completion_desc = f"{prefix}OpenLaw 공식 API에서 {len(found)}건 확보 | {items_str}"
+        completion_desc = f"{prefix}OpenLaw 공식 API에서 법령 {len(found)}건·판례 {len(precedent_sources)}건 확보 | {items_str}"
     else:
         completion_desc = f"{prefix}법령을 찾지 못했습니다."
 
@@ -788,7 +796,7 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
         ),
         "retrieved_sources": merged,
         "statute_search_status": (
-            "API_ERROR" if api_error else
+            "API_ERROR" if api_error and not (found or precedent_sources) else
             "PARTIAL_SUCCESS" if partial else
             "OFFICIAL_SUCCESS" if (found or precedent_sources) else
             "VERIFIED_LOCAL_FALLBACK" if fallback else "NOT_FOUND"
