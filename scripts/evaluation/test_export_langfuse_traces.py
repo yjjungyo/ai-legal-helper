@@ -109,5 +109,69 @@ class LangfuseExportTests(unittest.TestCase):
             self.assertEqual(manifest["failed"], 0)
 
 
+    def test_ids_file_reads_comments_blank_lines_and_preserves_order(self):
+        other = "2490a3cf-d04c-4c6e-8f4b-ece8a46377dc"
+        with tempfile.TemporaryDirectory() as d:
+            ids = Path(d) / "trace_ids.txt"
+            ids.write_text("\ufeff# V8 trace list\n\n" + self.trace + "\n  " + other + "  \n", encoding="utf-8")
+            rows = mod.read_ids_file(ids, "SC-001", "2", "LegalAgent E2E V8")
+        self.assertEqual([r["trace_id"] for r in rows], [self.trace, other])
+        self.assertEqual(rows[0]["case_id"], "SC-001")
+        self.assertEqual(rows[1]["service"], "LegalAgent E2E V8")
+
+    def test_ids_file_rejects_empty_and_duplicate_ids(self):
+        with tempfile.TemporaryDirectory() as d:
+            ids = Path(d) / "ids.txt"
+            ids.write_text("  # no traces\n\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "비어"):
+                mod.read_ids_file(ids, "SC-001", "1", "Manual")
+            ids.write_text(self.trace + "\n" + self.trace + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "중복"):
+                mod.read_ids_file(ids, "SC-001", "1", "Manual")
+
+    def test_ids_file_exports_each_trace_and_continues_after_failure(self):
+        ok1 = self.trace
+        bad = "00000000-0000-0000-0000-000000000002"
+        ok2 = "00000000-0000-0000-0000-000000000003"
+        with tempfile.TemporaryDirectory() as d:
+            dpath = Path(d)
+            ids = dpath / "trace_ids.txt"
+            ids.write_text("\n".join([ok1, bad, ok2]) + "\n", encoding="utf-8")
+            env = dpath / "local.env"
+            env.write_text(
+                "LANGFUSE_HOST=http://localhost:3001\n"
+                "LANGFUSE_PUBLIC_KEY=pk-test\n"
+                "LANGFUSE_SECRET_KEY=sk-sensitive\n", encoding="utf-8")
+            out = dpath / "exported"
+            called = []
+
+            def fake_export(reader, trace_id):
+                called.append(trace_id)
+                if trace_id == bad:
+                    raise mod.ApiError(404, "/api/public/traces/" + bad, "API 요청 실패")
+                return {
+                    "id": trace_id,
+                    "observations": [{"id": "obs-" + trace_id, "traceId": trace_id, "output": "result"}],
+                }, "v2_observations", []
+
+            with patch.object(mod.LangfuseReader, "export", new=fake_export):
+                rc = mod.main([
+                    "--ids-file", str(ids), "--case-id", "SC-001", "--step", "3",
+                    "--service", "LegalAgent E2E V8", "--env-file", str(env),
+                    "--out", str(out), "--zip", "--delay", "0",
+                ])
+            self.assertEqual(rc, 1)  # Partial failures are visible in the process exit code.
+            self.assertEqual(called, [ok1, bad, ok2])
+            manifest = json.loads((out / "export_manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual((manifest["requested"], manifest["success"], manifest["failed"]), (3, 2, 1))
+            self.assertEqual([x["status"] for x in manifest["traces"]], ["OK", "FAILED", "OK"])
+            self.assertEqual(len(list(out.glob("SC-001_step3_*.json"))), 2)
+            self.assertTrue((dpath / "exported.zip").is_file())
+            with __import__("zipfile").ZipFile(dpath / "exported.zip") as archive:
+                self.assertEqual(len(archive.namelist()), 3)  # Two successes + manifest
+                for name in archive.namelist():
+                    self.assertNotIn("sk-sensitive", archive.read(name).decode("utf-8"))
+
+
 if __name__ == "__main__":
     unittest.main()

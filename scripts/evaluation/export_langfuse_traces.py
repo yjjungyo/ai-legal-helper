@@ -232,6 +232,30 @@ def read_manifest(path: Path) -> list[dict[str, str]]:
     return [{key: str(value or "").strip() for key, value in row.items()} for row in rows]
 
 
+def read_ids_file(path: Path, case_id: str, step: str, service: str) -> list[dict[str, str]]:
+    """Read a UTF-8 text file with one Trace UUID per line, in input order.
+
+    Empty lines and lines starting with '#' are ignored. Each requested ID
+    remains an independent export task, so one invalid ID/API failure does
+    not prevent later IDs from being processed by main().
+    """
+    rows: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for line_number, raw in enumerate(path.read_text(encoding="utf-8-sig").splitlines(), 1):
+        trace_id = raw.strip()
+        if not trace_id or trace_id.startswith("#"):
+            continue
+        # Never overwrite a previous export because the same ID is listed twice.
+        dedupe_key = trace_id.lower()
+        if dedupe_key in seen:
+            raise ValueError(f"{path}:{line_number}: 중복 Trace ID: {trace_id}")
+        seen.add(dedupe_key)
+        rows.append({"case_id": case_id, "step": step, "service": service, "trace_id": trace_id})
+    if not rows:
+        raise ValueError(f"Trace ID 목록 파일이 비어 있습니다: {path}")
+    return rows
+
+
 def safe_filename(row: dict[str, str]) -> str:
     def clean(s: str) -> str:
         return re.sub(r"[^A-Za-z0-9_-]+", "_", s.strip()).strip("_")
@@ -253,6 +277,7 @@ def main(argv: list[str] | None = None) -> int:
     group.add_argument("--manifest", type=Path, help="case_id,step,service,trace_id CSV 파일")
     group.add_argument("--all", action="store_true", help="제공된 SC-001~SC-003 25건 일괄")
     group.add_argument("--trace-id", action="append", help="단일 ID 또는 여러 --trace-id")
+    group.add_argument("--ids-file", type=Path, help="Trace ID를 한 줄씩 기록한 UTF-8 TXT 파일")
     parser.add_argument("--case-id", default="manual", help="--trace-id의 사건명")
     parser.add_argument("--step", default="1", help="--trace-id의 단계")
     parser.add_argument("--service", default="Manual", help="--trace-id의 서비스")
@@ -272,6 +297,8 @@ def main(argv: list[str] | None = None) -> int:
         reader = LangfuseReader(host, public, secret, timeout=args.timeout)
         if args.all or args.manifest:
             rows = read_manifest(DEFAULT_MANIFEST if args.all else args.manifest)
+        elif args.ids_file:
+            rows = read_ids_file(args.ids_file, args.case_id, args.step, args.service)
         else:
             rows = [{"case_id": args.case_id, "step": args.step, "service": args.service, "trace_id": tid}
                     for tid in args.trace_id]
