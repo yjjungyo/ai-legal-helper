@@ -20,11 +20,11 @@ d049beb7-f807-403c-b288-3012d9359db2
 프로젝트 루트에서 실행:
 
 ```powershell
-python scripts/evaluation/export_langfuse_traces.py --ids-file scripts/evaluation/my_trace_ids.txt --case-id SC-001 --service "LegalAgent E2E V8" --out artifacts/langfuse_trace_export --zip
+python scripts/evaluation/export_langfuse_traces.py --ids-file scripts/evaluation/my_trace_ids.txt --case-id SC-001 --step batch --service "LegalAgent E2E V8" --out artifacts/langfuse_trace_export --zip
 ```
 
 - TXT의 순서대로 한 건씩 조회합니다. 중간 조회가 실패해도 기본적으로 나머지 ID를 계속 처리합니다.
-- 한 건마다 `SC-001_step1_LegalAgent_E2E_V8_<trace-id>.json` 형식으로 개별 저장합니다. `--ids-file`은 `--case-id`, `--step`, `--service`를 **목록 전체에 공통 적용**합니다.
+- 한 건마다 `SC-001_stepbatch_LegalAgent_E2E_V8_<trace-id>.json` 형식으로 개별 저장합니다. `--ids-file`은 `--case-id`, `--step`, `--service`를 **목록 전체에 공통 적용**합니다. 따라서 위 예시는 `stepbatch`로 저장되며, 원래의 1·2·3차 단계 구분이 필요하면 아래 CSV `--manifest` 방식을 사용하세요.
 - `export_manifest.json`에 각 ID의 `OK/FAILED` 상태와 Observation 수, 실패 사유를 남깁니다.
 - `--zip`을 지정하면 성공한 JSON과 결과 목록을 ZIP으로 묶습니다. 부분 실패가 있으면 종료 코드는 `1`입니다.
 - 잘못된 ID는 해당 행의 `FAILED`로 기록합니다. **동일 ID 중복 기재 및 빈 TXT는 입력 오류**로 거부합니다.
