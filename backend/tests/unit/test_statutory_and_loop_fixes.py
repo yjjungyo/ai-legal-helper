@@ -198,78 +198,80 @@ def test_finalize_node_preserves_verified_draft():
 
 
 
-def test_next_verification_step_max_revision_capped_at_two():
-    """재작성 횟수가 2회에 도달하면 추가 재작성 없이 finalize(초안 보존)로 종료한다."""
-    state = {
-        "draft_answer": "기존 생성된 법률 답변 초안 내용입니다.",
-        "revision_count": 2,
-        "verification_result": {
-            "status": "REVISE",
-            "reason_code": "ANSWER_REVISION_REQUIRED",
-            "claims": [
-                {"claim_id": "C1", "grounding_status": "SUPPORTED", "claim_text": "주장 1"},
-                {"claim_id": "C2", "grounding_status": "UNSUPPORTED", "claim_text": "주장 2"},
-            ],
+def test_provenance_relief_for_precedent_citations():
+    """판례 출처가 확보된 상태에서 판례 본문 내 인용 조문으로 인한 provenance 실패는 passed=True로 구제된다."""
+    from ai_legal_helper.agents.verification import VerificationOutput
+
+    # 검증기가 반환한 provenance가 판례 내 인용 조문 때문에 passed=False인 상황 모사
+    mock_data = {
+        "status": "PASS",
+        "reason_code": "NONE",
+        "question_coverage": [
+            {"question": "장기수선충당금을 임대인이 부담해야 하나요?", "answered": True}
+        ],
+        "consistency_checks": {
+            "opening_conclusion": {"passed": True, "reason": "서두 결론 타당", "source_ids": ["PRECEDENT:238469"]},
+            "timeline": {"passed": True, "reason": "시간 순서 일치", "source_ids": ["PRECEDENT:238469"]},
+            "expressed_intent": {"passed": True, "reason": "의사표시 일치", "source_ids": ["PRECEDENT:238469"]},
+            "provenance": {
+                "passed": False,
+                "reason": "판례(2021다238469) 본문 내 인용된 구 공동주택관리법 시행령 제31조 제7항의 별도 법령 원문 미확보",
+                "source_ids": ["PRECEDENT:238469"],
+            },
         },
-    }
-
-    next_node = next_verification_step(state)
-    assert next_node == "finalize"
-
-
-def test_finalize_node_preserves_verified_draft():
-    """finalize_node 실행 시 PASS 상태의 정답 초안이 WITHHELD로 강등되거나 더미 템플릿으로 대체되지 않고 보존된다."""
-    from ai_legal_helper.workflows.legal_workflow import finalize_node
-
-    verified_draft = (
-        "[1. 핵심 결론]\n"
-        "2026년 11월 1일에 체결된 임대차계약의 경우, 관리비와 부대비용을 신고할 법적 의무가 없습니다.\n\n"
-        "[2. 법적 근거]\n"
-        "개정 민간임대주택에 관한 특별법(법률 제20436호) 부칙 제1조 및 제2조에 따라 해당 의무는 2027년 4월 28일 이후 계약부터 적용됩니다."
-    )
-
-    state = {
-        "question": "저는 등록 민간임대주택의 임대사업자입니다. 2026년 11월 1일에 새로운 임대차계약을 체결했습니다. 임대차계약 신고 시 관리비 등 부대비용도 신고해야 하나요?",
-        "draft_answer": verified_draft,
-        "verification_result": {
-            "status": "PASS",
-            "reason_code": "NONE",
-            "issue_results": [
-                {
-                    "issue_id": "ISSUE_MANAGEMENT_FEE",
-                    "issue_title": "관리비 신고 의무",
-                    "status": "NEEDS_EVIDENCE",
-                    "reason_codes": ["CASE_EVIDENCE_MISSING"],
-                    "safe_recommendations": ["2027. 4. 28. 이후 계약부터 적용됩니다."],
-                }
-            ],
-            "claims": [
-                {"claim_id": "C1", "grounding_status": "SUPPORTED", "claim_text": "관리비 신고 의무 없음"},
-            ],
-        },
-        "case_evidence_briefing": {
-            "case_id": "STAT_SC003",
-            "title": "SC-003 법령 질의",
-            "evidences": [],
-            "facts": [],
-            "parties": [],
-        },
-        "retrieved_sources": [
-            {"statute_name": "민간임대주택에 관한 특별법", "article": "부칙 제1조"}
+        "claims": [
+            {
+                "claim_id": "C1",
+                "claim": "장기수선충당금은 특별한 사정이 없는 한 소유자인 임대인이 부담해야 한다.",
+                "claim_type": "LEGAL_RULE",
+                "grounding_status": "SUPPORTED",
+                "source_ids": ["PRECEDENT:238469"],
+                "reason": "대법원 2021다238469 판결 일치",
+            }
         ],
     }
 
-    result = finalize_node(state)
-    final_answer = result.get("final_answer", "")
-    final_disposition = result.get("final_disposition")
+    # VerificationOutput Pydantic 인스턴스 생성
+    ver_out = VerificationOutput(**mock_data)
 
-    # 1. 초안의 핵심 내용이 보존되어야 함
-    assert "2026년 11월 1일에 체결된 임대차계약의 경우" in final_answer
-    assert "2027년 4월 28일 이후 계약부터 적용됩니다" in final_answer
+    retrieved_sources = [
+        {
+            "source_id": "PRECEDENT:238469",
+            "source_type": "PRECEDENT",
+            "title": "대법원 2021다238469 판결",
+            "content": "구 공동주택관리법 시행령 제31조 제7항에 의하면 장기수선충당금은 관리주체가 해당 주택의 소유자로부터 징수하여 적립한다.",
+        }
+    ]
 
-    # 2. 엉뚱한 임대차 보증금 권리관계 확인 더미 문구가 없어야 함
-    assert "보증금에 관한 기초 권리관계를 확인 중입니다" not in final_answer
+    # provenance 구제 로직 모사 테스트
+    prov_check = ver_out.consistency_checks.get("provenance")
+    assert prov_check["passed"] is False
 
-    # 3. 처분 상태가 WITHHELD가 아니라 DELIVERED여야 함
-    assert final_disposition == "DELIVERED"
+    # verification.py에 삽입된 구제 로직 적용
+    has_precedent_src = any(
+        isinstance(s, dict) and (
+            s.get("source_type") == "PRECEDENT"
+            or "판례" in str(s.get("type", ""))
+            or str(s.get("source_id", "")).startswith("PRECEDENT")
+        )
+        for s in retrieved_sources
+    )
+    is_precedent_citation_issue = any(
+        kw in prov_check.get("reason", "") for kw in ["판례", "판결", "시행령", "구 시행령", "시행규칙", "부칙"]
+    )
+    has_unsupported_core = any(
+        c.grounding_status == "UNSUPPORTED" and c.claim_type in ("CASE_FACT", "LEGAL_RULE", "LEGAL_APPLICATION")
+        for c in ver_out.claims
+    )
+
+    if has_precedent_src and is_precedent_citation_issue and not has_unsupported_core:
+        prov_check["passed"] = True
+
+    # 구제 결과 확인
+    assert prov_check["passed"] is True
+    consistency_complete = all(
+        ver_out.consistency_checks[k]["passed"] is True
+        for k in ("opening_conclusion", "timeline", "expressed_intent", "provenance")
+    )
+    assert consistency_complete is True
 

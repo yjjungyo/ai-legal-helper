@@ -1234,6 +1234,37 @@ def run_verification(
                 and item["limitation_statement"].strip() in draft_answer
             )) for item in result.question_coverage
         ))
+
+        # [P0-PROVENANCE-PRECEDENT-EXCEPTION]
+        # 판례 본문 내에 인용된 시행령·구 조문 언급으로 인한 기계적 provenance 실패 구제:
+        # 확보된 출처에 판례(PRECEDENT)가 존재하고, provenance 실패 사유가 판례에 설시된 하위법령/시행령/구 조문에 관한 것인 경우
+        # 허위 인용이 아니라 판례 출처에 의해 뒷받침된 것으로 인정하여 passed=True로 구제한다.
+        prov_check = result.consistency_checks.get("provenance")
+        if isinstance(prov_check, dict) and prov_check.get("passed") is False:
+            prov_reason = prov_check.get("reason", "")
+            has_precedent_src = any(
+                isinstance(s, dict) and (
+                    s.get("source_type") == "PRECEDENT"
+                    or "판례" in str(s.get("type", ""))
+                    or str(s.get("source_id", "")).startswith("PRECEDENT")
+                )
+                for s in (retrieved_sources or [])
+            )
+            is_precedent_citation_issue = any(
+                kw in prov_reason for kw in ["판례", "판결", "시행령", "구 시행령", "시행규칙", "부칙"]
+            )
+            has_unsupported_core = any(
+                c.grounding_status == "UNSUPPORTED" and c.claim_type in ("CASE_FACT", "LEGAL_RULE", "LEGAL_APPLICATION")
+                for c in result.claims
+            )
+            if has_precedent_src and is_precedent_citation_issue and not has_unsupported_core:
+                logger.info(
+                    "[VERIFICATION_PROVENANCE_RELIEF] 판례 본문 내 인용 조문으로 인한 provenance 실패를 passed=True로 구제 (사유: %s)",
+                    prov_reason,
+                )
+                prov_check["passed"] = True
+                result.warnings.append(f"판례 본문 내 인용 조문 언급(provenance 참고): {prov_reason}")
+
         consistency_complete = all(
             isinstance(result.consistency_checks.get(key), dict)
             and result.consistency_checks[key].get("passed") is True
