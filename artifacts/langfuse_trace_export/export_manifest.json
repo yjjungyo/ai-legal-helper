@@ -1,0 +1,21 @@
+{
+  "exported_at": "2026-11-16T09:09:01.099771+00:00",
+  "source_host": "http://localhost:3001",
+  "project_id": "cmv56sw2u00063wm9ivtyrtdj",
+  "requested": 1,
+  "success": 1,
+  "failed": 0,
+  "traces": [
+    {
+      "case_id": "SC-001-3",
+      "step": "1",
+      "service": "Manual",
+      "trace_id": "fcd33a9c-b116-4917-8260-9920c4b69028",
+      "status": "OK",
+      "file": "SC-001-3_step1_Manual_fcd33a9c-b116-4917-8260-9920c4b69028.json",
+      "observations": 22,
+      "api_mode": "legacy_trace_v1_observations",
+      "warnings": []
+    }
+  ]
+}

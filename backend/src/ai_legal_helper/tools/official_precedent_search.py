@@ -168,7 +168,7 @@ def search_official_precedents(
     """공식 판례 API 검색. 실패시 출처 0건으로 반환해 검증 실패를 숨기지 않는다.
 
     쿼리/판례 수·응답 크기를 제한해 비용/응답시간 폭증을 막는다. API 인증
-    없는 상태에서는 전송을 시도하지 않는다. 동일 판례는 id로 중복 제거.
+    없는 상태에서는 전송을 시도하지 않는다. 동일 ID 또는 동일 법원·사건번호·선고일·본문은 중복 제거한다.
     """
     meta = diagnostic if diagnostic is not None else {}
     api_key = os.getenv("LAW_OPENAPI_KEY", "").strip()
@@ -185,6 +185,7 @@ def search_official_precedents(
     limit = max(1, min(int(max_results), 5))
     sources: list[dict[str, Any]] = []
     seen: set[str] = set()
+    seen_decisions: set[tuple[str, str, str, str]] = set()
     calls = 0
     failed = False
     for q in valid:
@@ -224,6 +225,15 @@ def search_official_precedents(
                 continue
             source = parse_precedent_detail(detail, expected_id=seq)
             if source and (not hit["case_number"] or hit["case_number"].replace(" ", "") == source["case_number"]):
+                # API 일련번호가 달라도 같은 판결 원문이면 결과 한도를 소비하지 않는다.
+                # 사건번호만 같고 법원·선고일·본문이 다른 경우는 각각 보존한다.
+                identity = tuple(str(source.get(key) or "") for key in (
+                    "court", "case_number", "decision_date", "content",
+                ))
+                if all(identity) and identity in seen_decisions:
+                    continue
+                if all(identity):
+                    seen_decisions.add(identity)
                 sources.append(source)
         # 다른 query는 첫 결과가 부족할 때에만 수행.
     meta.update(status="SUCCESS" if sources else "API_ERROR" if failed else "NOT_FOUND",

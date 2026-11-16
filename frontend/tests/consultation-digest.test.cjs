@@ -71,6 +71,26 @@ test('명시적 핵심 결론 제목이 있으면 해당 본문을 그대로 사
   assert.equal(result.lead, '지금은 판단을 유보해야 합니다.');
 });
 
+test('작성 안내 대신 핵심 정리 절 전체를 표시하고 조건과 원문을 보존한다', () => {
+  const intro = '아래는 제출 자료를 기준으로 실행 순서를 정리한 것입니다.\n\n';
+  const conclusion = '등록 자료상 반환을 요구할 수 있는 상태입니다.\n\n- 통지 도달이 확인된 경우를 전제로 합니다.\n- 이사가 필요하면 등기 완료 여부를 먼저 확인하세요.\n\n';
+  const answer = `${intro}## 1. 현재 법적 상태의 핵심 정리\n${conclusion}## 2. 후속 절차\n절차별 설명입니다.`;
+  const result = buildConsultationDigest({blocks: splitAnswerForDisplay(answer)});
+  assert.equal(result.lead, conclusion.trim());
+  assert.equal(result.fullAnswer, answer);
+  assert.ok(result.detailedAnswer.includes(intro.trim()));
+  assert.ok(result.detailedAnswer.includes('절차별 설명입니다.'));
+  assert.ok(!result.detailedAnswer.includes(conclusion.trim()));
+});
+
+test('핵심 정리 절이 상담 핵심 답변 카드 안에 렌더링된다', () => {
+  const answer = '아래와 같이 정리했습니다.\n\n### 핵심 정리\n통지 도달이 확인되면 반환을 청구할 수 있습니다.\n\n### 실행 순서\n등기 완료 여부를 확인하세요.';
+  const html = renderToStaticMarkup(React.createElement(VerifiedPresentationView, {answer}));
+  const card = html.slice(html.indexOf('<section'), html.indexOf('</section>'));
+  assert.match(card, /통지 도달이 확인되면 반환을 청구할 수 있습니다/);
+  assert.doesNotMatch(card, /아래와 같이 정리했습니다/);
+});
+
 test('증거 인용 단독 행을 핵심 판단 항목으로 승격하지 않는다', () => {
   const result = buildConsultationDigest({ ...sample(), blocks: [
     {block_id:'B001',kind:'LEAD',markdown:'추가 확인이 필요합니다.'},
@@ -86,6 +106,35 @@ const mockLegal = {
 const { VerifiedPresentationView } = transpileFile('VerifiedPresentationView.tsx', {
   './LegalAnswerView': mockLegal,
   './consultationDigest': {buildConsultationDigest, splitAnswerForDisplay},
+});
+
+test('중첩 결론을 상단으로 옮겨도 상세 분석에 빈 결론 카드가 남지 않는다', () => {
+  const answer = '등록 자료를 기준으로 정리한 답변입니다.\n\n## 1. 결론 요약\n\n### 핵심 결론\n통지 도달이 확인되면 반환을 요구할 수 있습니다.\n\n---\n\n## 2. 사실관계 정리\n현재 거주 여부를 확인했습니다.';
+  const digest = buildConsultationDigest({blocks: splitAnswerForDisplay(answer)});
+  assert.equal(digest.lead, '통지 도달이 확인되면 반환을 요구할 수 있습니다.');
+  assert.doesNotMatch(digest.detailedAnswer, /결론 요약|핵심 결론/);
+  assert.match(digest.detailedAnswer, /사실관계 정리/);
+  assert.equal(digest.fullAnswer, answer);
+
+  // 실제 법률 렌더러까지 사용하여 빈 제목 카드와 중복 본문을 함께 검증한다.
+  const realLegal = transpileFile('LegalAnswerView.tsx');
+  const {VerifiedPresentationView: View} = transpileFile('VerifiedPresentationView.tsx', {
+    './LegalAnswerView': realLegal,
+    './consultationDigest': {buildConsultationDigest, splitAnswerForDisplay},
+  });
+  const html = renderToStaticMarkup(React.createElement(View, {answer}));
+  assert.doesNotMatch(html, /결론 요약/);
+  assert.equal((html.match(/통지 도달이 확인되면 반환을 요구할 수 있습니다/g) || []).length, 1);
+  assert.match(html, /현재 거주 여부를 확인했습니다/);
+});
+
+test('본문이 있는 결론 요약 절을 승격하고 제목뿐인 절은 요약으로 사용하지 않는다', () => {
+  const answer = '서두 안내입니다.\n\n## 결론 요약\n구체적인 결론과 조건입니다.\n\n## 상세 분석\n근거입니다.';
+  const digest = buildConsultationDigest({blocks: splitAnswerForDisplay(answer)});
+  assert.equal(digest.lead, '구체적인 결론과 조건입니다.');
+  const empty = buildConsultationDigest({blocks: splitAnswerForDisplay('## 결론 요약\n\n## 상세 분석\n근거입니다.')});
+  assert.equal(empty.lead, null);
+  assert.match(empty.fullAnswer, /근거입니다/);
 });
 
 test('초기 화면은 요약을 표시하고 전체 분석은 기본 닫힘 details 안에 둔다', () => {

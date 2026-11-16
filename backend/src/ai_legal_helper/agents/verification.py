@@ -1144,15 +1144,12 @@ def run_verification(
 
     error_type: Optional[str] = None
     try:
-        # [최적화 1: run_verification 프롬프트 다이어트]
-        # 17개 증거 문서 전체 전문(3.1만 자)과 249개 사실관계(2.4만 자)를 무차별 주입하는 대신,
-        # 법령 원문 및 초안에서 실제 인용된 증거 문서 위주로 축약 주입하여 입력 토큰을 40k -> 10k 이하로 압축한다.
+        # 미인용 자료에도 반대 증거가 있을 수 있으므로 전체 출처를 유지한다.
+        # 동일 법령·버전·본문의 반복만 참조로 공유하고 출처 ID는 모두 보존한다.
         from ai_legal_helper.rag.grounding_context import (
-            prune_sources_for_verification,
             prune_case_context_for_verification,
         )
-        pruned_sources = prune_sources_for_verification(retrieved_sources, draft_answer=draft_answer)
-        formatted_sources, _ = format_grounding_sources(pruned_sources)
+        formatted_sources, _ = format_grounding_sources(retrieved_sources, compact_repeated_bodies=True)
         _, source_manifest = format_grounding_sources(retrieved_sources)
 
         compact_case_context = prune_case_context_for_verification(case_context, draft_answer=draft_answer, max_chars=4000)

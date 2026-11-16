@@ -31,6 +31,16 @@ const CLASSIFIERS: Array<{kind: PreviewSection['kind']; test: RegExp; title: str
   {kind: 'caution', test: /(?:아직.{0,12}단정|주의|미확인|불확실|추가.{0,6}확인.{0,6}필요|판단.{0,6}유보)/i, title: '판단 전 주의할 점'},
 ];
 
+/** 결론으로 명시된 제목만 재배치하며 일반 사실관계 절을 임의로 요약하지 않는다. */
+const CONCLUSION_TITLE = /(?:핵심\s*결론|최종\s*결론|상담\s*요지|핵심\s*답변|핵심\s*정리|결론\s*요약)/i;
+
+/** 제목과 장식 구분선을 제외한 원문을 반환하여 제목만 있는 절의 승격을 방지한다. */
+function conclusionBody(block: PresentationBlock): string {
+  const firstLineEnd = block.markdown.search(/\r?\n/);
+  if (firstLineEnd < 0) return '';
+  return block.markdown.slice(firstLineEnd).replace(/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/gm, '').trim();
+}
+
 function getExactBulletLines(block: PresentationBlock): string[] {
   const lines = block.markdown.split(/\r?\n/);
   const items: string[] = [];
@@ -116,18 +126,17 @@ export function buildConsultationDigest(presentation: Pick<ConsultationPresentat
   const blocks = presentation.blocks || [];
   const fullAnswer = blocks.map((b) => b.markdown).join('');
 
-  // 1. 명시적인 결론 섹션이 있으면 최우선으로 핵심 답변으로 채택
+  // 안내문만 있는 서두보다 원문에 명시된 결론·핵심 정리를 우선한다.
+  // 절 전체를 옮겨 사실관계에 붙은 조건·예외가 발췌 과정에서 탈락하지 않도록 한다.
   const explicit = blocks.find((b) =>
-    b.kind === 'SECTION' && /(?:핵심\s*결론|최종\s*결론|상담\s*요지|핵심\s*답변)/i.test(b.title || '')
+    b.kind === 'SECTION' && CONCLUSION_TITLE.test(b.title || '') && conclusionBody(b)
   );
   let lead: string | null = null;
   let leadBlockId: string | null = null;
 
   if (explicit) {
     leadBlockId = explicit.block_id;
-    const firstLineEnd = explicit.markdown.search(/\r?\n/);
-    const body = firstLineEnd < 0 ? '' : explicit.markdown.slice(firstLineEnd).trim();
-    lead = body || null;
+    lead = conclusionBody(explicit);
   } else {
     // 2. 명시적 결론 섹션이 없으면 첫머리 LEAD 블록 사용
     const leadBlock = blocks.find((b) => b.kind === 'LEAD' && b.markdown.trim());
@@ -144,7 +153,10 @@ export function buildConsultationDigest(presentation: Pick<ConsultationPresentat
   // 상단 핵심 요약 카드로 추출된 블록을 제외하여 하단 상세 분석 본문과의 중복 노출을 방지한다.
   let detailedAnswer = fullAnswer;
   if (lead && leadBlockId) {
-    const remainingBlocks = blocks.filter((b) => b.block_id !== leadBlockId);
+    // 하위 결론을 상단으로 옮겼을 때 부모의 '결론 요약' 제목만 빈 카드로 남지 않게 한다.
+    // 원문 보존용 fullAnswer는 유지하고, 표시 본문에서 내용 없는 결론 제목만 제외한다.
+    const remainingBlocks = blocks.filter((b) => b.block_id !== leadBlockId
+      && !(b.kind === 'SECTION' && CONCLUSION_TITLE.test(b.title || '') && !conclusionBody(b)));
     detailedAnswer = remainingBlocks.map((b) => b.markdown).join('').trimStart();
   }
 

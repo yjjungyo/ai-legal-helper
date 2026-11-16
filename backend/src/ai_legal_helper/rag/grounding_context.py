@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Tuple, Optional
 
 def format_grounding_sources(
     sources: List[Dict[str, Any]], max_chars: int = 120_000,
+    *, compact_repeated_bodies: bool = False,
 ) -> Tuple[str, Dict[str, Any]]:
     """전체 출처 본문과 실제 전달 목록을 함께 반환한다.
 
@@ -24,6 +25,9 @@ def format_grounding_sources(
     Args:
         sources: 이번 요청에서 확보한 사건 증거와 법령 레지스트리.
         max_chars: 출처 컨텍스트의 문자 예산. 초과 시 일부를 조용히 생략하지 않는다.
+        compact_repeated_bodies: 같은 법령·버전 또는 법원·사건번호·선고일에서
+            완전히 같은 본문만 앞선 출처로 참조한다.
+            모든 출처 ID와 메타데이터, 서로 다른 본문 및 사건 증거는 유지한다.
 
     Returns:
         원문 컨텍스트와 source_ids·char_count·complete를 포함한 전달 명세.
@@ -33,6 +37,7 @@ def format_grounding_sources(
     """
     blocks = []
     seen = {}
+    body_references = {}
     for source in sources or []:
         sid = str(source.get("source_id") or source.get("evidence_id") or "")
         content = str(source.get("content") or source.get("article_text") or "").strip()
@@ -63,7 +68,8 @@ def format_grounding_sources(
         )
         if eff_date:
             meta["effective_date"] = eff_date
-            meta["article_effective_date"] = source.get("article_effective_date") or eff_date
+            if source.get("article_effective_date"):
+                meta["article_effective_date"] = source["article_effective_date"]
 
         for law_key in (
             "statute_name", "article", "article_title", "promulgation_date",
@@ -72,6 +78,11 @@ def format_grounding_sources(
         ):
             if source.get(law_key) is not None:
                 meta[law_key] = source[law_key]
+        if compact_repeated_bodies:
+            # 본문을 공유해도 법령의 식별자·버전·부칙 구분은 출처마다 확인할 수 있어야 한다.
+            for version_key in ("law_id", "version_id", "law_version_id", "addendum_id", "supplement_section"):
+                if source.get(version_key) is not None:
+                    meta[version_key] = source[version_key]
         # [SUBSUMPTION-02 / Gemini] PRECEDENT는 판결문 내용 외에 법원,
         # 사건번호, 선고일이 있어야 다른 사건에 대한 법리 적용 범위와
         # 선후 시점을 해석할 수 있다. 조문 메타와 섞지 말고 판례만 유지.
@@ -129,7 +140,36 @@ def format_grounding_sources(
             if parts:
                 statute_date_header = f"\n[법령 효력 일자: {', '.join(parts)}]"
 
-        blocks.append(json.dumps(meta, ensure_ascii=False) + guide_section + statute_date_header + "\n본문:\n" + effective_content)
+        body_reference = None
+        if compact_repeated_bodies and stype == "STATUTE" and sid:
+            # 조문 번호가 같아도 개정본·청크·시행일이 다르면 원문을 각각 보존한다.
+            # ID는 제거하지 않아 기존 인용이 계속 같은 근거를 가리키도록 한다.
+            identity = tuple(str(source.get(key) or "") for key in (
+                "law_id", "statute_name", "law_name", "article", "version_id",
+                "law_version_id", "article_effective_date", "effective_date",
+                "law_effective_date", "promulgation_date", "version_date",
+                "addendum_id", "supplement_section", "effective_date_basis", "temporal_status",
+            ))
+            body_key = (identity, effective_content, guide_section)
+            body_reference = body_references.get(body_key)
+            if not body_reference:
+                body_references[body_key] = sid
+        elif (compact_repeated_bodies and stype == "PRECEDENT" and sid
+              and all(source.get(key) for key in ("court", "case_number", "decision_date"))):
+            # 과거 검색에 누적된 별도 API ID도 인용 ID를 유지한 채 같은 판결 본문을 공유한다.
+            identity = tuple(str(source[key]) for key in ("court", "case_number", "decision_date"))
+            body_key = ("PRECEDENT", identity, effective_content, guide_section)
+            body_reference = body_references.get(body_key)
+            if not body_reference:
+                body_references[body_key] = sid
+        if body_reference:
+            meta["body_source_id"] = body_reference
+            body_text = f"동일 본문: 위 source_id={body_reference}의 본문 전체를 참조. 현재 source_id도 인용 가능."
+        else:
+            body_text = effective_content
+        # 효력 일자는 이미 메타데이터에 있으므로 압축 모드에서 같은 날짜를 재서술하지 않는다.
+        date_header = "" if compact_repeated_bodies else statute_date_header
+        blocks.append(json.dumps(meta, ensure_ascii=False) + guide_section + date_header + "\n본문:\n" + body_text)
     rendered = "\n\n".join(blocks) or "(검색된 출처 없음)"
     if len(rendered) > max_chars:
         raise ValueError("GROUNDING_CONTEXT_LIMIT_EXCEEDED")

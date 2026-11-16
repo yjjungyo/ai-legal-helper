@@ -1,5 +1,10 @@
-화면 출력 형태가 또 달라졌다. 
+PS C:\myprjs\ai-legal-helper> 
+python scripts/evaluation/export_langfuse_traces.py --trace-id 91bbdb77-7834-439a-91b7-968823f3f4df --case-id SC-003 --zip
 
+[1/1] OK   SC-015 1 Manual: 46 obs → SC-015_step1_Manual_eb4ea15f-c21b-4334-a788-b91b8fbe651b.json
+ZIP: artifacts\langfuse_trace_export.zip
+완료: 1/1 성공, 결과 목록: artifacts\langfuse_trace_export\export_manifest.json
+PS C:\myprjs\ai-legal-helper> 
 
 
 구분	공식 명칭	정의
@@ -7,6 +12,17 @@ LegalChat	일반 LLM Chat 서비스	일반 LLM이 사용자 질문에 직접 답
 LegalRAG	AI 법률자문 서비스	법령 RAG를 통해 필요한 법령을 검색하고, 검색된 법률정보를 근거로 답변을 생성하는 서비스
 LegalAgent	AI 법률도우미	사건·사실·증거·쟁점을 관리하고 법률 분석, 대응계획 및 법률문서 작성을 지원하는 목표 서비스
 
+
+TODO : 
+1. 판례 속 인용 조문으로 인한 불필요한 REVISE 차단 (document_verification_prompt.py)
+원인: 확보된 판례(PRECEDENT:238469) 본문 안에 인용되어 있는 '구 시행령 제31조 제7항'을 언급했다는 이유만으로 provenance = false → REVISE가 반복되었습니다.
+수정: 검증 프롬프트에 "확보된 판례 본문 내에 명시적으로 인용·판시된 법령·구 조문 번호를 판례 설명 맥락에서 함께 언급한 경우, 별도 법령 원문이 없다는 이유로 provenance=false 또는 REVISE를 내리지 말고 warnings에만 참고로 남기라"는 예외 규칙을 추가합니다.
+2. 핵심 주장 100% 지지 시 revise 루프 조기 종료 (document_consultation.py)
+원인: eb4ea15f의 5차 검증처럼 모든 claims가 SUPPORTED(미흡 0건)인데도 REVISE가 나오면 재작성 한도까지 검증을 계속 돕니다.
+수정: next_verification_step에서 아래 조건을 모두 만족하면 revise로 보내지 않고 즉시 finalize로 넘겨 불필요한 재검증(회당 2~3분)을 생략합니다.
+claims에 UNSUPPORTED / UNCERTAIN이 0건
+contradictions, missing_legal_issues, legal_search_requests가 비어 있음
+question_coverage가 모두 answered=true
 
 
 

@@ -186,8 +186,9 @@ def test_run_verification_integrates_diet_pruning():
         mock_llm.invoke.assert_called_once()
         invoked_prompt = mock_llm.invoke.call_args[0][0]
 
-        # LLM에 주입된 프롬프트에 미인용 증거 본문 생략 표기가 반영되었는지 검증
-        assert "초안 미인용 부수 증거: 상세 본문 생략" in invoked_prompt
+        # 미인용 자료에도 반대 증거가 있을 수 있어 전체 본문을 보존해야 한다.
+        assert sources[2]["content"].strip() in invoked_prompt
+        assert "초안 미인용 부수 증거: 상세 본문 생략" not in invoked_prompt
         # source_manifest는 전체 3개 출처를 모두 인지하고 있는지 검증
         assert out["source_manifest"]["source_count"] == 3
 

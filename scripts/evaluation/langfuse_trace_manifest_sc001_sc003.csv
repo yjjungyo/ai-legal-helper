@@ -1,0 +1,26 @@
+case_id,step,service,trace_id
+SC-001,1,LegalChat,d860ca38-be7a-42d2-acc3-eba8d97d7131
+SC-001,1,LegalRag,2490a3cf-d04c-4c6e-8f4b-ece8a46377dc
+SC-001,1,LegalAgent POC,635eb356-006a-4911-b7a9-7f5a4338c29b
+SC-001,1,LegalAgent E2E,620376c0-cf02-456b-b2ee-dfc5008855b0
+SC-001,1,LegalAgent E2E V8,9a6ea3b1-5817-480d-a934-67eeb402ccab
+SC-001,2,LegalChat,4a6bb262-c3ef-4c81-b2d2-bc05bad6a21b
+SC-001,2,LegalRag,de5e6f16-7bc1-4acd-af4b-5022bc35782b
+SC-001,2,LegalAgent POC,67828544-db3b-4e94-8cc2-1657a265a91c
+SC-001,2,LegalAgent E2E,8acaa910-fe98-4daa-8b4d-9d94bb8b0147
+SC-001,2,LegalAgent E2E V8,3fe378fc-1ac5-4c90-adf6-0de614c0e65d
+SC-001,3,LegalChat,8072caf6-e9d7-45cd-b9c3-a181f1200e39
+SC-001,3,LegalRag,dc9bca1f-4ba9-4da4-9eb3-7bbd0c576975
+SC-001,3,LegalAgent POC,35afce36-dea0-4eba-9077-8d9b89cf329d
+SC-001,3,LegalAgent E2E,20fd1ab5-24ea-4b1e-8a73-d00b44f2549d
+SC-001,3,LegalAgent E2E V8,d049beb7-f807-403c-b288-3012d9359db2
+SC-002,1,LegalChat,0f35b09e-c6b4-47fd-bca5-034ca13c9849
+SC-002,1,LegalRag,020f194c-7a85-4e0b-82df-644d676af417
+SC-002,1,LegalAgent POC,07cc223a-ac34-4dfe-845a-6e6f0e86969d
+SC-002,1,LegalAgent E2E,71d359c1-0d51-4f40-92df-d4eb2ba82828
+SC-002,1,LegalAgent E2E V8,22da7384-3dfc-4522-a4ac-5107501db41b
+SC-003,1,LegalChat,83abd075-1474-481e-9624-e126792a7757
+SC-003,1,LegalRag,c8c770bb-ae14-4311-aa9e-eda54bbe67c5
+SC-003,1,LegalAgent POC,4062ee92-ed2e-47f9-81a9-cd0b2eb9a268
+SC-003,1,LegalAgent E2E,033755c3-d654-44df-ac3e-545c9e1ea67e
+SC-003,1,LegalAgent E2E V8,cac6f0da-defe-498b-83bf-3a647591f0ef

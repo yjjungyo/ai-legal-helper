@@ -49,8 +49,7 @@ services:
     image: chromadb/chroma:latest
     restart: unless-stopped
     environment:
-      - IS_PERSISTENT=TRUE
-      - PERSIST_DIRECTORY=/data
+      - CHROMA_PERSIST_PATH=/data
     ports:
       - "127.0.0.1:8001:8000"
     volumes:
