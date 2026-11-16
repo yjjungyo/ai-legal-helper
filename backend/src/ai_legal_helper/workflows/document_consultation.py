@@ -350,7 +350,20 @@ def verify_answer(state: Dict[str, Any]) -> Dict[str, Any]:
                 current_manifest=manifest,
             )
         )
-        if reusable:
+        from ai_legal_helper.workflows.monetary_checks import invalid_monetary_equations
+        invalid_equations = invalid_monetary_equations(draft)
+        if invalid_equations:
+            # 산술 오류가 명시된 초안을 비싼 법률 검증에 보내지 않고 먼저 수정한다.
+            # 지급 사실·법적 공제 가능성은 이 검사가 판정하지 않는다.
+            result = {
+                "status": "REVISE", "reason_code": "ANSWER_REVISION_REQUIRED",
+                "source_manifest": manifest, "claims": [], "warnings": [],
+                "revision_instructions": [
+                    "명시된 금액 산식이 일치하지 않습니다. 항목별 금액과 실제 지급 여부를 원문에 대조하고 첫 결론과 본문의 합계를 함께 수정하세요: " + equation
+                    for equation in invalid_equations
+                ],
+            }
+        elif reusable:
             reused_verifier = True
             # 이미 독립 LLM 검증을 거친 결과만 복사한다. 실패 결론을
             # PASS로 승격하거나 검증되지 않은 추가 법률효과를 인정하지 않는다.
@@ -389,6 +402,13 @@ def verify_answer(state: Dict[str, Any]) -> Dict[str, Any]:
             sources_sha256=(result.get("source_manifest") or {}).get("content_sha256") or "",
         )
         no_progress = issue_hash in progress_history or reused_verifier
+        if (state.get("revision_count") or 0) >= 1:
+            # 최소 한 번 고칠 기회를 준 뒤, 설명 문구만 달라진 동일 미지원 출처가
+            # 남으면 반복을 종료한다. 신규 검색 요청은 라우터에서 여전히 먼저 검사한다.
+            from ai_legal_helper.workflows.verification_progress import same_unresolved_applications
+            no_progress = no_progress or same_unresolved_applications(
+                state.get("verification_result") or {}, result,
+            )
         if issue_hash not in progress_history:
             progress_history = (progress_history + [issue_hash])[-5:]
     if no_progress:
@@ -491,9 +511,21 @@ def next_verification_step(state: Dict[str, Any]) -> str:
                 else:
                     target_node = "insufficient"
                     route_reason = "적용시점 근거 부재 보류 종료"
-            elif result.get("status") in ("REVISE", "INSUFFICIENT") and (state.get("revision_count") or 0) < 3:
+            # [EARLY_EXIT_100_PERCENT] 초안의 모든 핵심 주장(claims)이 이미 출처에 의해 100% 뒷받침(SUPPORTED)되었고
+            # 미지원 주장이 0건이며 허위 인용이 없는 경우:
+            # 사소한 출처 형식이나 provenance 경고로 인해 불필요한 거대 LLM 검증 루프(수백 초 지연)를 방지하고 즉시 finalize로 승인한다.
+            elif (
+                result.get("claims")
+                and all(c.get("grounding_status") == "SUPPORTED" for c in result.get("claims", []))
+                and not (result.get("citation_audit") or {}).get("unverified_citations")
+                and not (result.get("citation_audit") or {}).get("unsupported_citations")
+                and result.get("reason_code") not in ("LEGAL_SOURCE_MISSING", "EVIDENCE_CONFLICT", "VERIFICATION_ERROR")
+            ):
+                target_node = "finalize"
+                route_reason = f"모든 주장(100% {len(result.get('claims'))}건) 지지 및 인용 일치 확인 조기 승인"
+            elif result.get("status") in ("REVISE", "INSUFFICIENT") and (state.get("revision_count") or 0) < 2:
                 target_node = "revise"
-                route_reason = f"답변 보강 재작성 ({state.get('revision_count', 0) + 1}/3회)"
+                route_reason = f"답변 보강 재작성 ({state.get('revision_count', 0) + 1}/2회)"
             else:
                 if state.get("draft_answer") and result.get("claims"):
                     target_node = "finalize"

@@ -2405,9 +2405,21 @@ def supervisor_verification_decision(state: LegalState) -> str:
 
 
 
+        briefing_data = state.get("briefing") or {}
+
+        has_case_evidence = bool(briefing_data.get("evidences") or briefing_data.get("facts"))
+
         issue_res_objs = [IssueVerificationResult(**ir) for ir in issue_results_raw]
 
-        disposition, disp_reason = determine_final_disposition(issue_res_objs)
+        disposition, disp_reason = determine_final_disposition(
+
+            issue_res_objs,
+
+            has_case_evidence=has_case_evidence,
+
+            verification_status=status,
+
+        )
 
         logger.info(f"[DISPOSITION] 쟁점 기반 처분 결정: {disposition} ({disp_reason})")
 
@@ -3589,11 +3601,24 @@ def finalize_node(state: LegalState) -> Dict:
 
         ver_res["issue_results"] = issue_results_raw
 
-        calc_disp, _ = determine_final_disposition(issue_res_objs)
+        has_case_evidence = bool(briefing_obj.evidences or briefing_obj.facts)
 
-        # 전체 초안의 PASS가 쟁점별 미확인 상태를 덮어쓰지 않도록 최종 처분을 보존한다.
+        calc_disp, _ = determine_final_disposition(
 
-        final_disp = calc_disp if ver_status == "PASS" or calc_disp == "WITHHELD" else "CAUTIONARY"
+            issue_res_objs,
+
+            has_case_evidence=has_case_evidence,
+
+            verification_status=ver_status,
+
+        )
+
+        # 전체 초안의 검증 통과(PASS) 여부 및 쟁점별 처분 상태를 종합 반영한다.
+        # [P0-VER-STATUTORY] ver_status == "PASS"인 경우 법률 검증이 완료되었으므로 부당하게 WITHHELD로 강등되지 않도록 보장한다.
+        if ver_status == "PASS":
+            final_disp = "DELIVERED" if calc_disp in ("DELIVERED", "WITHHELD") else calc_disp
+        else:
+            final_disp = calc_disp if calc_disp == "WITHHELD" else "CAUTIONARY"
 
 
 
@@ -3612,28 +3637,62 @@ def finalize_node(state: LegalState) -> Dict:
 
 
         # [State-Answer Consistency]
-        # final_disp == "WITHHELD"인 경우, 검증되지 않은 단정적 초안(draft)을 그대로 방출하지 않고
-        # 쟁점별 보류 상태가 반영된 보류형 답변(assemble_grounded_answer)을 생성하거나 보류 안내로 대체한다.
-        if (not draft or final_disp == "WITHHELD") and "issue_res_objs" in locals():
-            from ai_legal_helper.workflows.final_disposition import assemble_grounded_answer
-            final = assemble_grounded_answer(
-                issue_res_objs,
-                briefing_obj,
-                draft if final_disp != "WITHHELD" else "",
-                final_disp,
-                conv_context=state.get("conversation_context"),
-                current_question=state.get("question", ""),
-                case_delta=case_delta,
-            )
-        else:
+        # ver_status == "PASS"이거나 유효한 초안(draft)이 존재하고 처분이 WITHHELD가 아닌 경우,
+        # 검증을 통과한 고품질 초안을 절대 폐기하지 않고 보존하여 정제 방출한다.
+        # 오직 초안이 없거나 검증 실패(ver_status != "PASS") 상태에서 WITHHELD인 경우에만 assemble_grounded_answer로 대체한다.
+        if draft and (ver_status == "PASS" or final_disp != "WITHHELD"):
+
             sanitized = sanitize_unverified_citations(
+
                 draft,
+
                 state.get("retrieved_sources", []),
+
                 case_context=state.get("case_context", ""),
+
             )
+
             final = clean_markdown_formatting(sanitized)
+
             if final_disp == "WITHHELD" and (final.startswith("예.") or final.startswith("네.")):
+
                 final = "현재 확인된 법령 시행 시점 및 자료상 단정적인 법률 의무를 확정하기 어렵습니다(판단 유보).\n\n" + final
+
+        elif "issue_res_objs" in locals():
+
+            from ai_legal_helper.workflows.final_disposition import assemble_grounded_answer
+
+            final = assemble_grounded_answer(
+
+                issue_res_objs,
+
+                briefing_obj,
+
+                draft if final_disp != "WITHHELD" else "",
+
+                final_disp,
+
+                conv_context=state.get("conversation_context"),
+
+                current_question=state.get("question", ""),
+
+                case_delta=case_delta,
+
+            )
+
+        else:
+
+            sanitized = sanitize_unverified_citations(
+
+                draft,
+
+                state.get("retrieved_sources", []),
+
+                case_context=state.get("case_context", ""),
+
+            )
+
+            final = clean_markdown_formatting(sanitized)
 
     else:
 
@@ -4634,7 +4693,8 @@ def statute_search_result_condition(state: LegalState) -> str:
 
     # [STEP5-PROGRESS-08 / Gemini] POST_VERIFICATION 이후 새 출처가
     # 0개면 같은 법령/판례를 다시 받아도 새로운 법률 지식은 없다.
-    # 법률 근거 부족 상태에서 대답 표현만 고치는 LLM 재분석을 생략.
+    # 이미 수정했거나 무진전인 초안은 같은 법률 근거로 재분석하지 않는다.
+    # 아직 고칠 기회가 없었던 검증 실패 초안에는 최초 수정 기회를 보장한다.
     # 이전에 작성·검증한 스냅샷은 finish_answer의 동일 원문/Temporal/
     # 인용/미지지 법률효과 안전 검사를 통과할 때만 조건부 반환 가능.
     # 그래프가 과거 저장 상태나 mock 데이터로 실행되는 경우
@@ -4642,6 +4702,14 @@ def statute_search_result_condition(state: LegalState) -> str:
     if (state.get("answer_mode") == DOCUMENT_MODE
             and state.get("search_delta_count") == 0
             and state.get("draft_answer")):
+        # 검색 무진전과 초안 수정 불가는 다르다. 아직 수정 기회가 없었다면
+        # 검증 지적·확보 근거 안에서 한 번 고치고 다시 독립 검증한다.
+        if ((state.get("revision_count") or 0) == 0
+                and not state.get("revision_no_progress")
+                and not state.get("verification_no_progress")
+                and (state.get("verification_result") or {}).get("status") in ("REVISE", "INSUFFICIENT")
+                and (state.get("verification_result") or {}).get("revision_instructions")):
+            return "revise"
         logger.info(
             "[STEP5_SEARCH] 새 법률 출처 0건: 재분석 LLM 생략; 기존 초안 안전 종료"
         )
@@ -5656,6 +5724,7 @@ def build_legal_graph(checkpointer: Optional[Any] = None):
         "run_agents": "run_agents",
 
         "re_analyze": "re_analyze",
+        "revise": "revise",
 
         # [STEP5-PROGRESS-09] 중복/실패 검색 후에도 기존 검증된 주장만
         # 있는 경우 안전한 CAUTIONARY를 받을 수 있게 finish_answer로

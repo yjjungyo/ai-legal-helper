@@ -264,22 +264,30 @@ def reconcile_issue_results(
 
 def determine_final_disposition(
     issue_results: List[IssueVerificationResult],
+    has_case_evidence: bool = True,
+    verification_status: Optional[str] = None,
 ) -> Tuple[str, str]:
     """쟁점별 검증 결과를 종합하여 최종 응답 처분 상태(DELIVERED, CAUTIONARY, WITHHELD)를 판정한다.
 
     Section 8.3 요구사항 반영:
-    1. DELIVERED: 핵심 법률 쟁점이 VERIFIED 상태로 확정되고 BLOCKED 쟁점이 없음.
-    2. CAUTIONARY: 실질적 법률 분석이 검증되었으나, 일부 쟁점이 CONDITIONAL 또는 NEEDS_EVIDENCE 상태임.
+    1. DELIVERED: 핵심 법률 쟁점이 VERIFIED 상태로 확정되고 BLOCKED 쟁점이 없거나,
+       검증기 전체 판정(verification_status)이 PASS인 법률 질의(사건 증거 미제출 질의 포함).
+    2. CAUTIONARY: 실질적 법률 분석이 검증되었으나, 일부 쟁점이 CONDITIONAL 또는 NEEDS_EVIDENCE 상태이거나,
+       증거 미제출 상태에서 일반 법령을 기준으로 주의적 분석을 제공하는 경우.
     3. WITHHELD: 모든 쟁점이 BLOCKED이거나, 안전하게 제공할 수 있는 법률적 판단이 전혀 없음.
 
     Args:
         issue_results: 각 단위 법률 쟁점별 검증 결과 목록.
+        has_case_evidence: 사건 증거 문서(계약서, 영수증 등) 또는 사실관계가 등록되어 있는지 여부.
+        verification_status: 전체 검증기(verification_node) 판정 상태 ('PASS', 'REVISE', 'FAIL' 등).
 
     Returns:
         Tuple[str, str]: (final_disposition, disposition_reason)
     """
     issue_results = reconcile_issue_results(issue_results)
     if not issue_results:
+        if verification_status == "PASS":
+            return "DELIVERED", "법률 쟁점 검토가 관련 법령 및 출처에 의해 검증(PASS)되었습니다."
         return "WITHHELD", "검증 대상 법률 쟁점이 도출되지 않았습니다."
 
     verified_count = sum(1 for r in issue_results if r.status == "VERIFIED")
@@ -287,8 +295,15 @@ def determine_final_disposition(
     needs_evidence_count = sum(1 for r in issue_results if r.status in ("NEEDS_EVIDENCE", "NEEDS_LEGAL_SOURCE"))
     blocked_count = sum(1 for r in issue_results if r.status == "BLOCKED")
 
-    # 모든 쟁점이 차단되었거나 실질 분석이 전무한 경우
+    # 모든 쟁점이 차단(BLOCKED)되었거나 실질 분석이 전무한 경우
     if verified_count == 0 and conditional_count == 0:
+        # [P0-VER-STATUTORY] 사건 증거 문서가 미제출된 순수 법률 질의(SC-003 등)의 경우:
+        # 사실관계 증거가 없어 issue_status는 NEEDS_EVIDENCE이나,
+        # 검증기 전체 판정이 이미 PASS(법률 규칙·적용 출처 지지 확인)인 경우 답변을 부당하게 WITHHELD로 유보하지 않는다.
+        if verification_status == "PASS":
+            return "DELIVERED", f"핵심 법률 쟁점 {len(issue_results)}건이 관련 법령 및 출처에 의해 검증(PASS)되었습니다 (증거 미제출 법률 질의)."
+        if not has_case_evidence and blocked_count == 0:
+            return "CAUTIONARY", f"증거 문서 미제출 상태의 법률 질의로 관련 법령 기준의 실질적 검토를 제공합니다 (쟁점 {len(issue_results)}건)."
         return "WITHHELD", f"모든 쟁점({len(issue_results)}건)의 증거 또는 법률 근거가 불충분하여 법률 판단을 유보합니다."
 
     # 모든 쟁점이 완전 검증된 경우
@@ -871,10 +886,17 @@ def assemble_grounded_answer(
         top_recs = [rec for r in verified_issues for rec in r.safe_recommendations[:1]]
         conclusion_lines = top_recs[:2]
     else:
-        conclusion_lines = [
-            f"현재 등록된 증거를 바탕으로 {deposit_text}에 관한 기초 권리관계를 확인 중입니다.",
-            "확인된 계약 사실과 미확인 요건을 구분하며, 현재 권리관계와 종료 여부를 추가 확인해야 합니다.",
-        ]
+        # [P0-VER-STATUTORY] 증거 문서가 등록되지 않은 일반 법령·법률 질의의 경우 무관한 임대차 보증금 문구를 배제한다.
+        if not (briefing.evidences or []) and deposit_krw == 0:
+            conclusion_lines = [
+                "제출된 사건 증거 자료가 등록되지 않은 상태이므로, 관련 법령 및 판례 기준의 일반 법률 원칙을 바탕으로 안내합니다.",
+                "개별 구체적 사실관계(계약 내용 및 실제 이행 여부)에 따라 법적 효과가 달라질 수 있으므로 구체적 사실 확인이 필요합니다.",
+            ]
+        else:
+            conclusion_lines = [
+                f"현재 등록된 증거를 바탕으로 {deposit_text}에 관한 기초 권리관계를 확인 중입니다.",
+                "확인된 계약 사실과 미확인 요건을 구분하며, 현재 권리관계와 종료 여부를 추가 확인해야 합니다.",
+            ]
     if repaid_krw > 0:
         # 확인된 거래의 산술 차액을 표시하되 현재 청구권·이행기 확정과 구분한다.
         conclusion_lines.append(
@@ -941,14 +963,25 @@ def assemble_grounded_answer(
                         "evidence_labels": result.supported_source_ids,
                     })
     else:
-        prioritized_actions = [
-            {"text": "갱신 여부, 종료 합의 및 해지·갱신거절 통지와 상대방 수신 자료를 확인하십시오.",
-             "evidence_labels": notice_labels},
-            {"text": "최초 보증금 지급과 임대인의 반환 거래를 구분하고, 현재까지의 실제 반환 내역을 대조하십시오.",
-             "evidence_labels": lease_labels},
-            {"text": "주민등록 초본·확정일자 확인 자료의 원본, 현재 점유 및 최신 등기사항을 확인하십시오.",
-             "evidence_labels": residence_labels},
-        ]
+        # [P0-VER-STATUTORY] 증거 문서가 등록되지 않은 일반 법령 질의의 경우 무관한 임대차 보증금 행동 가이드를 배제한다.
+        if not (briefing.evidences or []) and deposit_krw == 0:
+            prioritized_actions = [
+                {"text": "사안에 관련된 구체적 계약서, 영수증, 통지 등 증빙 자료를 확보하여 확인하십시오.",
+                 "evidence_labels": []},
+                {"text": "해당 법령의 시행 시점 및 부칙상 적용례가 본인 계약 체결일 또는 행위 시점에 적용되는지 검토하십시오.",
+                 "evidence_labels": []},
+                {"text": "분쟁 또는 행정 처분(과태료 등) 우려가 있는 경우 관련 행정청 유권해석 또는 법률 전문가와 추가 상담하십시오.",
+                 "evidence_labels": []},
+            ]
+        else:
+            prioritized_actions = [
+                {"text": "갱신 여부, 종료 합의 및 해지·갱신거절 통지와 상대방 수신 자료를 확인하십시오.",
+                 "evidence_labels": notice_labels},
+                {"text": "최초 보증금 지급과 임대인의 반환 거래를 구분하고, 현재까지의 실제 반환 내역을 대조하십시오.",
+                 "evidence_labels": lease_labels},
+                {"text": "주민등록 초본·확정일자 확인 자료의 원본, 현재 점유 및 최신 등기사항을 확인하십시오.",
+                 "evidence_labels": residence_labels},
+            ]
 
     # 최대 3~5개로 엄격히 제한
     final_actions = prioritized_actions[:5]

@@ -84,6 +84,21 @@ DOCUMENT_ANSWER_SYSTEM = """당신은 등록 자료를 읽고 사용자의 현�
 
 [E. 답변 출력 형식 및 타이포그래피 가독성 원칙 (STEP 6)]
 - [첫 문단 핵심 결론]: 첫 문단에서 사용자의 질문에 직접 답변하는 핵심 결론을 명쾌하게 제시하세요. 첫 문단 끝에 증거 파일 목록을 무더기로 몰아서 나열하지 마세요. 불필요하게 '사건 증거 기반 AI 분석 결과', '검증 완료' 등으로 시작하지 마세요.
+  * 첫 문단은 화면의 '상담 핵심 답변'에 그대로 표시됩니다. '아래는 자료를 기준으로 정리한 것입니다', '대응 방안을 안내하겠습니다' 같은 작성 안내나 기준일만으로 채우지 마세요.
+  * 복합 사건은 3~5문장으로 현재 질문에 대한 구체적인 결론, 그 결론을 좌우하는 사건 사실과 조건, 가장 먼저 할 조치와 선후관계를 함께 제시하세요. 단순 질문은 필요한 내용만 간결하게 답하세요.
+  * 근거가 부족하면 확인된 범위에서 가능한 판단과 결론을 바꾸는 미확인 요건을 구체적으로 밝히세요. 요약을 강하게 만들기 위해 조건을 생략하거나 회수 가능성·법적 효과를 단정하지 마세요.
+- [질문별 답변 범위와 반복 억제]: 현재 질문 원문이 요청한 산출물과 쟁점 수를 기준으로 분량을 정하세요. 길이는 목표이며 조건·예외·반대 증거를 생략하는 상한이 아닙니다.
+  * 단순 조문·요건 질문은 결론과 필요한 조건·근거 중심으로 400~900자 내외를 목표로 하세요.
+  * 후속 질문은 이번에 묻는 내용과 달라진 판단·조치에 집중하세요. 이전 사건 개요, 이미 설명한 법리·절차를 반복하지 말고 이해에 필요한 전제만 짧게 병기하세요. 후속 질문이 복합 재검토를 요구하면 그 범위는 충분히 답하세요.
+  * 복합 사건 분석은 1,500~2,500자 내외로 핵심 결론 → 요청된 쟁점별 판단 → 필요한 실행 순서를 작성하세요. 사건 연혁·금액·통지는 해당 판단에서 한 번 설명하고 별도 장문 연혁으로 반복하지 마세요.
+  * 상세 보고서·전체 검토를 명시적으로 요청하면 분량 목표보다 요청 범위를 우선하세요. 질문하지 않은 일반 소송 절차나 서류 목록을 관성적으로 추가하지 마세요.
+  * 사건의 결론·핵심 사실·근거 조문·결정적 조건·실행 조치가 충족되면 마무리하세요. 글자 수를 맞추려 같은 결론을 소제목마다 재서술하지 마세요.
+- [청구액 검산과 지급 상태]: 청구액을 제시할 때 항목별 금액과 실제 수령액을 구분하고, `항목 금액원 + 항목 금액원 - 실제 수령 금액원 = 잔액원`처럼 숫자 산식을 명시하여 검산하세요. 첫 결론과 본문은 같은 산식·지급 상태를 사용해야 합니다.
+  * 지급 예정·제안·공제 통지·지급 약속은 실제 입금이 아닙니다. 실제 수령이 확인된 금액만 기지급액으로 차감하세요. 수령 여부가 미확인이면 수령/미수령 분기를 명시하고 특정 잔액을 최소액으로 단정하지 마세요.
+  * 항목별 금액·통화 단위·합계·공제액을 대조하고, 동일 금액을 두 번 차감하지 마세요. 다툼 있는 청구액과 법원이 인정할 회수액도 구분하세요.
+- [직접 근거 및 수정 의무]: 법률에 직접 규정이 부족하면 해당 법률의 시행령·시행규칙과 위임 조문을 먼저 확인할 검색 대상으로 명시하세요. 특수한 반환·부담 규정을 확인하지 않고 일반 민법·판례만 반복 요청하지 마세요. 존재하지 않는 하위법령명이나 조문 번호는 만들지 마세요.
+  * 사건 시점의 시행본을 검색할 때 missing_laws 항목에 as_of_date를 YYYY-MM-DD로 명시하세요. 여러 사건 시점이 필요하면 날짜별로 분리하세요. 법령 전체 시행일과 개별 조문·항의 시행일은 구분하고, 본문의 개정 표기만으로 과거 적용을 확정하지 마세요.
+  * 수정 시 지적된 모든 미지원 주장을 원문과 새 근거로 다시 대조하세요. 직접 근거가 여전히 없다면 '근거가 충분하다' 같은 표현으로 바꾸지 말고 그 법률효과의 확정을 철회하며 확인된 사실과 미확인 법적 구성을 분리하세요. 올바른 산식으로 고친 첫 결론은 본문의 모든 합계와 일치시켜야 합니다.
 - [시각적 리듬감과 일관된 여백 (Visual Rhythm & Spacing)]:
   * 긴 서술형 통문단(줄글)을 지양하고, 1~2문장의 간결한 글머리 기호(`- `) 목록으로 시각적 리듬감을 살리세요.
   * 소제목(`### `) 위아래와 서로 다른 내용 블록 사이에는 반드시 빈 줄을 1개씩 넣어 답답하지 않게 일관된 여백을 확보하세요.
@@ -96,7 +111,7 @@ DOCUMENT_ANSWER_SYSTEM = """당신은 등록 자료를 읽고 사용자의 현�
     - 불릿 항목의 핵심 라벨 (예: `- **계약 종료 및 대항력 요건**: ...`)
   * 문장 전체를 무분별하게 길게 볼드 처리하지 말고 핵심 단어와 수치에만 강조하여 시각적 대비를 극대화하세요.
 - [최적 분량 및 유연한 소제목]:
-  * 질문에 필요한 핵심 답변과 필수 법적 근거, 대응 방안을 명쾌하게 설명하되, 동일한 내용을 다른 문단에서 불필요하게 반복하여 분량을 과도하게 늘리지 마세요. 1,500~2,500자 내외의 정돈된 답변으로 작성하세요.
+  * 질문에 필요한 핵심 답변과 필수 법적 근거, 대응 방안을 명쾌하게 설명하되, 위 질문별 분량 목표를 따르고 동일한 내용을 다른 문단에서 반복하지 마세요.
   * 질문에 맞춘 자연스러운 마크다운 소제목(`### `)으로 단락을 명확히 구분하세요. 단순한 질문에 소송 절차 안내를 강제하지 마세요. 이미 설명한 결론이나 면책 문구를 남발하지 마세요.
 - [자연스러운 인라인 출처 표기 (STEP 6)]:
   * 사건 문서(사실 문장)는 반드시 전체 파일명 그대로 `[01_임대차_주요내용.txt]`, `[E01_주택임대차계약서.txt]`와 같이 대괄호 안에 표기하세요.
@@ -279,15 +294,9 @@ def write_document_answer(
         limited,
         bool(previous_draft),
     )
-    # [컨텍스트 다이어트: 토큰 비용 및 지연시간 대폭 압축]
-    # LLM 프롬프트에 주입할 본문은 동일 조문 중복 제거 및 재작성 시 비인용 증거 축약을 거쳐 압축한다.
-    from ai_legal_helper.rag.grounding_context import prune_sources_for_consultation
-    diet_sources = prune_sources_for_consultation(
-        sources,
-        draft_answer=previous_draft,
-        verification=verification,
-    )
-    context, _ = format_grounding_sources(diet_sources)
+    # 서로 다른 원문·개정본과 미인용 반대 증거를 유지하고 동일 법령 본문만 참조로 공유한다.
+    # 원본 ID를 삭제하지 않으므로 부분 수정에서도 기존 인용이 유효하다.
+    context, _ = format_grounding_sources(sources, compact_repeated_bodies=True)
     # 최종 매니페스트는 검증 및 영속성 무결성 유지를 위해 전체 sources 기준으로 산출한다.
     _, manifest = format_grounding_sources(sources)
     # 감사 레지스트리의 본문을 수정 지적으로 다시 넣으면 원문이 중복되고 예산이 무의미해진다.
@@ -369,16 +378,23 @@ def write_document_answer(
             "old_text는 기존 초안에 정확히 한 번 나타나는 문자열이어야 합니다. "
             "검증 지적과 무관한 부분은 패치에 넣지 마세요. 기존 초안 전체를 출력하지 마세요."
         )
-    response = get_llm(temperature=0.0).invoke([
-        SystemMessage(content=DOCUMENT_ANSWER_SYSTEM + (
+    # 법령 보강 후 일반 작성에도 기본 규칙을 유지한다. 조건식 전체에 묶으면
+    # integrated/partial_repair가 모두 False일 때 시스템 메시지가 비게 된다.
+    system_prompt = DOCUMENT_ANSWER_SYSTEM
+    if integrated:
+        system_prompt += (
             "\n\n[최초 작성 구조화 출력 최우선 규약]\n"
             "이번 호출에서는 반드시 JSON 객체 한 개만 출력하세요. "
             "법령 근거가 충분하면 status=READY 및 answer 필드에 사용자용 마크다운 답변을 넣으세요. "
             "법령 원문이 핵심 쟁점에 부족하면 status=NEED_MORE_LAW, missing_laws 배열, answer 빈 문자열을 반환하세요."
-        ) if integrated else (DOCUMENT_ANSWER_SYSTEM + (
+        )
+    elif partial_repair:
+        system_prompt += (
             "\n\n[부분 수정 JSON 출력 규약]\n"
             "이번 호출에서는 최종 답변 대신 patches JSON 객체만 출력하세요."
-        ) if partial_repair else "")),
+        )
+    response = get_llm(temperature=0.0).invoke([
+        SystemMessage(content=system_prompt),
         HumanMessage(content=json.dumps(payload, ensure_ascii=False) + "\n\n[전체 근거 원문]\n" + context),
     ])
     answer = response.content
@@ -430,8 +446,12 @@ def write_document_answer(
                     articles = item.get("articles", [])
                     if not isinstance(name, str) or not name.strip() or not isinstance(issue, str) or not issue.strip() or not isinstance(articles, list) or not all(isinstance(a, str) for a in articles):
                         raise ValueError("INVALID_LAW_REQUEST")
+                    requested_date = item.get("as_of_date")
+                    if requested_date:
+                        requested_date = date.fromisoformat(str(requested_date)).isoformat()
                     requests.append({"law_name": name.strip(), "issue": issue.strip(),
-                                     "question_part": question, "articles": articles})
+                                     "question_part": question, "articles": articles,
+                                     "as_of_date": requested_date})
                 return {"draft_answer": "", "answer_source_manifest": manifest,
                         "answer_generation_error": None, "synthesis_law_gate": {
                             "status": "NEED_MORE_LAW", "legal_search_requests": requests,

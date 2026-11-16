@@ -135,6 +135,38 @@ def verification_defect_signature(
     })
 
 
+def same_unresolved_applications(previous: dict[str, Any], current: dict[str, Any]) -> bool:
+    """동일 원문으로 재검증해도 같은 법률효과·출처의 미지원 상태가 남았는지 비교한다.
+
+    Args:
+        previous: 직전 독립 검증 결과와 출처 명세.
+        current: 수정 후 독립 검증 결과와 출처 명세.
+
+    Returns:
+        같은 법률효과와 미지원 출처 묶음이 같고 실제 근거도 변하지 않았으면 True.
+        새 근거·판정 개선·검증 오류는 반복 결함으로 처리하지 않는다.
+    """
+    def blockers(result: dict[str, Any]) -> set[tuple]:
+        """자유 서술과 지지된 주변 주장을 제외한 실패 출처 묶음을 만든다."""
+        effects = {item.get("claim"): str(item.get("legal_effect") or "").strip()
+                   for item in result.get("application_checks") or [] if isinstance(item, dict)}
+        return {
+            (effects[claim.get("claim")], claim.get("grounding_status"),
+             tuple(sorted(claim.get("source_ids") or [])))
+            for claim in result.get("claims") or []
+            if claim.get("claim_type") == "LEGAL_APPLICATION"
+            and claim.get("grounding_status") in ("UNSUPPORTED", "UNCERTAIN")
+            and claim.get("source_ids")
+            and effects.get(claim.get("claim"))
+        }
+
+    old_sha = (previous.get("source_manifest") or {}).get("content_sha256")
+    new_sha = (current.get("source_manifest") or {}).get("content_sha256")
+    return bool(old_sha and old_sha == new_sha
+                and previous.get("status") == current.get("status") == "REVISE"
+                and blockers(previous) and blockers(previous) == blockers(current))
+
+
 def can_reuse_verification(
     *,
     previous: dict[str, Any],

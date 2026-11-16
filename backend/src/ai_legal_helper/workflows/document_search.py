@@ -7,6 +7,7 @@
 import hashlib
 import json
 import os
+from datetime import date
 from typing import Any
 
 from ai_legal_helper.tools.official_statute_search import _prepare_search_targets, _article_references
@@ -14,6 +15,27 @@ from ai_legal_helper.observability.logging_config import get_logger
 from ai_legal_helper.rag.temporal_applicability import ApplicabilityStatus, evaluate_statute_applicability
 
 logger = get_logger(__name__)
+
+
+def _request_date(state: dict[str, Any], request: dict[str, Any]) -> str | None:
+    """검색 요청의 명시 사건일을 우선하고, 없으면 기존 사건 기준일을 사용한다.
+
+    Args:
+        state: 사건 브리핑·의도 분석·시점 해석 상태.
+        request: 검증기가 구조화한 as_of_date가 포함될 수 있는 검색 요청.
+
+    Returns:
+        ISO 날짜 또는 None. 설명문 속 날짜를 임의로 법적 기준일로 추정하지 않는다.
+
+    Raises:
+        ValueError: 명시한 날짜 형식이 잘못된 경우. 최신본으로 조용히 대체하지 않는다.
+    """
+    value = (request.get("as_of_date")
+             or state.get("event_date")
+             or (state.get("intent_decision") or {}).get("event_date")
+             or (state.get("temporal_resolution") or {}).get("as_of_date")
+             or (state.get("case_evidence_briefing") or {}).get("as_of_date"))
+    return date.fromisoformat(str(value)).isoformat() if value else None
 
 
 def law_names(references: list[str]) -> list[str]:
@@ -139,6 +161,17 @@ def pending_searches(state: dict[str, Any]) -> list[dict[str, Any]]:
                 or not isinstance(articles_raw, list) or not all(isinstance(a, str) for a in articles_raw)):
             continue
         articles = _article_references(" ".join(articles_raw))[:10]
+        try:
+            as_of = _request_date(state, request)
+        except ValueError:
+            continue
+        # 현재 기준으로 확보한 조문을 과거 시행본 요청의 충족 근거로 재사용하지 않는다.
+        request_known = known if not as_of else {
+            (source.get("statute_name"), source.get("article"))
+            for source in state.get("retrieved_sources") or []
+            if source.get("source_type") == "STATUTE" and source.get("content")
+            and evaluate_statute_applicability(source, as_of).status is ApplicabilityStatus.APPLICABLE
+        }
         # 한 요청에 확보된 조문과 미확보 조문이 섞여도 새 조문만 다시 조회한다.
         # 조문 번호가 없는 쟁점 기반 요청의 경우 서로 다른 쟁점이 동일 법령이라는 이유로 탈락하지 않도록 쟁점명을 키에 반영한다.
         for article in articles or [""]:
@@ -147,11 +180,14 @@ def pending_searches(state: dict[str, Any]) -> list[dict[str, Any]]:
             else:
                 norm_iss = " ".join(issue.split())
                 key = hashlib.sha256(json.dumps([names[0], "", norm_iss], ensure_ascii=False).encode()).hexdigest()
-            if key in history or (article and (names[0], article) in known):
+            if as_of:
+                key = hashlib.sha256(json.dumps([key, as_of]).encode()).hexdigest()
+            if key in history or (article and (names[0], article) in request_known):
                 continue
             history.add(key)
             pending.append({"law_name": names[0], "articles": [article] if article else [],
-                            "issue": issue.strip(), "question_part": part.strip(), "key": key})
+                            "issue": issue.strip(), "question_part": part.strip(), "key": key,
+                            "as_of_date": as_of})
     return pending[:6]
 
 
@@ -257,11 +293,14 @@ def _verified_local_fallback(state: dict[str, Any], requests: list[dict[str, Any
 
     일반 벡터 유사도 결과나 시행일 미확인 문서는 fallback으로 승격하지 않는다.
     """
-    reference_date = (state.get("case_evidence_briefing") or {}).get("as_of_date")
-    if not reference_date:
-        return []
     matched = []
     for request in requests:
+        try:
+            reference_date = _request_date(state, request)
+        except ValueError:
+            return []
+        if not reference_date:
+            return []
         candidates = []
         for src in state.get("retrieved_sources") or []:
             if not isinstance(src, dict) or src.get("source_type") != "STATUTE":
@@ -598,6 +637,39 @@ def _retrieve_from_local_index(
 
 
 
+def _retrieve_delegated_local_sources(
+    law_name: str, sources: list[dict[str, Any]], query: str, as_of_date: str | None,
+) -> list[dict[str, Any]]:
+    """확보 조문의 위임 문구에 대응하는 하위법령을 로컬 인덱스에서 보충한다.
+
+    Args:
+        law_name: 승인된 본법 이름. 하위법령에는 다시 확장하지 않는다.
+        sources: 본법 검색 결과. 실제 위임 문구가 있을 때만 조회한다.
+        query: 기존 승인 요청의 쟁점.
+        as_of_date: 기존 검색의 기준일.
+
+    Returns:
+        실제 인덱스에서 확인된 시행령·시행규칙 조문. 외부 API 요청은 추가하지 않는다.
+    """
+    import re
+
+    if law_name.endswith(("시행령", "시행규칙")):
+        return []
+    text = "\n".join(str(source.get("content") or "") for source in sources)
+    suffixes = []
+    if "대통령령" in text:
+        suffixes.append("시행령")
+    if re.search(r"총리령|[가-힣]+부령", text):
+        suffixes.append("시행규칙")
+    related = []
+    for suffix in suffixes:
+        related.extend(_retrieve_from_local_index(
+            law_name=f"{law_name} {suffix}", articles=[], query=query,
+            as_of_date=as_of_date, limit=2,
+        ))
+    return related
+
+
 def can_satisfy_requests_locally(requests: list[dict[str, Any]]) -> bool:
     """법령 검색 요청들이 로컬 인덱스(law_docs_global)에서 모두 충족 가능한지 사전 검사한다.
 
@@ -622,8 +694,13 @@ def can_satisfy_requests_locally(requests: list[dict[str, Any]]) -> bool:
             law_name=law_name,
             articles=articles,
             query=issue,
+            as_of_date=req.get("as_of_date"),
             require_all=True,
         )
+        if req.get("as_of_date"):
+            matched = [source for source in matched if evaluate_statute_applicability(
+                source, req["as_of_date"],
+            ).status is ApplicabilityStatus.APPLICABLE]
         if not matched:
             return False
     return True
@@ -665,9 +742,9 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
             "statute_search_status": "NO_PENDING",
             "statute_search_count": curr_count + 1,
         }
-    grouped: dict[str, list[dict]] = {}
+    grouped: dict[tuple[str, str | None], list[dict]] = {}
     for request in requests:
-        grouped.setdefault(request["law_name"], []).append(request)
+        grouped.setdefault((request["law_name"], request.get("as_of_date")), []).append(request)
     found = []
     diagnostics = []
     channels_used = set()
@@ -675,7 +752,7 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
     openlaw_matched_count = 0
     statute_search_items = []
 
-    for name, items in grouped.items():
+    for (name, as_of), items in grouped.items():
         articles = list(dict.fromkeys(a for r in items for a in r["articles"]))
         has_unnumbered = any(not r.get("articles") for r in items)
         references = [f"{name} {a}" for a in articles]
@@ -705,9 +782,22 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
             law_name=name,
             articles=articles if not has_unnumbered else [],
             query=" ".join(r["issue"] for r in items),
-            as_of_date=(state.get("case_evidence_briefing") or {}).get("as_of_date"),
+            as_of_date=as_of,
             limit=max(len(articles), 4),
         )
+        if as_of:
+            # 해당 날짜에 대해 검증된 로컬 스냅샷만 재사용한다. 최신본의 본문이
+            # 비슷하다는 이유로 연혁 조회를 생략하지 않는다.
+            local_matched = [source for source in local_matched
+                             if evaluate_statute_applicability(source, as_of).status
+                             is ApplicabilityStatus.APPLICABLE]
+        if local_matched:
+            # 본법의 위임 규정만 보고 직접 청구 근거가 없다고 반복 판단하지 않도록
+            # 이미 적재된 하위법령도 같은 쟁점으로 확인한다. 조문 번호는 추정하지 않는다.
+            local_matched += _retrieve_delegated_local_sources(
+                name, local_matched, " ".join(r["issue"] for r in items),
+                as_of,
+            )
         if local_matched:
             logger.info(
                 "[DOCUMENT_SEARCH] 로컬 공식 법령 인덱스(law_docs_global)에서 '%s' 조문 %d건 즉시 재사용 (Local-First Hit)",
@@ -738,7 +828,7 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
             api_found = search_official_statutes(
                 query=" ".join(r["issue"] for r in items), candidate_laws=references,
                 missing_issues=[r["issue"] for r in items], max_articles_per_law=max(len(articles), 4),
-                as_of_date=(state.get("case_evidence_briefing") or {}).get("as_of_date"),
+                as_of_date=as_of,
                 diagnostic=diagnostic,
             )
             if api_found:
@@ -794,10 +884,14 @@ def execute_document_search(state: dict[str, Any]) -> dict[str, Any]:
             logger.info("[DOCUMENT_SEARCH] 공식 검색 실패 후 시점 검증된 기존 공식 원문 %d건 재사용", len(fallback))
     # 일부 법령만 확보했더라도 전체 검색 성공으로 오인하지 않는다.
     found_laws = {str(src.get("statute_name") or "") for src in found}
-    requested_laws = set(grouped)
+    requested_laws = {name for name, _as_of in grouped}
     # 법령명만 일치해도 요청 조문이 빠졌다면 부분 성공으로 표시한다.
     def _request_fulfilled(request: dict[str, Any]) -> bool:
-        matches = [src for src in found if src.get("statute_name") == request["law_name"]]
+        requested_date = request.get("as_of_date")
+        matches = [src for src in found if src.get("statute_name") == request["law_name"]
+                   and (not requested_date or src.get("requested_as_of_date") == requested_date
+                        or evaluate_statute_applicability(src, requested_date).status
+                        is ApplicabilityStatus.APPLICABLE)]
         if not matches:
             return False
         articles = request.get("articles") or []
