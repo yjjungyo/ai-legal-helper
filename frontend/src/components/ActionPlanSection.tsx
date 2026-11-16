@@ -97,7 +97,10 @@ export const ActionPlanSection: React.FC<Props> = ({ caseId }) => {
   };
 
   /**
-   * 해당 대응 조치(action_id)와 연결된 법률 서면 초안을 즉시 생성하고 문서 작성실로 이동
+   * 해당 대응 조치(action_id)와 연결된 법률 서면 초안을 즉시 생성하고 서면 작성실(docs 탭)로 이동합니다.
+   * 상대 경로 사용 시 발생할 수 있는 라우팅 중첩 오류를 방지하기 위해 절대 경로(`/${caseId}/workspace/docs`)를 사용합니다.
+   *
+   * @param action 법률 대응 조치 항목
    */
   const handleCreateLinkedDocument = async (action: LegalAction) => {
     try {
@@ -107,7 +110,8 @@ export const ActionPlanSection: React.FC<Props> = ({ caseId }) => {
         title: `${action.title} 서면 초안`,
         action_id: action.id,
       });
-      navigate('../documents');
+      // 서면 작성실 탭(docs)으로 절대 경로 이동하여 라우팅 중첩 및 오작동 원천 차단
+      navigate(`/${caseId}/workspace/docs`);
     } catch (err: any) {
       alert(err.message || '연관 법률 서면 생성에 실패했습니다.');
     } finally {

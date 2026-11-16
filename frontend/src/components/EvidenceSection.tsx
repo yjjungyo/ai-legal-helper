@@ -696,14 +696,16 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <button
-              onClick={() => navigate('../chat')}
+              onClick={() => navigate(`/${caseId}/workspace/chat`)}
               className="btn btn-primary btn-sm"
+              title="사건 지속 상담 탭으로 이동"
             >
               💬 AI 법률 상담(재분석) 이동
             </button>
             <button
-              onClick={() => navigate('../action')}
+              onClick={() => navigate(`/${caseId}/workspace/action`)}
               className="btn btn-secondary btn-sm"
+              title="법률 대응 계획 탭으로 이동"
             >
               📋 대응 계획 갱신 이동
             </button>

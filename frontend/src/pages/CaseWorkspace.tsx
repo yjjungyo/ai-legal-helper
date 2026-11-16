@@ -416,7 +416,8 @@ export function CaseWorkspace() {
           <Route path="graph" element={<EvidenceGraph caseId={activeCase.id} />} />
           <Route path="action" element={<ActionPlanSection caseId={activeCase.id} />} />
           <Route path="docs" element={<DocumentSection caseId={activeCase.id} />} />
-          <Route path="*" element={<Navigate to="overview" replace />} />
+          {/* 미정의 서브 경로 진입 시 상대 경로 중첩(.../overview/overview/...)을 원천 차단하기 위해 사건 개요 절대 경로로 리다이렉트 */}
+          <Route path="*" element={<Navigate to={`/${activeCase.id}/workspace/overview`} replace />} />
         </Routes>
       </main>
 
