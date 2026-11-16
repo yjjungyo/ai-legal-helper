@@ -462,11 +462,12 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
 
   /**
    * 사실 주장(Claim) 승인 처리 및 문서 상태·재분석 안내 갱신 (EVT-023)
+   * 승인 또는 사실 등록 실패 시 서버가 반환한 구체적인 원인(Reason/Detail)을 사용자에게 알립니다.
    */
   const handleApprove = async (claimId: string) => {
     if (!selectedDocId || bulkApproving) return;
     try {
-      await reviewEvidenceClaim(caseId, selectedDocId, claimId, { action: 'APPROVE' });
+      const res = await reviewEvidenceClaim(caseId, selectedDocId, claimId, { action: 'APPROVE' });
       await Promise.all([
         loadClaims(selectedDocId),
         loadEvidences(),
@@ -475,8 +476,13 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
       ]);
       setShowReanalyzePrompt(true);
       onRefreshCase();
-    } catch (err) {
-      alert('승인 처리 실패');
+      // Fact 등록이 제외되었거나 특이사항이 있는 경우 사용자에게 사유 알림
+      if (res && res.fact_registered === false && res.fact_message) {
+        alert(`[사실 등록 제외 안내]\n${res.fact_message}`);
+      }
+    } catch (err: any) {
+      console.error('사실 승인 실패:', err);
+      alert(`사실 승인 및 등록 실패:\n${err.message || '원인 불명의 오류가 발생했습니다.'}`);
     }
   };
 
@@ -490,19 +496,25 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
     setBulkResult('');
     let succeeded = 0;
     const failed: string[] = [];
+    const failedReasons: string[] = [];
     try {
       for (const id of targets) {
         try {
           await reviewEvidenceClaim(caseId, docId, id, { action: 'APPROVE' });
           succeeded++;
-        } catch {
+        } catch (err: any) {
           failed.push(id);
+          failedReasons.push(`[${id.slice(0, 8)}] ${err.message || '처리 오류'}`);
         }
         setBulkResult('승인 처리 중: ' + (succeeded + failed.length) + '/' + targets.length + '건');
       }
       // 개별 승인은 이미 서버에 반영되므로, 목록 갱신 실패와 승인 실패를 구분한다.
       setSelectedClaimIds(failed);
-      setBulkResult('일괄 승인 결과: 성공 ' + succeeded + '건, 실패 ' + failed.length + '건');
+      let summaryText = '일괄 승인 결과: 성공 ' + succeeded + '건, 실패 ' + failed.length + '건';
+      if (failedReasons.length > 0) {
+        summaryText += ` (실패 원인: ${failedReasons.slice(0, 2).join('; ')}${failedReasons.length > 2 ? ` 외 ${failedReasons.length - 2}건` : ''})`;
+      }
+      setBulkResult(summaryText);
       if (succeeded) {
         setShowReanalyzePrompt(true);
         onRefreshCase();
@@ -523,7 +535,7 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
       if (refreshed.some((result) => result.status === 'rejected')) {
         setBulkResult((prev) => prev + ' · 화면 갱신 일부 실패: 새로고침 후 확인하세요.');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('일괄 승인 후처리 오류:', error);
       setBulkResult('일괄 승인 결과: 성공 ' + succeeded + '건, 실패 ' + failed.length + '건 · 화면 갱신 실패: 새로고침 후 확인하세요.');
     } finally {
@@ -538,7 +550,7 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
     if (!selectedDocId || !modalState.action) return;
     const currentAction = modalState.action;
     try {
-      await reviewEvidenceClaim(caseId, selectedDocId, modalState.claimId, {
+      const res = await reviewEvidenceClaim(caseId, selectedDocId, modalState.claimId, {
         action: currentAction,
         new_statement: newStatement,
         review_reason: reason,
@@ -554,8 +566,12 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
         setShowReanalyzePrompt(true);
       }
       onRefreshCase();
-    } catch (err) {
-      alert('리뷰 처리에 실패했습니다.');
+      if (res && res.fact_registered === false && res.fact_message) {
+        alert(`[사실 등록 제외 안내]\n${res.fact_message}`);
+      }
+    } catch (err: any) {
+      console.error('리뷰 처리 실패:', err);
+      alert(`리뷰 처리 및 사실 등록 실패:\n${err.message || '원인 불명의 오류가 발생했습니다.'}`);
     }
   };
 
@@ -912,9 +928,9 @@ export const EvidenceSection: React.FC<Props> = ({ caseId, onRefreshCase }) => {
                         }
                       >
                         {reviewStatus === 'APPROVED'
-                          ? '승인됨 (Fact)'
+                          ? ((claim.claim_type || '').toUpperCase() === 'DOC_INFO' ? '승인됨 (서식: Fact 제외)' : '승인됨 (Fact 등록)')
                           : reviewStatus === 'EDITED'
-                          ? '수정 승인됨 (Fact)'
+                          ? '수정 승인됨 (Fact 등록)'
                           : reviewStatus === 'REJECTED'
                           ? '반려됨'
                           : '검토 대기'}

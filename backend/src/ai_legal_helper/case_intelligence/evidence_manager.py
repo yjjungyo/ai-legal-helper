@@ -652,13 +652,14 @@ def process_evidence_review(
                 candidate_facts=comparison_facts,
                 assessment=assessment_res,
                 claim_id=claim.id,
-                fact_id=target_fact.id,
+                fact_id=target_fact.id if target_fact else None,
                 fact_doc_names=fact_doc_map,
             )
 
             # 직접 처분문서 또는 공문서로 뒷받침된 사실은 DOCUMENT_VERIFIED 확정
             if (
-                adjudication_res.adjudication_status in ("EVIDENCE_SUPPORTED", "CORROBORATED")
+                target_fact
+                and adjudication_res.adjudication_status in ("EVIDENCE_SUPPORTED", "CORROBORATED")
                 and target_fact.verification_status != "DISPUTED"
             ):
                 target_fact.verification_status = "DOCUMENT_VERIFIED"
@@ -781,7 +782,7 @@ def process_evidence_review(
             # FactAdjudication 영구 기록
             db.add(FactAdjudication(
                 case_id=case.id,
-                fact_id=target_fact.id,
+                fact_id=target_fact.id if target_fact else None,
                 claim_id=claim.id,
                 adjudication_status=adjudication_res.adjudication_status,
                 primary_relation=adjudication_res.primary_relation,
@@ -821,6 +822,25 @@ def process_evidence_review(
         from ai_legal_helper.database.graph_sync_worker import queue_sync_task
 
         queue_sync_task(db, case.id)
+
+        # 7) Fact 등록 결과 및 상세 원인 기록 (프론트엔드 UI 피드백용)
+        if action == "REJECT":
+            review.fact_registered = False
+            review.fact_id = None
+            review.fact_status = "REJECTED"
+            review.fact_message = "주장이 반려되어 사건 사실(Fact)로 등록되지 않았습니다."
+        elif target_fact:
+            review.fact_registered = True
+            review.fact_id = target_fact.id
+            review.fact_status = "REGISTERED"
+            review.fact_message = "사건의 공식 사실(Fact)로 정상 등록되었습니다."
+        else:
+            review.fact_registered = False
+            review.fact_id = None
+            review.fact_status = "EXCLUDED_METADATA" if (claim.claim_type or "").upper() == "DOC_INFO" else "EXCLUDED_BOILERPLATE"
+            review.fact_message = (
+                "단순 문서 서식/메타데이터(DOC_INFO)이거나 표준 부동문자 조항으로 분류되어 사건 사실(Fact) 등록에서 제외되었습니다."
+            )
 
         db.commit()
         db.refresh(review)

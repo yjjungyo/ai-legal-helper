@@ -686,11 +686,28 @@ def review_evidence_claim(
         )
         db.add(audit)
         db.commit()
+
+        fact_registered = getattr(review, "fact_registered", True)
+        fact_id = getattr(review, "fact_id", None)
+        fact_status = getattr(review, "fact_status", "REGISTERED" if fact_registered else "EXCLUDED")
+        fact_message = getattr(
+            review,
+            "fact_message",
+            "사건 사실(Fact)로 정상 등록되었습니다." if fact_registered else "사건 사실 등록 대상에서 제외되었습니다."
+        )
+
+        return {
+            "status": "SUCCESS",
+            "review_id": review.id,
+            "fact_registered": fact_registered,
+            "fact_id": fact_id,
+            "fact_status": fact_status,
+            "fact_message": fact_message,
+        }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception:
-        raise HTTPException(status_code=500, detail="동시 수정이 발생했거나 처리 중 오류가 발생했습니다.")
-    return {"status": "SUCCESS", "review_id": review.id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"사실 등록 처리 중 오류가 발생했습니다: {str(e)}")
 
 
 @router.delete("/{evidence_id}")

@@ -51,7 +51,16 @@ export const reviewEvidenceClaim = async (caseId: string, evidenceId: string, cl
     method: 'POST',
     body: JSON.stringify(reviewReq)
   });
-  if (!response.ok) throw new Error('Failed to review claim');
+  if (!response.ok) {
+    let errorDetail = '사실 검토 및 등록에 실패했습니다.';
+    try {
+      const errData = await response.json();
+      errorDetail = errData.detail || errData.message || errorDetail;
+    } catch {
+      // response body 파싱 불가 시 기본 에러 유지
+    }
+    throw new Error(errorDetail);
+  }
   return response.json();
 };
 
