@@ -676,7 +676,7 @@ def process_evidence_review(
                     db.add(EvidenceGap(
                         case_id=case.id,
                         claim_id=claim.id,
-                        fact_id=target_fact.id,
+                        fact_id=target_fact.id if target_fact else None,
                         gap_type=gap_item.gap_type,
                         target_proposition=gap_item.target_proposition,
                         description=gap_item.description,
@@ -691,7 +691,8 @@ def process_evidence_review(
             # rather than repeatedly re-interpreting the same reviewed fact.
             # An unsupported or ambiguous monetary statement gets no tag.
             if (
-                adjudication_res.adjudication_status in ("EVIDENCE_SUPPORTED", "CORROBORATED")
+                target_fact
+                and adjudication_res.adjudication_status in ("EVIDENCE_SUPPORTED", "CORROBORATED")
                 and target_fact.verification_status == "DOCUMENT_VERIFIED"
                 and not (claim.structured_slots or {}).get("reviewed_semantics")
             ):

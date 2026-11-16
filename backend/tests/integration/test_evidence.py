@@ -226,3 +226,62 @@ def test_evidence_delete_and_cascade_facts():
     assert len(facts_after) == 0, "Promoted Fact from this evidence must be deleted"
     db.close()
 
+
+def test_review_doc_info_claim_metadata_exclusion():
+    """서식/메타데이터(DOC_INFO) 클레임 승인 시 예외 없이 Fact 제외 안내가 반환되는지 검증한다.
+
+    문서 제목 등 단순 서식 정보는 지식 그래프 노이즈 방지를 위해 사건 Fact(요건사실) 등록 대상에서
+    제외되지만, 심리·감사 파이프라인(adjudicate_fact) 및 반환 객체는 'NoneType' 오류 없이
+    정상적으로 200 OK와 함께 제외 사유(EXCLUDED_METADATA)를 응답해야 한다.
+    """
+    from sqlalchemy.orm import sessionmaker
+    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    db = TestingSessionLocal()
+
+    # 1. 테스트 케이스 및 증거 문서 생성
+    case = models.Case(title="Metadata Exclusion Case", case_type="TEST", user_id="test-user-id")
+    db.add(case)
+    db.flush()
+
+    doc = models.EvidenceDocument(
+        case_id=case.id,
+        original_filename="부동산임대차계약서.txt",
+        safe_storage_key="mock_key",
+        media_type="text/plain",
+        size_bytes=100,
+        sha256="mock_hash",
+        status="REVIEW_REQUIRED",
+    )
+    db.add(doc)
+    db.flush()
+
+    # 2. DOC_INFO 서식 클레임 생성
+    claim = models.EvidenceClaim(
+        case_id=case.id,
+        evidence_id=doc.id,
+        statement="문서 제목: 부동산임대차계약서",
+        claim_type="DOC_INFO",
+        assertion_status="DOCUMENT_STATES",
+        confidence=0.9,
+    )
+    db.add(claim)
+    db.commit()
+    case_id = case.id
+    evidence_id = doc.id
+    claim_id = claim.id
+    db.close()
+
+    # 3. 승인(APPROVE) API 요청 실행
+    res_review = client.post(
+        f"/api/v1/cases/{case_id}/evidence/{evidence_id}/claims/{claim_id}/review",
+        json={"action": "APPROVE"},
+    )
+
+    # 4. 검증: 500 에러 없이 200 성공 및 Fact 제외 메타데이터 정상 응답 확인
+    assert res_review.status_code == 200
+    data = res_review.json()
+    assert data["fact_registered"] is False
+    assert data["fact_status"] == "EXCLUDED_METADATA"
+    assert "단순 문서 서식/메타데이터" in data["fact_message"]
+
+
