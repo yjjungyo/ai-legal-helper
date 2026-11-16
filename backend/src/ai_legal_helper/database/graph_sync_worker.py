@@ -113,7 +113,7 @@ def _process_pending_tasks():
     for info in task_info:
         task_id = info["id"]
         case_id = info["case_id"]
-        logger.info(f"[그래프 동기화 워커] 사건({case_id}) 그래프 동기화 작업 시작")
+        # logger.info(f"[그래프 동기화 워커] 사건({case_id}) 그래프 동기화 작업 시작")
 
         # 실제 동기화 로직 수행 (PostgreSQL 스냅샷 -> Neo4j 단독 동기화, ChromaDB 미사용)
         result = safe_sync_case(case_id)
