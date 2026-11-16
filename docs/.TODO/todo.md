@@ -90,17 +90,13 @@ TODO : 국가법령정보센터
 
 done --
 
-SC-001 ~ SC-003까지 결과보고서 및  kpi까지 작성하자.  
-파일명은 AI_Legal_Helper_KPI_202611151124_자동평가-E2EV8-1차.xlsx 이다. 
-AI_Legal_Helper_KPI_202611151124_자동평가-E2EV8-1차.xlsx 파일에 작성하라. 
-
+SC-001 ~ SC-003까지 결과보고서 및  kpi까지 작성하자.
+docs/evaluation/kpi/AI_Legal_Helper_KPI_202611151124_자동평가-E2EV8-2차.xlsx 파일에 작성하라. 
 실행_KPI_기록 시트 작성하라.
-Service 컬럼별 trace id 에 대해 답변내용부터 성능비교 까지 모두 작성한다. 
-성능비교는 Service LegalAgent 버전만 한다. 
-E2E 버전은 POC 버전과 비교 평가하여 특이사항란 마지막에  (POC 대비 속도 몇배 향상, 토큰 몇% 절감, 비용 몇% 절감)  처럼 비교 평가한다. 
-
+Service 컬럼별 trace id 에 대해 답변내용부터 성능비교 까지 모두 작성한다.
+성능비교는 Service LegalAgent 버전만 한다.
+E2E 버전은 POC 버전과 비교 평가하여 성능비교란에 POC 대비 속도 몇배 향상, 토큰 몇% 절감, 비용 몇% 절감 처럼 비교 평가한다. 
 정량적목표(KPI) 시트를 참고하여 목표KPI_기록 시트를 작성하라.
-
 작성이 완료되면 깃허브에 올려라.
 
 
