@@ -97,9 +97,12 @@ _LARGE_UNIT_MAP: Dict[str, int] = {
     "조": 1_000_000_000_000,
 }
 
-# 금액 표현 추출용 정규식: 접두사 '금(金)'은 독립 어절일 때만 매칭하여 '보증금', '계약금' 등의 어미 '금'이 잘리지 않도록 함
+# 금액 표현 추출용 정규식:
+# 1) 앞선 한글 단어(조사 '이', '가', '을' 등)나 영숫자가 잘려 숫자로 잘못 흡수되지 않도록 (?<![가-힣A-Za-z0-9]) 적용
+# 2) 접두사 '금(金)'은 독립 어절일 때만 매칭하여 '보증금', '계약금' 등의 어미 '금'이 잘리지 않도록 함
 _AMOUNT_EXPR_RE = re.compile(
-    r"(?:(?<![가-힣A-Za-z0-9])금\s+)?"
+    r"(?<![가-힣A-Za-z0-9])"
+    r"(?:금\s+)?"
     r"((?:[0-9]+(?:,[0-9]{3})*(?:\.[0-9]+)?|[일이삼사오육륙칠팔구십백천만억조\s])+)"
     r"\s*(원|만원|만\s*원|억원|억\s*원|천만원|천만\s*원|백만원|백만\s*원)",
 )
@@ -549,6 +552,7 @@ def extract_amount_roles(text: str, *, role_map: Optional[Dict[str, str]] = None
         role_map = _batch_numeric_role_map(text, include_dates=False, allow_llm=allow_llm)
     for index, match in enumerate(matches):
         num_part = (match.group(1) or "").strip()
+        num_part = re.sub(r"^[이그저]\s+(?=\d)", "", num_part).strip()
         suffix = (match.group(2) or "").replace(" ", "").strip()
         if not num_part:
             continue
@@ -587,6 +591,7 @@ def extract_normalized_amounts(text: str) -> List[int]:
     values: List[int] = []
     for match in _AMOUNT_EXPR_RE.finditer(_exclude_date_tokens_from_money_matches(text)):
         num_part = (match.group(1) or "").strip()
+        num_part = re.sub(r"^[이그저]\s+(?=\d)", "", num_part).strip()
         suffix = (match.group(2) or "").replace(" ", "").strip()
         if not num_part:
             continue

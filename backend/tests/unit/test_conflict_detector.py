@@ -877,3 +877,45 @@ def test_proof_or_inquiry_request_vs_payment_not_contradiction():
     dec = evaluate_claim_against_fact(slots_claim, fact_payment, claim_id="c-inquiry", fact_slots=slots_fact)
     assert dec.status == "DIFFERENT_CONTEXT"
     assert dec.reason_code == "PROOF_REQUEST_VS_ACTUAL_PAYMENT"
+
+
+def test_korean_subject_marker_i_not_parsed_as_digit_two():
+    """한국어 주격조사 '이'가 수사 '이(2)'로 오인되어 금액이 2억 원 부풀려지는 결함을 방지한다.
+
+    예: '금액이 3억 원', '보증금이 3억 원'에서 '이'가 한글 숫자 2로 캡처되어
+    2 + 3 = 5억 원으로 왜곡되는 현상을 차단하고, 정확히 3억 원(300,000,000원)으로 파싱되어
+    기존 3억 원 Fact와 배타적 상충(CONTRADICTION)이 발생하지 않는지 검증한다.
+    """
+    from ai_legal_helper.case_intelligence.conflict_detector import extract_normalized_amounts
+
+    samples = [
+        ("문자 내용에는 보증금 반환 채무 금액이 3억 원으로 언급되어 있다.", 300_000_000),
+        ("정민우는 전세보증금이 3억 원 전액이라고 기재하였다.", 300_000_000),
+        ("임차인 정민우는 보증금이 3억 원이라고 주장하였다.", 300_000_000),
+        ("이 3억 원은 반환 대상이다.", 300_000_000),
+        ("문서에는 보증금이 4억 5천만 원으로 기재되어 있다.", 450_000_000),
+    ]
+
+    for stmt, expected_krw in samples:
+        amounts = extract_normalized_amounts(stmt)
+        assert expected_krw in amounts, f"문장 '{stmt}'에서 {expected_krw:,}원이 추출되어야 하나 {amounts}가 반환됨"
+
+    # 기존 3억 원 반환 요청 Fact와 비교 시 상충이 아닌 일치(CONSISTENT)로 정상 판정되어야 함
+    claim_text = "문자 내용에는 보증금 반환 채무 금액이 3억 원으로 언급되어 있다."
+    fact_text = "이수현은 2026년 9월 30일에 맞춰 전세보증금 3억 원의 반환을 요청하였다."
+
+    fact = Fact(
+        id="f-300m",
+        case_id="case-amount-fix",
+        statement=fact_text,
+        fact_type="AMOUNT",
+        source_type="DOCUMENT_SUPPORTED",
+    )
+    c_slots = build_structured_slots(claim_text, claim_type="AMOUNT")
+    f_slots = build_structured_slots(fact_text, claim_type="AMOUNT")
+    dec = evaluate_claim_against_fact(c_slots, fact, claim_id="c-300m", fact_slots=f_slots)
+
+    assert dec.status != "CONTRADICTION", f"동일한 3억 원 진술이 상충으로 판정됨: {dec.explanation}"
+    assert dec.status == "CONSISTENT"
+    assert dec.reason_code == "NORMALIZED_AMOUNT_MATCH"
+
