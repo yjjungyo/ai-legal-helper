@@ -885,6 +885,33 @@ def synchronize_case_entities(
     }
 
 
+def is_eligible_for_case_fact(claim_type: Optional[str], statement: Optional[str]) -> bool:
+    """단순 서식 메타데이터(DOC_INFO)나 일반 부동문자 계약조항은 사건 Fact로 등록하지 않는다.
+
+    증거 지식 그래프의 과도한 단편화와 노드 과밀을 방지하고 법률 요건사실 중심의 Fact 체계를 유지한다.
+    """
+    if not statement:
+        return False
+    if (claim_type or "").upper() == "DOC_INFO":
+        return False
+    stmt = statement.strip()
+    # 단순 문서 서식/제목/확인번호 메타데이터
+    doc_meta_keywords = ("문서 제목은", "이체 확인번호", "서명 표시가 기재", "서명란이 포함", "문서 자체에")
+    if any(kw in stmt for kw in doc_meta_keywords):
+        return False
+    # 일반적 계약 부동문자 / 당연한 민법 원칙 조항
+    boilerplate_clauses = (
+        "주거 목적으로 임대한다",
+        "약정한 기일에 지급할 의무가 있다",
+        "수령과 동시에 목적물을 인도할 의무",
+        "목적물을 반환하고 임대인은 보증금을 반환",
+        "관련 법령에 따른다",
+    )
+    if any(kw in stmt for kw in boilerplate_clauses):
+        return False
+    return True
+
+
 def rebuild_case_entities(
     db: Session,
     case_id: str,
@@ -931,7 +958,7 @@ def rebuild_case_entities(
     backfilled_facts: List[str] = []
     for claim in approved_claims:
         norm_stmt = "".join((claim.statement or "").split())
-        if not norm_stmt:
+        if not norm_stmt or not is_eligible_for_case_fact(claim.claim_type, claim.statement):
             continue
         if norm_stmt not in facts_by_norm:
             backfilled_facts.append(claim.statement)

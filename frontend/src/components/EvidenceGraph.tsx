@@ -15,7 +15,8 @@ interface Props {
 }
 
 export const EvidenceGraph: React.FC<Props> = ({ caseId }) => {
-  const [graphData, setGraphData] = useState<{ nodes: any[]; links: any[] }>({ nodes: [], links: [] });
+  const [rawGraphData, setRawGraphData] = useState<{ nodes: any[]; links: any[] }>({ nodes: [], links: [] });
+  const [filterMode, setFilterMode] = useState<'CONCISE' | 'ALL' | 'CONFLICTS'>('CONCISE');
   const [analysis, setAnalysis] = useState<any>(null);
   const [selectedNode, setSelectedNode] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -65,7 +66,7 @@ export const EvidenceGraph: React.FC<Props> = ({ caseId }) => {
           ...e,
           name: e.type,
         }));
-        setGraphData({ nodes, links });
+        setRawGraphData({ nodes, links });
       }
 
       const anaRes = await getGraphAnalysis(caseId);
@@ -83,18 +84,92 @@ export const EvidenceGraph: React.FC<Props> = ({ caseId }) => {
     loadGraph();
   }, [loadGraph]);
 
+  /**
+   * 필터 모드에 따른 시각화 그래프 데이터 계산
+   * - CONCISE (기본): 중복 Claim 노드를 숨기고 Document -> Fact 직접 연결 가상 엣지로 치환하여 과밀 방지
+   * - CONFLICTS: 상충(CONTRADICTS) 엣지와 연관 노드만 선별 표시
+   * - ALL: 전체 원본 노드/엣지 렌더링
+   */
+  const graphData = React.useMemo(() => {
+    if (!rawGraphData.nodes.length) return { nodes: [], links: [] };
+
+    if (filterMode === 'CONFLICTS') {
+      const conflictLinks = rawGraphData.links.filter((l) => l.type === 'CONTRADICTS');
+      const conflictNodeIds = new Set<string>();
+      conflictLinks.forEach((l) => {
+        const s = typeof l.source === 'object' ? l.source.id : l.source;
+        const t = typeof l.target === 'object' ? l.target.id : l.target;
+        conflictNodeIds.add(s);
+        conflictNodeIds.add(t);
+      });
+      const nodes = rawGraphData.nodes.filter((n) => conflictNodeIds.has(n.id));
+      return { nodes, links: conflictLinks };
+    }
+
+    if (filterMode === 'CONCISE') {
+      // 1. Claim 노드 제외 (Fact, Document, Event, Action, Issue 등 핵심 노드만 보존)
+      const claimNodeIds = new Set(
+        rawGraphData.nodes.filter((n) => n.type === 'EvidenceClaim').map((n) => n.id)
+      );
+      const nodes = rawGraphData.nodes.filter((n) => n.type !== 'EvidenceClaim');
+      const validNodeIds = new Set(nodes.map((n) => n.id));
+
+      // 2. Claim을 거치는 관계를 Document -> Fact 직접 SUPPORTS 엣지로 치환
+      const claimToDoc = new Map<string, string>(); // claimId -> docId
+      rawGraphData.links.forEach((l) => {
+        const s = typeof l.source === 'object' ? l.source.id : l.source;
+        const t = typeof l.target === 'object' ? l.target.id : l.target;
+        if (l.type === 'HAS_CLAIM') {
+          claimToDoc.set(t, s);
+        }
+      });
+
+      const synthesizedLinks: any[] = [];
+      const seenLinkPairs = new Set<string>();
+
+      rawGraphData.links.forEach((l) => {
+        const s = typeof l.source === 'object' ? l.source.id : l.source;
+        const t = typeof l.target === 'object' ? l.target.id : l.target;
+
+        if (claimNodeIds.has(s) && validNodeIds.has(t)) {
+          // Claim -> Fact (SUPPORTS 등) 관계인 경우 Document -> Fact 로 연결
+          const docId = claimToDoc.get(s);
+          if (docId && validNodeIds.has(docId)) {
+            const pairKey = `${docId}->${t}:${l.type}`;
+            if (!seenLinkPairs.has(pairKey)) {
+              seenLinkPairs.add(pairKey);
+              synthesizedLinks.push({
+                source: docId,
+                target: t,
+                type: l.type,
+                name: l.type,
+              });
+            }
+          }
+        } else if (validNodeIds.has(s) && validNodeIds.has(t)) {
+          synthesizedLinks.push(l);
+        }
+      });
+
+      return { nodes, links: synthesizedLinks };
+    }
+
+    // ALL 모드
+    return rawGraphData;
+  }, [rawGraphData, filterMode]);
+
   // 노드 반발력 및 링크 거리 최적화 (뭉침 현상 방지)
   useEffect(() => {
     if (fgRef.current && graphData.nodes.length > 0) {
       try {
         const charge = fgRef.current.d3Force('charge');
         if (charge) {
-          const strength = graphData.nodes.length > 60 ? -350 : -240;
+          const strength = graphData.nodes.length > 60 ? -380 : -260;
           charge.strength(strength);
         }
         const link = fgRef.current.d3Force('link');
         if (link) {
-          link.distance(65);
+          link.distance(75);
         }
         fgRef.current.d3ReheatSimulation();
       } catch {
@@ -172,7 +247,62 @@ export const EvidenceGraph: React.FC<Props> = ({ caseId }) => {
             </span>
           )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          {/* 뷰 모드 필터 버튼 그룹 (핵심 요약 뷰 vs 세부 주장 포함 vs 상충 관계) */}
+          <div style={{ display: 'inline-flex', borderRadius: '6px', overflow: 'hidden', border: '1px solid #cbd5e1', marginRight: '6px' }}>
+            <button
+              type="button"
+              onClick={() => setFilterMode('CONCISE')}
+              title="중복 Claim을 숨기고 증거 문서와 확정 사실 위주로 깔끔하게 시각화합니다."
+              style={{
+                padding: '6px 11px',
+                fontSize: '0.84em',
+                fontWeight: filterMode === 'CONCISE' ? 700 : 500,
+                backgroundColor: filterMode === 'CONCISE' ? '#2563eb' : '#fff',
+                color: filterMode === 'CONCISE' ? '#fff' : '#475569',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              📋 핵심 요약 뷰
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterMode('ALL')}
+              title="추출된 세부 주장(Claim) 노드까지 모두 펼쳐봅니다."
+              style={{
+                padding: '6px 11px',
+                fontSize: '0.84em',
+                fontWeight: filterMode === 'ALL' ? 700 : 500,
+                backgroundColor: filterMode === 'ALL' ? '#2563eb' : '#fff',
+                color: filterMode === 'ALL' ? '#fff' : '#475569',
+                borderLeft: '1px solid #cbd5e1',
+                borderRight: '1px solid #cbd5e1',
+                borderTop: 'none',
+                borderBottom: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              🔍 전체 뷰 (주장 포함)
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterMode('CONFLICTS')}
+              title="서로 모순되는 상충(CONTRADICTS) 엣지와 연관 노드만 선별하여 집중 표시합니다."
+              style={{
+                padding: '6px 11px',
+                fontSize: '0.84em',
+                fontWeight: filterMode === 'CONFLICTS' ? 700 : 500,
+                backgroundColor: filterMode === 'CONFLICTS' ? '#dc2626' : '#fff',
+                color: filterMode === 'CONFLICTS' ? '#fff' : '#475569',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              ⚡ 상충 중심
+            </button>
+          </div>
+
           <button 
             type="button"
             onClick={handleZoomIn} 

@@ -539,6 +539,8 @@ def process_evidence_review(
             )
             primary_date = claim_slots.normalized_dates[0] if claim_slots.normalized_dates else None
 
+            from ai_legal_helper.case_intelligence.entity_sync import is_eligible_for_case_fact
+
             if matched_fact:
                 target_fact = matched_fact
                 if ver_status == "DISPUTED":
@@ -551,7 +553,7 @@ def process_evidence_review(
                 target_fact.scope = claim_slots.scope
                 target_fact.temporal_context = claim_slots.temporal_context
                 target_fact.structured_slots = claim_slots.model_dump()
-            else:
+            elif is_eligible_for_case_fact(claim.claim_type, claim.statement):
                 target_fact = Fact(
                     case_id=case.id,
                     statement=claim.statement,
@@ -569,39 +571,42 @@ def process_evidence_review(
                 )
                 db.add(target_fact)
                 db.flush()
+            else:
+                target_fact = None
 
             revision.changed_entity_ids = {
                 "claim_id": claim.id,
-                "fact_id": target_fact.id,
+                "fact_id": target_fact.id if target_fact else None,
                 "deleted_fact_ids": deleted_fact_ids,
             }
 
-            # 자기 자신의 Fact에 대한 SUPPORTS EvidenceLink 생성
-            db.add(
-                EvidenceLink(
-                    evidence_id=claim.evidence_id,
-                    claim_id=claim.id,
-                    target_type="FACT",
-                    target_id=target_fact.id,
-                    link_type="SUPPORTS",
-                )
-            )
-
-            # 다중 증거 교차 지지(CONSISTENT): 다른 문서의 기존 Fact와 정규화 금액/일자가 일치하면 교차 SUPPORTS 연결
-            seen_sup_ids = {target_fact.id}
-            for cons_dec in verified_consistent:
-                if cons_dec.target_fact_id in seen_sup_ids:
-                    continue
-                seen_sup_ids.add(cons_dec.target_fact_id)
+            if target_fact:
+                # 자기 자신의 Fact에 대한 SUPPORTS EvidenceLink 생성
                 db.add(
                     EvidenceLink(
                         evidence_id=claim.evidence_id,
                         claim_id=claim.id,
                         target_type="FACT",
-                        target_id=cons_dec.target_fact_id,
+                        target_id=target_fact.id,
                         link_type="SUPPORTS",
                     )
                 )
+
+                # 다중 증거 교차 지지(CONSISTENT): 다른 문서의 기존 Fact와 정규화 금액/일자가 일치하면 교차 SUPPORTS 연결
+                seen_sup_ids = {target_fact.id}
+                for cons_dec in verified_consistent:
+                    if cons_dec.target_fact_id in seen_sup_ids:
+                        continue
+                    seen_sup_ids.add(cons_dec.target_fact_id)
+                    db.add(
+                        EvidenceLink(
+                            evidence_id=claim.evidence_id,
+                            claim_id=claim.id,
+                            target_type="FACT",
+                            target_id=cons_dec.target_fact_id,
+                            link_type="SUPPORTS",
+                        )
+                    )
 
             # (A) 사실 명제 추출 (SemanticProposition)
             prop = extract_semantic_proposition(

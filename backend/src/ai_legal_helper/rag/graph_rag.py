@@ -409,10 +409,19 @@ class GraphRAGRetriever:
 
     # ------------------------------------------------------------------ UI
     def get_case_graph(self, case_id: str, include_pending: bool = False) -> Dict[str, Any]:
-        """React Evidence Graph 탭용 노드/엣지 목록을 반환한다."""
+        """React Evidence Graph 탭용 노드/엣지 목록을 반환한다.
+
+        [시각화 최적화 원칙]
+        1. 단순 원문 발췌 조각(EvidenceSpan)은 캔버스 과밀 방지를 위해 기본 시각화에서 제외한다.
+        2. Case 루트 노드 및 단순 계층 소속 관계(HAS_FACT, HAS_EVENT, HAS_EVIDENCE 등)는
+           물리 엔진 상의 자전거 바퀴살(Spoke) 뭉침을 방지하기 위해 시각화 엣지에서 제외하고,
+           실제 법률 의미 관계(SUPPORTS, CONTRADICTS, RELATED_TO, OCCURRED_BEFORE 등)만 선으로 렌더링한다.
+        """
         nodes = self._run("""
             MATCH (n {case_id: $case_id})
-            WHERE $include_pending OR NOT n:EvidenceClaim OR n.review_status IN $approved
+            WHERE ($include_pending OR NOT n:EvidenceClaim OR n.review_status IN $approved)
+              AND NOT n:EvidenceSpan
+              AND NOT n:Case
             RETURN n.id AS id, labels(n)[0] AS type,
                    coalesce(n.title, n.statement, n.name, n.filename, n.text_excerpt) AS label,
                    properties(n) AS props
@@ -421,6 +430,7 @@ class GraphRAGRetriever:
         edges = self._run("""
             MATCH (a {case_id: $case_id})-[r]->(b {case_id: $case_id})
             WHERE a.id IN $ids AND b.id IN $ids
+              AND NOT type(r) IN ['HAS_FACT', 'HAS_EVENT', 'HAS_EVIDENCE', 'INVOLVES_PARTY', 'RECOMMENDS_ACTION']
             RETURN a.id AS source, b.id AS target, type(r) AS type,
                    coalesce(r.is_ai_inferred, false) AS is_ai_inferred
         """, case_id=case_id, ids=ids)

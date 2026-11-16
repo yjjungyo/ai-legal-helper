@@ -1235,20 +1235,26 @@ def check_proposition_comparability(
 
     # 3-1. 화행(Speech Act) 분리: 의사표시/해지 통지(NOTICE) vs 이행/퇴거 예정일(STATEMENT/SCHEDULE)
     # 설명: 임차인이 임대인에게 퇴거 의사를 통지한 행위(통지일)와 실제 퇴거 예정일(목표일)은 서로 다른 시점 차원의 양립 가능한 사실이다.
-    is_notice_a = pa.speech_act == "NOTICE" or any(kw in (pa.statement or "") for kw in ("알렸", "통지", "통보", "고지", "보냈다"))
-    is_notice_b = pb.speech_act == "NOTICE" or any(kw in (pb.statement or "") for kw in ("알렸", "통지", "통보", "고지", "보냈다"))
-    if is_notice_a != is_notice_b:
-        mismatched.append("COMMUNICATION_NOTICE_VS_SCHEDULE")
-        return ComparabilityResult(
-            is_comparable=False,
-            status="CONSISTENT",
-            identity_status="COMPATIBLE",
-            reason_code="NOTICE_DATE_VS_TARGET_DATE",
-            explanation="의사표시·해지 통지를 발송한 일자와 퇴거·이행을 예정한 목표일자는 서로 다른 시점 차원의 양립 가능한 사실입니다.",
-            matched_dimensions=matched,
-            mismatched_dimensions=mismatched,
-            temporal_semantics="Notice Date vs Scheduled Target Date",
-        )
+    # 주의: 서로 모순되지 않는다는 이유만으로 통지 사실이 계약서 제목 등 무관한 사실을 지지(SUPPORTS)한다고 판정해서는 안 되므로
+    # 반드시 status="DIFFERENT_CONTEXT"를 반환하며, 두 진술이 모두 퇴거/해지/반환/종료 맥락을 공유할 때만 제한적으로 적용한다.
+    term_contexts = ("퇴거", "이사", "해지", "종료", "만기", "반환", "명도", "인도")
+    has_rel_ctx_a = any(tc in (pa.statement or "") for tc in term_contexts)
+    has_rel_ctx_b = any(tc in (pb.statement or "") for tc in term_contexts)
+    if has_rel_ctx_a and has_rel_ctx_b:
+        is_notice_a = pa.speech_act == "NOTICE" or any(kw in (pa.statement or "") for kw in ("알렸", "통지", "통보", "고지", "보냈다"))
+        is_notice_b = pb.speech_act == "NOTICE" or any(kw in (pb.statement or "") for kw in ("알렸", "통지", "통보", "고지", "보냈다"))
+        if is_notice_a != is_notice_b:
+            mismatched.append("COMMUNICATION_NOTICE_VS_SCHEDULE")
+            return ComparabilityResult(
+                is_comparable=False,
+                status="DIFFERENT_CONTEXT",
+                identity_status="COMPATIBLE",
+                reason_code="NOTICE_DATE_VS_TARGET_DATE",
+                explanation="의사표시·해지 통지를 발송한 일자와 퇴거·이행을 예정한 목표일자는 서로 다른 시점 차원의 별개 사실입니다.",
+                matched_dimensions=matched,
+                mismatched_dimensions=mismatched,
+                temporal_semantics="Notice Date vs Scheduled Target Date",
+            )
 
     # 3-2. 급부 대상(Object) 분리: 열쇠·출입카드(목적물 인도) vs 보증금·차임(금전 지급)
     # 설명: 임차인의 열쇠·출입카드 반환 의무와 임대인의 보증금 반환 의무는 동시이행 관계에 있는

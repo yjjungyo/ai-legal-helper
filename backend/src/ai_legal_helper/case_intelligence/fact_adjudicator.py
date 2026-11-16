@@ -286,7 +286,7 @@ def adjudicate_fact(
             elif comp_res.reason_code in ("INITIAL_EVENT_VS_MAINTAINED_STATUS", "EVENT_VS_STATE"):
                 found_relation = "CONTINUES"
                 relation_basis = "최초 행위 발생 이후 현재 시점까지 상태가 계속 유지되는 지속(CONTINUES) 관계입니다."
-            elif comp_res.reason_code in ("TEMPORALLY_COMPATIBLE", "PAYMENT_AMOUNT_MATCH", "NOTICE_DATE_VS_TARGET_DATE"):
+            elif comp_res.reason_code in ("TEMPORALLY_COMPATIBLE", "PAYMENT_AMOUNT_MATCH"):
                 found_relation = "SUPPORTS"
                 relation_basis = comp_res.explanation or "서로 다른 진술이 동일한 사실 또는 정상 이행을 상호 입증·지지하는 관계입니다."
             elif comp_res.status == "DIFFERENT_CONTEXT":
