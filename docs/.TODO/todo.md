@@ -1,10 +1,13 @@
 PS C:\myprjs\ai-legal-helper> 
 python scripts/evaluation/export_langfuse_traces.py --trace-id 91bbdb77-7834-439a-91b7-968823f3f4df --case-id SC-003 --zip
 
-[1/1] OK   SC-015 1 Manual: 46 obs → SC-015_step1_Manual_eb4ea15f-c21b-4334-a788-b91b8fbe651b.json
-ZIP: artifacts\langfuse_trace_export.zip
-완료: 1/1 성공, 결과 목록: artifacts\langfuse_trace_export\export_manifest.json
-PS C:\myprjs\ai-legal-helper> 
+
+python scripts/evaluation/export_langfuse_traces.py `
+  --ids-file E2EV8_trace_id.txt `
+  --case-id E2E_V8 `
+  --step batch `
+  --service "LegalAgent E2E V8" `
+  --zip
 
 
 구분	공식 명칭	정의
