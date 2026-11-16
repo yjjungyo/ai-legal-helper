@@ -1069,6 +1069,11 @@ def evaluate_claim_against_fact(
     elif getattr(fact, "structured_slots", None) and isinstance(fact.structured_slots, dict):
         try:
             actual_fact_slots = StructuredFactSlots.model_validate(fact.structured_slots)
+            # 파서 규칙 개선에 따른 슬롯의 normalized_amounts 불일치 방지 가드:
+            # fact.statement 원문에서 추출된 금액과 슬롯 금액이 다르면 원문 파싱 결과로 자동 보정
+            text_amounts = extract_normalized_amounts(getattr(fact, "statement", "") or "")
+            if set(actual_fact_slots.normalized_amounts) != set(text_amounts):
+                actual_fact_slots.normalized_amounts = text_amounts
         except Exception:
             actual_fact_slots = build_structured_slots(
                 statement=getattr(fact, "statement", "") or "",
