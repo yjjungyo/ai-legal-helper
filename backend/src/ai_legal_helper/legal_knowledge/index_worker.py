@@ -13,6 +13,7 @@
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
 import math
@@ -637,8 +638,8 @@ def enqueue_approved_sources(sources: list[dict]) -> dict:
         # 필수 식별 정보(법령ID, MST, 법령명, 시행일)가 완전히 확인된 법령만 큐에 추가
         if not (law_id and mst and name and date):
             continue
-        # 모의 데이터나 결측치 문자열 배제
-        if law_id.lower() in ("none", "null") or mst.lower() in ("none", "null"):
+        # 모의 데이터나 결측치 문자열 배제 (MST는 6자리 내외의 숫자여야 함)
+        if law_id.lower() in ("none", "null") or mst.lower() in ("none", "null", "current") or not mst.isdigit():
             continue
 
         prom_no = str(source.get("promulgation_number") or "").strip()
@@ -686,3 +687,74 @@ def run_worker_once() -> dict:
             fetch_xml=lambda url: _fetch_xml_with_retry(url, api_key=key),
             chroma_collection=collection, embeddings=get_embeddings(),
         )
+
+
+async def law_index_worker_loop(interval_seconds: float = 3.0) -> None:
+    """FastAPI 백그라운드 태스크로 동작하는 비동기 공식 법령 증분 인덱싱 워커 루프.
+
+    온디맨드 법령 검색 과정에서 PostgreSQL 작업 큐(OfficialLawIndexJob)에 등록된
+    대기 중인(PENDING/RETRY) 공식 법령 버전을 주기적으로 폴링하여,
+    비동기 스레드 풀(asyncio.to_thread)에서 전체 조문 XML 파싱, 도메인 분류, 임베딩 생성 및
+    ChromaDB 해당 컬렉션(law_docs_civil, law_docs_global 등)에 영구 적재한다.
+
+    상담 스레드의 응답 지연을 방지하면서도 검색된 법령이 영구적으로 벡터 DB에 누적되도록 보장한다.
+
+    Args:
+        interval_seconds: 큐 확인 대기 주기 (초 단위, 기본값: 3.0초).
+
+    Notes:
+        - LEGAL_BACKGROUND_INDEX_ENABLED 환경변수가 1/true일 때만 동작한다.
+        - LAW_OPENAPI_KEY가 설정되지 않은 경우 워커를 자동으로 유휴 상태로 대기시킨다.
+        - FastAPI lifespan 종료 시 CancelledError를 수신하여 안전하게 graceful shutdown된다.
+    """
+    if os.getenv("LEGAL_BACKGROUND_INDEX_ENABLED", "1") not in ("1", "true", "True"):
+        logger.info("[LAW_INDEX_WORKER] LEGAL_BACKGROUND_INDEX_ENABLED가 비활성화되어 법령 인덱싱 워커를 시작하지 않습니다.")
+        return
+
+    key = os.getenv("LAW_OPENAPI_KEY", "")
+    if not key:
+        logger.warning("[LAW_INDEX_WORKER] LAW_OPENAPI_KEY가 없어 공식 법령 인덱싱 워커가 유휴 상태로 대기합니다.")
+
+    logger.info("[LAW_INDEX_WORKER] 백그라운드 공식 법령 증분 인덱싱 워커가 시작되었습니다. (폴링 주기: %.1f초)", interval_seconds)
+
+    while True:
+        try:
+            # 대기 중인 작업이 있으면 연속해서 소진(drain)하고, 비었으면 interval 동안 대기한다.
+            has_more = True
+            while has_more:
+                if not os.getenv("LAW_OPENAPI_KEY", ""):
+                    has_more = False
+                    break
+
+                output = await asyncio.to_thread(run_worker_once)
+                status = output.get("status")
+
+                if status in ("EMPTY", "SKIPPED"):
+                    has_more = False
+                elif status == "READY":
+                    logger.info(
+                        "[LAW_INDEX_WORKER] 공식 법령 Chroma 인덱싱 성공: 법령=%s (MST=%s, 청크=%s건)",
+                        output.get("law_name"),
+                        output.get("mst"),
+                        output.get("chunk_count"),
+                    )
+                elif status in ("FAILED", "RETRY"):
+                    logger.warning(
+                        "[LAW_INDEX_WORKER] 공식 법령 인덱싱 실패/재시도: job_id=%s, 오류=%s",
+                        output.get("job_id"),
+                        output.get("error_code"),
+                    )
+                    # 동일 실패 작업의 무한 고속 루프 방지
+                    has_more = False
+        except asyncio.CancelledError:
+            logger.info("[LAW_INDEX_WORKER] 백그라운드 공식 법령 인덱싱 워커 종료 신호를 수신하여 안전하게 중단합니다.")
+            break
+        except Exception as exc:
+            logger.error("[LAW_INDEX_WORKER] 워커 루프 실행 중 예외 발생: %s", exc)
+
+        try:
+            await asyncio.sleep(interval_seconds)
+        except asyncio.CancelledError:
+            logger.info("[LAW_INDEX_WORKER] 백그라운드 공식 법령 인덱싱 워커가 대기 중 안전하게 종료되었습니다.")
+            break
+

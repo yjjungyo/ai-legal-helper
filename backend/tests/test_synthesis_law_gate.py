@@ -29,7 +29,7 @@ def test_document_writer_ready_single_call(monkeypatch):
             }, ensure_ascii=False)})()
 
     monkeypatch.setattr(module, "get_llm", lambda **kwargs: FakeLLM())
-    monkeypatch.setattr(module, "format_grounding_sources", lambda sources: ("근거 원문", {"content_sha256": "hash"}))
+    monkeypatch.setattr(module, "format_grounding_sources", lambda sources, **kwargs: ("근거 원문", {"content_sha256": "hash"}))
     out = module.write_document_answer("질문", [])
     assert out["draft_answer"] == "근거에 따른 답변"
     assert out.get("synthesis_law_gate") is None
@@ -46,7 +46,7 @@ def test_document_writer_missing_law_returns_no_draft(monkeypatch):
             }, ensure_ascii=False)})()
 
     monkeypatch.setattr(module, "get_llm", lambda **kwargs: FakeLLM())
-    monkeypatch.setattr(module, "format_grounding_sources", lambda sources: ("근거 원문", {"content_sha256": "hash"}))
+    monkeypatch.setattr(module, "format_grounding_sources", lambda sources, **kwargs: ("근거 원문", {"content_sha256": "hash"}))
     out = module.write_document_answer("질문", [])
     assert out["draft_answer"] == ""
     assert out["synthesis_law_gate"]["status"] == "NEED_MORE_LAW"
@@ -90,7 +90,7 @@ def test_post_search_returns_to_retrieval_before_first_draft():
         "statute_search_phase": "POST_VERIFICATION",
         "synthesis_law_gate": {"status": "NEED_MORE_LAW"},
         "statute_search_results": [{"source_id": "LAW:1", "content": "원문"}],
-    }) == "run_agents"
+    }) == "synthesize"
     assert statute_search_result_condition({
         "statute_search_phase": "POST_VERIFICATION",
         "synthesis_law_gate": {"status": "NEED_MORE_LAW"},
@@ -135,7 +135,7 @@ def test_document_writer_handles_unescaped_control_characters(monkeypatch):
             return type("Reply", (), {"content": raw_json_with_literal_newline})()
 
     monkeypatch.setattr(module, "get_llm", lambda **kwargs: FakeLLM())
-    monkeypatch.setattr(module, "format_grounding_sources", lambda sources: ("근거 원문", {"content_sha256": "hash"}))
+    monkeypatch.setattr(module, "format_grounding_sources", lambda sources, **kwargs: ("근거 원문", {"content_sha256": "hash"}))
 
     out = module.write_document_answer("질문", [])
     assert "첫 번째 줄" in out["draft_answer"]
@@ -155,7 +155,7 @@ def test_document_writer_regex_fallback_recovers_unescaped_quotes(monkeypatch):
             return type("Reply", (), {"content": malformed_json})()
 
     monkeypatch.setattr(module, "get_llm", lambda **kwargs: FakeLLM())
-    monkeypatch.setattr(module, "format_grounding_sources", lambda sources: ("근거 원문", {"content_sha256": "hash"}))
+    monkeypatch.setattr(module, "format_grounding_sources", lambda sources, **kwargs: ("근거 원문", {"content_sha256": "hash"}))
 
     out = module.write_document_answer("질문", [])
     assert '보증금 1억' in out["draft_answer"]

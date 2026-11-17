@@ -363,7 +363,7 @@ def test_search_results_no_new_sources_skip_reanalyze(document_state):
 def test_search_results_pre_analysis_keeps_required_retrieval(document_state):
     st={**document_state, "statute_search_status":"NOT_FOUND",
         "statute_search_phase":"PRE_ANALYSIS", "search_delta_count":0}
-    assert workflow.statute_search_result_condition(st) == "run_agents"
+    assert workflow.statute_search_result_condition(st) == "synthesize"
 
 
 def test_search_results_new_precedent_keeps_reanalysis(document_state):

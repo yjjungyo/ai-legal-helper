@@ -179,11 +179,11 @@ def test_existing_post_search_routes_to_reanalysis_but_pre_search_to_agents():
     assert statute_search_result_condition({
         "statute_search_phase": "PRE_ANALYSIS",
         "statute_search_results": [],
-    }) == "run_agents"
+    }) == "synthesize"
     assert statute_search_result_condition({
         "statute_search_phase": "PRE_ANALYSIS",
         "statute_search_results": [{"source_id": "x"}],
-    }) == "run_agents"
+    }) == "synthesize"
     assert statute_search_result_condition({
         "statute_search_results": [{"source_id": "x"}],
     }) == "re_analyze"

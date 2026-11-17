@@ -4533,23 +4533,17 @@ def execute_statute_search_node(state: LegalState) -> Dict:
 
 
 
-    # P9: 실제 승인된 공식 검색의 확인된 법령 버전만 작업 큐에 추가한다.
-
-    # 상담 스레드에서 XML 재조회·임베딩은 절대 수행하지 않는다.
-
-
-
-    if (state.get("approval_status") == "APPROVED"
-
-            and os.getenv("LEGAL_BACKGROUND_INDEX_ENABLED", "1") in ("1", "true", "True")
-
+    # [P9 증분 인덱싱] 검색된 공식 법령의 확인된 버전을 백그라운드 인덱싱 작업 큐에 등록한다.
+    # 상담 스레드의 응답 지연을 방지하기 위해 실시간 전체 XML 임베딩은 수행하지 않고
+    # 비동기 작업 큐(OfficialLawIndexJob)에 등록하여 백그라운드 워커가 처리하도록 위임한다.
+    if (os.getenv("LEGAL_BACKGROUND_INDEX_ENABLED", "1") in ("1", "true", "True")
             and statute_sources):
-
-        from ai_legal_helper.legal_knowledge.index_worker import enqueue_approved_sources
-
-        queue_result = enqueue_approved_sources(statute_sources)
-
-        logger.info("[OFFICIAL_INDEX] approved enqueue result=%s", queue_result)
+        try:
+            from ai_legal_helper.legal_knowledge.index_worker import enqueue_approved_sources
+            queue_result = enqueue_approved_sources(statute_sources)
+            logger.info("[OFFICIAL_INDEX] statute_search enqueue result=%s", queue_result)
+        except Exception as queue_exc:
+            logger.warning("[OFFICIAL_INDEX] 백그라운드 인덱스 작업 큐 등록 중 예외 발생: %s", queue_exc)
 
 
 
@@ -4652,43 +4646,27 @@ def statute_search_result_condition(state: LegalState) -> str:
 
 
     선행 HITL 검색 결과가 없거나 API 장애인 경우 insufficient로 분기하며,
-
-    최초 초안 작성 전(synthesis_law_gate=NEED_MORE_LAW) 검색 완료 시에는 초안 작성을 위해 run_agents로,
-
+    최초 초안 작성 전(synthesis_law_gate=NEED_MORE_LAW) 검색 완료 시에는 중복 ChromaDB 검색(run_agents)을 생략하고
+    확보된 법령 원문을 바탕으로 곧바로 초안을 작성하기 위해 synthesize로 직결하며,
     기존 초안이 있는 사후 검증 단계에서는 re_analyze로 분기한다.
 
-
-
     Args:
-
         state: 현재 LangGraph 워크플로우 상태.
 
-
-
     Returns:
-
-        str: 'run_agents' (선행/초안 전 검색 시), 're_analyze' (사후 검증 재작성 시), 'insufficient' (장애 또는 실패 시).
-
+        str: 'synthesize' (선행/초안 전 검색 완료 시), 're_analyze' (사후 검증 재작성 시), 'insufficient' (장애 또는 실패 시).
     """
-
     status = state.get("statute_search_status")
-
     if status == "API_ERROR":
-
         return "insufficient"
 
     if state.get("statute_search_phase") == "PRE_ANALYSIS":
-
-        return "run_agents"
+        return "synthesize"
 
     gate = state.get("synthesis_law_gate") or {}
-
     if gate.get("status") == "NEED_MORE_LAW" and not state.get("draft_answer"):
-
         if status in ("NOT_FOUND", "VERIFIED_LOCAL_FALLBACK", "PARTIAL_SUCCESS") or state.get("statute_search_results"):
-
-            return "run_agents"
-
+            return "synthesize"
         return "insufficient"
 
     # [STEP5-PROGRESS-08 / Gemini] POST_VERIFICATION 이후 새 출처가
@@ -5720,9 +5698,8 @@ def build_legal_graph(checkpointer: Optional[Any] = None):
 
 
     graph.add_conditional_edges("execute_statute_search", statute_search_result_condition, {
-
+        "synthesize": "synthesize",
         "run_agents": "run_agents",
-
         "re_analyze": "re_analyze",
         "revise": "revise",
 

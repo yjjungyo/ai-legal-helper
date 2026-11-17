@@ -32,6 +32,7 @@ from ai_legal_helper.observability.context import (
     reset_case_id,
 )
 from ai_legal_helper.database.graph_sync_worker import graph_sync_worker_loop
+from ai_legal_helper.legal_knowledge.index_worker import law_index_worker_loop
 from ai_legal_helper.database.session import engine
 from ai_legal_helper.database.neo4j import get_neo4j_driver
 import sys
@@ -60,12 +61,14 @@ async def lifespan(app: FastAPI):
         logger.warning(f"[서버 시작] 체크포인터 초기화 경고: {e}")
 
     worker_task = asyncio.create_task(graph_sync_worker_loop())
+    law_index_task = asyncio.create_task(law_index_worker_loop(interval_seconds=3.0))
     yield
-    # 1. 백그라운드 Graph Sync Worker 안전 종료
+    # 1. 백그라운드 Worker 안전 종료
+    law_index_task.cancel()
     worker_task.cancel()
     try:
-        await worker_task
-    except asyncio.CancelledError:
+        await asyncio.gather(worker_task, law_index_task, return_exceptions=True)
+    except Exception:
         pass
     # 2. Langfuse 관측성 버퍼 플러시
     try:

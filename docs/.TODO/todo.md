@@ -74,6 +74,12 @@ router_error_code: null
  
   run_official_law_index_worker.py 를 실행해 기존 누락된 부칙을 인덱싱(재처리)합니다.
 =========
+# 4. Launch Official Law Index Worker daemon in a new window
+Write-Host "4. 공식 법령 백그라운드 임베딩 워커 (Daemon) 실행 창을 띄웁니다..." -ForegroundColor Green
+$workerCmd = "cd '$ProjectRoot\backend'; & '.\.venv\Scripts\Activate.ps1'; python scripts\run_official_law_index_worker.py --execute --loop --interval 5"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "$workerCmd"
+
+
 
 ===
 done --legal_evidence_bundle_node 제거 완료 (run_agents -> synthesize 직결)
