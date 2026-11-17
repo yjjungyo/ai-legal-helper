@@ -1,0 +1,33 @@
+<PARSED TEXT FOR SHEET: 1 / 1 TABS
+TAB NAME: langgraph_edges.csv>
+index,source,target
+0,START,supervisor_initialize
+1,supervisor_initialize,route
+2,route,run_agents
+3,run_agents,synthesize
+4,synthesize,verification
+5,verification,finalize
+6,finalize,END
+7,supervisor_initialize,general_conversation
+8,supervisor_initialize,evidence_unavailable
+9,supervisor_initialize,routing_exit
+10,route,routing_exit
+11,general_conversation,END
+12,evidence_unavailable,END
+13,routing_exit,END
+14,synthesize,statute_search_approval
+15,synthesize,insufficient
+16,verification,statute_search_approval
+17,verification,execute_statute_search
+18,verification,revise
+19,verification,insufficient
+20,statute_search_approval,execute_statute_search
+21,statute_search_approval,insufficient
+22,execute_statute_search,run_agents
+23,execute_statute_search,re_analyze
+24,execute_statute_search,revise
+25,execute_statute_search,finalize
+26,execute_statute_search,insufficient
+27,re_analyze,verification
+28,revise,verification
+29,insufficient,END
