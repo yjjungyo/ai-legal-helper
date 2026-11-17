@@ -378,8 +378,16 @@ def _extract_role_name_pairs_from_statement(
     return found
 
 
-def _merge_trust_status(current: str, candidate_fact: Fact) -> str:
-    """복수의 Fact가 하나의 당사자를 지지할 때 가장 신뢰도가 높은 검증 상태를 결정한다."""
+def _merge_trust_status(current: str, candidate_fact: Optional[Fact]) -> str:
+    """복수의 Fact가 하나의 당사자를 지지할 때 가장 신뢰도가 높은 검증 상태를 결정한다.
+
+    Args:
+        current: 현재까지 누적된 검증 상태 문자열.
+        candidate_fact: 비교 대상 사실관계 객체 (None 허용).
+
+    Returns:
+        str: 우선순위가 더 높은 검증 상태 문자열.
+    """
     priority = {
         "DOCUMENT_VERIFIED": 4,
         "VERIFIED": 3,
@@ -387,10 +395,14 @@ def _merge_trust_status(current: str, candidate_fact: Fact) -> str:
         "DISPUTED": 1,
         "UNVERIFIED": 0,
     }
-    fact_status = (candidate_fact.verification_status or "UNVERIFIED").upper()
-    if candidate_fact.source_type == "DOCUMENT_SUPPORTED" and fact_status == "UNVERIFIED":
+    if not candidate_fact:
+        return current or "UNVERIFIED"
+
+    fact_status = (getattr(candidate_fact, "verification_status", None) or "UNVERIFIED").upper()
+    source_type = getattr(candidate_fact, "source_type", None)
+    if source_type == "DOCUMENT_SUPPORTED" and fact_status == "UNVERIFIED":
         fact_status = "DOCUMENT_VERIFIED"
-    elif candidate_fact.source_type == "USER_CLAIM" and fact_status == "UNVERIFIED":
+    elif source_type == "USER_CLAIM" and fact_status == "UNVERIFIED":
         # A party's assertion is NOT independent verification of identity.
         fact_status = "PARTY_ASSERTED"
 
@@ -420,11 +432,12 @@ def extract_parties_from_facts(
         List[_ExtractedPartyCandidate]: 정규화된 당사자 후보 목록.
     """
     claim_map = claim_ids_by_fact_id or {}
+    clean_facts = [f for f in (facts or []) if f is not None]
 
-    # PARTY_INFO 사실을 먼저 정렬하여 우선 처리
+    # None 필터링 및 PARTY_INFO 사실 우선 정렬
     sorted_facts = sorted(
-        facts,
-        key=lambda f: 0 if (f.fact_type or "").upper() in ("PARTY_INFO", "당사자정보") else 1,
+        clean_facts,
+        key=lambda f: 0 if (getattr(f, "fact_type", None) or "").upper() in ("PARTY_INFO", "당사자정보") else 1,
     )
 
     substantive_by_key: Dict[Tuple[str, str], _ExtractedPartyCandidate] = {}
@@ -526,7 +539,7 @@ def extract_parties_from_facts(
     # 동일 역할(role) 및 동일 연락처(contacts)를 공유하는 중복 후보 통합
     # 예: 동일 연락처를 갖는 복수의 임차인 후보가 존재할 경우 실제 인명(PARTY_INFO 또는 3자 성명)으로 단일화
     party_info_fact_ids = {
-        f.id for f in facts if (f.fact_type or "").upper() in ("PARTY_INFO", "당사자정보")
+        f.id for f in clean_facts if (getattr(f, "fact_type", None) or "").upper() in ("PARTY_INFO", "당사자정보")
     }
     cands_by_role_and_phone: Dict[Tuple[str, str], List[_ExtractedPartyCandidate]] = {}
     for cand in substantive_by_key.values():
@@ -732,7 +745,7 @@ def synchronize_case_parties(
                 changed = (
                     existing_p.party_relationship != cand.party_relationship
                     or existing_p.notes != notes_str
-                    or existing_p.verification_status != cand.verification_status
+                    or getattr(existing_p, "verification_status", None) != cand.verification_status
                     or (existing_p.related_fact_ids or []) != cand.related_fact_ids
                     or (existing_p.related_claim_ids or []) != cand.related_claim_ids
                 )

@@ -95,13 +95,16 @@ def derive_fact_trust_status(
     return ("DOCUMENT_VERIFIED", "DOCUMENT_SUPPORTED")
 
 
-def _restore_non_disputed_status(fact: Fact) -> str:
+def _restore_non_disputed_status(fact: Optional[Fact]) -> str:
     """상충이 해소된 Fact의 원래 출처 유형(source_type)에 맞는 검증 상태를 반환한다."""
-    if fact.source_type == "PARTY_ALLEGATION":
-        return "PARTY_ASSERTED"
-    if fact.source_type == "AI_INFERENCE":
+    if not fact:
         return "UNVERIFIED"
-    if fact.source_type == "USER_CLAIM":
+    src = getattr(fact, "source_type", None)
+    if src == "PARTY_ALLEGATION":
+        return "PARTY_ASSERTED"
+    if src == "AI_INFERENCE":
+        return "UNVERIFIED"
+    if src == "USER_CLAIM":
         return "VERIFIED"
     return "DOCUMENT_VERIFIED"
 
@@ -277,10 +280,12 @@ def _recalculate_case_disputed_facts(db: Session, case_id: str) -> None:
         for sl in sup_links_of_contradicting:
             actively_contradicted_fact_ids.add(sl.target_id)
 
-    for fact in case_facts:
-        if fact.id in actively_contradicted_fact_ids:
+    for fact in (case_facts or []):
+        if not fact:
+            continue
+        if getattr(fact, "id", None) in actively_contradicted_fact_ids:
             fact.verification_status = "DISPUTED"
-        elif fact.verification_status == "DISPUTED":
+        elif getattr(fact, "verification_status", None) == "DISPUTED":
             fact.verification_status = _restore_non_disputed_status(fact)
 
 
@@ -660,7 +665,7 @@ def process_evidence_review(
             if (
                 target_fact
                 and adjudication_res.adjudication_status in ("EVIDENCE_SUPPORTED", "CORROBORATED")
-                and target_fact.verification_status != "DISPUTED"
+                and getattr(target_fact, "verification_status", None) != "DISPUTED"
             ):
                 target_fact.verification_status = "DOCUMENT_VERIFIED"
                 target_fact.source_type = "DOCUMENT_SUPPORTED"
@@ -693,7 +698,7 @@ def process_evidence_review(
             if (
                 target_fact
                 and adjudication_res.adjudication_status in ("EVIDENCE_SUPPORTED", "CORROBORATED")
-                and target_fact.verification_status == "DOCUMENT_VERIFIED"
+                and getattr(target_fact, "verification_status", None) == "DOCUMENT_VERIFIED"
                 and not (claim.structured_slots or {}).get("reviewed_semantics")
             ):
                 from ai_legal_helper.case_intelligence.settlement_calculator import (

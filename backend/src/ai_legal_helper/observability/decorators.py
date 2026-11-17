@@ -11,11 +11,15 @@
 2. 상위 Span ID(`prev_span_id`)를 보존하여 중첩 `@trace` 호출 시 부모-자식 Span 트리 구성
 3. 예외 발생 시 API 키, 토큰, 이메일, 전화번호, 주민등록번호 등 민감정보(PII) 자동 마스킹
 """
+import os
 import functools
 import inspect
 import time
 import uuid
 from typing import Callable, Any, Optional
+
+# Langfuse SDK의 단일 이벤트 크기 기본 제한(1MB)으로 인한 input/output 자동 drop 방지 (5MB로 상향)
+os.environ.setdefault("LANGFUSE_MAX_EVENT_SIZE_BYTES", "5000000")
 from ai_legal_helper.observability.logging_config import get_logger
 from ai_legal_helper.observability.context import (
     get_trace_id, set_trace_id, reset_trace_id,
@@ -148,15 +152,17 @@ def _get_func_meta(func: Callable) -> tuple[str, int]:
 
 
 
-def _sanitize_for_langfuse(data: Any) -> Any:
+def _sanitize_for_langfuse(data: Any, is_input: bool = False) -> Any:
     """Langfuse에 기록될 관측 데이터를 직렬화 가능한 형태로 재귀 변환하며 민감정보를 마스킹한다.
 
-    KPI 자동 평가 및 사후 분석을 위해 데이터를 임의로 자르거나(strip/truncate) 요약하지 않고
-    모든 필드와 원본 구조를 온전하게 보존한다. 단, 주민등록번호, 계좌번호 등 민감정보(PII)는
-    개인정보 보호 표준에 따라 안전하게 마스킹한다.
+    KPI 자동 평가 및 사후 분석을 위해 답변(final_answer), 검증 결과(claims, issue_results),
+    법령 출처(retrieved_sources), 사실관계(facts, timeline) 등 핵심 데이터를 일절 strip하지 않고
+    100% 온전하게 보존한다. 단, Langfuse SDK의 1MB 전송 한도 초과로 인한 전체 드롭(drop)을
+    방지하기 위해 불필요한 증거 원문 파일 전문(source_documents raw dump) 및 입력 State 중복만 안전하게 정제한다.
 
     Args:
         data: 노드/스팬의 입출력 데이터 객체.
+        is_input: 입력 인자(State)인지 여부. True일 경우 이전 단계 원문 덤프의 중복 복제를 억제함.
 
     Returns:
         Any: 축약 없이 원본 구조가 보존되고 직렬화 가능한 관측용 객체.
@@ -169,29 +175,56 @@ def _sanitize_for_langfuse(data: Any) -> Any:
     elif isinstance(data, (int, float, bool)):
         return data
     elif isinstance(data, dict):
-        return {k: _sanitize_for_langfuse(v) for k, v in data.items()}
+        sanitized = {}
+        for k, v in data.items():
+            # 1. 사건 증거 브리핑: 사실(facts), 타임라인(timeline), 요약문(formatted_summary)은 100% 온전히 보존하되
+            #    수백 KB에 달하는 중복 파일 바이트 덤프(source_documents raw dump)만 배제하여 1MB 초과 차단
+            if k == "case_evidence_briefing" and isinstance(v, dict):
+                sanitized[k] = {
+                    "case_id": v.get("case_id"),
+                    "title": v.get("title"),
+                    "case_type": v.get("case_type"),
+                    "facts": _sanitize_for_langfuse(v.get("facts", []), is_input=is_input),
+                    "timeline": _sanitize_for_langfuse(v.get("timeline", []), is_input=is_input),
+                    "formatted_summary": mask_pii(v.get("formatted_summary", "")),
+                    "source_documents_count": len(v.get("source_documents", [])),
+                    "source_registry_count": len(v.get("source_registry", {})),
+                }
+            # 2. 노드 입력(input)에 State가 통째로 복제될 때, 이전 단계 검색 원문 전문의 중복 전송 방지
+            elif is_input and k in ("retrieved_sources", "case_evidence_sources") and isinstance(v, list):
+                sanitized[k] = [
+                    {
+                        "source_id": s.get("source_id") if isinstance(s, dict) else str(s),
+                        "name": s.get("law_name") or s.get("document_name") or s.get("title") if isinstance(s, dict) else "",
+                        "source_type": s.get("source_type") if isinstance(s, dict) else "",
+                    }
+                    for s in v
+                ]
+            else:
+                sanitized[k] = _sanitize_for_langfuse(v, is_input=is_input)
+        return sanitized
     elif isinstance(data, (list, tuple, set)):
-        return [_sanitize_for_langfuse(item) for item in data]
+        return [_sanitize_for_langfuse(item, is_input=is_input) for item in data]
     elif hasattr(data, "model_dump") and callable(data.model_dump):
         try:
-            return _sanitize_for_langfuse(data.model_dump())
+            return _sanitize_for_langfuse(data.model_dump(), is_input=is_input)
         except Exception:
             return mask_pii(str(data))
     elif hasattr(data, "dict") and callable(data.dict):
         try:
-            return _sanitize_for_langfuse(data.dict())
+            return _sanitize_for_langfuse(data.dict(), is_input=is_input)
         except Exception:
             return mask_pii(str(data))
     elif hasattr(data, "to_json") and callable(data.to_json):
         try:
-            return _sanitize_for_langfuse(data.to_json())
+            return _sanitize_for_langfuse(data.to_json(), is_input=is_input)
         except Exception:
             return mask_pii(str(data))
     elif hasattr(data, "content") and hasattr(data, "type"):
         # LangChain BaseMessage (AIMessage, HumanMessage 등) 객체
         return {
             "type": getattr(data, "type", "message"),
-            "content": _sanitize_for_langfuse(getattr(data, "content", "")),
+            "content": _sanitize_for_langfuse(getattr(data, "content", ""), is_input=is_input),
             "id": getattr(data, "id", None),
             "name": getattr(data, "name", None),
         }
@@ -204,7 +237,7 @@ def _sanitize_span_output(func_name: str, output_data: Any) -> Any:
     """Langfuse Span Output에 기록될 출력 데이터를 정제한다.
 
     KPI 자동 측정 및 사후 분석이 가능하도록 데이터를 일절 strip(축약, 자르기, 필드 제거)하지 않고
-    원본 구조와 모든 내용(verification_result, claims, retrieved_sources, case_evidence_briefing 등)을
+    원본 구조와 모든 내용(verification_result, claims, retrieved_sources, final_answer 등)을
     100% 온전하게 보존한다. 단, 개인정보(PII) 마스킹은 안전하게 적용한다.
 
     Args:
@@ -217,7 +250,7 @@ def _sanitize_span_output(func_name: str, output_data: Any) -> Any:
     if output_data is None:
         return None
     try:
-        return _sanitize_for_langfuse(output_data)
+        return _sanitize_for_langfuse(output_data, is_input=False)
     except Exception as exc:
         logger.debug(f"Span output 정제 중 오류: {exc}")
         return output_data

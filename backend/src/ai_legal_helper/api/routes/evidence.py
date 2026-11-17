@@ -705,8 +705,10 @@ def review_evidence_claim(
             "fact_message": fact_message,
         }
     except ValueError as e:
+        logger.warning("[REVIEW_CLAIM_VALIDATION_ERROR] case_id=%s evidence_id=%s claim_id=%s: %s", case.id, evidence_id, claim_id, e)
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        logger.exception("[REVIEW_CLAIM_PROCESSING_ERROR] case_id=%s evidence_id=%s claim_id=%s: %s", case.id, evidence_id, claim_id, e)
         raise HTTPException(status_code=500, detail=f"사실 등록 처리 중 오류가 발생했습니다: {str(e)}")
 
 

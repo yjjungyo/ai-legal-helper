@@ -2233,8 +2233,10 @@ def reconcile_case_conflicts(
 
         # 3. 더 이상 승인된 CONTRADICTS 링크가 남아 있지 않은 DISPUTED Fact 복원
         restored_fact_ids: Set[str] = set()
-        for fact in case_facts:
-            if fact.verification_status == "DISPUTED":
+        for fact in (case_facts or []):
+            if not fact:
+                continue
+            if getattr(fact, "verification_status", None) == "DISPUTED":
                 remaining_contra = (
                     db.query(EvidenceLink)
                     .join(EvidenceClaim, EvidenceLink.claim_id == EvidenceClaim.id)

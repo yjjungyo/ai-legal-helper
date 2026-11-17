@@ -647,4 +647,43 @@ class TestPartiesAndTimelineSync:
         for bad_name in prohibited_non_names:
             assert bad_name not in party_names, f"비인명 '{bad_name}'가 Party로 잘못 생성되었습니다!"
 
+    def test_t19_none_fact_and_verification_status_safety(self, db_session):
+        """T19: 사실관계 객체나 verification_status가 None/결측인 경우에도 안전하게 동작한다.
+
+        [검증 내용]
+        1. candidate_fact가 None인 경우 _merge_trust_status가 예외 없이 기본값/기존 상태를 반환하는지 검증.
+        2. candidate_fact의 verification_status가 None인 경우에도 UNVERIFIED로 안전하게 폴백되는지 검증.
+        3. facts 목록에 None이 섞여있거나 Party.verification_status가 None인 레코드가 있어도
+           extract_parties_from_facts 및 synchronize_case_parties가 예외를 발생시키지 않는지 검증.
+        """
+        from ai_legal_helper.case_intelligence.entity_sync import _merge_trust_status
+
+        # 1. candidate_fact가 None일 때의 안전성 검증
+        assert _merge_trust_status("UNVERIFIED", None) == "UNVERIFIED"
+        assert _merge_trust_status("DOCUMENT_VERIFIED", None) == "DOCUMENT_VERIFIED"
+
+        # 2. Fact의 verification_status가 None일 때의 안전성 검증
+        fact_with_none_status = Fact(statement="임대인은 홍길동이다.", verification_status=None, source_type="DOCUMENT_SUPPORTED")
+        merged = _merge_trust_status("UNVERIFIED", fact_with_none_status)
+        assert merged == "DOCUMENT_VERIFIED"
+
+        # 3. None이 포함된 facts 리스트에 대한 extract_parties_from_facts 안전성 검증
+        cands = extract_parties_from_facts([None, fact_with_none_status, None])
+        assert len(cands) == 1
+        assert cands[0].name == "홍길동"
+        assert cands[0].verification_status == "DOCUMENT_VERIFIED"
+
+        # 4. DB에 verification_status가 None인 레코드가 있는 사건 동기화 안전성 검증
+        case, _ = _create_case_with_doc(db_session, title="None 상태 방어 테스트")
+        fact1 = Fact(case_id=case.id, statement="임차인은 성춘향이다.", verification_status=None, fact_type="PARTY_INFO")
+        db_session.add(fact1)
+        db_session.commit()
+
+        res = synchronize_case_parties(db_session, case.id)
+        assert res["total_derived"] == 1
+        party = db_session.query(Party).filter_by(case_id=case.id, name="성춘향").first()
+        assert party is not None
+        assert party.verification_status is not None
+
+
 

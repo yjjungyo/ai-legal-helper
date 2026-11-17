@@ -24,6 +24,9 @@ import re
 import logging
 from typing import Optional, Dict, Any, List
 
+# Langfuse SDK의 단일 이벤트 크기 기본 제한(1MB)으로 인한 input/output 자동 drop 방지 (5MB로 상향)
+os.environ.setdefault("LANGFUSE_MAX_EVENT_SIZE_BYTES", "5000000")
+
 logger = logging.getLogger(__name__)
 
 # LangChain 1.x 버전에서 langfuse 2.x SDK의 이전 import 경로 호환성 보장
