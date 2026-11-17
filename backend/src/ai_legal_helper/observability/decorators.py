@@ -148,161 +148,79 @@ def _get_func_meta(func: Callable) -> tuple[str, int]:
 
 
 
-def _sanitize_span_output(func_name: str, output_data: Any) -> Any:
-    """Langfuse Span Output에 기록될 출력 데이터를 경량화·요약하여 관측 성능 및 가독성을 최적화한다.
+def _sanitize_for_langfuse(data: Any) -> Any:
+    """Langfuse에 기록될 관측 데이터를 직렬화 가능한 형태로 재귀 변환하며 민감정보를 마스킹한다.
 
-    LangGraph 파이프라인 내부에서는 전체 원본 상태(State)가 노드 간에 온전히 전달되어야 하지만,
-    Langfuse Span Output에 수백 KB의 사건 증거 원문(case_evidence_briefing), 검색 출처 덤프(retrieved_sources),
-    중복 단위 쟁점 검증 결과(issue_results)가 그대로 직렬화되면 트리 뷰 오염과 대용량 페이로드 오버헤드가 발생한다.
-    본 함수는 워크플로우의 실제 동작에는 일절 영향을 주지 않으면서 관측 계층(Langfuse)에만
-    핵심 상태, 식별자, 항목 개수, 프리뷰 요약본을 전달하도록 정제한다.
+    KPI 자동 평가 및 사후 분석을 위해 데이터를 임의로 자르거나(strip/truncate) 요약하지 않고
+    모든 필드와 원본 구조를 온전하게 보존한다. 단, 주민등록번호, 계좌번호 등 민감정보(PII)는
+    개인정보 보호 표준에 따라 안전하게 마스킹한다.
+
+    Args:
+        data: 노드/스팬의 입출력 데이터 객체.
+
+    Returns:
+        Any: 축약 없이 원본 구조가 보존되고 직렬화 가능한 관측용 객체.
+    """
+    if data is None:
+        return None
+
+    if isinstance(data, str):
+        return mask_pii(data)
+    elif isinstance(data, (int, float, bool)):
+        return data
+    elif isinstance(data, dict):
+        return {k: _sanitize_for_langfuse(v) for k, v in data.items()}
+    elif isinstance(data, (list, tuple, set)):
+        return [_sanitize_for_langfuse(item) for item in data]
+    elif hasattr(data, "model_dump") and callable(data.model_dump):
+        try:
+            return _sanitize_for_langfuse(data.model_dump())
+        except Exception:
+            return mask_pii(str(data))
+    elif hasattr(data, "dict") and callable(data.dict):
+        try:
+            return _sanitize_for_langfuse(data.dict())
+        except Exception:
+            return mask_pii(str(data))
+    elif hasattr(data, "to_json") and callable(data.to_json):
+        try:
+            return _sanitize_for_langfuse(data.to_json())
+        except Exception:
+            return mask_pii(str(data))
+    elif hasattr(data, "content") and hasattr(data, "type"):
+        # LangChain BaseMessage (AIMessage, HumanMessage 등) 객체
+        return {
+            "type": getattr(data, "type", "message"),
+            "content": _sanitize_for_langfuse(getattr(data, "content", "")),
+            "id": getattr(data, "id", None),
+            "name": getattr(data, "name", None),
+        }
+    else:
+        # 기타 객체는 문자열 변환 후 마스킹 (길이를 자르지 않음)
+        return mask_pii(repr(data))
+
+
+def _sanitize_span_output(func_name: str, output_data: Any) -> Any:
+    """Langfuse Span Output에 기록될 출력 데이터를 정제한다.
+
+    KPI 자동 측정 및 사후 분석이 가능하도록 데이터를 일절 strip(축약, 자르기, 필드 제거)하지 않고
+    원본 구조와 모든 내용(verification_result, claims, retrieved_sources, case_evidence_briefing 등)을
+    100% 온전하게 보존한다. 단, 개인정보(PII) 마스킹은 안전하게 적용한다.
 
     Args:
         func_name: 대상 함수명 또는 노드 식별자.
         output_data: 노드 또는 함수가 반환한 원본 출력 데이터.
 
     Returns:
-        Any: 민감정보가 마스킹되고 대용량 원문이 경량 요약된 관측용 출력 객체.
+        Any: 원본 구조 및 데이터가 온전히 보존된 관측용 출력 객체.
     """
     if output_data is None:
         return None
-
     try:
-        if isinstance(output_data, dict):
-            sanitized: dict[str, Any] = {}
-            for k, v in output_data.items():
-                if v is None:
-                    sanitized[k] = None
-                    continue
-
-                # 1. 사건 증거 종합 브리핑 객체 경량화 (수백 KB의 원문 문서 전문 덤프 방지)
-                if k == "case_evidence_briefing" and isinstance(v, dict):
-                    sanitized[k] = {
-                        "case_id": v.get("case_id"),
-                        "title": v.get("title"),
-                        "case_type": v.get("case_type"),
-                        "facts_count": len(v.get("facts", [])),
-                        "timeline_count": len(v.get("timeline", [])),
-                        "documents_count": len(v.get("source_documents", [])),
-                        "source_registry_count": len(v.get("source_registry", {})),
-                        "summary_preview": (v.get("formatted_summary") or "")[:250] + "..." if len(v.get("formatted_summary") or "") > 250 else v.get("formatted_summary", ""),
-                    }
-                # 2. 사건 증거 출처 목록 경량화 (원문 텍스트 전문 제외 및 식별자 메타데이터 보존)
-                elif k == "case_evidence_sources" and isinstance(v, list):
-                    sanitized[k] = {
-                        "total_count": len(v),
-                        "items": [
-                            {
-                                "label": s.get("evidence_label") or s.get("label"),
-                                "document_name": s.get("document_name") or s.get("filename") or s.get("source_id"),
-                                "source_type": s.get("source_type"),
-                                "review_status": s.get("review_status"),
-                            }
-                            for s in v[:10]
-                            if isinstance(s, dict)
-                        ],
-                    }
-                # 3. 검색된 법령/판례 출처 목록 경량화 (원문 content 제외, 식별자 및 120자 프리뷰 보존)
-                elif k == "retrieved_sources" and isinstance(v, list):
-                    sanitized[k] = {
-                        "total_count": len(v),
-                        "items": [
-                            {
-                                "source_id": s.get("source_id"),
-                                "source_type": s.get("source_type"),
-                                "name": s.get("law_name") or s.get("document_name") or s.get("title"),
-                                "content_preview": (s.get("content", "")[:120] + "...") if s.get("content") else "",
-                            }
-                            for s in v[:10]
-                            if isinstance(s, dict)
-                        ],
-                    }
-                # 4. 검증 완료 출처 목록 경량화
-                elif k == "verified_sources" and isinstance(v, list):
-                    sanitized[k] = {
-                        "total_count": len(v),
-                        "items": [
-                            {
-                                "source_id": s.get("source_id"),
-                                "source_type": s.get("source_type"),
-                                "citation_tag": s.get("citation_tag") or s.get("evidence_label"),
-                            }
-                            for s in v[:10]
-                            if isinstance(s, dict)
-                        ],
-                    }
-                # 5. 단위 쟁점 검증 결과 목록 경량화 (최상위와 verification_result 간 중복 덤프 해소)
-                elif k == "issue_results" and isinstance(v, list):
-                    sanitized[k] = [
-                        {
-                            "task_id": r.get("task_id"),
-                            "status": r.get("status"),
-                            "core_issue": r.get("core_issue"),
-                            "supported_statutes": r.get("supported_statute_ids", []),
-                            "unsupported_claims_count": len(r.get("unsupported_claims", [])),
-                        }
-                        for r in v
-                        if isinstance(r, dict)
-                    ]
-                # 6. 종합 검증 결과(verification_result) 객체 경량화
-                elif k == "verification_result" and isinstance(v, dict):
-                    v_sanitized = {
-                        "status": v.get("status"),
-                        "reason_code": v.get("reason_code"),
-                        "candidate_laws": v.get("candidate_laws", []),
-                        "claims_count": len(v.get("claims", [])),
-                        "warnings": v.get("warnings", []),
-                        "revision_instructions": v.get("revision_instructions", []),
-                        "issue_results_count": len(v.get("issue_results", [])),
-                    }
-                    if "citation_audit" in v and isinstance(v["citation_audit"], dict):
-                        v_sanitized["citation_audit"] = {
-                            "audit_status": v["citation_audit"].get("audit_status"),
-                            "verified_count": len(v["citation_audit"].get("verified_sources", [])),
-                            "unverified_citations": v["citation_audit"].get("unverified_citations", []),
-                        }
-                    sanitized[k] = v_sanitized
-                # 7. 장문의 사건 컨텍스트 축약
-                elif k == "case_context" and isinstance(v, str):
-                    if len(v) > 300:
-                        sanitized[k] = mask_pii(v[:300]) + f"... [총 {len(v)}자 원문 축약]"
-                    else:
-                        sanitized[k] = mask_pii(v)
-                # 8. 지식 그래프 근거 축약
-                elif k == "graph_evidence" and isinstance(v, dict):
-                    sanitized[k] = {
-                        "available": v.get("available"),
-                        "search_mode": v.get("search_mode"),
-                        "valid_paths_count": len(v.get("valid_paths", [])),
-                        "evidence_gaps_count": len(v.get("evidence_gaps", [])),
-                        "contradictions_count": len(v.get("contradictions", [])),
-                    }
-                # 9. 초안 답변 (답변 확인을 위해 최대 3000자까지 보존)
-                elif k == "draft_answer" and isinstance(v, str):
-                    if len(v) > 3000:
-                        sanitized[k] = mask_pii(v[:3000]) + f"... [총 {len(v)}자 축약]"
-                    else:
-                        sanitized[k] = mask_pii(v)
-                # 10. 일반 긴 문자열 축약
-                elif isinstance(v, str):
-                    if len(v) > 1500:
-                        sanitized[k] = mask_pii(v[:1500]) + f"... [총 {len(v)}자 축약]"
-                    else:
-                        sanitized[k] = mask_pii(v)
-                else:
-                    # 기본 숫자, 불리언, 소형 리스트/딕셔너리는 그대로 보존
-                    sanitized[k] = v
-            return sanitized
-
-        elif isinstance(output_data, str):
-            if len(output_data) > 3000:
-                return mask_pii(output_data[:3000]) + f"... [총 {len(output_data)}자 축약]"
-            return mask_pii(output_data)
-
-        return output_data
+        return _sanitize_for_langfuse(output_data)
     except Exception as exc:
-        logger.debug(f"Span output 경량화 중 오류: {exc}")
-        return repr(output_data)[:1000]
+        logger.debug(f"Span output 정제 중 오류: {exc}")
+        return output_data
 
 
 def trace(func: Callable) -> Callable:
@@ -476,8 +394,8 @@ def trace(func: Callable) -> Callable:
             input_payload = None
             if args or kwargs:
                 input_payload = {
-                    "args": [mask_pii(repr(a)[:500]) for a in args],
-                    "kwargs": {k: mask_pii(repr(v)[:500]) for k, v in kwargs.items()},
+                    "args": [_sanitize_for_langfuse(a) for a in args],
+                    "kwargs": {k: _sanitize_for_langfuse(v) for k, v in kwargs.items()},
                 }
             log_entry(start_time, current_trace_id, current_span_id, is_new_trace, parent_agent, parent_node, prev_span_id, input_data=input_payload)
 
@@ -539,8 +457,8 @@ def trace(func: Callable) -> Callable:
             input_payload = None
             if args or kwargs:
                 input_payload = {
-                    "args": [mask_pii(repr(a)[:500]) for a in args],
-                    "kwargs": {k: mask_pii(repr(v)[:500]) for k, v in kwargs.items()},
+                    "args": [_sanitize_for_langfuse(a) for a in args],
+                    "kwargs": {k: _sanitize_for_langfuse(v) for k, v in kwargs.items()},
                 }
             log_entry(start_time, current_trace_id, current_span_id, is_new_trace, parent_agent, parent_node, prev_span_id, input_data=input_payload)
 
