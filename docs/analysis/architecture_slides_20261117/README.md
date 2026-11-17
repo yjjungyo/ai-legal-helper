@@ -46,8 +46,8 @@ AI Master 최종 평가 발표자료에 삽입하기 위한 **16:9(1600×900 기
 ## 출력·재생성
 
 - 각 SVG: 편집 가능한 벡터 원본. GitHub 미리보기 또는 SVG 지원 편집기에서 열 수 있습니다.
-- `build_slides.py`: SVG 3장과 발표용 PNG, 개별 PDF 및 3페이지 PDF를 재생성합니다.
-- 필요 패키지: `python3`, `svgwrite`, `PyMuPDF (fitz)`, `Inkscape` 및 한국어 폰트(`Noto Sans CJK KR` 권장).
-- 실행: `python build_slides.py` (스크립트 상단의 출력 경로를 사용할 위치에 맞게 변경할 수 있습니다).
+- `build_slides.py`: 함께 제공된 SVG 3장을 발표용 PNG, 개별 PDF 및 3페이지 통합 PDF로 변환합니다.
+- 변환 도구: `python3`, `PyMuPDF (fitz)`, `Inkscape` 및 한국어 폰트(`Noto Sans CJK KR` 권장).
+- 실행: `python build_slides.py` (스크립트를 이 폴더에서 실행하며, 출력 파일은 같은 폴더에 생성됩니다).
 
 **주의:** 이 자료는 아키텍처 설명용이며, 실제 E2E V8에서 어떤 조건부 노드가 실행되었는지는 별도 Langfuse Trace로 입증해야 합니다.
